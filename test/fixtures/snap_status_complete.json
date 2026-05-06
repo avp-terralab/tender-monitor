@@ -1,0 +1,23 @@
+{
+  "tender_id": "UA-2026-04-30-010542-a",
+  "title": "Психіатрична лікарня — реактиви",
+  "status": "complete",
+  "dateModified": "2026-05-25T10:00:00+03:00",
+  "tenderPeriod": { "endDate": "2026-05-15T14:00:00+03:00" },
+  "auctionPeriod": { "startDate": "2026-05-16T12:00:00+03:00" },
+  "documents": [],
+  "questions": [],
+  "complaints": [],
+  "awards": [
+    {
+      "id": "award1",
+      "status": "active",
+      "suppliers": [{ "name": "ТОВ ТерраЛаб", "identifier": { "id": "12345678" } }],
+      "complaints": []
+    }
+  ],
+  "contracts": [
+    { "id": "contract1", "status": "active", "documents": [] }
+  ],
+  "cancellations": []
+}

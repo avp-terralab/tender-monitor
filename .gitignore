@@ -1,0 +1,6 @@
+.local-state/
+notes/sample_*.json
+node_modules/
+*.log
+.env
+.DS_Store

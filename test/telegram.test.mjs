@@ -1,0 +1,342 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { formatDigest, chunkMessage, formatHeartbeat } from '../telegram.mjs';
+
+test('formatDigest: deadline_changed + new_question', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    title: 'Психіатрична лікарня — реактиви',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-2026-04-30-010542-a',
+    events: [
+      { type: 'deadline_changed', old: '2026-05-15T14:00:00+03:00', new: '2026-05-20T14:00:00+03:00' },
+      { type: 'new_question', id: 'q1', title: 'Чи можна подавати ФОП?' },
+    ],
+  }]);
+  assert.match(text, /🔔/);
+  assert.match(text, /UA-2026-04-30-010542-a/);
+  assert.match(text, /Психіатрична лікарня/);
+  assert.match(text, /Дедлайн/);
+  assert.match(text, /15\.05.*20\.05/);
+  assert.match(text, /питання/i);
+  assert.match(text, /ФОП/);
+  assert.match(text, /prozorro\.gov\.ua\/tender\/UA-2026/);
+});
+
+test('formatDigest: heading shows HH:MM from runIso', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', []);
+  assert.match(text, /\(13:00, \d{2}\.\d{2}\.\d{4}\)/);
+});
+
+test('formatDigest: award_qualified shows supplier with EDRPOU', () => {
+  const text = formatDigest('2026-06-01T13:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'Tender X',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{
+      type: 'award_qualified', id: 'a1',
+      supplier_name: 'ТОВ ТерраЛаб', supplier_edrpou: '12345678',
+      old: 'pending', new: 'active',
+    }],
+  }]);
+  assert.match(text, /переможц/i);
+  assert.match(text, /ТерраЛаб/);
+  assert.match(text, /12345678/);
+});
+
+test('formatDigest: contract_signed and contract_terminated produce distinct messages', () => {
+  const signed = formatDigest('2026-06-01T13:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X', prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'contract_signed', id: 'c1' }],
+  }]);
+  const terminated = formatDigest('2026-06-01T13:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X', prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'contract_terminated', id: 'c1' }],
+  }]);
+  assert.match(signed, /[Дд]оговір.*підпис/i);
+  assert.match(terminated, /[Дд]оговір.*розірв/i);
+  assert.notEqual(signed, terminated);
+});
+
+test('formatDigest: monitoring_started shows status and deadline', () => {
+  const text = formatDigest('2026-05-06T09:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'Tender X',
+    status: 'active.tendering',
+    deadline: '2026-05-15T14:00:00+03:00',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'monitoring_started', status: 'active.tendering', title: 'Tender X', deadline: '2026-05-15T14:00:00+03:00' }],
+  }]);
+  assert.match(text, /ℹ️ Статус: Приймання пропозицій/);
+  assert.match(text, /15\.05/);
+});
+
+test('formatDigest: each group contains prozorro_url as href link', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-A', title: 'A', prozorro_url: 'https://prozorro.gov.ua/tender/UA-A',
+    events: [{ type: 'deadline_changed', old: 'a', new: 'b' }],
+  }, {
+    tender_id: 'UA-B', title: 'B', prozorro_url: 'https://prozorro.gov.ua/tender/UA-B',
+    events: [{ type: 'deadline_changed', old: 'a', new: 'b' }],
+  }]);
+  // URL appears in href attribute before the link text (UA-A / UA-B)
+  assert.match(text, /prozorro\.gov\.ua\/tender\/UA-A[\s\S]*UA-B/);
+  assert.match(text, /prozorro\.gov\.ua\/tender\/UA-B/);
+});
+
+test('formatDigest: empty groups produces just a heading', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', []);
+  assert.match(text, /🔔/);
+  assert.match(text, /\(13:00, \d{2}\.\d{2}\.\d{4}\)/);
+  // No bullet points / tender lines
+  assert.doesNotMatch(text, /🆔/);
+});
+
+// ─── Change 3: title truncation ───────────────────────────────────────────────
+test('formatDigest: title longer than 200 chars is truncated to 199+ellipsis', () => {
+  const longTitle = 'А'.repeat(201);
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-X', title: longTitle,
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'deadline_changed', old: 'a', new: 'b' }],
+  }]);
+  // Title line: "Предмет закупівлі: <truncated 199 + …>" with no leading indent
+  const match = text.match(/^ {2}📦 Предмет закупівлі: (А+…?)$/m);
+  assert.ok(match, `Expected to find title line, got:\n${text}`);
+  assert.equal(match[1].length, 200); // 199 + '…'
+  assert.ok(match[1].endsWith('…'));
+});
+
+test('formatDigest: title exactly 200 chars is not truncated', () => {
+  const exactTitle = 'Б'.repeat(200);
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-X', title: exactTitle,
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'deadline_changed', old: 'a', new: 'b' }],
+  }]);
+  const match = text.match(/^ {2}📦 Предмет закупівлі: (Б+)$/m);
+  assert.ok(match);
+  assert.equal(match[1].length, 200);
+  assert.ok(!match[1].endsWith('…'));
+});
+
+test('formatDigest: title strips trailing ДК code suffix', () => {
+  const title = 'Консалтингові послуги з підготовки лабораторії, код ДК 021:2015 – 71620000-0 - Аналітичні послуги';
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-X', title,
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'deadline_changed', old: 'a', new: 'b' }],
+  }]);
+  assert.match(text, /📦 Предмет закупівлі: Консалтингові послуги з підготовки лабораторії$/m);
+  assert.doesNotMatch(text, /код ДК/i);
+});
+
+// ─── Change 4: days-to-deadline ───────────────────────────────────────────────
+test('fmtTimeLeft via formatDigest: future deadline shows days + hours', () => {
+  // runIso = 2026-05-06T09:00, deadline = 2026-05-08T09:00 → 2 days 0 hours
+  const text = formatDigest('2026-05-06T09:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X',
+    status: 'active.tendering',
+    deadline: '2026-05-08T09:00:00+03:00',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'monitoring_started', status: 'active.tendering', title: 'X',
+               deadline: '2026-05-08T09:00:00+03:00',
+               docs_count: 0, questions_count: 0, complaints_count: 0 }],
+  }]);
+  assert.match(text, /Залишилось: 2 (день|дні|днів)/);
+});
+
+test('fmtTimeLeft via formatDigest: past deadline shows friendly text', () => {
+  // runIso after deadline
+  const text = formatDigest('2026-05-20T09:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X',
+    status: 'active.tendering',
+    deadline: '2026-05-15T14:00:00+03:00',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'monitoring_started', status: 'active.tendering', title: 'X',
+               deadline: '2026-05-15T14:00:00+03:00',
+               docs_count: 0, questions_count: 0, complaints_count: 0 }],
+  }]);
+  assert.match(text, /Залишилось: минув на/);
+});
+
+test('fmtTimeLeft via formatDigest: near-zero deadline shows закінчується зараз', () => {
+  // deadline within 60 seconds
+  const text = formatDigest('2026-05-08T09:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X',
+    status: 'active.tendering',
+    deadline: '2026-05-08T09:00:30+03:00',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'monitoring_started', status: 'active.tendering', title: 'X',
+               deadline: '2026-05-08T09:00:30+03:00',
+               docs_count: 0, questions_count: 0, complaints_count: 0 }],
+  }]);
+  assert.match(text, /Залишилось: закінчується зараз/);
+});
+
+// ─── Change 5: new fields in formatDigest ─────────────────────────────────────
+test('formatDigest: renders procurement_method_type label', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    procurement_method_type: 'aboveThreshold',
+    events: [{ type: 'deadline_changed', old: 'a', new: 'b' }],
+  }]);
+  assert.match(text, /Відкриті торги з особливостями/);
+});
+
+test('formatDigest: renders classification DK code and description', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    classification: { id: '71620000-0', description: 'Аналітичні послуги', scheme: 'ДК021' },
+    events: [{ type: 'deadline_changed', old: 'a', new: 'b' }],
+  }]);
+  assert.match(text, /🔖 ДК: 71620000-0 — Аналітичні послуги/);
+});
+
+test('formatDigest: renders contact name, telephone, email on two lines', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    contact: { name: 'Людмила Романчук', telephone: '+380362643715', email: 'skprokl@gmail.com' },
+    events: [{ type: 'deadline_changed', old: 'a', new: 'b' }],
+  }]);
+  assert.match(text, /📞 Людмила Романчук: \+380 36 264-37-15\n {2}✉ skprokl@gmail\.com/);
+});
+
+test('formatDigest: monitoring_started shows docs/questions/complaints counts', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'monitoring_started', status: 'active.tendering', title: 'X',
+               deadline: '2026-05-20T14:00:00+03:00',
+               docs_count: 8, questions_count: 1, complaints_count: 0 }],
+  }]);
+  assert.match(text, /📎 Документів: 8 · Питань: 1 · Скарг: 0/);
+});
+
+// ─── Change 9: Telegram message length cap ────────────────────────────────────
+test('chunkMessage: short text returns single chunk', () => {
+  const text = 'Hello world';
+  const chunks = chunkMessage(text, 4000);
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0], text);
+});
+
+test('chunkMessage: long text splits at double-newline boundaries, each chunk <= max', () => {
+  // Build a text > 4000 chars with double-newline boundaries
+  const part = 'А'.repeat(1500);
+  const text = `${part}\n\n${part}\n\n${part}`;
+  assert.ok(text.length > 4000);
+  const chunks = chunkMessage(text, 4000);
+  assert.ok(chunks.length > 1, `Expected multiple chunks, got ${chunks.length}`);
+  for (const c of chunks) {
+    assert.ok(c.length <= 4000, `Chunk length ${c.length} exceeds 4000`);
+  }
+});
+
+test('chunkMessage: splits at double-newline not mid-line', () => {
+  // 3 groups of 1800 chars each, total > 4000
+  const g1 = 'Group1: ' + 'X'.repeat(1792);
+  const g2 = 'Group2: ' + 'Y'.repeat(1792);
+  const g3 = 'Group3: ' + 'Z'.repeat(1792);
+  const text = [g1, g2, g3].join('\n\n');
+  const chunks = chunkMessage(text, 4000);
+  // Each group is 1800 chars; g1+g2 = 3602 chars which fits; g3 goes to next chunk
+  assert.ok(chunks.length >= 2);
+  // No chunk should contain a partial group — each group is a solid block
+  for (const c of chunks) {
+    assert.ok(!c.includes('Group1') || c.includes('Group1: '), 'Group1 intact');
+    assert.ok(!c.includes('Group2') || c.includes('Group2: '), 'Group2 intact');
+  }
+});
+
+// ─── New tests for 5 enhancements ────────────────────────────────────────────
+
+test('formatDigest: context block (ℹ️ Статус + ⏰ Залишилось) appears for ongoing runs (no monitoring_started event)', () => {
+  const text = formatDigest('2026-05-06T09:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X',
+    status: 'active.tendering',
+    deadline: '2026-05-08T09:00:00+03:00',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'new_question', title: 'q' }],
+  }]);
+  assert.match(text, /ℹ️ Статус: Приймання пропозицій/);
+  assert.match(text, /⏰ Залишилось:/);
+});
+
+test('formatDigest: escapes HTML special chars in title', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'Закупівля <script>alert(1)</script> & таке',
+    status: 'active.tendering', deadline: '2026-05-15',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'new_question', title: 'a' }],
+  }]);
+  assert.doesNotMatch(text, /<script>/);
+  assert.match(text, /&lt;script&gt;/);
+  assert.match(text, /&amp;/);
+});
+
+test('formatDigest: formats Ukrainian phones', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X',
+    status: 'active.tendering', deadline: '2026-05-15',
+    contact: { name: 'Test', telephone: '+380362643715, +380362281692', email: null },
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'new_question', title: 'q' }],
+  }]);
+  assert.match(text, /\+380 36 264-37-15/);
+  assert.match(text, /\+380 36 228-16-92/);
+});
+
+test('formatDigest: inserts ━ separator between multiple groups', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [
+    { tender_id: 'UA-A', title: 'A', status: 'active.tendering', deadline: '2026-05-15',
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-A',
+      events: [{ type: 'new_question', title: 'q' }] },
+    { tender_id: 'UA-B', title: 'B', status: 'active.tendering', deadline: '2026-05-15',
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-B',
+      events: [{ type: 'new_question', title: 'q' }] },
+  ]);
+  assert.match(text, /━{20,}/);
+});
+
+test('formatDigest: no separator with single group', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-A', title: 'A', status: 'active.tendering', deadline: '2026-05-15',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-A',
+    events: [{ type: 'new_question', title: 'q' }],
+  }]);
+  assert.doesNotMatch(text, /━/);
+});
+
+test('formatDigest: tender_id rendered as HTML <a href> link', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-2026-04-30-010542-a', title: 'X',
+    status: 'active.tendering', deadline: '2026-05-15',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-2026-04-30-010542-a',
+    events: [{ type: 'new_question', title: 'q' }],
+  }]);
+  assert.match(text, /<a href="https:\/\/prozorro\.gov\.ua\/tender\/UA-2026-04-30-010542-a">UA-2026-04-30-010542-a<\/a>/);
+  // Bottom 🔗 line removed:
+  assert.doesNotMatch(text, /🔗 https/);
+});
+
+// ─── Change C: formatHeartbeat ────────────────────────────────────────────────
+test('formatHeartbeat: includes heading, count, and tenders with deadlines', () => {
+  const text = formatHeartbeat('2026-05-08T06:00:00.000Z', [
+    { tender_id: 'UA-X', title: 'X', status: 'active.tendering', deadline: '2026-05-15T14:00:00+03:00' },
+    { tender_id: 'UA-Y', title: 'Y', status: 'active.qualification', deadline: null },
+  ]);
+  assert.match(text, /🟢 Heartbeat/);
+  assert.match(text, /Моніторю 2 тендери/);
+  assert.match(text, /UA-X/);
+  assert.match(text, /UA-Y/);
+  assert.match(text, /Приймання пропозицій/);
+  assert.match(text, /Розгляд пропозицій/);
+});
+
+test('formatHeartbeat: empty snapshots produces still-alive line without deadlines section', () => {
+  const text = formatHeartbeat('2026-05-08T06:00:00.000Z', []);
+  assert.match(text, /🟢 Heartbeat/);
+  assert.match(text, /Моніторю 0 тендерів/);
+  assert.doesNotMatch(text, /Поточні дедлайни/);
+});
