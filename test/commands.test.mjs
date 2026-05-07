@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseCommand, buildAutoNotes, formatAddReply, handleList,
-  applyMutation, handleAdd, handleStatus,
+  applyMutation, handleAdd, handleStatus, handleRemove,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -66,7 +66,7 @@ test('parseCommand: /add without args → error', () => {
 
 test('parseCommand: unknown slash command', () => {
   assert.deepEqual(parseCommand('/foo'), { cmd: 'unknown' });
-  assert.deepEqual(parseCommand('/remove UA-...'), { cmd: 'unknown' });
+  assert.deepEqual(parseCommand('/delete UA-...'), { cmd: 'unknown' });
 });
 
 test('parseCommand: free text — null', () => {
@@ -402,4 +402,79 @@ test('handleStatus: formats live status', () => {
 test('handleStatus: empty watchlist', () => {
   const reply = handleStatus({ watchlist: [], sha: '0000000' });
   assert.match(reply, /Watchlist: 0 tenders \(0 active\)/);
+});
+
+test('parseCommand: /remove with valid id', () => {
+  assert.deepEqual(
+    parseCommand('/remove UA-2026-04-30-010542-a'),
+    { cmd: 'remove', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /remove with bot suffix', () => {
+  assert.deepEqual(
+    parseCommand('/remove@my_bot UA-2026-04-30-010542-a'),
+    { cmd: 'remove', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /remove without args → error', () => {
+  assert.deepEqual(parseCommand('/remove'), { cmd: 'remove', error: 'missing_id' });
+});
+
+test('parseCommand: /remove invalid id → error', () => {
+  assert.deepEqual(parseCommand('/remove bad-id'), { cmd: 'remove', error: 'invalid_id' });
+});
+
+test('parseCommand: /remove rejects extra args after id', () => {
+  // /remove takes only id, no notes — extra text → invalid
+  assert.deepEqual(
+    parseCommand('/remove UA-2026-04-30-010542-a extra'),
+    { cmd: 'remove', error: 'invalid_id' }
+  );
+});
+
+test('handleRemove: existing tender → mutation:delete + ✅ Видалено', () => {
+  const result = handleRemove(
+    { watchlist: [{ tender_id: 'UA-X', enabled: true, notes: 'X' }] },
+    { tender_id: 'UA-X' }
+  );
+  assert.match(result.reply, /✅ Видалено UA-X/);
+  assert.match(result.reply, /Додати знову: \/add UA-X/);
+  assert.deepEqual(result.mutation, { type: 'delete', tender_id: 'UA-X' });
+});
+
+test('handleRemove: not in watchlist → ❓ + no mutation', () => {
+  const result = handleRemove(
+    { watchlist: [{ tender_id: 'UA-Y', enabled: true }] },
+    { tender_id: 'UA-X' }
+  );
+  assert.match(result.reply, /❓ UA-X не у watchlist/);
+  assert.equal(result.mutation, null);
+});
+
+test('handleRemove: disabled tender still removable', () => {
+  const result = handleRemove(
+    { watchlist: [{ tender_id: 'UA-X', enabled: false, notes: 'auto-disabled: 404' }] },
+    { tender_id: 'UA-X' }
+  );
+  assert.match(result.reply, /✅ Видалено/);
+  assert.equal(result.mutation.type, 'delete');
+});
+
+test('applyMutation: delete removes the matching row', () => {
+  const wl = [
+    { tender_id: 'UA-A', enabled: true },
+    { tender_id: 'UA-B', enabled: true },
+    { tender_id: 'UA-C', enabled: false },
+  ];
+  const result = applyMutation(wl, { type: 'delete', tender_id: 'UA-B' });
+  assert.equal(result.length, 2);
+  assert.deepEqual(result.map(r => r.tender_id), ['UA-A', 'UA-C']);
+});
+
+test('applyMutation: delete on non-existent id → no change', () => {
+  const wl = [{ tender_id: 'UA-A', enabled: true }];
+  const result = applyMutation(wl, { type: 'delete', tender_id: 'UA-XX' });
+  assert.deepEqual(result, wl);
 });

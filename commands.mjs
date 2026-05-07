@@ -25,6 +25,16 @@ export function parseCommand(text) {
     };
   }
 
+  const removeMatch = trimmed.match(/^\/remove(?:@\w+)?(?:\s+(.*))?$/i);
+  if (removeMatch) {
+    const args = (removeMatch[1] || '').trim();
+    if (!args) return { cmd: 'remove', error: 'missing_id' };
+    const idMatch = args.match(new RegExp(`^(${TENDER_ID_RE_STR})$`));
+    if (!idMatch) return { cmd: 'remove', error: 'invalid_id' };
+    const id = idMatch[1].slice(0, -1) + idMatch[1].slice(-1).toLowerCase();
+    return { cmd: 'remove', tender_id: id };
+  }
+
   if (trimmed.startsWith('/')) return { cmd: 'unknown' };
   return { cmd: null };
 }
@@ -95,7 +105,24 @@ export function applyMutation(watchlist, mutation) {
         : r
     );
   }
+  if (mutation.type === 'delete') {
+    return watchlist.filter(r => r.tender_id !== mutation.tender_id);
+  }
   return watchlist;
+}
+
+export function handleRemove({ watchlist }, { tender_id }) {
+  const existing = watchlist.find(r => r.tender_id === tender_id);
+  if (!existing) {
+    return {
+      reply: `❓ ${tender_id} не у watchlist`,
+      mutation: null,
+    };
+  }
+  return {
+    reply: `✅ Видалено ${tender_id}\nДодати знову: /add ${tender_id}`,
+    mutation: { type: 'delete', tender_id },
+  };
 }
 
 export async function handleAdd(deps, { tender_id, notes }) {
@@ -151,9 +178,8 @@ export async function handleAdd(deps, { tender_id, notes }) {
 export const HELP_TEXT = [
   'Команди:',
   '/add UA-YYYY-MM-DD-NNNNNN-x [нотатки] — додати тендер',
+  '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
   '/list — показати всі тендери на моніторингу',
   '/status — здоровʼя бота',
   '/help — це повідомлення',
-  '',
-  'Видалити/призупинити: github.com/avp-terralab/tender-monitor → watchlist.json',
 ].join('\n');

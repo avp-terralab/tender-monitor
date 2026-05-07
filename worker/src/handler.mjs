@@ -1,4 +1,4 @@
-import { parseCommand, handleAdd, handleList, handleStatus, applyMutation, HELP_TEXT } from '../../commands.mjs';
+import { parseCommand, handleAdd, handleList, handleStatus, handleRemove, applyMutation, HELP_TEXT } from '../../commands.mjs';
 import { fetchTender, extractSnapshot } from '../../prozorro.mjs';
 import { sendReply } from '../../telegram.mjs';
 import { loadWatchlist, saveWatchlist, ConflictError } from './github.mjs';
@@ -24,12 +24,25 @@ export async function runHandler({ update, env, deps = {} }) {
     } else if (cmd.error === 'missing_id') {
       reply = '❌ Не вказано tender_id. /add UA-YYYY-MM-DD-NNNNNN-x';
     } else {
-      reply = await handleAddWithRetry({
-        env, cmd,
+      reply = await applyMutationWithRetry({
+        env,
         loadWatchlist: _loadWatchlist,
         saveWatchlist: _saveWatchlist,
-        fetchTender: _fetchTender,
-        extractSnapshot: _extractSnapshot,
+        computeMutation: ({ watchlist }) =>
+          handleAdd({ watchlist, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot }, cmd),
+      });
+    }
+  } else if (cmd.cmd === 'remove') {
+    if (cmd.error === 'invalid_id') {
+      reply = '❌ Невалідний tender_id. Формат: /remove UA-YYYY-MM-DD-NNNNNN-x';
+    } else if (cmd.error === 'missing_id') {
+      reply = '❌ Не вказано tender_id. /remove UA-YYYY-MM-DD-NNNNNN-x';
+    } else {
+      reply = await applyMutationWithRetry({
+        env,
+        loadWatchlist: _loadWatchlist,
+        saveWatchlist: _saveWatchlist,
+        computeMutation: ({ watchlist }) => handleRemove({ watchlist }, cmd),
       });
     }
   } else if (cmd.cmd === 'list') {
@@ -68,11 +81,11 @@ export async function runHandler({ update, env, deps = {} }) {
   }
 }
 
-async function handleAddWithRetry({ env, cmd, loadWatchlist, saveWatchlist, fetchTender, extractSnapshot }) {
+async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, computeMutation }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { watchlist, sha } = await loadWatchlist(env);
-      const result = await handleAdd({ watchlist, fetchTender, extractSnapshot }, cmd);
+      const result = await computeMutation({ watchlist });
       if (!result.mutation) return result.reply;
       const newWatchlist = applyMutation(watchlist, result.mutation);
       await saveWatchlist(env, newWatchlist, sha);
@@ -80,7 +93,7 @@ async function handleAddWithRetry({ env, cmd, loadWatchlist, saveWatchlist, fetc
     } catch (err) {
       if (err instanceof ConflictError && attempt === 0) continue;
       if (err instanceof ConflictError) break;
-      console.error('worker: handleAdd failed:', err.message);
+      console.error('worker: applyMutationWithRetry failed:', err.message);
       if (err.message.includes('GitHub')) {
         return '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
       }

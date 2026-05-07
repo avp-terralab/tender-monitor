@@ -297,3 +297,61 @@ test('runHandler: /status when loadWatchlist throws → reply with GitHub error 
   assert.match(sent[0].text, /Worker live, але GitHub недоступний/);
   assert.match(sent[0].text, /503/);
 });
+
+test('runHandler: /remove existing tender → save + reply ✅ Видалено', async () => {
+  const saved = [];
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [{ tender_id: ID, enabled: true, notes: 'old' }],
+      sha: 'sha1',
+    }),
+    saveWatchlist: async (env, wl, sha) => { saved.push({ wl, sha }); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/remove ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].wl.length, 0);
+  assert.match(sent[0].text, /✅ Видалено/);
+});
+
+test('runHandler: /remove non-existing tender → ❓, no save', async () => {
+  let saveCalled = false;
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 'sha1' }),
+    saveWatchlist: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/remove ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /❓.*не у watchlist/);
+});
+
+test('runHandler: /remove invalid id → error reply, no GitHub call', async () => {
+  let loadCalled = false;
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => { loadCalled = true; return { watchlist: [], sha: 'x' }; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/remove bad-id', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(loadCalled, false);
+  assert.match(sent[0].text, /Невалідний/);
+});
+
+test('runHandler: /remove without id → "Не вказано"', async () => {
+  const { deps, sent } = await makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/remove', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /Не вказано/);
+});
