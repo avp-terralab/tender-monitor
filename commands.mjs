@@ -177,7 +177,7 @@ export async function handleAdd(deps, { tender_id, notes }) {
 
 export const HELP_TEXT = [
   'Команди:',
-  '/add UA-YYYY-MM-DD-NNNNNN-x [нотатки] — додати тендер',
+  '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
   '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
   '/list — показати всі тендери на моніторингу',
   '/status — здоровʼя бота',
