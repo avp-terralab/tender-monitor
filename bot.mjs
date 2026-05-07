@@ -1,6 +1,6 @@
 import { parseCommand, handleAdd, handleList, applyMutation } from './commands.mjs';
 import { fetchTender, extractSnapshot } from './prozorro.mjs';
-import { getUpdates, sendReply } from './telegram.mjs';
+import { getUpdates, sendReply, chunkMessage } from './telegram.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -79,15 +79,21 @@ export async function runBot(deps) {
       continue; // free text — ignore
     }
 
-    try {
-      await sendReply({
-        token,
-        chatId: msg.chat.id,
-        text: reply,
-        replyToMessageId: msg.message_id,
-      });
-    } catch (err) {
-      console.error('Bot: sendReply failed:', err.message);
+    const chunks = chunkMessage(reply, 4000);
+    for (let i = 0; i < chunks.length; i++) {
+      const annotated = chunks.length > 1
+        ? `${chunks[i]}\n— ${i + 1}/${chunks.length} —`
+        : chunks[i];
+      try {
+        await sendReply({
+          token,
+          chatId: msg.chat.id,
+          text: annotated,
+          replyToMessageId: i === 0 ? msg.message_id : undefined,
+        });
+      } catch (err) {
+        console.error('Bot: sendReply failed:', err.message);
+      }
     }
     processed++;
   }

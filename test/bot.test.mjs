@@ -182,3 +182,36 @@ test('runBot: sendReply failure does not break loop', async () => {
   assert.equal(sentCount, 2); // both attempts made
   assert.equal(watchlistStore.value.length, 1); // /add still mutated despite reply failure
 });
+
+test('runBot: /list chunks output when over Telegram limit', async () => {
+  const longNotes = 'X'.repeat(80);  // truncated to 80 in handleList
+  const bigWatchlist = [];
+  for (let i = 0; i < 60; i++) {
+    bigWatchlist.push({
+      tender_id: `UA-2026-04-30-${String(i).padStart(6, '0')}-a`,
+      enabled: true,
+      notes: longNotes,
+    });
+  }
+  const { deps, sent } = await makeDeps({
+    getUpdates: async () => [
+      { update_id: 1, message: { chat: { id: 123 }, text: '/list', message_id: 1 } },
+    ],
+    loadWatchlist: async () => bigWatchlist,
+  });
+  await runBot(deps);
+  // 60 rows × ~115 chars ≈ 6900 chars > 4000 → must be ≥2 chunks
+  assert.ok(sent.length >= 2, `expected ≥2 chunks, got ${sent.length}`);
+  // Each chunk has a "— K/N —" annotation
+  assert.match(sent[0].text, /— 1\/\d+ —/);
+});
+
+test('runBot: /add without args → "Не вказано tender_id" reply', async () => {
+  const { deps, sent } = await makeDeps({
+    getUpdates: async () => [
+      { update_id: 1, message: { chat: { id: 123 }, text: '/add', message_id: 1 } },
+    ],
+  });
+  await runBot(deps);
+  assert.match(sent[0].text, /Не вказано/);
+});

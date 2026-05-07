@@ -24,7 +24,7 @@ jobs:
 
       - name: Run tests
         run: |
-          node --test test/commands.test.mjs test/bot.test.mjs test/telegram.test.mjs
+          node --test test/*.test.mjs
 
       - name: Run bot
         env:
