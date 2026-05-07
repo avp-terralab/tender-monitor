@@ -1,3 +1,5 @@
+import { stripDkCode, truncate } from './telegram.mjs';
+
 const TENDER_ID_RE_STR = 'UA-\\d{4}-\\d{2}-\\d{2}-\\d{6}-[a-zA-Z]';
 
 export function parseCommand(text) {
@@ -24,4 +26,15 @@ export function parseCommand(text) {
 
   if (trimmed.startsWith('/')) return { cmd: 'unknown' };
   return { cmd: null };
+}
+
+export function buildAutoNotes(snapshot) {
+  const entity = snapshot?.procuringEntity?.name ?? '';
+  const title = stripDkCode(snapshot?.title ?? '');
+  let combined;
+  if (entity && title) combined = `${entity} — ${title}`;
+  else if (entity) combined = entity;
+  else if (title) combined = title;
+  else combined = '';
+  return truncate(combined, 200);
 }

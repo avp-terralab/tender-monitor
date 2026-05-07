@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCommand } from '../commands.mjs';
+import { parseCommand, buildAutoNotes } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
   assert.deepEqual(parseCommand('/list'), { cmd: 'list' });
@@ -79,4 +79,42 @@ test('parseCommand: non-string input — null', () => {
 
 test('parseCommand: leading/trailing whitespace tolerated', () => {
   assert.deepEqual(parseCommand('  /list  '), { cmd: 'list' });
+});
+
+const SAMPLE_SNAP = {
+  tender_id: 'UA-2026-04-30-010542-a',
+  title: 'Реактиви для лабораторії, код ДК 33696500-0',
+  procuringEntity: { name: 'КНП «Рівненська ОКЛ»', edrpou: '12345678' },
+};
+
+test('buildAutoNotes: combines entity name and stripped title', () => {
+  assert.equal(
+    buildAutoNotes(SAMPLE_SNAP),
+    'КНП «Рівненська ОКЛ» — Реактиви для лабораторії'
+  );
+});
+
+test('buildAutoNotes: missing procuringEntity → just title', () => {
+  assert.equal(
+    buildAutoNotes({ ...SAMPLE_SNAP, procuringEntity: null }),
+    'Реактиви для лабораторії'
+  );
+});
+
+test('buildAutoNotes: missing title → just entity name', () => {
+  assert.equal(
+    buildAutoNotes({ ...SAMPLE_SNAP, title: null }),
+    'КНП «Рівненська ОКЛ»'
+  );
+});
+
+test('buildAutoNotes: empty snapshot → empty string', () => {
+  assert.equal(buildAutoNotes({}), '');
+});
+
+test('buildAutoNotes: truncates at 200 chars', () => {
+  const longTitle = 'А'.repeat(300);
+  const result = buildAutoNotes({ title: longTitle });
+  assert.ok(result.length <= 200);
+  assert.ok(result.endsWith('…'));
 });
