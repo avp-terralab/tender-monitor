@@ -1,0 +1,3 @@
+name = "tender-monitor-bot"
+main = "src/index.mjs"
+compatibility_date = "2026-05-01"
