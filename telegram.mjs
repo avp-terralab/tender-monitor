@@ -59,7 +59,7 @@ const PROC_METHOD_LABELS = {
 
 export const fmtStatus = (s) => STATUS_LABELS[s] ?? (s ?? '');
 
-function escapeHtml(s) {
+export function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

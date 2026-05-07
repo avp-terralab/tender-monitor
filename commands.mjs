@@ -1,4 +1,4 @@
-import { stripDkCode, truncate, fmtStatus, fmtDeadline } from './telegram.mjs';
+import { stripDkCode, truncate, fmtStatus, fmtDeadline, escapeHtml } from './telegram.mjs';
 
 const TENDER_ID_RE_STR = 'UA-\\d{4}-\\d{2}-\\d{2}-\\d{6}-[a-zA-Z]';
 
@@ -44,9 +44,9 @@ export function formatAddReply(snapshot, { reEnable }) {
   const verb = reEnable ? 'Поновив моніторинг' : 'Додано';
   lines.push(`✅ ${verb} ${snapshot.tender_id}`);
   const title = stripDkCode(snapshot.title ?? '');
-  if (title) lines.push(`📦 ${truncate(title, 200)}`);
+  if (title) lines.push(`📦 ${escapeHtml(truncate(title, 200))}`);
   if (snapshot.procuringEntity?.name) {
-    lines.push(`👥 ${snapshot.procuringEntity.name}`);
+    lines.push(`👥 ${escapeHtml(snapshot.procuringEntity.name)}`);
   }
   if (snapshot.status) {
     let line = `ℹ️ Статус: ${fmtStatus(snapshot.status)}`;

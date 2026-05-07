@@ -163,3 +163,19 @@ test('formatAddReply: drops DK code from title', () => {
   assert.match(reply, /📦 Реактиви\n/);
   assert.doesNotMatch(reply, /код ДК/);
 });
+
+test('formatAddReply: HTML-escapes user-controlled fields', () => {
+  const reply = formatAddReply(
+    {
+      ...FULL_SNAP,
+      title: 'A & B <test> "x"',
+      procuringEntity: { name: 'ТОВ «A&B>'  },
+    },
+    { reEnable: false }
+  );
+  // & must become &amp;, < must become &lt;, > must become &gt;
+  assert.doesNotMatch(reply, /& [A-Za-z]/); // no raw "& X" sequences
+  assert.match(reply, /A &amp; B/);
+  assert.match(reply, /&lt;test&gt;/);
+  assert.match(reply, /A&amp;B&gt;/);
+});
