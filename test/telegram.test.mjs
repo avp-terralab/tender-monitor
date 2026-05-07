@@ -450,3 +450,28 @@ test('sendReply: omits reply_to_message_id when not provided', async () => {
   await sendReply({ token: 'TOK', chatId: '12345', text: 'hi', fetch: fakeFetch });
   assert.equal(calls[0].body.reply_to_message_id, undefined);
 });
+
+test('sendReply: retries on transient 5xx then succeeds', async () => {
+  let calls = 0;
+  const fakeFetch = async () => {
+    calls++;
+    if (calls === 1) {
+      return { ok: false, status: 503, text: async () => 'temporary' };
+    }
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: 1 } }) };
+  };
+  const result = await sendReply({ token: 'TOK', chatId: '12345', text: 'hi', fetch: fakeFetch });
+  assert.equal(calls, 2);
+  assert.equal(result.ok, true);
+});
+
+test('sendReply: throws on telegram-level not-ok', async () => {
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({ ok: false, description: 'chat not found' }),
+  });
+  await assert.rejects(
+    () => sendReply({ token: 'TOK', chatId: '999', text: 'hi', fetch: fakeFetch }),
+    /chat not found/
+  );
+});

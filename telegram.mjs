@@ -344,12 +344,27 @@ export async function sendReply({ token, chatId, text, replyToMessageId, fetch: 
     disable_web_page_preview: 'true',
   };
   if (replyToMessageId != null) params.reply_to_message_id = String(replyToMessageId);
-  const res = await fetchImpl(url, {
-    method: 'POST',
-    body: new URLSearchParams(params),
-  });
-  if (!res.ok) {
-    throw new Error(`Telegram sendReply ${res.status}: ${await res.text()}`);
+
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetchImpl(url, {
+        method: 'POST',
+        body: new URLSearchParams(params),
+      });
+      if (!res.ok) {
+        lastErr = new Error(`Telegram sendReply ${res.status}: ${await res.text()}`);
+        continue;
+      }
+      const json = await res.json();
+      if (!json.ok) {
+        lastErr = new Error(`Telegram sendReply: ${json.description ?? 'unknown error'}`);
+        continue;
+      }
+      return json;
+    } catch (err) {
+      lastErr = err;
+    }
   }
-  return res.json();
+  throw lastErr;
 }
