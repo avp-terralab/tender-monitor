@@ -27,3 +27,32 @@ export async function loadWatchlist(env, { fetch: fetchImpl = fetch } = {}) {
   const text = atob(content.replace(/\n/g, ''));
   return { watchlist: JSON.parse(text), sha };
 }
+
+export async function saveWatchlist(env, watchlist, sha, { fetch: fetchImpl = fetch } = {}) {
+  const body = {
+    message: `bot: update watchlist ${new Date().toISOString()}`,
+    content: btoa(JSON.stringify(watchlist, null, 2) + '\n'),
+    sha,
+    branch: 'main',
+  };
+  const res = await fetchImpl(
+    `${API_BASE}/repos/${REPO}/contents/${FILE}`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${env.GITHUB_PAT}`,
+        'User-Agent': 'tender-monitor-worker',
+        'Content-Type': 'application/json',
+        Accept: 'application/vnd.github+json',
+      },
+      body: JSON.stringify(body),
+    }
+  );
+  if (res.status === 409) {
+    throw new ConflictError(`GitHub PUT 409 conflict on ${FILE}`);
+  }
+  if (!res.ok) {
+    throw new Error(`GitHub PUT ${res.status}: ${await res.text()}`);
+  }
+  return res.json();
+}

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWatchlist, ConflictError } from '../src/github.mjs';
+import { loadWatchlist, ConflictError, saveWatchlist } from '../src/github.mjs';
 
 const ENV = { GITHUB_PAT: 'PAT_VALUE' };
 
@@ -59,5 +59,63 @@ test('loadWatchlist: throws on 404', async () => {
   await assert.rejects(
     () => loadWatchlist(ENV, { fetch: fakeFetch }),
     /404/
+  );
+});
+
+test('saveWatchlist: builds correct PUT request', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, opts });
+    return { ok: true, status: 200, json: async () => ({ content: { sha: 'newSha' } }) };
+  };
+  const wl = [{ tender_id: 'UA-X', enabled: true, notes: 'X' }];
+  await saveWatchlist(ENV, wl, 'oldSha', { fetch: fakeFetch });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /api\.github\.com\/repos\/avp-terralab\/tender-monitor\/contents\/watchlist\.json/);
+  assert.equal(calls[0].opts.method, 'PUT');
+  assert.equal(calls[0].opts.headers.Authorization, 'Bearer PAT_VALUE');
+  const body = JSON.parse(calls[0].opts.body);
+  assert.equal(body.sha, 'oldSha');
+  assert.equal(body.branch, 'main');
+  assert.match(body.message, /^bot: update watchlist /);
+  // Decode content to verify
+  const decoded = atob(body.content);
+  assert.deepEqual(JSON.parse(decoded), wl);
+  assert.ok(decoded.endsWith('\n'), 'JSON should end with newline');
+});
+
+test('saveWatchlist: throws ConflictError on 409', async () => {
+  const fakeFetch = async () => ({
+    ok: false,
+    status: 409,
+    text: async () => 'Conflict',
+  });
+  await assert.rejects(
+    () => saveWatchlist(ENV, [], 'sha', { fetch: fakeFetch }),
+    (err) => err instanceof ConflictError
+  );
+});
+
+test('saveWatchlist: throws plain Error on 401', async () => {
+  const fakeFetch = async () => ({
+    ok: false,
+    status: 401,
+    text: async () => 'Bad credentials',
+  });
+  await assert.rejects(
+    () => saveWatchlist(ENV, [], 'sha', { fetch: fakeFetch }),
+    (err) => err instanceof Error && !(err instanceof ConflictError) && /401/.test(err.message)
+  );
+});
+
+test('saveWatchlist: throws plain Error on 5xx', async () => {
+  const fakeFetch = async () => ({
+    ok: false,
+    status: 503,
+    text: async () => 'Service Unavailable',
+  });
+  await assert.rejects(
+    () => saveWatchlist(ENV, [], 'sha', { fetch: fakeFetch }),
+    /503/
   );
 });
