@@ -374,6 +374,11 @@ test('fmtStatus: returns raw key for unknown status', () => {
   assert.equal(fmtStatus('weird.status'), 'weird.status');
 });
 
+test('fmtStatus: returns empty string for null/undefined', () => {
+  assert.equal(fmtStatus(null), '');
+  assert.equal(fmtStatus(undefined), '');
+});
+
 test('fmtDeadline: ISO datetime to "DD.MM.YYYY до HH:MM"', () => {
   assert.equal(
     fmtDeadline('2026-05-15T14:30:00+03:00'),

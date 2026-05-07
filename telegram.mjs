@@ -57,7 +57,7 @@ const PROC_METHOD_LABELS = {
   simple: 'Спрощена',
 };
 
-export const fmtStatus = (s) => STATUS_LABELS[s] ?? s;
+export const fmtStatus = (s) => STATUS_LABELS[s] ?? (s ?? '');
 
 function escapeHtml(s) {
   if (s == null) return '';
