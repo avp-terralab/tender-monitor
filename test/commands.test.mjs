@@ -205,12 +205,20 @@ test('handleList: mix enabled and disabled', () => {
   assert.match(reply, /Всього: 2 \(1 active\)/);
 });
 
-test('handleList: notes truncated to 200 chars', () => {
-  const longNotes = 'X'.repeat(300);
+test('handleList: customer truncated to 60 chars', () => {
+  const longCustomer = 'X'.repeat(100);
   const reply = handleList({ watchlist: [
-    { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: longNotes }
+    { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: longCustomer }
   ]});
-  assert.ok(reply.includes('X'.repeat(199) + '…'));
+  assert.ok(reply.includes('X'.repeat(59) + '…'));
+});
+
+test('handleList: extracts customer from auto-format "entity — title"', () => {
+  const reply = handleList({ watchlist: [
+    { tender_id: 'UA-A', enabled: true, notes: 'КНП «Рівненська ОКЛ» — Реактиви для лабораторії' }
+  ]});
+  assert.match(reply, /UA-A — КНП «Рівненська ОКЛ»/);
+  assert.doesNotMatch(reply, /Реактиви/);
 });
 
 test('handleList: numbers entries 1, 2, 3 with blank line between', () => {

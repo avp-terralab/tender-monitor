@@ -76,8 +76,11 @@ export function handleList({ watchlist }) {
   }
   const rows = watchlist.map((r, i) => {
     const icon = r.enabled ? '🟢' : '🔴';
-    const notes = r.notes ? ` — ${escapeHtml(truncate(r.notes, 200))}` : '';
-    return `${i + 1}. ${icon} ${r.tender_id}${notes}`;
+    // Auto-notes format is "<customer> — <title>"; show only customer.
+    // For free-form notes without " — ", show whole thing (still likely entity-like).
+    const customer = r.notes ? r.notes.split(' — ')[0].trim() : '';
+    const suffix = customer ? ` — ${escapeHtml(truncate(customer, 60))}` : '';
+    return `${i + 1}. ${icon} ${r.tender_id}${suffix}`;
   });
   const active = watchlist.filter(r => r.enabled).length;
   return rows.join('\n\n') + `\n\nВсього: ${watchlist.length} (${active} active)`;
@@ -239,7 +242,7 @@ export const HELP_TEXT = [
   'Команди:',
   '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
   '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
-  '/list — короткий список (id + нотатки)',
+  '/list — короткий список (id + Замовник)',
   '/info — детально по кожному (замовник, ДК, ціна, статус)',
   '/status — здоровʼя бота',
   '/help — це повідомлення',
