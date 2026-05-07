@@ -3,7 +3,7 @@ import { fetchTender, extractSnapshot } from './prozorro.mjs';
 import { getUpdates, sendReply } from './telegram.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const HELP_TEXT = [
   'Команди:',
@@ -101,8 +101,7 @@ export async function runBot(deps) {
 }
 
 // CI entrypoint (executed when bot.mjs is run directly)
-const isMain = import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`
-  || import.meta.url.endsWith(process.argv[1].split('/').pop());
+const isMain = import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isMain) {
   const REPO = dirname(fileURLToPath(import.meta.url));
