@@ -321,3 +321,35 @@ export async function sendDigest({ token, chatId }, text) {
   }
   return last;
 }
+
+export async function getUpdates({ token, offset, fetch: fetchImpl = fetch }) {
+  const url = `https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=0&limit=100`;
+  const res = await fetchImpl(url);
+  if (!res.ok) {
+    throw new Error(`Telegram getUpdates ${res.status}: ${await res.text()}`);
+  }
+  const json = await res.json();
+  if (!json.ok) {
+    throw new Error(`Telegram getUpdates: ${json.description ?? 'unknown error'}`);
+  }
+  return json.result ?? [];
+}
+
+export async function sendReply({ token, chatId, text, replyToMessageId, fetch: fetchImpl = fetch }) {
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  const params = {
+    chat_id: String(chatId),
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: 'true',
+  };
+  if (replyToMessageId != null) params.reply_to_message_id = String(replyToMessageId);
+  const res = await fetchImpl(url, {
+    method: 'POST',
+    body: new URLSearchParams(params),
+  });
+  if (!res.ok) {
+    throw new Error(`Telegram sendReply ${res.status}: ${await res.text()}`);
+  }
+  return res.json();
+}

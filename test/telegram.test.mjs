@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, getUpdates, sendReply } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -388,4 +388,65 @@ test('fmtDeadline: ISO datetime to "DD.MM.YYYY до HH:MM"', () => {
 
 test('fmtDeadline: returns empty for null', () => {
   assert.equal(fmtDeadline(null), '');
+});
+
+test('getUpdates: builds correct URL with offset and timeout=0', async () => {
+  const calls = [];
+  const fakeFetch = async (url) => {
+    calls.push(url);
+    return { ok: true, json: async () => ({ ok: true, result: [{ update_id: 42 }] }) };
+  };
+  const updates = await getUpdates({ token: 'TOK', offset: 100, fetch: fakeFetch });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /\/botTOK\/getUpdates/);
+  assert.match(calls[0], /offset=100/);
+  assert.match(calls[0], /timeout=0/);
+  assert.match(calls[0], /limit=100/);
+  assert.deepEqual(updates, [{ update_id: 42 }]);
+});
+
+test('getUpdates: throws on non-ok response', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 401, text: async () => 'Unauthorized' });
+  await assert.rejects(
+    () => getUpdates({ token: 'BAD', offset: 0, fetch: fakeFetch }),
+    /401/
+  );
+});
+
+test('getUpdates: throws on telegram-level not-ok', async () => {
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({ ok: false, description: 'Bad Request' }),
+  });
+  await assert.rejects(
+    () => getUpdates({ token: 'TOK', offset: 0, fetch: fakeFetch }),
+    /Bad Request/
+  );
+});
+
+test('sendReply: posts to sendMessage with reply_to_message_id', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, body: Object.fromEntries(opts.body) });
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: 99 } }) };
+  };
+  await sendReply({
+    token: 'TOK', chatId: '12345', text: 'hi',
+    replyToMessageId: 10, fetch: fakeFetch,
+  });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/botTOK\/sendMessage/);
+  assert.equal(calls[0].body.chat_id, '12345');
+  assert.equal(calls[0].body.text, 'hi');
+  assert.equal(calls[0].body.reply_to_message_id, '10');
+});
+
+test('sendReply: omits reply_to_message_id when not provided', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, body: Object.fromEntries(opts.body) });
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendReply({ token: 'TOK', chatId: '12345', text: 'hi', fetch: fakeFetch });
+  assert.equal(calls[0].body.reply_to_message_id, undefined);
 });
