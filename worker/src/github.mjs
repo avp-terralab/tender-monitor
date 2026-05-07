@@ -24,14 +24,18 @@ export async function loadWatchlist(env, { fetch: fetchImpl = fetch } = {}) {
     throw new Error(`GitHub GET ${res.status}: ${await res.text()}`);
   }
   const { content, sha } = await res.json();
-  const text = atob(content.replace(/\n/g, ''));
+  const bytes = Uint8Array.from(atob(content.replace(/\n/g, '')), (c) => c.charCodeAt(0));
+  const text = new TextDecoder().decode(bytes);
   return { watchlist: JSON.parse(text), sha };
 }
 
 export async function saveWatchlist(env, watchlist, sha, { fetch: fetchImpl = fetch } = {}) {
+  const json = JSON.stringify(watchlist, null, 2) + '\n';
+  const bytes = new TextEncoder().encode(json);
+  const base64 = btoa(String.fromCharCode(...bytes));
   const body = {
     message: `bot: update watchlist ${new Date().toISOString()}`,
-    content: btoa(JSON.stringify(watchlist, null, 2) + '\n'),
+    content: base64,
     sha,
     branch: 'main',
   };

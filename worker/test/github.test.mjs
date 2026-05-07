@@ -119,3 +119,31 @@ test('saveWatchlist: throws plain Error on 5xx', async () => {
     /503/
   );
 });
+
+test('loadWatchlist: decodes UTF-8 (Cyrillic notes round-trip)', async () => {
+  const wl = [{ tender_id: 'UA-X', enabled: true, notes: 'Рівне ОКЛ — ISO 15189 консалтинг' }];
+  const json = JSON.stringify(wl);
+  const content = Buffer.from(json, 'utf-8').toString('base64');
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({ content, sha: 'abc' }),
+  });
+  const result = await loadWatchlist(ENV, { fetch: fakeFetch });
+  assert.deepEqual(result.watchlist, wl);
+  assert.equal(result.watchlist[0].notes, 'Рівне ОКЛ — ISO 15189 консалтинг');
+});
+
+test('saveWatchlist: encodes UTF-8 (Cyrillic round-trips through base64)', async () => {
+  const wl = [{ tender_id: 'UA-X', enabled: true, notes: 'Рівне ОКЛ — ISO 15189' }];
+  let capturedBody;
+  const fakeFetch = async (url, opts) => {
+    capturedBody = JSON.parse(opts.body);
+    return { ok: true, json: async () => ({}) };
+  };
+  await saveWatchlist(ENV, wl, 'sha', { fetch: fakeFetch });
+  // Decode the base64 → bytes → UTF-8 string and verify it parses back to the original
+  const decodedBytes = Buffer.from(capturedBody.content, 'base64');
+  const decodedJson = decodedBytes.toString('utf-8');
+  assert.match(decodedJson, /Рівне ОКЛ/);
+  assert.deepEqual(JSON.parse(decodedJson), wl);
+});
