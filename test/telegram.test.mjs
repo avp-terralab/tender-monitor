@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, getUpdates, sendReply } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -339,4 +339,139 @@ test('formatHeartbeat: empty snapshots produces still-alive line without deadlin
   assert.match(text, /🟢 Heartbeat/);
   assert.match(text, /Моніторю 0 тендерів/);
   assert.doesNotMatch(text, /Поточні дедлайни/);
+});
+
+test('truncate: returns string unchanged when shorter than max', () => {
+  assert.equal(truncate('hello', 10), 'hello');
+});
+
+test('truncate: shortens with ellipsis when longer', () => {
+  assert.equal(truncate('hello world', 8), 'hello w…');
+});
+
+test('truncate: handles null/undefined', () => {
+  assert.equal(truncate(null, 5), '');
+  assert.equal(truncate(undefined, 5), '');
+});
+
+test('stripDkCode: removes DK suffix', () => {
+  assert.equal(
+    stripDkCode('Реактиви для лабораторії, код ДК 33696500-0'),
+    'Реактиви для лабораторії'
+  );
+});
+
+test('stripDkCode: leaves title without DK unchanged', () => {
+  assert.equal(stripDkCode('Просто реактиви'), 'Просто реактиви');
+});
+
+test('fmtStatus: maps known status to label', () => {
+  assert.equal(fmtStatus('active.tendering'), 'Приймання пропозицій');
+  assert.equal(fmtStatus('complete'), 'Завершено');
+});
+
+test('fmtStatus: returns raw key for unknown status', () => {
+  assert.equal(fmtStatus('weird.status'), 'weird.status');
+});
+
+test('fmtStatus: returns empty string for null/undefined', () => {
+  assert.equal(fmtStatus(null), '');
+  assert.equal(fmtStatus(undefined), '');
+});
+
+test('fmtDeadline: ISO datetime to "DD.MM.YYYY до HH:MM"', () => {
+  assert.equal(
+    fmtDeadline('2026-05-15T14:30:00+03:00'),
+    '15.05.2026 до 14:30'
+  );
+});
+
+test('fmtDeadline: returns empty for null', () => {
+  assert.equal(fmtDeadline(null), '');
+});
+
+test('getUpdates: builds correct URL with offset and timeout=0', async () => {
+  const calls = [];
+  const fakeFetch = async (url) => {
+    calls.push(url);
+    return { ok: true, json: async () => ({ ok: true, result: [{ update_id: 42 }] }) };
+  };
+  const updates = await getUpdates({ token: 'TOK', offset: 100, fetch: fakeFetch });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /\/botTOK\/getUpdates/);
+  assert.match(calls[0], /offset=100/);
+  assert.match(calls[0], /timeout=0/);
+  assert.match(calls[0], /limit=100/);
+  assert.deepEqual(updates, [{ update_id: 42 }]);
+});
+
+test('getUpdates: throws on non-ok response', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 401, text: async () => 'Unauthorized' });
+  await assert.rejects(
+    () => getUpdates({ token: 'BAD', offset: 0, fetch: fakeFetch }),
+    /401/
+  );
+});
+
+test('getUpdates: throws on telegram-level not-ok', async () => {
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({ ok: false, description: 'Bad Request' }),
+  });
+  await assert.rejects(
+    () => getUpdates({ token: 'TOK', offset: 0, fetch: fakeFetch }),
+    /Bad Request/
+  );
+});
+
+test('sendReply: posts to sendMessage with reply_to_message_id', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, body: Object.fromEntries(opts.body) });
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: 99 } }) };
+  };
+  await sendReply({
+    token: 'TOK', chatId: '12345', text: 'hi',
+    replyToMessageId: 10, fetch: fakeFetch,
+  });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/botTOK\/sendMessage/);
+  assert.equal(calls[0].body.chat_id, '12345');
+  assert.equal(calls[0].body.text, 'hi');
+  assert.equal(calls[0].body.reply_to_message_id, '10');
+});
+
+test('sendReply: omits reply_to_message_id when not provided', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, body: Object.fromEntries(opts.body) });
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendReply({ token: 'TOK', chatId: '12345', text: 'hi', fetch: fakeFetch });
+  assert.equal(calls[0].body.reply_to_message_id, undefined);
+});
+
+test('sendReply: retries on transient 5xx then succeeds', async () => {
+  let calls = 0;
+  const fakeFetch = async () => {
+    calls++;
+    if (calls === 1) {
+      return { ok: false, status: 503, text: async () => 'temporary' };
+    }
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: 1 } }) };
+  };
+  const result = await sendReply({ token: 'TOK', chatId: '12345', text: 'hi', fetch: fakeFetch });
+  assert.equal(calls, 2);
+  assert.equal(result.ok, true);
+});
+
+test('sendReply: throws on telegram-level not-ok', async () => {
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({ ok: false, description: 'chat not found' }),
+  });
+  await assert.rejects(
+    () => sendReply({ token: 'TOK', chatId: '999', text: 'hi', fetch: fakeFetch }),
+    /chat not found/
+  );
 });

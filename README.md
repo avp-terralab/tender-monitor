@@ -31,6 +31,15 @@ Set in repo Settings → Secrets and variables → Actions:
 
 ### Manage tenders
 
+**Telegram (recommended):**
+- `/add UA-YYYY-MM-DD-NNNNNN-x` — додати тендер. Опційно: `/add UA-... мої нотатки`.
+- `/list` — побачити повний watchlist.
+- `/help` — список команд.
+
+Bot реагує тільки на повідомлення з `TELEGRAM_CHAT_ID` (інші ігноруються мовчки). Polling — кожні 5 хв через GHA workflow `bot.yml`. Зміна вступає в силу на найближчому monitor-тіку (09/13/18 Київ).
+
+**Manual edit (для bulk-операцій або видалення):**
+
 Edit `watchlist.json` on the repo's main branch. Each row:
 
 ```json
@@ -38,6 +47,13 @@ Edit `watchlist.json` on the repo's main branch. Each row:
 ```
 
 Set `enabled: false` to pause. Auto-disabled rows (404 from Prozorro) get `auto-disabled: ...` appended to `notes`.
+
+### Workflows
+
+- `.github/workflows/monitor.yml` — cron `0 6,10,15 * * *` UTC (09/13/18 Київ). Шле дайджест змін.
+- `.github/workflows/bot.yml` — cron `*/5 * * * *`. Обробляє Telegram-команди.
+
+Обидва використовують `concurrency: tender-monitor` → серіалізуються при пушах.
 
 ## Local development
 
@@ -56,10 +72,10 @@ Set `enabled: false` to pause. Auto-disabled rows (404 from Prozorro) get `auto-
 ## Tests
 
 ```
-node --test test/compare.test.mjs test/prozorro.test.mjs test/telegram.test.mjs test/monitor.test.mjs
+node --test test/*.test.mjs
 ```
 
-Should report 70+ tests passing.
+Should report 140+ tests passing across compare, prozorro, telegram, monitor, commands, and bot suites.
 
 ## Spec
 
