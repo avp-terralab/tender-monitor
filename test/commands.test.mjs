@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseCommand, buildAutoNotes, formatAddReply, handleList,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
+  abbreviateLegalForm,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -205,12 +206,72 @@ test('handleList: mix enabled and disabled', () => {
   assert.match(reply, /Всього: 2 \(1 active\)/);
 });
 
-test('handleList: customer truncated to 100 chars', () => {
-  const longCustomer = 'X'.repeat(150);
+test('handleList: customer truncated to 150 chars', () => {
+  const longCustomer = 'X'.repeat(200);
   const reply = handleList({ watchlist: [
     { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: longCustomer }
   ]});
-  assert.ok(reply.includes('X'.repeat(99) + '…'));
+  assert.ok(reply.includes('X'.repeat(149) + '…'));
+});
+
+test('abbreviateLegalForm: КНП', () => {
+  assert.equal(
+    abbreviateLegalForm('Комунальне некомерційне підприємство «Центральна районна лікарня»'),
+    'КНП «Центральна районна лікарня»'
+  );
+});
+
+test('abbreviateLegalForm: КП', () => {
+  assert.equal(
+    abbreviateLegalForm('Комунальне підприємство «Київтепло»'),
+    'КП «Київтепло»'
+  );
+});
+
+test('abbreviateLegalForm: ТОВ', () => {
+  assert.equal(
+    abbreviateLegalForm('Товариство з обмеженою відповідальністю «ТерраЛаб»'),
+    'ТОВ «ТерраЛаб»'
+  );
+});
+
+test('abbreviateLegalForm: ДП', () => {
+  assert.equal(
+    abbreviateLegalForm('Державне підприємство «Укрзалізниця»'),
+    'ДП «Укрзалізниця»'
+  );
+});
+
+test('abbreviateLegalForm: ФОП (з тире)', () => {
+  assert.equal(
+    abbreviateLegalForm('Фізична особа-підприємець Іван Петренко'),
+    'ФОП Іван Петренко'
+  );
+});
+
+test('abbreviateLegalForm: longer КНП wins over short КП', () => {
+  // The phrase starts with "Комунальне некомерційне підприємство" — must abbreviate to КНП, not КП
+  assert.equal(
+    abbreviateLegalForm('Комунальне некомерційне підприємство «Тест»'),
+    'КНП «Тест»'
+  );
+});
+
+test('abbreviateLegalForm: name without legal form returns unchanged', () => {
+  assert.equal(abbreviateLegalForm('Acme Inc'), 'Acme Inc');
+});
+
+test('abbreviateLegalForm: empty/null returns unchanged', () => {
+  assert.equal(abbreviateLegalForm(''), '');
+  assert.equal(abbreviateLegalForm(null), null);
+});
+
+test('handleList: applies legal-form abbreviation to customer', () => {
+  const reply = handleList({ watchlist: [
+    { tender_id: 'UA-A', enabled: true, notes: 'Комунальне некомерційне підприємство «Х» — Реактиви' }
+  ]});
+  assert.match(reply, /КНП «Х»/);
+  assert.doesNotMatch(reply, /Комунальне/);
 });
 
 test('handleList: extracts customer from auto-format "entity — title"', () => {

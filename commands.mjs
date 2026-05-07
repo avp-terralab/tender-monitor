@@ -70,6 +70,29 @@ export function formatAddReply(snapshot, { reEnable }) {
   return lines.join('\n');
 }
 
+// Legal-form abbreviations for Ukrainian entity names. Order matters —
+// longer phrases must be matched before their shorter prefixes.
+// Note: JS regex \b is ASCII-only — use \s+ to require whitespace separator.
+const LEGAL_FORM_ABBREVIATIONS = [
+  [/^Комунальне\s+некомерційне\s+підприємство\s+/i, 'КНП '],
+  [/^Комунальне\s+підприємство\s+/i, 'КП '],
+  [/^Товариство\s+з\s+обмеженою\s+відповідальністю\s+/i, 'ТОВ '],
+  [/^Приватне\s+акціонерне\s+товариство\s+/i, 'ПрАТ '],
+  [/^Публічне\s+акціонерне\s+товариство\s+/i, 'ПАТ '],
+  [/^Акціонерне\s+товариство\s+/i, 'АТ '],
+  [/^Державне\s+підприємство\s+/i, 'ДП '],
+  [/^Приватне\s+підприємство\s+/i, 'ПП '],
+  [/^Фізична\s+особа[-\s]+підприємець\s+/i, 'ФОП '],
+];
+
+export function abbreviateLegalForm(name) {
+  if (!name) return name;
+  for (const [re, replacement] of LEGAL_FORM_ABBREVIATIONS) {
+    if (re.test(name)) return name.replace(re, replacement).trim();
+  }
+  return name;
+}
+
 export function handleList({ watchlist }) {
   if (!watchlist || watchlist.length === 0) {
     return '📭 Список порожній. Додай тендер: /add UA-...';
@@ -78,8 +101,9 @@ export function handleList({ watchlist }) {
     const icon = r.enabled ? '🟢' : '🔴';
     // Auto-notes format is "<customer> — <title>"; show only customer.
     // For free-form notes without " — ", show whole thing (still likely entity-like).
-    const customer = r.notes ? r.notes.split(' — ')[0].trim() : '';
-    const suffix = customer ? ` — ${escapeHtml(truncate(customer, 100))}` : '';
+    const rawCustomer = r.notes ? r.notes.split(' — ')[0].trim() : '';
+    const customer = abbreviateLegalForm(rawCustomer);
+    const suffix = customer ? ` — ${escapeHtml(truncate(customer, 150))}` : '';
     return `${i + 1}. ${icon} ${r.tender_id}${suffix}`;
   });
   const active = watchlist.filter(r => r.enabled).length;
