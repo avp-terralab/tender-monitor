@@ -57,3 +57,18 @@ export function formatAddReply(snapshot, { reEnable }) {
   lines.push('Перший snapshot — на наступному monitor-тіку (09/13/18 Київ).');
   return lines.join('\n');
 }
+
+export function handleList({ watchlist }) {
+  if (!watchlist || watchlist.length === 0) {
+    return '📭 Список порожній. Додай тендер: /add UA-...';
+  }
+  const lines = watchlist.map(r => {
+    const icon = r.enabled ? '🟢' : '🔴';
+    const notes = r.notes ? ` — ${escapeHtml(truncate(r.notes, 80))}` : '';
+    return `${icon} ${r.tender_id}${notes}`;
+  });
+  const active = watchlist.filter(r => r.enabled).length;
+  lines.push('');
+  lines.push(`Всього: ${watchlist.length} (${active} active)`);
+  return lines.join('\n');
+}

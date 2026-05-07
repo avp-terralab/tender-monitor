@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCommand, buildAutoNotes, formatAddReply } from '../commands.mjs';
+import { parseCommand, buildAutoNotes, formatAddReply, handleList } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
   assert.deepEqual(parseCommand('/list'), { cmd: 'list' });
@@ -178,4 +178,48 @@ test('formatAddReply: HTML-escapes user-controlled fields', () => {
   assert.match(reply, /A &amp; B/);
   assert.match(reply, /&lt;test&gt;/);
   assert.match(reply, /A&amp;B&gt;/);
+});
+
+test('handleList: empty watchlist', () => {
+  assert.match(handleList({ watchlist: [] }), /порожній/i);
+});
+
+test('handleList: single enabled tender', () => {
+  const reply = handleList({ watchlist: [
+    { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'Рівне ОКЛ' }
+  ]});
+  assert.match(reply, /🟢 UA-2026-04-30-010542-a — Рівне ОКЛ/);
+  assert.match(reply, /Всього: 1 \(1 active\)/);
+});
+
+test('handleList: mix enabled and disabled', () => {
+  const reply = handleList({ watchlist: [
+    { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'Active' },
+    { tender_id: 'UA-2025-01-01-000001-a', enabled: false, notes: 'auto-disabled: 404' },
+  ]});
+  assert.match(reply, /🟢 UA-2026-04-30-010542-a — Active/);
+  assert.match(reply, /🔴 UA-2025-01-01-000001-a — auto-disabled: 404/);
+  assert.match(reply, /Всього: 2 \(1 active\)/);
+});
+
+test('handleList: notes truncated to 80 chars', () => {
+  const longNotes = 'X'.repeat(150);
+  const reply = handleList({ watchlist: [
+    { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: longNotes }
+  ]});
+  assert.ok(reply.includes('X'.repeat(79) + '…'));
+});
+
+test('handleList: row without notes — id only', () => {
+  const reply = handleList({ watchlist: [
+    { tender_id: 'UA-2026-04-30-010542-a', enabled: true }
+  ]});
+  assert.match(reply, /🟢 UA-2026-04-30-010542-a$/m);
+});
+
+test('handleList: HTML-escapes notes', () => {
+  const reply = handleList({ watchlist: [
+    { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'A & <B>' }
+  ]});
+  assert.match(reply, /A &amp; &lt;B&gt;/);
 });
