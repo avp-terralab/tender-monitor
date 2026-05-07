@@ -18,7 +18,21 @@ export async function runHandler({ update, env, deps = {} }) {
   const cmd = parseCommand(msg.text);
   let reply;
 
-  if (cmd.cmd === 'list') {
+  if (cmd.cmd === 'add') {
+    if (cmd.error === 'invalid_id') {
+      reply = '❌ Невалідний tender_id. Формат: UA-YYYY-MM-DD-NNNNNN-x';
+    } else if (cmd.error === 'missing_id') {
+      reply = '❌ Не вказано tender_id. /add UA-YYYY-MM-DD-NNNNNN-x';
+    } else {
+      reply = await handleAddWithRetry({
+        env, cmd,
+        loadWatchlist: _loadWatchlist,
+        saveWatchlist: _saveWatchlist,
+        fetchTender: _fetchTender,
+        extractSnapshot: _extractSnapshot,
+      });
+    }
+  } else if (cmd.cmd === 'list') {
     try {
       const { watchlist } = await _loadWatchlist(env);
       reply = handleList({ watchlist });
@@ -44,4 +58,26 @@ export async function runHandler({ update, env, deps = {} }) {
   } catch (err) {
     console.error('worker: sendReply failed:', err.message);
   }
+}
+
+async function handleAddWithRetry({ env, cmd, loadWatchlist, saveWatchlist, fetchTender, extractSnapshot }) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { watchlist, sha } = await loadWatchlist(env);
+      const result = await handleAdd({ watchlist, fetchTender, extractSnapshot }, cmd);
+      if (!result.mutation) return result.reply;
+      const newWatchlist = applyMutation(watchlist, result.mutation);
+      await saveWatchlist(env, newWatchlist, sha);
+      return result.reply;
+    } catch (err) {
+      if (err instanceof ConflictError && attempt === 0) continue;
+      if (err instanceof ConflictError) break;
+      console.error('worker: handleAdd failed:', err.message);
+      if (err.message.includes('GitHub')) {
+        return '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+      }
+      return '⚠️ Сталася помилка на стороні бота';
+    }
+  }
+  return '⚠️ Не зміг зберегти, спробуй за хвилину';
 }
