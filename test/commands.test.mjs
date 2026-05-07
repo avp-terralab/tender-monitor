@@ -160,6 +160,6 @@ test('formatAddReply: drops DK code from title', () => {
     { ...FULL_SNAP, title: 'Реактиви, код ДК 33696500-0' },
     { reEnable: false }
   );
-  assert.match(reply, /📦 Реактиви\b/);
+  assert.match(reply, /📦 Реактиви\n/);
   assert.doesNotMatch(reply, /код ДК/);
 });
