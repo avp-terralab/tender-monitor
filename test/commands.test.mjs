@@ -205,12 +205,26 @@ test('handleList: mix enabled and disabled', () => {
   assert.match(reply, /Всього: 2 \(1 active\)/);
 });
 
-test('handleList: notes truncated to 80 chars', () => {
+test('handleList: notes truncated to 100 chars', () => {
   const longNotes = 'X'.repeat(150);
   const reply = handleList({ watchlist: [
     { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: longNotes }
   ]});
-  assert.ok(reply.includes('X'.repeat(79) + '…'));
+  assert.ok(reply.includes('X'.repeat(99) + '…'));
+});
+
+test('handleList: numbers entries 1, 2, 3 with blank line between', () => {
+  const reply = handleList({ watchlist: [
+    { tender_id: 'UA-A', enabled: true },
+    { tender_id: 'UA-B', enabled: true },
+    { tender_id: 'UA-C', enabled: false },
+  ]});
+  assert.match(reply, /1\. 🟢 UA-A/);
+  assert.match(reply, /2\. 🟢 UA-B/);
+  assert.match(reply, /3\. 🔴 UA-C/);
+  // Blank line between entries (\n\n)
+  assert.match(reply, /UA-A\n\n2\. /);
+  assert.match(reply, /UA-B\n\n3\. /);
 });
 
 test('handleList: row without notes — id only', () => {

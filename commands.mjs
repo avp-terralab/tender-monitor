@@ -73,15 +73,13 @@ export function handleList({ watchlist }) {
   if (!watchlist || watchlist.length === 0) {
     return '📭 Список порожній. Додай тендер: /add UA-...';
   }
-  const lines = watchlist.map(r => {
+  const rows = watchlist.map((r, i) => {
     const icon = r.enabled ? '🟢' : '🔴';
-    const notes = r.notes ? ` — ${escapeHtml(truncate(r.notes, 80))}` : '';
-    return `${icon} ${r.tender_id}${notes}`;
+    const notes = r.notes ? ` — ${escapeHtml(truncate(r.notes, 100))}` : '';
+    return `${i + 1}. ${icon} ${r.tender_id}${notes}`;
   });
   const active = watchlist.filter(r => r.enabled).length;
-  lines.push('');
-  lines.push(`Всього: ${watchlist.length} (${active} active)`);
-  return lines.join('\n');
+  return rows.join('\n\n') + `\n\nВсього: ${watchlist.length} (${active} active)`;
 }
 
 export function handleStatus({ watchlist, sha }) {
