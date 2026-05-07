@@ -1,18 +1,10 @@
-import { parseCommand, handleAdd, handleList, applyMutation } from './commands.mjs';
+import { parseCommand, handleAdd, handleList, applyMutation, HELP_TEXT } from './commands.mjs';
+export { HELP_TEXT };
 import { fetchTender, extractSnapshot } from './prozorro.mjs';
 import { getUpdates, sendReply, chunkMessage } from './telegram.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-
-export const HELP_TEXT = [
-  'Команди:',
-  '/add UA-YYYY-MM-DD-NNNNNN-x [нотатки] — додати тендер',
-  '/list — показати всі тендери на моніторингу',
-  '/help — це повідомлення',
-  '',
-  'Видалити/призупинити: github.com/avp-terralab/tender-monitor → watchlist.json',
-].join('\n');
 
 export async function runBot(deps) {
   const {
