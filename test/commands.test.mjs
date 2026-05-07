@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCommand, buildAutoNotes, formatAddReply, handleList, applyMutation } from '../commands.mjs';
+import {
+  parseCommand, buildAutoNotes, formatAddReply, handleList,
+  applyMutation, handleAdd,
+} from '../commands.mjs';
 
 test('parseCommand: /list', () => {
   assert.deepEqual(parseCommand('/list'), { cmd: 'list' });
@@ -262,4 +265,114 @@ test('applyMutation: unknown type — returns input unchanged', () => {
   const wl = [{ tender_id: 'UA-A', enabled: true }];
   const result = applyMutation(wl, { type: 'wat' });
   assert.deepEqual(result, wl);
+});
+
+// --- handleAdd tests ---
+
+const RAW_OK = {
+  data: {
+    tenderID: 'UA-2026-04-30-010542-a',
+    title: 'Реактиви для лабораторії',
+    status: 'active.tendering',
+    tenderPeriod: { endDate: '2026-05-15T14:30:00+03:00' },
+    procuringEntity: { name: 'КНП «Рівненська ОКЛ»', identifier: { id: '12345678' } },
+    items: [],
+  },
+};
+const ID = 'UA-2026-04-30-010542-a';
+
+const mockDeps = async (overrides = {}) => ({
+  watchlist: [],
+  fetchTender: async () => RAW_OK,
+  extractSnapshot: (await import('../prozorro.mjs')).extractSnapshot,
+  ...overrides,
+});
+
+test('handleAdd: new tender, fetch OK → mutation:append + ✅ Додано', async () => {
+  const result = await handleAdd(await mockDeps(), { tender_id: ID, notes: null });
+  assert.match(result.reply, /✅ Додано/);
+  assert.equal(result.mutation.type, 'append');
+  assert.equal(result.mutation.row.tender_id, ID);
+  assert.equal(result.mutation.row.enabled, true);
+  assert.match(result.mutation.row.notes, /Рівненська ОКЛ/);
+});
+
+test('handleAdd: user notes override auto-notes', async () => {
+  const result = await handleAdd(
+    await mockDeps(),
+    { tender_id: ID, notes: 'мій коментар' }
+  );
+  assert.equal(result.mutation.row.notes, 'мій коментар');
+});
+
+test('handleAdd: fetch 404 → ❌ + no mutation', async () => {
+  const deps = await mockDeps({
+    fetchTender: async () => { throw new Error('Prozorro summary 404: ' + ID); },
+  });
+  const result = await handleAdd(deps, { tender_id: ID, notes: null });
+  assert.match(result.reply, /❌/);
+  assert.match(result.reply, /не знайдено/);
+  assert.equal(result.mutation, null);
+});
+
+test('handleAdd: fetch "no UUID returned" → ❌ (treated as not-found)', async () => {
+  const deps = await mockDeps({
+    fetchTender: async () => { throw new Error('Prozorro: no UUID returned for ' + ID); },
+  });
+  const result = await handleAdd(deps, { tender_id: ID, notes: null });
+  assert.match(result.reply, /❌/);
+  assert.equal(result.mutation, null);
+});
+
+test('handleAdd: fetch 5xx → ⚠️ + no mutation', async () => {
+  const deps = await mockDeps({
+    fetchTender: async () => { throw new Error('Prozorro summary 503: timeout'); },
+  });
+  const result = await handleAdd(deps, { tender_id: ID, notes: null });
+  assert.match(result.reply, /⚠️/);
+  assert.match(result.reply, /Спробуй ще раз/);
+  assert.equal(result.mutation, null);
+});
+
+test('handleAdd: already enabled → short-circuit, no fetch', async () => {
+  let fetchCalled = false;
+  const deps = await mockDeps({
+    watchlist: [{ tender_id: ID, enabled: true, notes: 'old' }],
+    fetchTender: async () => { fetchCalled = true; return RAW_OK; },
+  });
+  const result = await handleAdd(deps, { tender_id: ID, notes: null });
+  assert.match(result.reply, /⚠️ Вже моніторю/);
+  assert.equal(result.mutation, null);
+  assert.equal(fetchCalled, false);
+});
+
+test('handleAdd: previously disabled, fetch OK → re-enable + update + ✅ Поновив', async () => {
+  const deps = await mockDeps({
+    watchlist: [{ tender_id: ID, enabled: false, notes: 'auto-disabled: 404' }],
+  });
+  const result = await handleAdd(deps, { tender_id: ID, notes: null });
+  assert.match(result.reply, /✅ Поновив/);
+  assert.equal(result.mutation.type, 'update');
+  assert.equal(result.mutation.tender_id, ID);
+  assert.equal(result.mutation.fields.enabled, true);
+  assert.match(result.mutation.fields.notes, /Рівненська ОКЛ/);
+  assert.doesNotMatch(result.mutation.fields.notes, /auto-disabled/);
+});
+
+test('handleAdd: previously disabled, fetch still 404 → no re-enable, ❌', async () => {
+  const deps = await mockDeps({
+    watchlist: [{ tender_id: ID, enabled: false, notes: 'auto-disabled: 404' }],
+    fetchTender: async () => { throw new Error('Prozorro summary 404'); },
+  });
+  const result = await handleAdd(deps, { tender_id: ID, notes: null });
+  assert.match(result.reply, /❌/);
+  assert.equal(result.mutation, null);
+});
+
+test('handleAdd: previously disabled, user-supplied notes used in update', async () => {
+  const deps = await mockDeps({
+    watchlist: [{ tender_id: ID, enabled: false, notes: 'auto-disabled: 404' }],
+  });
+  const result = await handleAdd(deps, { tender_id: ID, notes: 'мій новий коментар' });
+  assert.equal(result.mutation.fields.notes, 'мій новий коментар');
 });

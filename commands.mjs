@@ -86,3 +86,53 @@ export function applyMutation(watchlist, mutation) {
   }
   return watchlist;
 }
+
+export async function handleAdd(deps, { tender_id, notes }) {
+  const { watchlist, fetchTender, extractSnapshot } = deps;
+  const existing = watchlist.find(r => r.tender_id === tender_id);
+
+  if (existing?.enabled) {
+    return {
+      reply: `⚠️ Вже моніторю ${tender_id}`,
+      mutation: null,
+    };
+  }
+
+  let snapshot;
+  try {
+    const raw = await fetchTender(tender_id);
+    snapshot = extractSnapshot(raw);
+  } catch (err) {
+    if (/(404|not found|no UUID)/i.test(err.message)) {
+      return {
+        reply: `❌ ${tender_id} не знайдено в Prozorro. Перевір id.`,
+        mutation: null,
+      };
+    }
+    return {
+      reply: `⚠️ Не зміг перевірити ${tender_id} в Prozorro: ${err.message}. Спробуй ще раз.`,
+      mutation: null,
+    };
+  }
+
+  const finalNotes = notes ?? buildAutoNotes(snapshot);
+
+  if (existing) {
+    return {
+      reply: formatAddReply(snapshot, { reEnable: true }),
+      mutation: {
+        type: 'update',
+        tender_id,
+        fields: { enabled: true, notes: finalNotes },
+      },
+    };
+  }
+
+  return {
+    reply: formatAddReply(snapshot, { reEnable: false }),
+    mutation: {
+      type: 'append',
+      row: { tender_id, enabled: true, notes: finalNotes },
+    },
+  };
+}
