@@ -93,3 +93,33 @@ test('runHandler: free text → no-op', async () => {
   });
   assert.equal(sent.length, 0);
 });
+
+test('runHandler: /list with watchlist → formatted reply', async () => {
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [{ tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'X' }],
+      sha: 'abc',
+    }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/list', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /🟢 UA-2026-04-30-010542-a/);
+  assert.match(sent[0].text, /Всього: 1 \(1 active\)/);
+});
+
+test('runHandler: /list when loadWatchlist throws → ⚠️ reply', async () => {
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => { throw new Error('GitHub GET 503: timeout'); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/list', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /⚠️ GitHub тимчасово недоступний/);
+});

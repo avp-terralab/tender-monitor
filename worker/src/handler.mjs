@@ -18,7 +18,15 @@ export async function runHandler({ update, env, deps = {} }) {
   const cmd = parseCommand(msg.text);
   let reply;
 
-  if (cmd.cmd === 'help') {
+  if (cmd.cmd === 'list') {
+    try {
+      const { watchlist } = await _loadWatchlist(env);
+      reply = handleList({ watchlist });
+    } catch (err) {
+      console.error('worker: loadWatchlist failed:', err.message);
+      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+    }
+  } else if (cmd.cmd === 'help') {
     reply = HELP_TEXT;
   } else if (cmd.cmd === 'unknown') {
     reply = '❓ Не розумію. /help';
