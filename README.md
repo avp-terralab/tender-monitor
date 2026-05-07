@@ -36,7 +36,7 @@ Set in repo Settings → Secrets and variables → Actions:
 - `/list` — побачити повний watchlist.
 - `/help` — список команд.
 
-Bot реагує тільки на повідомлення з `TELEGRAM_CHAT_ID` (інші ігноруються мовчки). Polling — кожні 5 хв через GHA workflow `bot.yml`. Зміна вступає в силу на найближчому monitor-тіку (09/13/18 Київ).
+Bot реагує тільки на повідомлення з `ALLOWED_CHAT_ID` (інші ігноруються мовчки). Webhook через Cloudflare Worker — sub-second response. Зміна watchlist комітиться у репо одразу після reply від бота.
 
 **Manual edit (для bulk-операцій або видалення):**
 

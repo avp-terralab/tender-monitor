@@ -24,7 +24,7 @@ jobs:
       - name: Run tests
         run: node --test test/*.test.mjs worker/test/*.test.mjs
       - name: Install wrangler
-        run: cd worker && npm install --no-save wrangler
+        run: cd worker && npm install --no-save wrangler@^3
       - name: Deploy
         working-directory: worker
         env:
