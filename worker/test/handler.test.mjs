@@ -263,3 +263,37 @@ test('runHandler: /add when loadWatchlist 5xx → ⚠️ reply, no save', async 
   assert.equal(saveCalled, false);
   assert.match(sent[0].text, /⚠️ GitHub/);
 });
+
+test('runHandler: /status with watchlist → reply with counts and sha', async () => {
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [
+        { tender_id: 'UA-A', enabled: true },
+        { tender_id: 'UA-B', enabled: false },
+      ],
+      sha: 'fedcba9876543210',
+    }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/status', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /🟢 Worker live/);
+  assert.match(sent[0].text, /Watchlist: 2 tenders \(1 active\)/);
+  assert.match(sent[0].text, /sha fedcba9/);
+});
+
+test('runHandler: /status when loadWatchlist throws → reply with GitHub error note', async () => {
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => { throw new Error('GitHub GET 503: timeout'); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/status', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /Worker live, але GitHub недоступний/);
+  assert.match(sent[0].text, /503/);
+});

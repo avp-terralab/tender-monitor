@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseCommand, buildAutoNotes, formatAddReply, handleList,
-  applyMutation, handleAdd,
+  applyMutation, handleAdd, handleStatus,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -375,4 +375,31 @@ test('handleAdd: previously disabled, user-supplied notes used in update', async
   });
   const result = await handleAdd(deps, { tender_id: ID, notes: 'мій новий коментар' });
   assert.equal(result.mutation.fields.notes, 'мій новий коментар');
+});
+
+test('parseCommand: /status', () => {
+  assert.deepEqual(parseCommand('/status'), { cmd: 'status' });
+});
+
+test('parseCommand: /status with bot suffix', () => {
+  assert.deepEqual(parseCommand('/status@my_bot'), { cmd: 'status' });
+});
+
+test('handleStatus: formats live status', () => {
+  const reply = handleStatus({
+    watchlist: [
+      { tender_id: 'UA-A', enabled: true },
+      { tender_id: 'UA-B', enabled: true },
+      { tender_id: 'UA-C', enabled: false },
+    ],
+    sha: 'abc1234567890def',
+  });
+  assert.match(reply, /🟢 Worker live/);
+  assert.match(reply, /Watchlist: 3 tenders \(2 active\)/);
+  assert.match(reply, /sha abc1234/);
+});
+
+test('handleStatus: empty watchlist', () => {
+  const reply = handleStatus({ watchlist: [], sha: '0000000' });
+  assert.match(reply, /Watchlist: 0 tenders \(0 active\)/);
 });

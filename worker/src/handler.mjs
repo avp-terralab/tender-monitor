@@ -1,4 +1,4 @@
-import { parseCommand, handleAdd, handleList, applyMutation, HELP_TEXT } from '../../commands.mjs';
+import { parseCommand, handleAdd, handleList, handleStatus, applyMutation, HELP_TEXT } from '../../commands.mjs';
 import { fetchTender, extractSnapshot } from '../../prozorro.mjs';
 import { sendReply } from '../../telegram.mjs';
 import { loadWatchlist, saveWatchlist, ConflictError } from './github.mjs';
@@ -39,6 +39,14 @@ export async function runHandler({ update, env, deps = {} }) {
     } catch (err) {
       console.error('worker: loadWatchlist failed:', err.message);
       reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+    }
+  } else if (cmd.cmd === 'status') {
+    try {
+      const { watchlist, sha } = await _loadWatchlist(env);
+      reply = handleStatus({ watchlist, sha });
+    } catch (err) {
+      console.error('worker: status loadWatchlist failed:', err.message);
+      reply = `⚠️ Worker live, але GitHub недоступний: ${err.message}`;
     }
   } else if (cmd.cmd === 'help') {
     reply = HELP_TEXT;

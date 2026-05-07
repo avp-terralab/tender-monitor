@@ -9,6 +9,7 @@ export function parseCommand(text) {
 
   if (/^\/list(?:@\w+)?$/i.test(trimmed)) return { cmd: 'list' };
   if (/^\/help(?:@\w+)?$/i.test(trimmed)) return { cmd: 'help' };
+  if (/^\/status(?:@\w+)?$/i.test(trimmed)) return { cmd: 'status' };
 
   const addMatch = trimmed.match(/^\/add(?:@\w+)?(?:\s+(.*))?$/i);
   if (addMatch) {
@@ -70,6 +71,16 @@ export function handleList({ watchlist }) {
   const active = watchlist.filter(r => r.enabled).length;
   lines.push('');
   lines.push(`Всього: ${watchlist.length} (${active} active)`);
+  return lines.join('\n');
+}
+
+export function handleStatus({ watchlist, sha }) {
+  const active = watchlist.filter(r => r.enabled).length;
+  const lines = [
+    '🟢 Worker live',
+    `📋 Watchlist: ${watchlist.length} tenders (${active} active)`,
+    `✅ GitHub auth: OK (sha ${sha.slice(0, 7)})`,
+  ];
   return lines.join('\n');
 }
 
@@ -141,6 +152,7 @@ export const HELP_TEXT = [
   'Команди:',
   '/add UA-YYYY-MM-DD-NNNNNN-x [нотатки] — додати тендер',
   '/list — показати всі тендери на моніторингу',
+  '/status — здоровʼя бота',
   '/help — це повідомлення',
   '',
   'Видалити/призупинити: github.com/avp-terralab/tender-monitor → watchlist.json',
