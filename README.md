@@ -72,10 +72,10 @@ Set `enabled: false` to pause. Auto-disabled rows (404 from Prozorro) get `auto-
 ## Tests
 
 ```
-node --test test/compare.test.mjs test/prozorro.test.mjs test/telegram.test.mjs test/monitor.test.mjs
+node --test test/*.test.mjs
 ```
 
-Should report 70+ tests passing.
+Should report 140+ tests passing across compare, prozorro, telegram, monitor, commands, and bot suites.
 
 ## Spec
 
