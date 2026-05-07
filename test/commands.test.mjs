@@ -205,12 +205,12 @@ test('handleList: mix enabled and disabled', () => {
   assert.match(reply, /Всього: 2 \(1 active\)/);
 });
 
-test('handleList: customer truncated to 60 chars', () => {
-  const longCustomer = 'X'.repeat(100);
+test('handleList: customer truncated to 100 chars', () => {
+  const longCustomer = 'X'.repeat(150);
   const reply = handleList({ watchlist: [
     { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: longCustomer }
   ]});
-  assert.ok(reply.includes('X'.repeat(59) + '…'));
+  assert.ok(reply.includes('X'.repeat(99) + '…'));
 });
 
 test('handleList: extracts customer from auto-format "entity — title"', () => {

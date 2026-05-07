@@ -79,7 +79,7 @@ export function handleList({ watchlist }) {
     // Auto-notes format is "<customer> — <title>"; show only customer.
     // For free-form notes without " — ", show whole thing (still likely entity-like).
     const customer = r.notes ? r.notes.split(' — ')[0].trim() : '';
-    const suffix = customer ? ` — ${escapeHtml(truncate(customer, 60))}` : '';
+    const suffix = customer ? ` — ${escapeHtml(truncate(customer, 100))}` : '';
     return `${i + 1}. ${icon} ${r.tender_id}${suffix}`;
   });
   const active = watchlist.filter(r => r.enabled).length;
