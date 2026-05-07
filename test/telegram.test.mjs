@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -339,4 +339,48 @@ test('formatHeartbeat: empty snapshots produces still-alive line without deadlin
   assert.match(text, /🟢 Heartbeat/);
   assert.match(text, /Моніторю 0 тендерів/);
   assert.doesNotMatch(text, /Поточні дедлайни/);
+});
+
+test('truncate: returns string unchanged when shorter than max', () => {
+  assert.equal(truncate('hello', 10), 'hello');
+});
+
+test('truncate: shortens with ellipsis when longer', () => {
+  assert.equal(truncate('hello world', 8), 'hello w…');
+});
+
+test('truncate: handles null/undefined', () => {
+  assert.equal(truncate(null, 5), '');
+  assert.equal(truncate(undefined, 5), '');
+});
+
+test('stripDkCode: removes DK suffix', () => {
+  assert.equal(
+    stripDkCode('Реактиви для лабораторії, код ДК 33696500-0'),
+    'Реактиви для лабораторії'
+  );
+});
+
+test('stripDkCode: leaves title without DK unchanged', () => {
+  assert.equal(stripDkCode('Просто реактиви'), 'Просто реактиви');
+});
+
+test('fmtStatus: maps known status to label', () => {
+  assert.equal(fmtStatus('active.tendering'), 'Приймання пропозицій');
+  assert.equal(fmtStatus('complete'), 'Завершено');
+});
+
+test('fmtStatus: returns raw key for unknown status', () => {
+  assert.equal(fmtStatus('weird.status'), 'weird.status');
+});
+
+test('fmtDeadline: ISO datetime to "DD.MM.YYYY до HH:MM"', () => {
+  assert.equal(
+    fmtDeadline('2026-05-15T14:30:00+03:00'),
+    '15.05.2026 до 14:30'
+  );
+});
+
+test('fmtDeadline: returns empty for null', () => {
+  assert.equal(fmtDeadline(null), '');
 });

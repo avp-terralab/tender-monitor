@@ -57,7 +57,7 @@ const PROC_METHOD_LABELS = {
   simple: 'Спрощена',
 };
 
-const fmtStatus = (s) => STATUS_LABELS[s] ?? s;
+export const fmtStatus = (s) => STATUS_LABELS[s] ?? s;
 
 function escapeHtml(s) {
   if (s == null) return '';
@@ -75,12 +75,12 @@ function formatPhone(raw) {
   }).join(', ');
 }
 
-function truncate(s, max) {
+export function truncate(s, max) {
   if (!s || s.length <= max) return s ?? '';
   return s.slice(0, max - 1) + '…';
 }
 
-function stripDkCode(title) {
+export function stripDkCode(title) {
   if (!title) return '';
   return title.replace(/\s*[,;]\s*код\s+ДК\s+.+$/i, '').trim();
 }
@@ -96,7 +96,7 @@ function fmtDate(iso) {
   return iso;
 }
 
-function fmtDeadline(iso) {
+export function fmtDeadline(iso) {
   if (!iso) return '';
   // Deadlines render as "DD.MM.YYYY до HH:MM" (час як крайній термін)
   const dt = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
