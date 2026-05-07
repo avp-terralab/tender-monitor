@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCommand, buildAutoNotes } from '../commands.mjs';
+import { parseCommand, buildAutoNotes, formatAddReply } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
   assert.deepEqual(parseCommand('/list'), { cmd: 'list' });
@@ -117,4 +117,49 @@ test('buildAutoNotes: truncates at 200 chars', () => {
   const result = buildAutoNotes({ title: longTitle });
   assert.ok(result.length <= 200);
   assert.ok(result.endsWith('…'));
+});
+
+const FULL_SNAP = {
+  tender_id: 'UA-2026-04-30-010542-a',
+  title: 'Реактиви для лабораторії',
+  status: 'active.tendering',
+  tenderPeriod: { endDate: '2026-05-15T14:30:00+03:00' },
+  procuringEntity: { name: 'КНП «Рівненська ОКЛ»', edrpou: '12345678' },
+};
+
+test('formatAddReply: new tender — full template', () => {
+  const reply = formatAddReply(FULL_SNAP, { reEnable: false });
+  assert.match(reply, /✅ Додано UA-2026-04-30-010542-a/);
+  assert.match(reply, /📦 Реактиви для лабораторії/);
+  assert.match(reply, /👥 КНП «Рівненська ОКЛ»/);
+  assert.match(reply, /Статус: Приймання пропозицій/);
+  assert.match(reply, /дедлайн 15\.05\.2026 до 14:30/);
+  assert.match(reply, /Перший snapshot/);
+});
+
+test('formatAddReply: re-enable shows "Поновив" prefix', () => {
+  const reply = formatAddReply(FULL_SNAP, { reEnable: true });
+  assert.match(reply, /✅ Поновив моніторинг UA-/);
+  assert.doesNotMatch(reply, /✅ Додано/);
+});
+
+test('formatAddReply: omits 👥 when procuringEntity null', () => {
+  const reply = formatAddReply({ ...FULL_SNAP, procuringEntity: null }, { reEnable: false });
+  assert.doesNotMatch(reply, /👥/);
+  assert.match(reply, /📦 Реактиви/);
+});
+
+test('formatAddReply: omits "дедлайн" when tenderPeriod.endDate null', () => {
+  const reply = formatAddReply({ ...FULL_SNAP, tenderPeriod: null }, { reEnable: false });
+  assert.match(reply, /Статус: Приймання пропозицій/);
+  assert.doesNotMatch(reply, /дедлайн/);
+});
+
+test('formatAddReply: drops DK code from title', () => {
+  const reply = formatAddReply(
+    { ...FULL_SNAP, title: 'Реактиви, код ДК 33696500-0' },
+    { reEnable: false }
+  );
+  assert.match(reply, /📦 Реактиви\b/);
+  assert.doesNotMatch(reply, /код ДК/);
 });

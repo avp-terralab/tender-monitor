@@ -1,4 +1,4 @@
-import { stripDkCode, truncate } from './telegram.mjs';
+import { stripDkCode, truncate, fmtStatus, fmtDeadline } from './telegram.mjs';
 
 const TENDER_ID_RE_STR = 'UA-\\d{4}-\\d{2}-\\d{2}-\\d{6}-[a-zA-Z]';
 
@@ -37,4 +37,23 @@ export function buildAutoNotes(snapshot) {
   else if (title) combined = title;
   else combined = '';
   return truncate(combined, 200);
+}
+
+export function formatAddReply(snapshot, { reEnable }) {
+  const lines = [];
+  const verb = reEnable ? 'Поновив моніторинг' : 'Додано';
+  lines.push(`✅ ${verb} ${snapshot.tender_id}`);
+  const title = stripDkCode(snapshot.title ?? '');
+  if (title) lines.push(`📦 ${truncate(title, 200)}`);
+  if (snapshot.procuringEntity?.name) {
+    lines.push(`👥 ${snapshot.procuringEntity.name}`);
+  }
+  if (snapshot.status) {
+    let line = `ℹ️ Статус: ${fmtStatus(snapshot.status)}`;
+    const deadline = snapshot.tenderPeriod?.endDate;
+    if (deadline) line += `, дедлайн ${fmtDeadline(deadline)}`;
+    lines.push(line);
+  }
+  lines.push('Перший snapshot — на наступному monitor-тіку (09/13/18 Київ).');
+  return lines.join('\n');
 }
