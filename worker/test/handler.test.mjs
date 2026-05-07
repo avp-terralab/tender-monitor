@@ -452,3 +452,54 @@ test('runHandler: /info when loadWatchlist throws → ⚠️ reply', async () =>
   });
   assert.match(sent[0].text, /⚠️ GitHub недоступний/);
 });
+
+test('runHandler: /list fetches value for enabled rows; skips disabled', async () => {
+  const fetched = [];
+  const RAW = (id) => ({
+    data: {
+      tenderID: id,
+      title: 'X',
+      status: 'active.tendering',
+      tenderPeriod: { endDate: '2026-05-15T14:00:00+03:00' },
+      procuringEntity: { name: 'Тест', identifier: { id: '1' } },
+      items: [],
+      value: { amount: 12345, currency: 'UAH', valueAddedTaxIncluded: true },
+    },
+  });
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [
+        { tender_id: 'UA-A', enabled: true, notes: 'ТОВ «А»' },
+        { tender_id: 'UA-B', enabled: false, notes: 'ТОВ «Б»' },
+      ],
+      sha: 'x',
+    }),
+    fetchTender: async (id) => { fetched.push(id); return RAW(id); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/list', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.deepEqual(fetched, ['UA-A']);  // disabled UA-B not fetched
+  assert.match(sent[0].text, /UA-A — ТОВ «А» — 12 345 UAH/);
+  // UA-B disabled — no value
+  assert.match(sent[0].text, /🔴 UA-B — ТОВ «Б»\n\nВсього/);
+});
+
+test('runHandler: /list fetch failure on enabled row → list still works without value', async () => {
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [{ tender_id: 'UA-A', enabled: true, notes: 'ТОВ «А»' }],
+      sha: 'x',
+    }),
+    fetchTender: async () => { throw new Error('Prozorro 503'); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/list', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /UA-A — ТОВ «А»/);
+  assert.doesNotMatch(sent[0].text, /UAH/);
+});

@@ -48,7 +48,18 @@ export async function runHandler({ update, env, deps = {} }) {
   } else if (cmd.cmd === 'list') {
     try {
       const { watchlist } = await _loadWatchlist(env);
-      reply = handleList({ watchlist });
+      // Fetch value from Prozorro for enabled rows in parallel; ignore failures (just no value shown)
+      const augmented = await Promise.all(watchlist.map(async (r) => {
+        if (!r.enabled) return r;
+        try {
+          const raw = await _fetchTender(r.tender_id);
+          const snap = _extractSnapshot(raw);
+          return { ...r, _value: snap.value };
+        } catch {
+          return r;
+        }
+      }));
+      reply = handleList({ watchlist: augmented });
     } catch (err) {
       console.error('worker: loadWatchlist failed:', err.message);
       reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';

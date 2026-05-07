@@ -58,7 +58,7 @@ export function formatAddReply(snapshot, { reEnable }) {
   const title = stripDkCode(snapshot.title ?? '');
   if (title) lines.push(`📦 ${escapeHtml(truncate(title, 200))}`);
   if (snapshot.procuringEntity?.name) {
-    lines.push(`👥 ${escapeHtml(snapshot.procuringEntity.name)}`);
+    lines.push(`👥 ${escapeHtml(abbreviateLegalForm(snapshot.procuringEntity.name))}`);
   }
   if (snapshot.status) {
     let line = `ℹ️ Статус: ${fmtStatus(snapshot.status)}`;
@@ -100,11 +100,16 @@ export function handleList({ watchlist }) {
   const rows = watchlist.map((r, i) => {
     const icon = r.enabled ? '🟢' : '🔴';
     // Auto-notes format is "<customer> — <title>"; show only customer.
-    // For free-form notes without " — ", show whole thing (still likely entity-like).
     const rawCustomer = r.notes ? r.notes.split(' — ')[0].trim() : '';
     const customer = abbreviateLegalForm(rawCustomer);
-    const suffix = customer ? ` — ${escapeHtml(truncate(customer, 150))}` : '';
-    return `${i + 1}. ${icon} ${r.tender_id}${suffix}`;
+    const customerSuffix = customer ? ` — ${escapeHtml(truncate(customer, 150))}` : '';
+    // Optional value (provided by handler from Prozorro fetch on enabled rows)
+    let valueSuffix = '';
+    if (r._value && typeof r._value.amount === 'number') {
+      const amount = formatMoney(r._value.amount);
+      valueSuffix = ` — ${amount} ${r._value.currency}`;
+    }
+    return `${i + 1}. ${icon} ${r.tender_id}${customerSuffix}${valueSuffix}`;
   });
   const active = watchlist.filter(r => r.enabled).length;
   return rows.join('\n\n') + `\n\nВсього: ${watchlist.length} (${active} active)`;
@@ -115,7 +120,8 @@ function formatInfoEntry(g) {
   sections.push(`🆔 Ідентифікатор закупівлі: <a href="${escapeHtml(g.prozorro_url)}">${escapeHtml(g.tender_id)}</a>`);
   if (g.procuring_entity?.name) {
     const edrpou = g.procuring_entity.edrpou ? ` (ЄДРПОУ ${g.procuring_entity.edrpou})` : '';
-    sections.push(`👥 Замовник: ${escapeHtml(g.procuring_entity.name)}${edrpou}`);
+    const name = abbreviateLegalForm(g.procuring_entity.name);
+    sections.push(`👥 Замовник: ${escapeHtml(name)}${edrpou}`);
   }
   if (g.classification?.id) {
     const desc = g.classification.description ? ` — ${escapeHtml(g.classification.description)}` : '';

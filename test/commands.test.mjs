@@ -642,3 +642,52 @@ test('formatInfo: multiple entries are numbered and separated by line', () => {
   // Separator between entries
   assert.match(reply, /━{20,}/);
 });
+
+test('handleList: shows value when _value present on row', () => {
+  const reply = handleList({ watchlist: [
+    {
+      tender_id: 'UA-A',
+      enabled: true,
+      notes: 'КНП «Х»',
+      _value: { amount: 800147, currency: 'UAH', valueAddedTaxIncluded: true },
+    },
+  ]});
+  assert.match(reply, /UA-A — КНП «Х» — 800 147 UAH/);
+});
+
+test('handleList: omits value if _value missing (e.g. failed fetch)', () => {
+  const reply = handleList({ watchlist: [
+    { tender_id: 'UA-A', enabled: true, notes: 'КНП «Х»' },
+  ]});
+  assert.match(reply, /UA-A — КНП «Х»\n\nВсього/);
+  assert.doesNotMatch(reply, /UAH/);
+});
+
+test('formatAddReply: abbreviates entity legal form', () => {
+  const reply = formatAddReply(
+    {
+      tender_id: 'UA-X',
+      title: 'Послуги',
+      status: 'active.tendering',
+      tenderPeriod: { endDate: '2026-05-15T14:30:00+03:00' },
+      procuringEntity: { name: 'Товариство з обмеженою відповідальністю «ТерраЛаб»' },
+    },
+    { reEnable: false }
+  );
+  assert.match(reply, /👥 ТОВ «ТерраЛаб»/);
+  assert.doesNotMatch(reply, /Товариство з обмеженою/);
+});
+
+test('formatInfo: abbreviates entity in 👥 line', () => {
+  const reply = formatInfo({
+    runIso: '2026-05-08T13:00:00+03:00',
+    groups: [{
+      tender_id: 'UA-X',
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+      status: 'active.tendering',
+      procuring_entity: { name: 'Комунальне підприємство «Київтепло»', edrpou: '11111111' },
+    }],
+  });
+  assert.match(reply, /👥 Замовник: КП «Київтепло»/);
+  assert.doesNotMatch(reply, /Комунальне підприємство/);
+});
