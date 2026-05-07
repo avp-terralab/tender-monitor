@@ -15,6 +15,25 @@ export async function runHandler({ update, env, deps = {} }) {
   if (String(msg.chat?.id) !== String(env.ALLOWED_CHAT_ID)) return;
   if (typeof msg.text !== 'string') return;
 
-  // Routing logic added in next tasks
-  return;
+  const cmd = parseCommand(msg.text);
+  let reply;
+
+  if (cmd.cmd === 'help') {
+    reply = HELP_TEXT;
+  } else if (cmd.cmd === 'unknown') {
+    reply = '❓ Не розумію. /help';
+  } else {
+    return; // free text or other unhandled — no reply
+  }
+
+  try {
+    await _sendReply({
+      token: env.TELEGRAM_BOT_TOKEN,
+      chatId: msg.chat.id,
+      text: reply,
+      replyToMessageId: msg.message_id,
+    });
+  } catch (err) {
+    console.error('worker: sendReply failed:', err.message);
+  }
 }

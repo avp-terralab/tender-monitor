@@ -57,3 +57,39 @@ test('runHandler: message without text → no-op', async () => {
   });
   assert.equal(sent.length, 0);
 });
+
+import { HELP_TEXT } from '../../commands.mjs';
+
+test('runHandler: /help → sendReply HELP_TEXT', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/help', message_id: 7 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].text, HELP_TEXT);
+  assert.equal(sent[0].chatId, 123);
+  assert.equal(sent[0].replyToMessageId, 7);
+  assert.equal(sent[0].token, 'TOK');
+});
+
+test('runHandler: /unknown → sendReply "Не розумію"', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/foo', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /Не розумію/);
+});
+
+test('runHandler: free text → no-op', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: 'hello', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 0);
+});
