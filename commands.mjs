@@ -75,7 +75,7 @@ export function handleList({ watchlist }) {
   }
   const rows = watchlist.map((r, i) => {
     const icon = r.enabled ? '🟢' : '🔴';
-    const notes = r.notes ? ` — ${escapeHtml(truncate(r.notes, 120))}` : '';
+    const notes = r.notes ? ` — ${escapeHtml(truncate(r.notes, 200))}` : '';
     return `${i + 1}. ${icon} ${r.tender_id}${notes}`;
   });
   const active = watchlist.filter(r => r.enabled).length;
