@@ -1,0 +1,33 @@
+name: pat-health
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Monday 09:00 UTC = 12:00 Київ
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify GITHUB_PAT against repo Contents API
+        env:
+          PAT: ${{ secrets.GITHUB_PAT_FOR_WORKER }}
+        run: |
+          if [ -z "$PAT" ]; then
+            echo "::error::Secret GITHUB_PAT_FOR_WORKER not set. Add it under repo Settings -> Secrets."
+            exit 1
+          fi
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $PAT" \
+            -H "User-Agent: tender-monitor-worker" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/avp-terralab/tender-monitor/contents/watchlist.json")
+          if [ "$status" = "200" ]; then
+            echo "PAT is healthy (HTTP 200)."
+            exit 0
+          fi
+          echo "::error::PAT check failed: HTTP $status. Regenerate at https://github.com/settings/personal-access-tokens, then: cd worker && npx wrangler secret put GITHUB_PAT, and update GitHub Secret GITHUB_PAT_FOR_WORKER."
+          exit 1
