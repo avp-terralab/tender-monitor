@@ -10,6 +10,11 @@ test('parseCommand: /list with bot suffix', () => {
   assert.deepEqual(parseCommand('/list@my_bot'), { cmd: 'list' });
 });
 
+test('parseCommand: /list and /help reject trailing text (strict)', () => {
+  assert.deepEqual(parseCommand('/list extra'), { cmd: 'unknown' });
+  assert.deepEqual(parseCommand('/help please'), { cmd: 'unknown' });
+});
+
 test('parseCommand: /help', () => {
   assert.deepEqual(parseCommand('/help'), { cmd: 'help' });
 });
