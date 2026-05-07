@@ -127,8 +127,12 @@ export function formatInfo({ runIso, groups, errors = [] }) {
   const date = KYIV_DATE.format(new Date(runIso));
   const lines = [`📋 Статус тендерів (${time}, ${date})`, ''];
   for (let i = 0; i < groups.length; i++) {
-    lines.push(formatInfoEntry(groups[i]));
-    if (i < groups.length - 1) lines.push('');
+    lines.push(`${i + 1}. ${formatInfoEntry(groups[i])}`);
+    if (i < groups.length - 1) {
+      lines.push('');
+      lines.push('━'.repeat(24));
+      lines.push('');
+    }
   }
   if (errors.length > 0) {
     lines.push('');
