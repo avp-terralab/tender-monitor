@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCommand, buildAutoNotes, formatAddReply, handleList } from '../commands.mjs';
+import { parseCommand, buildAutoNotes, formatAddReply, handleList, applyMutation } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
   assert.deepEqual(parseCommand('/list'), { cmd: 'list' });
@@ -222,4 +222,44 @@ test('handleList: HTML-escapes notes', () => {
     { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'A & <B>' }
   ]});
   assert.match(reply, /A &amp; &lt;B&gt;/);
+});
+
+test('applyMutation: append adds new row', () => {
+  const wl = [{ tender_id: 'UA-A', enabled: true, notes: 'A' }];
+  const result = applyMutation(wl, {
+    type: 'append',
+    row: { tender_id: 'UA-B', enabled: true, notes: 'B' },
+  });
+  assert.equal(result.length, 2);
+  assert.equal(result[1].tender_id, 'UA-B');
+});
+
+test('applyMutation: append does not mutate input', () => {
+  const wl = [{ tender_id: 'UA-A', enabled: true }];
+  const result = applyMutation(wl, {
+    type: 'append',
+    row: { tender_id: 'UA-B', enabled: true },
+  });
+  assert.equal(wl.length, 1);
+  assert.notEqual(result, wl);
+});
+
+test('applyMutation: update changes only matching row', () => {
+  const wl = [
+    { tender_id: 'UA-A', enabled: false, notes: 'old' },
+    { tender_id: 'UA-B', enabled: true, notes: 'B' },
+  ];
+  const result = applyMutation(wl, {
+    type: 'update',
+    tender_id: 'UA-A',
+    fields: { enabled: true, notes: 'new' },
+  });
+  assert.deepEqual(result[0], { tender_id: 'UA-A', enabled: true, notes: 'new' });
+  assert.deepEqual(result[1], wl[1]);
+});
+
+test('applyMutation: unknown type — returns input unchanged', () => {
+  const wl = [{ tender_id: 'UA-A', enabled: true }];
+  const result = applyMutation(wl, { type: 'wat' });
+  assert.deepEqual(result, wl);
 });

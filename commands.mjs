@@ -72,3 +72,17 @@ export function handleList({ watchlist }) {
   lines.push(`Всього: ${watchlist.length} (${active} active)`);
   return lines.join('\n');
 }
+
+export function applyMutation(watchlist, mutation) {
+  if (mutation.type === 'append') {
+    return [...watchlist, mutation.row];
+  }
+  if (mutation.type === 'update') {
+    return watchlist.map(r =>
+      r.tender_id === mutation.tender_id
+        ? { ...r, ...mutation.fields }
+        : r
+    );
+  }
+  return watchlist;
+}
