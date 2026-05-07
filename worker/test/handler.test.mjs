@@ -355,3 +355,100 @@ test('runHandler: /remove without id → "Не вказано"', async () => {
   });
   assert.match(sent[0].text, /Не вказано/);
 });
+
+test('runHandler: /info with active tenders → fetch each + reply', async () => {
+  const RAW = (id) => ({
+    data: {
+      tenderID: id, title: 'X', status: 'active.tendering',
+      tenderPeriod: { endDate: '2026-05-15T14:00:00+03:00' },
+      procuringEntity: { name: 'Тест', identifier: { id: '11111111' } },
+      items: [{ classification: { id: '72260000-5', description: 'Test', scheme: 'ДК021' } }],
+      value: { amount: 100, currency: 'UAH', valueAddedTaxIncluded: false },
+    },
+  });
+  const fetched = [];
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [
+        { tender_id: 'UA-A', enabled: true },
+        { tender_id: 'UA-B', enabled: true },
+        { tender_id: 'UA-C', enabled: false },
+      ],
+      sha: 'abc',
+    }),
+    fetchTender: async (id) => { fetched.push(id); return RAW(id); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/info', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  // Disabled UA-C must NOT be fetched
+  assert.deepEqual(fetched.sort(), ['UA-A', 'UA-B']);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /📋 Статус тендерів/);
+  assert.match(sent[0].text, /UA-A/);
+  assert.match(sent[0].text, /UA-B/);
+  assert.doesNotMatch(sent[0].text, /UA-C/);
+});
+
+test('runHandler: /info empty enabled watchlist → friendly reply', async () => {
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [{ tender_id: 'UA-A', enabled: false }],
+      sha: 'x',
+    }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/info', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /📭 Немає активних тендерів/);
+});
+
+test('runHandler: /info partial Prozorro errors are listed in footer', async () => {
+  let count = 0;
+  const RAW = {
+    data: {
+      tenderID: 'UA-A', title: 'X', status: 'active.tendering',
+      tenderPeriod: { endDate: '2026-05-15T14:00:00+03:00' },
+      procuringEntity: { name: 'T', identifier: { id: '1' } },
+      items: [],
+    },
+  };
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [
+        { tender_id: 'UA-A', enabled: true },
+        { tender_id: 'UA-B', enabled: true },
+      ],
+      sha: 'x',
+    }),
+    fetchTender: async (id) => {
+      count++;
+      if (id === 'UA-B') throw new Error('Prozorro 503');
+      return RAW;
+    },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/info', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /UA-A/);
+  assert.match(sent[0].text, /⚠️ не вдалось перевірити/);
+  assert.match(sent[0].text, /UA-B — Prozorro 503/);
+});
+
+test('runHandler: /info when loadWatchlist throws → ⚠️ reply', async () => {
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => { throw new Error('GitHub GET 503'); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/info', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /⚠️ GitHub недоступний/);
+});

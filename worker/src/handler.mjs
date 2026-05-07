@@ -1,4 +1,4 @@
-import { parseCommand, handleAdd, handleList, handleStatus, handleRemove, applyMutation, HELP_TEXT } from '../../commands.mjs';
+import { parseCommand, handleAdd, handleList, handleStatus, handleRemove, applyMutation, formatInfo, HELP_TEXT } from '../../commands.mjs';
 import { fetchTender, extractSnapshot } from '../../prozorro.mjs';
 import { sendReply } from '../../telegram.mjs';
 import { loadWatchlist, saveWatchlist, ConflictError } from './github.mjs';
@@ -60,6 +60,39 @@ export async function runHandler({ update, env, deps = {} }) {
     } catch (err) {
       console.error('worker: status loadWatchlist failed:', err.message);
       reply = `⚠️ Worker live, але GitHub недоступний: ${err.message}`;
+    }
+  } else if (cmd.cmd === 'info') {
+    try {
+      const { watchlist } = await _loadWatchlist(env);
+      const enabled = watchlist.filter(r => r.enabled);
+      if (enabled.length === 0) {
+        reply = '📭 Немає активних тендерів.';
+      } else {
+        const results = await Promise.all(enabled.map(async r => {
+          try {
+            const raw = await _fetchTender(r.tender_id);
+            const snap = _extractSnapshot(raw);
+            return {
+              tender_id: r.tender_id,
+              prozorro_url: `https://prozorro.gov.ua/tender/${r.tender_id}`,
+              status: snap.status,
+              deadline: snap.tenderPeriod?.endDate ?? null,
+              procuring_entity: snap.procuringEntity,
+              value: snap.value,
+              classification: snap.classification,
+              contact: snap.contact,
+            };
+          } catch (err) {
+            return { tender_id: r.tender_id, error: err.message };
+          }
+        }));
+        const groups = results.filter(r => !r.error);
+        const errors = results.filter(r => r.error);
+        reply = formatInfo({ runIso: new Date().toISOString(), groups, errors });
+      }
+    } catch (err) {
+      console.error('worker: info loadWatchlist failed:', err.message);
+      reply = '⚠️ GitHub недоступний, спробуй ще раз';
     }
   } else if (cmd.cmd === 'help') {
     reply = HELP_TEXT;

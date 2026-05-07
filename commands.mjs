@@ -1,4 +1,4 @@
-import { stripDkCode, truncate, fmtStatus, fmtDeadline, escapeHtml } from './telegram.mjs';
+import { stripDkCode, truncate, fmtStatus, fmtDeadline, escapeHtml, formatMoney, formatPhone } from './telegram.mjs';
 
 const TENDER_ID_RE_STR = 'UA-\\d{4}-\\d{2}-\\d{2}-\\d{6}-[a-zA-Z]';
 
@@ -10,6 +10,7 @@ export function parseCommand(text) {
   if (/^\/list(?:@\w+)?$/i.test(trimmed)) return { cmd: 'list' };
   if (/^\/help(?:@\w+)?$/i.test(trimmed)) return { cmd: 'help' };
   if (/^\/status(?:@\w+)?$/i.test(trimmed)) return { cmd: 'status' };
+  if (/^\/info(?:@\w+)?$/i.test(trimmed)) return { cmd: 'info' };
 
   const addMatch = trimmed.match(/^\/add(?:@\w+)?(?:\s+(.*))?$/i);
   if (addMatch) {
@@ -80,6 +81,63 @@ export function handleList({ watchlist }) {
   });
   const active = watchlist.filter(r => r.enabled).length;
   return rows.join('\n\n') + `\n\nВсього: ${watchlist.length} (${active} active)`;
+}
+
+function formatInfoEntry(g) {
+  const sections = [];
+  sections.push(`🆔 Ідентифікатор закупівлі: <a href="${escapeHtml(g.prozorro_url)}">${escapeHtml(g.tender_id)}</a>`);
+  if (g.procuring_entity?.name) {
+    const edrpou = g.procuring_entity.edrpou ? ` (ЄДРПОУ ${g.procuring_entity.edrpou})` : '';
+    sections.push(`👥 Замовник: ${escapeHtml(g.procuring_entity.name)}${edrpou}`);
+  }
+  if (g.classification?.id) {
+    const desc = g.classification.description ? ` — ${escapeHtml(g.classification.description)}` : '';
+    sections.push(`🔖 ДК: ${g.classification.id}${desc}`);
+  }
+  if (g.value && typeof g.value.amount === 'number') {
+    const amount = formatMoney(g.value.amount);
+    const vatTag = g.value.valueAddedTaxIncluded ? 'з ПДВ' : 'без ПДВ';
+    sections.push(`💰 Вартість: ${amount} ${g.value.currency} (${vatTag})`);
+  }
+  if (g.contact?.name) {
+    const tel = formatPhone(g.contact.telephone ?? '');
+    const phoneLine = `📞 ${escapeHtml(g.contact.name)}: ${escapeHtml(tel)}`;
+    const emailLine = g.contact.email ? `✉️ ${escapeHtml(g.contact.email)}` : '';
+    sections.push(emailLine ? `${phoneLine}\n${emailLine}` : phoneLine);
+  }
+  if (g.status) {
+    let statusLine = `ℹ️ Статус: ${fmtStatus(g.status)}`;
+    if (g.deadline) statusLine += ` до ${fmtDeadline(g.deadline)}`;
+    sections.push(statusLine);
+  }
+  return sections.join('\n');
+}
+
+export function formatInfo({ runIso, groups, errors = [] }) {
+  if (groups.length === 0 && errors.length === 0) {
+    return '📭 Немає активних тендерів.';
+  }
+  const KYIV_TIME = new Intl.DateTimeFormat('uk-UA', {
+    timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  const KYIV_DATE = new Intl.DateTimeFormat('uk-UA', {
+    timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', year: 'numeric',
+  });
+  const time = KYIV_TIME.format(new Date(runIso));
+  const date = KYIV_DATE.format(new Date(runIso));
+  const lines = [`📋 Статус тендерів (${time}, ${date})`, ''];
+  for (let i = 0; i < groups.length; i++) {
+    lines.push(formatInfoEntry(groups[i]));
+    if (i < groups.length - 1) lines.push('');
+  }
+  if (errors.length > 0) {
+    lines.push('');
+    lines.push('⚠️ не вдалось перевірити:');
+    for (const e of errors) {
+      lines.push(`  • ${e.tender_id} — ${e.error}`);
+    }
+  }
+  return lines.join('\n');
 }
 
 export function handleStatus({ watchlist, sha }) {
@@ -178,6 +236,7 @@ export const HELP_TEXT = [
   '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
   '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
   '/list — показати всі тендери на моніторингу',
+  '/info — повний статус усіх тендерів',
   '/status — здоровʼя бота',
   '/help — це повідомлення',
 ].join('\n');

@@ -64,7 +64,7 @@ export function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function formatPhone(raw) {
+export function formatPhone(raw) {
   if (!raw) return '';
   return raw.split(',').map(p => {
     const digits = p.replace(/\D/g, '');
@@ -248,7 +248,7 @@ export function formatDigest(runIso, groups) {
   return lines.join('\n').trimEnd();
 }
 
-function formatMoney(amount) {
+export function formatMoney(amount) {
   return Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 

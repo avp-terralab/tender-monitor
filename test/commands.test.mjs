@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseCommand, buildAutoNotes, formatAddReply, handleList,
-  applyMutation, handleAdd, handleStatus, handleRemove,
+  applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -491,4 +491,71 @@ test('applyMutation: delete on non-existent id → no change', () => {
   const wl = [{ tender_id: 'UA-A', enabled: true }];
   const result = applyMutation(wl, { type: 'delete', tender_id: 'UA-XX' });
   assert.deepEqual(result, wl);
+});
+
+test('parseCommand: /info', () => {
+  assert.deepEqual(parseCommand('/info'), { cmd: 'info' });
+});
+
+test('parseCommand: /info with bot suffix', () => {
+  assert.deepEqual(parseCommand('/info@my_bot'), { cmd: 'info' });
+});
+
+test('parseCommand: /info with trailing text → unknown', () => {
+  assert.deepEqual(parseCommand('/info extra'), { cmd: 'unknown' });
+});
+
+const SAMPLE_GROUP = {
+  tender_id: 'UA-2026-04-29-008605-a',
+  prozorro_url: 'https://prozorro.gov.ua/tender/UA-2026-04-29-008605-a',
+  status: 'active.qualification',
+  deadline: '2026-05-07T01:00:00+03:00',
+  procuring_entity: { name: 'КНП «Центральна районна лікарня»', edrpou: '33578224' },
+  value: { amount: 800147, currency: 'UAH', valueAddedTaxIncluded: true },
+  classification: { id: '72260000-5', description: 'Послуги, пов\'язані з програмним забезпеченням' },
+  contact: { name: 'Дмитерчук Микола', email: 'mykola@ukr.net', telephone: '+380956623651' },
+};
+
+test('formatInfo: full entry contains all fields from spec', () => {
+  const reply = formatInfo({
+    runIso: '2026-05-08T13:00:00+03:00',
+    groups: [SAMPLE_GROUP],
+  });
+  assert.match(reply, /📋 Статус тендерів \(13:00, 08\.05\.2026\)/);
+  assert.match(reply, /🆔 Ідентифікатор закупівлі: <a href=".*">UA-2026-04-29-008605-a<\/a>/);
+  assert.match(reply, /👥 Замовник: КНП «Центральна районна лікарня» \(ЄДРПОУ 33578224\)/);
+  assert.match(reply, /🔖 ДК: 72260000-5 — Послуги, пов'язані з програмним забезпеченням/);
+  assert.match(reply, /💰 Вартість: 800 147 UAH \(з ПДВ\)/);
+  assert.match(reply, /📞 Дмитерчук Микола: \+380 95 662-36-51/);
+  assert.match(reply, /✉️ mykola@ukr\.net/);
+  assert.match(reply, /ℹ️ Статус: Розгляд пропозицій до 07\.05\.2026 до 01:00/);
+});
+
+test('formatInfo: empty groups → reply about no tenders', () => {
+  const reply = formatInfo({ runIso: '2026-05-08T13:00:00+03:00', groups: [] });
+  assert.match(reply, /📭 Немає активних тендерів/);
+});
+
+test('formatInfo: errors footer with failures', () => {
+  const reply = formatInfo({
+    runIso: '2026-05-08T13:00:00+03:00',
+    groups: [],
+    errors: [{ tender_id: 'UA-X', error: 'Prozorro 503' }],
+  });
+  assert.match(reply, /⚠️ не вдалось перевірити/);
+  assert.match(reply, /UA-X — Prozorro 503/);
+});
+
+test('formatInfo: skips fields when null', () => {
+  const minimal = {
+    tender_id: 'UA-X',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    status: 'active.tendering',
+  };
+  const reply = formatInfo({ runIso: '2026-05-08T13:00:00+03:00', groups: [minimal] });
+  assert.match(reply, /UA-X/);
+  assert.doesNotMatch(reply, /👥/);
+  assert.doesNotMatch(reply, /🔖/);
+  assert.doesNotMatch(reply, /💰/);
+  assert.doesNotMatch(reply, /📞/);
 });
