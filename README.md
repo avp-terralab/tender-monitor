@@ -36,7 +36,7 @@ Set in repo Settings → Secrets and variables → Actions:
 - `/list` — побачити повний watchlist.
 - `/help` — список команд.
 
-Bot реагує тільки на повідомлення з `TELEGRAM_CHAT_ID` (інші ігноруються мовчки). Polling — кожні 5 хв через GHA workflow `bot.yml`. Зміна вступає в силу на найближчому monitor-тіку (09/13/18 Київ).
+Bot реагує тільки на повідомлення з `ALLOWED_CHAT_ID` (інші ігноруються мовчки). Webhook через Cloudflare Worker — sub-second response. Зміна watchlist комітиться у репо одразу після reply від бота.
 
 **Manual edit (для bulk-операцій або видалення):**
 
@@ -51,9 +51,9 @@ Set `enabled: false` to pause. Auto-disabled rows (404 from Prozorro) get `auto-
 ### Workflows
 
 - `.github/workflows/monitor.yml` — cron `0 6,10,15 * * *` UTC (09/13/18 Київ). Шле дайджест змін.
-- `.github/workflows/bot.yml` — cron `*/5 * * * *`. Обробляє Telegram-команди.
+- `.github/workflows/worker-deploy.yml` — на push у main + paths filter. Деплоїть Cloudflare Worker (Telegram webhook). Не cron — реактивний.
 
-Обидва використовують `concurrency: tender-monitor` → серіалізуються при пушах.
+Bot-команди (`/add`, `/list`, `/help`) обробляє Cloudflare Worker (sub-second response). Підключення налаштовано через webhook (див. `worker/README.md`).
 
 ## Local development
 
@@ -72,10 +72,10 @@ Set `enabled: false` to pause. Auto-disabled rows (404 from Prozorro) get `auto-
 ## Tests
 
 ```
-node --test test/*.test.mjs
+node --test test/*.test.mjs worker/test/*.test.mjs
 ```
 
-Should report 140+ tests passing across compare, prozorro, telegram, monitor, commands, and bot suites.
+Should report 160+ tests passing across all suites.
 
 ## Spec
 

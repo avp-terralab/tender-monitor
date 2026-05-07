@@ -136,3 +136,12 @@ export async function handleAdd(deps, { tender_id, notes }) {
     },
   };
 }
+
+export const HELP_TEXT = [
+  'Команди:',
+  '/add UA-YYYY-MM-DD-NNNNNN-x [нотатки] — додати тендер',
+  '/list — показати всі тендери на моніторингу',
+  '/help — це повідомлення',
+  '',
+  'Видалити/призупинити: github.com/avp-terralab/tender-monitor → watchlist.json',
+].join('\n');
