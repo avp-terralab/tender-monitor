@@ -51,9 +51,9 @@ Set `enabled: false` to pause. Auto-disabled rows (404 from Prozorro) get `auto-
 ### Workflows
 
 - `.github/workflows/monitor.yml` — cron `0 6,10,15 * * *` UTC (09/13/18 Київ). Шле дайджест змін.
-- `.github/workflows/bot.yml` — cron `*/5 * * * *`. Обробляє Telegram-команди.
+- `.github/workflows/worker-deploy.yml` — на push у main + paths filter. Деплоїть Cloudflare Worker (Telegram webhook). Не cron — реактивний.
 
-Обидва використовують `concurrency: tender-monitor` → серіалізуються при пушах.
+Bot-команди (`/add`, `/list`, `/help`) обробляє Cloudflare Worker (sub-second response). Підключення налаштовано через webhook (див. `worker/README.md`).
 
 ## Local development
 
@@ -72,10 +72,10 @@ Set `enabled: false` to pause. Auto-disabled rows (404 from Prozorro) get `auto-
 ## Tests
 
 ```
-node --test test/*.test.mjs
+node --test test/*.test.mjs worker/test/*.test.mjs
 ```
 
-Should report 140+ tests passing across compare, prozorro, telegram, monitor, commands, and bot suites.
+Should report 160+ tests passing across all suites.
 
 ## Spec
 
