@@ -119,6 +119,35 @@ export async function runHandler({ update, env, deps = {} }) {
       console.error('worker: info loadWatchlist failed:', err.message);
       reply = '⚠️ GitHub недоступний, спробуй ще раз';
     }
+  } else if (cmd.cmd === 'watch') {
+    if (cmd.error === 'invalid_edrpou') {
+      reply = '❌ EDRPOU має бути 8 цифр';
+    } else if (cmd.error === 'missing_edrpou') {
+      reply = '❌ Не вказано EDRPOU. /watch 12345678';
+    } else {
+      reply = await applyEntityMutationWithRetry({
+        env,
+        loadWatchedEntities: _loadWatchedEntities,
+        saveWatchedEntities: _saveWatchedEntities,
+        computeMutation: ({ entities }) => handleWatch({
+          watchedEntities: entities,
+          fetchTendersFeed: _fetchTendersFeed,
+          fetchTender: _fetchTender,
+          extractSnapshot: _extractSnapshot,
+        }, cmd),
+        onSuccess: async (mutation) => {
+          if (mutation.bootstrap && mutation.bootstrap.ids.length > 0) {
+            const { seen, sha } = await _loadWatchedSeen(env);
+            const updated = { ...seen };
+            updated[mutation.bootstrap.edrpou] = [
+              ...(updated[mutation.bootstrap.edrpou] ?? []),
+              ...mutation.bootstrap.ids,
+            ];
+            await _saveWatchedSeen(env, updated, sha);
+          }
+        },
+      });
+    }
   } else if (cmd.cmd === 'unwatch') {
     if (cmd.error === 'invalid_edrpou') {
       reply = '❌ EDRPOU має бути 8 цифр';

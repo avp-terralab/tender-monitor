@@ -610,3 +610,84 @@ test('runHandler: /unwatch non-existing → ❓, no save', async () => {
   assert.match(sent[0].text, /❓ 11111111/);
   assert.equal(saveCalled, false);
 });
+
+test('runHandler: /watch invalid → ❌ reply, no calls', async () => {
+  let loadCalled = false;
+  const { deps, sent } = await makeDeps({
+    loadWatchedEntities: async () => { loadCalled = true; return { entities: [], sha: null }; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/watch abc', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /EDRPOU має бути 8 цифр/);
+  assert.equal(loadCalled, false);
+});
+
+test('runHandler: /watch missing → "Не вказано"', async () => {
+  const { deps, sent } = await makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/watch', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /Не вказано/);
+});
+
+test('runHandler: /watch new EDRPOU → save entity + bootstrap seen', async () => {
+  const savedEntities = [];
+  const savedSeen = [];
+  const { deps, sent } = await makeDeps({
+    loadWatchedEntities: async () => ({ entities: [], sha: null }),
+    saveWatchedEntities: async (env, entities) => { savedEntities.push(entities); },
+    loadWatchedSeen: async () => ({ seen: {}, sha: null }),
+    saveWatchedSeen: async (env, seen) => { savedSeen.push(seen); },
+    fetchTendersFeed: async () => ({
+      items: [
+        { tenderID: 'UA-A', procuringEntity: { identifier: { id: '11111111' }, name: 'КНП «Тест»' } },
+      ],
+      next: null,
+    }),
+    fetchTender: async () => ({
+      data: {
+        tenderID: 'UA-A',
+        status: 'active.tendering',
+        procuringEntity: { name: 'КНП «Тест»', identifier: { id: '11111111' } },
+        items: [],
+      },
+    }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/watch 11111111', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /✅ Стежу за 11111111/);
+  assert.equal(savedEntities.length, 1);
+  assert.equal(savedEntities[0].length, 1);
+  assert.equal(savedEntities[0][0].edrpou, '11111111');
+  assert.equal(savedSeen.length, 1);
+  assert.deepEqual(savedSeen[0]['11111111'], ['UA-A']);
+});
+
+test('runHandler: /watch existing → no save, no bootstrap', async () => {
+  let saveEntityCalled = false;
+  let saveSeenCalled = false;
+  const { deps, sent } = await makeDeps({
+    loadWatchedEntities: async () => ({
+      entities: [{ edrpou: '11111111', name: 'X', enabled: true }],
+      sha: 's',
+    }),
+    saveWatchedEntities: async () => { saveEntityCalled = true; },
+    saveWatchedSeen: async () => { saveSeenCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/watch 11111111', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /⚠️ Вже стежу/);
+  assert.equal(saveEntityCalled, false);
+  assert.equal(saveSeenCalled, false);
+});
