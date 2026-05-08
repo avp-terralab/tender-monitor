@@ -334,8 +334,8 @@ export async function handleWatch(deps, { edrpou }) {
 
   let entityName = '(unknown)';
   let bootstrapIds = [];
-  // Walk up to 5 pages (~500 tenders) to better cover rare publishers when discovering name + bootstrap
-  const WATCH_PAGE_CAP = 5;
+  // Walk up to 10 pages (~1000 tenders) to better cover rare publishers when discovering name + bootstrap
+  const WATCH_PAGE_CAP = 10;
   try {
     const allItems = [];
     let pageOffset = null;
@@ -375,7 +375,7 @@ export async function handleWatch(deps, { edrpou }) {
     added_at: new Date().toISOString(),
   };
   const reply = entityName === '(unknown)'
-    ? `✅ ${edrpou} збережено. Серед ~500 останніх публікацій Prozorro тендерів від цього замовника не виявлено — нормально, якщо замовник публікує рідко. Назва замовника зʼявиться у /watched коли bot знайде його перший новий тендер. Якщо EDRPOU помилковий — /unwatch ${edrpou}.`
+    ? `✅ ${edrpou} збережено. Серед ~1000 останніх публікацій Prozorro тендерів від цього замовника не виявлено — нормально, якщо замовник публікує рідко. Назва замовника зʼявиться у /watched коли bot знайде його перший новий тендер. Якщо EDRPOU помилковий — /unwatch ${edrpou}.`
     : `✅ Стежу за ${edrpou} — ${escapeHtml(abbreviateLegalForm(entityName))}\nПомічено як уже-побачені: ${bootstrapIds.length} активних тендерів. Алерт буде на нові.`;
   return {
     reply,
