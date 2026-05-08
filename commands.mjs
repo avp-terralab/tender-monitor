@@ -189,8 +189,8 @@ function formatInfoEntry(g, runIso) {
       if (left) sections.push(`⏰ Залишилось: ${left}`);
     }
   }
-  if (typeof g.documents_count === 'number' && g.documents_count > 0) {
-    sections.push(`📎 Документів: ${g.documents_count} (/docs ${g.tender_id})`);
+  if (Array.isArray(g.documents) && g.documents.length > 0) {
+    sections.push(`📎 Документи (${g.documents.length}):\n${formatDocsCompact(g.documents)}`);
   }
   return sections.join('\n');
 }
@@ -454,11 +454,7 @@ function fmtDocDate(iso) {
   return iso;
 }
 
-export function formatDocs({ tender_id, docs }) {
-  if (!docs || docs.length === 0) {
-    return `📭 У тендера <a href="https://prozorro.gov.ua/tender/${escapeHtml(tender_id)}">${escapeHtml(tender_id)}</a> немає документів.`;
-  }
-
+function groupDocsByType(docs) {
   const groups = new Map();
   for (const d of docs) {
     const key = d.documentType && DOC_TYPE_LABELS[d.documentType]
@@ -467,12 +463,38 @@ export function formatDocs({ tender_id, docs }) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(d);
   }
-
   const orderedKeys = [
     ...DOC_TYPE_ORDER.filter(k => groups.has(k)),
     ...Array.from(groups.keys()).filter(k => !DOC_TYPE_ORDER.includes(k) && k !== '__other'),
     ...(groups.has('__other') ? ['__other'] : []),
   ];
+  return orderedKeys.map(key => ({
+    key,
+    label: key === '__other' ? OTHER_LABEL : DOC_TYPE_LABELS[key],
+    docs: [...groups.get(key)].sort((a, b) => (b.datePublished || '').localeCompare(a.datePublished || '')),
+  }));
+}
+
+export function formatDocsCompact(docs) {
+  if (!docs || docs.length === 0) return '';
+  const lines = [];
+  for (const group of groupDocsByType(docs)) {
+    lines.push(`  ${group.label}:`);
+    for (const d of group.docs) {
+      const title = escapeHtml(truncate(d.title || '(без назви)', 150));
+      const link = d.url
+        ? `<a href="${escapeHtml(d.url)}">завантажити</a>`
+        : '(URL недоступний)';
+      lines.push(`    • ${title} — ${link}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+export function formatDocs({ tender_id, docs }) {
+  if (!docs || docs.length === 0) {
+    return `📭 У тендера <a href="https://prozorro.gov.ua/tender/${escapeHtml(tender_id)}">${escapeHtml(tender_id)}</a> немає документів.`;
+  }
 
   const lines = [
     `📎 Документи <a href="https://prozorro.gov.ua/tender/${escapeHtml(tender_id)}">${escapeHtml(tender_id)}</a> (${docs.length})`,
@@ -480,15 +502,9 @@ export function formatDocs({ tender_id, docs }) {
   ];
 
   let counter = 0;
-  for (const key of orderedKeys) {
-    const label = key === '__other' ? OTHER_LABEL : DOC_TYPE_LABELS[key];
-    lines.push(label);
-    const sortedDocs = [...groups.get(key)].sort((a, b) => {
-      const da = a.datePublished || '';
-      const db = b.datePublished || '';
-      return db.localeCompare(da);
-    });
-    for (const d of sortedDocs) {
+  for (const group of groupDocsByType(docs)) {
+    lines.push(group.label);
+    for (const d of group.docs) {
       counter++;
       const title = escapeHtml(truncate(d.title || '(без назви)', 200));
       const date = fmtDocDate(d.datePublished);

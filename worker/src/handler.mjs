@@ -109,6 +109,7 @@ export async function runHandler({ update, env, deps = {} }) {
           try {
             const raw = await _fetchTender(r.tender_id);
             const snap = _extractSnapshot(raw);
+            const docs = _extractDocuments(raw);
             return {
               tender_id: r.tender_id,
               prozorro_url: `https://prozorro.gov.ua/tender/${r.tender_id}`,
@@ -118,7 +119,7 @@ export async function runHandler({ update, env, deps = {} }) {
               value: snap.value,
               classification: snap.classification,
               contact: snap.contact,
-              documents_count: (snap.documents ?? []).length,
+              documents: docs,
             };
           } catch (err) {
             return { tender_id: r.tender_id, error: err.message };

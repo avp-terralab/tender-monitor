@@ -397,6 +397,34 @@ test('runHandler: /info with active tenders → fetch each + reply', async () =>
   assert.doesNotMatch(sent[0].text, /UA-C/);
 });
 
+test('runHandler: /info renders inline documents per tender', async () => {
+  const RAW = {
+    data: {
+      tenderID: ID, title: 'X', status: 'active.tendering',
+      tenderPeriod: { endDate: '2026-05-15T14:00:00+03:00' },
+      procuringEntity: { name: 'T', identifier: { id: '1' } },
+      items: [],
+      documents: [
+        { id: 'd1', title: 'ТД.docx', documentType: 'tenderNotice',
+          datePublished: '2026-04-30T12:00:00+03:00', url: 'https://x/td' },
+      ],
+    },
+  };
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [{ tender_id: ID, enabled: true }], sha: 'x',
+    }),
+    fetchTender: async () => RAW,
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/info', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /📎 Документи \(1\):/);
+  assert.match(sent[0].text, /• ТД\.docx — <a href="https:\/\/x\/td">завантажити<\/a>/);
+});
+
 test('runHandler: /info UA-... existing in watchlist → fetches just that one', async () => {
   const RAW = (id) => ({
     data: {
