@@ -98,7 +98,7 @@ export function formatAddReply(snapshot, { reEnable, nowIso }) {
       if (left) lines.push(`⏰ Залишилось: ${left}`);
     }
   }
-  lines.push('Перший snapshot — на наступному monitor-тіку (09/13/18 Київ).');
+  lines.push('Перший snapshot — на наступному monitor-тіку (09/12/15/18 Київ).');
   return lines.join('\n');
 }
 

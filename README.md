@@ -18,7 +18,7 @@ State and watchlist:
 
 ## GitHub Actions deployment
 
-Workflow lives at `.github/workflows/monitor.yml`. It runs on cron `0 6,10,15 * * *` UTC and on manual dispatch.
+Workflow lives at `.github/workflows/monitor.yml`. It runs on cron `0 6,9,12,15 * * *` UTC and on manual dispatch.
 
 ### Required secrets
 
@@ -50,7 +50,7 @@ Set `enabled: false` to pause. Auto-disabled rows (404 from Prozorro) get `auto-
 
 ### Workflows
 
-- `.github/workflows/monitor.yml` — cron `0 6,10,15 * * *` UTC (09/13/18 Київ). Шле дайджест змін.
+- `.github/workflows/monitor.yml` — cron `0 6,9,12,15 * * *` UTC (09/12/15/18 Київ). Шле дайджест змін.
 - `.github/workflows/worker-deploy.yml` — на push у main + paths filter. Деплоїть Cloudflare Worker (Telegram webhook). Не cron — реактивний.
 
 Bot-команди (`/add`, `/list`, `/help`) обробляє Cloudflare Worker (sub-second response). Підключення налаштовано через webhook (див. `worker/README.md`).

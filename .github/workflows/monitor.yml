@@ -1,9 +1,9 @@
 name: tender-monitor
 
 on:
-  # 06:00, 10:00, 15:00 UTC = 09:00, 13:00, 18:00 Europe/Kyiv (EEST = UTC+3)
+  # 06:00, 09:00, 12:00, 15:00 UTC = 09:00, 12:00, 15:00, 18:00 Europe/Kyiv (EEST = UTC+3)
   schedule:
-    - cron: '0 6,10,15 * * *'
+    - cron: '0 6,9,12,15 * * *'
   # Allow manual trigger from Actions tab
   workflow_dispatch:
 
