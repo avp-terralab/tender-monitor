@@ -65,6 +65,78 @@ test('runHandler: message from wrong chat → silent skip', async () => {
   assert.equal(sent.length, 0);
 });
 
+test('runHandler: comma-separated ALLOWED_CHAT_ID → both ids allowed', async () => {
+  const { deps, sent } = makeDeps();
+  const multiEnv = { ...ENV, ALLOWED_CHAT_ID: '123, 456' };
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/help', message_id: 9 } },
+    env: multiEnv,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].chatId, 456);
+});
+
+test('runHandler: comma-separated ALLOWED_CHAT_ID → unlisted id still rejected', async () => {
+  const { deps, sent } = makeDeps();
+  const multiEnv = { ...ENV, ALLOWED_CHAT_ID: '123,456' };
+  await runHandler({
+    update: { message: { chat: { id: 789 }, text: '/help', message_id: 1 } },
+    env: multiEnv,
+    deps,
+  });
+  assert.equal(sent.length, 0);
+});
+
+test('runHandler: /start from non-allowed → reply with their chat_id and access prompt', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 999 }, text: '/start', message_id: 5 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].chatId, 999);
+  assert.match(sent[0].text, /<code>999<\/code>/);
+  assert.match(sent[0].text, /приватний бот/i);
+  assert.match(sent[0].text, /Надішли цей id адміну/i);
+});
+
+test('runHandler: /start from allowed → friendly greeting with chat_id and /help hint', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/start', message_id: 6 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].chatId, 123);
+  assert.match(sent[0].text, /<code>123<\/code>/);
+  assert.match(sent[0].text, /\/help/);
+  assert.doesNotMatch(sent[0].text, /приватний бот/i);
+});
+
+test('runHandler: /start@botusername variant works', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 999 }, text: '/start@terralab_tenders_bot', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /<code>999<\/code>/);
+});
+
+test('runHandler: non-/start command from non-allowed → still silent', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 999 }, text: '/list', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 0);
+});
+
 test('runHandler: message without text → no-op', async () => {
   const { deps, sent } = makeDeps();
   await runHandler({

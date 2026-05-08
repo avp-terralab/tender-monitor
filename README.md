@@ -36,7 +36,7 @@ Set in repo Settings → Secrets and variables → Actions:
 - `/list` — побачити повний watchlist.
 - `/help` — список команд.
 
-Bot реагує тільки на повідомлення з `ALLOWED_CHAT_ID` (інші ігноруються мовчки). Webhook через Cloudflare Worker — sub-second response. Зміна watchlist комітиться у репо одразу після reply від бота.
+Bot реагує тільки на повідомлення з `ALLOWED_CHAT_ID` (інші ігноруються мовчки). `ALLOWED_CHAT_ID` — comma-separated список chat_id (наприклад `1744078008,5551234567`). Webhook через Cloudflare Worker — sub-second response. Зміна watchlist комітиться у репо одразу після reply від бота.
 
 **Manual edit (для bulk-операцій або видалення):**
 

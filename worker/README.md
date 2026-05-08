@@ -35,7 +35,7 @@ cd worker
 npx wrangler secret put TELEGRAM_BOT_TOKEN     # bot token from BotFather
 npx wrangler secret put TELEGRAM_WEBHOOK_SECRET # random 32-char string
 npx wrangler secret put GITHUB_PAT              # fine-grained PAT, Contents:R+W on this repo
-npx wrangler secret put ALLOWED_CHAT_ID         # 1744078008 (or your chat id)
+npx wrangler secret put ALLOWED_CHAT_ID         # 1744078008 (or comma-separated: 1744078008,5551234567)
 ```
 
 ## Setup webhook (one-time)

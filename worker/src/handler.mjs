@@ -26,7 +26,32 @@ export async function runHandler({ update, env, deps = {} }) {
 
   const msg = update.message;
   if (!msg) return;
-  if (String(msg.chat?.id) !== String(env.ALLOWED_CHAT_ID)) return;
+  const allowedIds = String(env.ALLOWED_CHAT_ID ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  const chatId = String(msg.chat?.id);
+  const isAllowed = allowedIds.includes(chatId);
+
+  // /start works for everyone — reveals chat_id so non-allowed users can request access
+  if (typeof msg.text === 'string' && /^\/start(?:@\w+)?(?:\s|$)/i.test(msg.text)) {
+    const startReply = isAllowed
+      ? `👋 Привіт!\n\nТвій chat_id: <code>${chatId}</code>\n\n/help — список команд.`
+      : `👋 Привіт!\n\nЦе приватний бот. Твій chat_id: <code>${chatId}</code>\n\nНадішли цей id адміну, щоб отримати доступ.`;
+    try {
+      await _sendReply({
+        token: env.TELEGRAM_BOT_TOKEN,
+        chatId: msg.chat.id,
+        text: startReply,
+        replyToMessageId: msg.message_id,
+      });
+    } catch (err) {
+      console.error('worker: sendReply /start failed:', err.message);
+    }
+    return;
+  }
+
+  if (!isAllowed) return;
   if (typeof msg.text !== 'string') return;
 
   const cmd = parseCommand(msg.text);
