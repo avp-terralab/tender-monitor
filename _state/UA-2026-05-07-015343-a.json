@@ -1,0 +1,75 @@
+{
+  "tender_id": "UA-2026-05-07-015343-a",
+  "saved_at": "2026-05-08T10:54:47.458Z",
+  "snapshot": {
+    "tender_id": "UA-2026-05-07-015343-a",
+    "title": "Розроблення комплексного плану просторового розвитку території Миронівської міської територіальної громади Обухівського району Київської області, концепції інтегрованого розвитку території громади та виготовлення (оновлення) топографічної основи масштабу 1:10 000 і 1:2000",
+    "status": "active.tendering",
+    "dateModified": "2026-05-08T13:02:40.987302+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-05-15T00:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "МИРОНІВСЬКА МІСЬКА РАДА",
+      "edrpou": "04054984"
+    },
+    "value": {
+      "amount": 37500000,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": true
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "71410000-5",
+      "description": "Послуги у сфері містобудування",
+      "scheme": "ДК021"
+    },
+    "contact": {
+      "name": "Ільченко Олександр Володимирович",
+      "email": "tender_mmtg@myronivka-mrada.gov.ua",
+      "telephone": "380457451271"
+    },
+    "documents": [
+      {
+        "id": "d086ff85505c46f29f76996642f71dd4",
+        "title": "ПРОЄКТ Договору про закупівлю (Комплексний план).doc",
+        "documentType": "contractProforma",
+        "datePublished": "2026-05-07T23:54:03.555987+03:00"
+      },
+      {
+        "id": "c4028427dc4e4566a02749189bc61292",
+        "title": "ТД (Комплексний план).docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-05-07T23:54:03.555987+03:00"
+      },
+      {
+        "id": "bcce6cb1816e49f0ac8086c6a537765e",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-05-07T23:55:28.033366+03:00"
+      }
+    ],
+    "questions": [
+      {
+        "id": "860d721a5961443b9957769616f612f1",
+        "title": "Вимоги технічного завдання на виготовлення топографічної основи масштабу 1:10000",
+        "answer": null
+      },
+      {
+        "id": "4194c1adf15341ea9323fb71d2228915",
+        "title": "Вимоги технічного завдання на виготовлення топографічної основи масштабу 1:2000",
+        "answer": null
+      },
+      {
+        "id": "aed156ed27b84d8eb9c8328797aadd62",
+        "title": "Вимоги технічного завдання на розроблення концепції інтегрованого розвитку",
+        "answer": null
+      }
+    ],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}

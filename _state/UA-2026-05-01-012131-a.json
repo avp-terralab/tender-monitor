@@ -1,0 +1,96 @@
+{
+  "tender_id": "UA-2026-05-01-012131-a",
+  "saved_at": "2026-05-08T10:54:47.458Z",
+  "snapshot": {
+    "tender_id": "UA-2026-05-01-012131-a",
+    "title": "Детектори та аналізатори",
+    "status": "active.tendering",
+    "dateModified": "2026-05-08T00:50:22.422399+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-05-09T00:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "військова частина А1356",
+      "edrpou": "08502014"
+    },
+    "value": {
+      "amount": 180000,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": true
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "38430000-8",
+      "description": "Детектори та аналізатори",
+      "scheme": "ДК021"
+    },
+    "contact": {
+      "name": "Статкевич Віктор Сергійович",
+      "email": "d.lykush@ps.mil.gov.ua",
+      "telephone": "380997006291"
+    },
+    "documents": [
+      {
+        "id": "b09c0aa702fe43468254a20fa961020a",
+        "title": "Додаток 4 проєкт договору Трасошукач.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-05-01T23:43:31.767095+03:00"
+      },
+      {
+        "id": "4491fd6645524b77b5f483414491faa7",
+        "title": "ТД Трасошукач.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-05-01T23:43:31.767095+03:00"
+      },
+      {
+        "id": "b0c14e702f594cc0a6da547cff6a5aeb",
+        "title": "Додаток 2 технічні вимоги Трасошукач.doc",
+        "documentType": "technicalSpecifications",
+        "datePublished": "2026-05-01T23:43:31.767095+03:00"
+      },
+      {
+        "id": "e19ed1b2c51840c683fea15ff7164339",
+        "title": "Додаток 5 лист-згода.docx",
+        "documentType": null,
+        "datePublished": "2026-05-01T23:43:31.767095+03:00"
+      },
+      {
+        "id": "f663653f428b4a00a6d14bd1105e913a",
+        "title": "Додаток 1 тендерна пропозиція Трасошукач.docx",
+        "documentType": null,
+        "datePublished": "2026-05-01T23:43:31.767095+03:00"
+      },
+      {
+        "id": "7b31205a15524fe399e75637eb86387b",
+        "title": "Додаток 3 кваліфікаційні критерії.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-05-01T23:43:31.767095+03:00"
+      },
+      {
+        "id": "cb6456f2ac80406fa252f2dd7107bacc",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-05-01T23:46:08.270661+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": [
+      {
+        "id": "61c5863776e144f9b80a71cd739aeb04",
+        "status": "unsuccessful"
+      },
+      {
+        "id": "8bf8814c702a41548ec4329ba760184f",
+        "status": "pending"
+      }
+    ],
+    "_notifiedDeadlines": [
+      "24h",
+      "12h"
+    ]
+  }
+}
