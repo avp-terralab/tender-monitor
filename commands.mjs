@@ -374,14 +374,18 @@ export async function handleWatch(deps, { edrpou }) {
 }
 
 export const HELP_TEXT = [
-  'Команди:',
+  'Загальні команди:',
+  '/help — список команд',
+  '/status — здоровʼя бота',
+  '',
+  'Моніторинг закупівель за ID:',
   '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
   '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
   '/list — короткий список (id + Замовник)',
   '/info — детально по кожному (замовник, ДК, ціна, статус)',
+  '',
+  'Моніторинг замовників за EDRPOU:',
   '/watch EDRPOU — стежити за замовником',
   '/unwatch EDRPOU — припинити стежити',
   '/watched — список замовників',
-  '/status — здоровʼя бота',
-  '/help — це повідомлення',
 ].join('\n');
