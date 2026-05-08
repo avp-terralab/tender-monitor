@@ -24,6 +24,11 @@ const makeDeps = (overrides = {}) => {
       fetchTender: async () => RAW_OK,
       extractSnapshot: (raw) => raw.data,
       sendReply: async (args) => { sent.push(args); },
+      loadWatchedEntities: async () => ({ entities: [], sha: null }),
+      saveWatchedEntities: async () => ({}),
+      loadWatchedSeen: async () => ({ seen: {}, sha: null }),
+      saveWatchedSeen: async () => ({}),
+      fetchTendersFeed: async () => ({ items: [], next: null }),
       ...overrides,
     },
   };
@@ -502,4 +507,48 @@ test('runHandler: /list fetch failure on enabled row → list still works withou
   });
   assert.match(sent[0].text, /UA-A — ТОВ «А»/);
   assert.doesNotMatch(sent[0].text, /UAH/);
+});
+
+test('runHandler: /watched empty → 📭 reply', async () => {
+  const { deps, sent } = await makeDeps({
+    loadWatchedEntities: async () => ({ entities: [], sha: null }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/watched', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /📭/);
+});
+
+test('runHandler: /watched with entities → list reply', async () => {
+  const { deps, sent } = await makeDeps({
+    loadWatchedEntities: async () => ({
+      entities: [
+        { edrpou: '02000010', name: 'КП «Х»', enabled: true },
+        { edrpou: '11111111', name: '(unknown)', enabled: true },
+      ],
+      sha: 'x',
+    }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/watched', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /02000010/);
+  assert.match(sent[0].text, /11111111/);
+  assert.match(sent[0].text, /Всього: 2/);
+});
+
+test('runHandler: /watched when GitHub fails → ⚠️ reply', async () => {
+  const { deps, sent } = await makeDeps({
+    loadWatchedEntities: async () => { throw new Error('GitHub GET 503'); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/watched', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /⚠️ GitHub/);
 });

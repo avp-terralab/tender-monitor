@@ -1,7 +1,16 @@
-import { parseCommand, handleAdd, handleList, handleStatus, handleRemove, applyMutation, formatInfo, HELP_TEXT } from '../../commands.mjs';
-import { fetchTender, extractSnapshot } from '../../prozorro.mjs';
+import {
+  parseCommand, handleAdd, handleList, handleStatus, handleRemove,
+  handleWatch, handleUnwatch, handleWatched,
+  applyMutation, applyEntityMutation, formatInfo, HELP_TEXT,
+} from '../../commands.mjs';
+import { fetchTender, extractSnapshot, fetchTendersFeed } from '../../prozorro.mjs';
 import { sendReply } from '../../telegram.mjs';
-import { loadWatchlist, saveWatchlist, ConflictError } from './github.mjs';
+import {
+  loadWatchlist, saveWatchlist,
+  loadWatchedEntities, saveWatchedEntities,
+  loadWatchedSeen, saveWatchedSeen,
+  ConflictError,
+} from './github.mjs';
 
 export async function runHandler({ update, env, deps = {} }) {
   const _loadWatchlist = deps.loadWatchlist ?? loadWatchlist;
@@ -9,6 +18,11 @@ export async function runHandler({ update, env, deps = {} }) {
   const _fetchTender = deps.fetchTender ?? fetchTender;
   const _extractSnapshot = deps.extractSnapshot ?? extractSnapshot;
   const _sendReply = deps.sendReply ?? sendReply;
+  const _loadWatchedEntities = deps.loadWatchedEntities ?? loadWatchedEntities;
+  const _saveWatchedEntities = deps.saveWatchedEntities ?? saveWatchedEntities;
+  const _loadWatchedSeen = deps.loadWatchedSeen ?? loadWatchedSeen;
+  const _saveWatchedSeen = deps.saveWatchedSeen ?? saveWatchedSeen;
+  const _fetchTendersFeed = deps.fetchTendersFeed ?? fetchTendersFeed;
 
   const msg = update.message;
   if (!msg) return;
@@ -104,6 +118,14 @@ export async function runHandler({ update, env, deps = {} }) {
     } catch (err) {
       console.error('worker: info loadWatchlist failed:', err.message);
       reply = '⚠️ GitHub недоступний, спробуй ще раз';
+    }
+  } else if (cmd.cmd === 'watched') {
+    try {
+      const { entities } = await _loadWatchedEntities(env);
+      reply = handleWatched({ watchedEntities: entities });
+    } catch (err) {
+      console.error('worker: /watched failed:', err.message);
+      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
     }
   } else if (cmd.cmd === 'help') {
     reply = HELP_TEXT;
