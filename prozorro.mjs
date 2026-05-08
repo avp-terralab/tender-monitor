@@ -88,6 +88,20 @@ export function extractSnapshot(raw) {
   };
 }
 
+export function extractDocuments(raw) {
+  const data = raw?.data ?? raw;
+  const docs = data?.documents ?? [];
+  return docs.map(d => ({
+    id: d.id,
+    title: d.title ?? '',
+    documentType: d.documentType ?? null,
+    format: d.format ?? null,
+    datePublished: d.datePublished ?? null,
+    dateModified: d.dateModified ?? null,
+    url: d.url ?? null,
+  }));
+}
+
 export async function fetchTender(tenderId) {
   // Step 1: tenderID -> UUID
   const summaryRes = await fetch(

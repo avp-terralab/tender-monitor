@@ -581,6 +581,104 @@ test('runHandler: /list fetch failure on enabled row → list still works withou
   assert.doesNotMatch(sent[0].text, /UAH/);
 });
 
+// ─── /docs ────────────────────────────────────────────────────────────────────
+
+const RAW_DOCS = {
+  data: {
+    tenderID: ID,
+    documents: [
+      { id: 'd1', title: 'ТД.docx', documentType: 'tenderNotice',
+        datePublished: '2026-04-30T12:00:00+03:00', url: 'https://x/td' },
+      { id: 'd2', title: 'Додаток 5.docx', documentType: 'biddingDocuments',
+        datePublished: '2026-04-30T12:30:00+03:00', url: 'https://x/d5' },
+    ],
+  },
+};
+
+test('runHandler: /docs UA-... existing → fetch + reply with documents', async () => {
+  const fetched = [];
+  const { deps, sent } = await makeDeps({
+    fetchTender: async (id) => { fetched.push(id); return RAW_DOCS; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/docs ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.deepEqual(fetched, [ID]);
+  assert.match(sent[0].text, /📎 Документи/);
+  assert.match(sent[0].text, /ТД\.docx/);
+  assert.match(sent[0].text, /Додаток 5/);
+  assert.match(sent[0].text, /https:\/\/x\/td/);
+});
+
+test('runHandler: /docs UA-... not in Prozorro (404) → ❌ reply', async () => {
+  const { deps, sent } = await makeDeps({
+    fetchTender: async () => { throw new Error('Prozorro summary 404: ' + ID); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/docs ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /❌/);
+  assert.match(sent[0].text, /не знайдено в Prozorro/);
+});
+
+test('runHandler: /docs UA-... 5xx → ⚠️ reply', async () => {
+  const { deps, sent } = await makeDeps({
+    fetchTender: async () => { throw new Error('Prozorro summary 503: timeout'); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/docs ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /⚠️/);
+  assert.match(sent[0].text, /завантажити документи/);
+});
+
+test('runHandler: /docs UA-... empty documents → 📭 reply', async () => {
+  const { deps, sent } = await makeDeps({
+    fetchTender: async () => ({ data: { tenderID: ID, documents: [] } }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/docs ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /📭/);
+  assert.match(sent[0].text, /немає документів/);
+});
+
+test('runHandler: /docs invalid id → ❌, no fetch', async () => {
+  let fetched = false;
+  const { deps, sent } = await makeDeps({
+    fetchTender: async () => { fetched = true; return RAW_DOCS; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/docs bad-id', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(fetched, false);
+  assert.match(sent[0].text, /Невалідний/);
+});
+
+test('runHandler: /docs without id → "Не вказано", no fetch', async () => {
+  let fetched = false;
+  const { deps, sent } = await makeDeps({
+    fetchTender: async () => { fetched = true; return RAW_DOCS; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/docs', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(fetched, false);
+  assert.match(sent[0].text, /Не вказано/);
+});
+
 test('runHandler: /watched empty → 📭 reply', async () => {
   const { deps, sent } = await makeDeps({
     loadWatchedEntities: async () => ({ entities: [], sha: null }),

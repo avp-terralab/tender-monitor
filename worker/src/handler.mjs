@@ -1,9 +1,9 @@
 import {
   parseCommand, handleAdd, handleList, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
-  applyMutation, applyEntityMutation, formatInfo, HELP_TEXT,
+  applyMutation, applyEntityMutation, formatInfo, formatDocs, HELP_TEXT,
 } from '../../commands.mjs';
-import { fetchTender, extractSnapshot, fetchTendersFeed } from '../../prozorro.mjs';
+import { fetchTender, extractSnapshot, extractDocuments, fetchTendersFeed } from '../../prozorro.mjs';
 import { sendReply } from '../../telegram.mjs';
 import {
   loadWatchlist, saveWatchlist,
@@ -17,6 +17,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const _saveWatchlist = deps.saveWatchlist ?? saveWatchlist;
   const _fetchTender = deps.fetchTender ?? fetchTender;
   const _extractSnapshot = deps.extractSnapshot ?? extractSnapshot;
+  const _extractDocuments = deps.extractDocuments ?? extractDocuments;
   const _sendReply = deps.sendReply ?? sendReply;
   const _loadWatchedEntities = deps.loadWatchedEntities ?? loadWatchedEntities;
   const _saveWatchedEntities = deps.saveWatchedEntities ?? saveWatchedEntities;
@@ -117,6 +118,7 @@ export async function runHandler({ update, env, deps = {} }) {
               value: snap.value,
               classification: snap.classification,
               contact: snap.contact,
+              documents_count: (snap.documents ?? []).length,
             };
           } catch (err) {
             return { tender_id: r.tender_id, error: err.message };
@@ -129,6 +131,24 @@ export async function runHandler({ update, env, deps = {} }) {
     } catch (err) {
       console.error('worker: info loadWatchlist failed:', err.message);
       reply = '⚠️ GitHub недоступний, спробуй ще раз';
+    }
+  } else if (cmd.cmd === 'docs') {
+    if (cmd.error === 'invalid_id') {
+      reply = '❌ Невалідний tender_id. Формат: /docs UA-YYYY-MM-DD-NNNNNN-x';
+    } else if (cmd.error === 'missing_id') {
+      reply = '❌ Не вказано tender_id. /docs UA-YYYY-MM-DD-NNNNNN-x';
+    } else {
+      try {
+        const raw = await _fetchTender(cmd.tender_id);
+        const docs = _extractDocuments(raw);
+        reply = formatDocs({ tender_id: cmd.tender_id, docs });
+      } catch (err) {
+        if (/(404|not found|no UUID)/i.test(err.message)) {
+          reply = `❌ ${cmd.tender_id} не знайдено в Prozorro. Перевір id.`;
+        } else {
+          reply = `⚠️ Не зміг завантажити документи: ${err.message}. Спробуй за хвилину.`;
+        }
+      }
     }
   } else if (cmd.cmd === 'watch') {
     if (cmd.error === 'invalid_edrpou') {

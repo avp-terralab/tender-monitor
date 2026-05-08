@@ -23,6 +23,16 @@ export function parseCommand(text) {
     return { cmd: 'info', tender_id: id };
   }
 
+  const docsMatch = trimmed.match(/^\/docs(?:@\w+)?(?:\s+(.*))?$/i);
+  if (docsMatch) {
+    const args = (docsMatch[1] || '').trim();
+    if (!args) return { cmd: 'docs', error: 'missing_id' };
+    const idMatch = args.match(new RegExp(`^(${TENDER_ID_RE_STR})$`));
+    if (!idMatch) return { cmd: 'docs', error: 'invalid_id' };
+    const id = idMatch[1].slice(0, -1) + idMatch[1].slice(-1).toLowerCase();
+    return { cmd: 'docs', tender_id: id };
+  }
+
   const addMatch = trimmed.match(/^\/add(?:@\w+)?(?:\s+(.*))?$/i);
   if (addMatch) {
     const args = (addMatch[1] || '').trim();
@@ -178,6 +188,9 @@ function formatInfoEntry(g, runIso) {
       const left = fmtTimeLeft(g.deadline, runIso);
       if (left) sections.push(`⏰ Залишилось: ${left}`);
     }
+  }
+  if (typeof g.documents_count === 'number' && g.documents_count > 0) {
+    sections.push(`📎 Документів: ${g.documents_count} (/docs ${g.tender_id})`);
   }
   return sections.join('\n');
 }
@@ -402,6 +415,98 @@ export async function handleWatch(deps, { edrpou }) {
   };
 }
 
+const DOC_TYPE_LABELS = {
+  tenderNotice: '📋 Оголошення / тендерна документація',
+  evaluationCriteria: '📋 Кваліфікаційні критерії',
+  eligibilityCriteria: '📋 Підстави відхилення',
+  technicalSpecifications: '⚙️ Технічні характеристики',
+  biddingDocuments: '📑 Перелік документів',
+  contractTemplate: '📜 Проект договору',
+  commercialProposal: '💰 Цінова пропозиція',
+  illustration: '🖼 Ілюстрації',
+  cancellationDetails: '🛑 Скасування',
+  evaluationReports: '📊 Звіт про оцінку',
+  notice: '📢 Повідомлення',
+};
+
+const DOC_TYPE_ORDER = [
+  'tenderNotice',
+  'evaluationCriteria',
+  'eligibilityCriteria',
+  'technicalSpecifications',
+  'biddingDocuments',
+  'contractTemplate',
+  'commercialProposal',
+  'evaluationReports',
+  'cancellationDetails',
+  'notice',
+  'illustration',
+];
+
+const OTHER_LABEL = '📝 Інше';
+
+function fmtDocDate(iso) {
+  if (!iso) return '';
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (m) return `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}`;
+  const d = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (d) return `${d[3]}.${d[2]}.${d[1]}`;
+  return iso;
+}
+
+export function formatDocs({ tender_id, docs }) {
+  if (!docs || docs.length === 0) {
+    return `📭 У тендера <a href="https://prozorro.gov.ua/tender/${escapeHtml(tender_id)}">${escapeHtml(tender_id)}</a> немає документів.`;
+  }
+
+  const groups = new Map();
+  for (const d of docs) {
+    const key = d.documentType && DOC_TYPE_LABELS[d.documentType]
+      ? d.documentType
+      : '__other';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(d);
+  }
+
+  const orderedKeys = [
+    ...DOC_TYPE_ORDER.filter(k => groups.has(k)),
+    ...Array.from(groups.keys()).filter(k => !DOC_TYPE_ORDER.includes(k) && k !== '__other'),
+    ...(groups.has('__other') ? ['__other'] : []),
+  ];
+
+  const lines = [
+    `📎 Документи <a href="https://prozorro.gov.ua/tender/${escapeHtml(tender_id)}">${escapeHtml(tender_id)}</a> (${docs.length})`,
+    '',
+  ];
+
+  let counter = 0;
+  for (const key of orderedKeys) {
+    const label = key === '__other' ? OTHER_LABEL : DOC_TYPE_LABELS[key];
+    lines.push(label);
+    const sortedDocs = [...groups.get(key)].sort((a, b) => {
+      const da = a.datePublished || '';
+      const db = b.datePublished || '';
+      return db.localeCompare(da);
+    });
+    for (const d of sortedDocs) {
+      counter++;
+      const title = escapeHtml(truncate(d.title || '(без назви)', 200));
+      const date = fmtDocDate(d.datePublished);
+      const datePart = date ? `   ${date}` : '';
+      const urlPart = d.url
+        ? `   ↳ <a href="${escapeHtml(d.url)}">завантажити</a>`
+        : '   ↳ (URL недоступний)';
+      lines.push(`${counter}. ${title}`);
+      if (datePart) lines.push(datePart);
+      lines.push(urlPart);
+      lines.push('');
+    }
+  }
+
+  lines.push(`🌐 Тендер: https://prozorro.gov.ua/tender/${escapeHtml(tender_id)}`);
+  return lines.join('\n').trimEnd();
+}
+
 export const HELP_TEXT = [
   'Загальні команди:',
   '/help — список команд',
@@ -412,6 +517,7 @@ export const HELP_TEXT = [
   '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
   '/list — короткий список (id + Замовник)',
   '/info [UA-...] — детально (всі або один)',
+  '/docs UA-... — список документів тендера',
   '',
   'Моніторинг замовників за EDRPOU:',
   '/watch EDRPOU — стежити за замовником',
