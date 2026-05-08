@@ -236,6 +236,42 @@ export function handleRemove({ watchlist }, { tender_id }) {
   };
 }
 
+export function handleWatched({ watchedEntities }) {
+  if (!watchedEntities || watchedEntities.length === 0) {
+    return '📭 Не стежу за жодним замовником. Додай: /watch <EDRPOU>';
+  }
+  const rows = watchedEntities.map((e, i) => {
+    const icon = e.enabled ? '🟢' : '🔴';
+    const name = e.name && e.name !== '(unknown)'
+      ? ` — ${escapeHtml(truncate(abbreviateLegalForm(e.name), 100))}`
+      : '';
+    return `${i + 1}. ${icon} ${e.edrpou}${name}`;
+  });
+  return rows.join('\n\n') + `\n\nВсього: ${watchedEntities.length}`;
+}
+
+export function handleUnwatch({ watchedEntities }, { edrpou }) {
+  const existing = watchedEntities.find(e => e.edrpou === edrpou);
+  if (!existing) {
+    return { reply: `❓ ${edrpou} не у watched-списку`, mutation: null };
+  }
+  const namePart = existing.name && existing.name !== '(unknown)' ? ` (${existing.name})` : '';
+  return {
+    reply: `✅ Прибрав ${edrpou}${namePart}`,
+    mutation: { type: 'delete_entity', edrpou },
+  };
+}
+
+export function applyEntityMutation(watchedEntities, mutation) {
+  if (mutation.type === 'append') {
+    return [...watchedEntities, mutation.row];
+  }
+  if (mutation.type === 'delete_entity') {
+    return watchedEntities.filter(e => e.edrpou !== mutation.edrpou);
+  }
+  return watchedEntities;
+}
+
 export async function handleAdd(deps, { tender_id, notes }) {
   const { watchlist, fetchTender, extractSnapshot } = deps;
   const existing = watchlist.find(r => r.tender_id === tender_id);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseCommand, buildAutoNotes, formatAddReply, handleList,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
-  abbreviateLegalForm,
+  abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -728,4 +728,62 @@ test('parseCommand: /unwatch without args → error', () => {
 
 test('parseCommand: /unwatch invalid → error', () => {
   assert.deepEqual(parseCommand('/unwatch 12345'), { cmd: 'unwatch', error: 'invalid_edrpou' });
+});
+
+test('handleWatched: empty list', () => {
+  assert.match(handleWatched({ watchedEntities: [] }), /порожн|жодним/i);
+});
+
+test('handleWatched: list with entities and abbreviation', () => {
+  const reply = handleWatched({ watchedEntities: [
+    { edrpou: '02000010', name: 'Комунальне підприємство «Х»', enabled: true },
+    { edrpou: '11111111', name: '(unknown)', enabled: true },
+  ]});
+  assert.match(reply, /1\. 🟢 02000010 — КП «Х»/);
+  assert.match(reply, /2\. 🟢 11111111$/m);
+  assert.match(reply, /Всього: 2/);
+});
+
+test('handleUnwatch: existing → mutation:delete_entity + ✅', () => {
+  const result = handleUnwatch(
+    { watchedEntities: [{ edrpou: '02000010', name: 'Test', enabled: true }] },
+    { edrpou: '02000010' }
+  );
+  assert.match(result.reply, /✅ Прибрав 02000010/);
+  assert.deepEqual(result.mutation, { type: 'delete_entity', edrpou: '02000010' });
+});
+
+test('handleUnwatch: not in list → ❓ + null mutation', () => {
+  const result = handleUnwatch(
+    { watchedEntities: [] },
+    { edrpou: '02000010' }
+  );
+  assert.match(result.reply, /❓ 02000010 не у watched/);
+  assert.equal(result.mutation, null);
+});
+
+test('applyEntityMutation: append', () => {
+  const wl = [{ edrpou: '11111111', enabled: true }];
+  const result = applyEntityMutation(wl, {
+    type: 'append',
+    row: { edrpou: '22222222', enabled: true },
+  });
+  assert.equal(result.length, 2);
+  assert.equal(result[1].edrpou, '22222222');
+});
+
+test('applyEntityMutation: delete_entity', () => {
+  const wl = [
+    { edrpou: '11111111', enabled: true },
+    { edrpou: '22222222', enabled: true },
+  ];
+  const result = applyEntityMutation(wl, { type: 'delete_entity', edrpou: '11111111' });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].edrpou, '22222222');
+});
+
+test('applyEntityMutation: unknown type → unchanged', () => {
+  const wl = [{ edrpou: '11111111', enabled: true }];
+  const result = applyEntityMutation(wl, { type: 'foo' });
+  assert.deepEqual(result, wl);
 });
