@@ -397,7 +397,7 @@ test('runHandler: /info with active tenders → fetch each + reply', async () =>
   assert.doesNotMatch(sent[0].text, /UA-C/);
 });
 
-test('runHandler: /info renders inline documents per tender', async () => {
+test('runHandler: /info shows 📎 Документи (N) with /docs hint per tender', async () => {
   const RAW = {
     data: {
       tenderID: ID, title: 'X', status: 'active.tendering',
@@ -405,8 +405,8 @@ test('runHandler: /info renders inline documents per tender', async () => {
       procuringEntity: { name: 'T', identifier: { id: '1' } },
       items: [],
       documents: [
-        { id: 'd1', title: 'ТД.docx', documentType: 'tenderNotice',
-          datePublished: '2026-04-30T12:00:00+03:00', url: 'https://x/td' },
+        { id: 'd1', title: 'ТД.docx', documentType: 'tenderNotice' },
+        { id: 'd2', title: 'Додаток 5.docx', documentType: 'biddingDocuments' },
       ],
     },
   };
@@ -421,8 +421,7 @@ test('runHandler: /info renders inline documents per tender', async () => {
     env: ENV,
     deps,
   });
-  assert.match(sent[0].text, /📎 Документи \(1\):/);
-  assert.match(sent[0].text, /• ТД\.docx — <a href="https:\/\/x\/td">завантажити<\/a>/);
+  assert.match(sent[0].text, new RegExp(`📎 Документи \\(2\\): /docs ${ID}`));
 });
 
 test('runHandler: /info UA-... existing in watchlist → fetches just that one', async () => {

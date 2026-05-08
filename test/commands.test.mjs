@@ -1077,63 +1077,32 @@ test('formatDocs: missing url shows fallback', () => {
   assert.match(reply, /URL недоступний/);
 });
 
-test('formatInfo: shows 📎 Документи (N) with inline list when documents present', () => {
+test('formatInfo: shows 📎 Документи (N) with /docs command per tender', () => {
   const reply = formatInfo({
     runIso: '2026-05-08T13:00:00+03:00',
     groups: [{
-      tender_id: 'UA-X',
-      prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+      tender_id: 'UA-2026-04-30-010542-a',
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-2026-04-30-010542-a',
       status: 'active.tendering',
-      documents: [
-        { id: 'd1', title: 'ТД.docx', documentType: 'tenderNotice',
-          datePublished: '2026-04-30T12:00:00+03:00', url: 'https://x/td' },
-        { id: 'd2', title: 'Додаток 5.docx', documentType: 'biddingDocuments',
-          datePublished: '2026-04-30T12:30:00+03:00', url: 'https://x/d5' },
-      ],
+      documents_count: 7,
     }],
   });
-  assert.match(reply, /📎 Документи \(2\):/);
-  assert.match(reply, /📋 Оголошення/);
-  assert.match(reply, /• ТД\.docx — <a href="https:\/\/x\/td">завантажити<\/a>/);
-  assert.match(reply, /📑 Перелік документів/);
-  assert.match(reply, /• Додаток 5\.docx/);
+  assert.match(reply, /📎 Документи \(7\): \/docs UA-2026-04-30-010542-a/);
 });
 
-test('formatInfo: omits 📎 line when documents missing or empty', () => {
-  const replyEmpty = formatInfo({
+test('formatInfo: omits 📎 line when count is 0 or absent', () => {
+  const replyZero = formatInfo({
     runIso: '2026-05-08T13:00:00+03:00',
     groups: [{ tender_id: 'UA-X', prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
-               status: 'active.tendering', documents: [] }],
+               status: 'active.tendering', documents_count: 0 }],
   });
   const replyAbsent = formatInfo({
     runIso: '2026-05-08T13:00:00+03:00',
     groups: [{ tender_id: 'UA-X', prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
                status: 'active.tendering' }],
   });
-  assert.doesNotMatch(replyEmpty, /📎/);
+  assert.doesNotMatch(replyZero, /📎/);
   assert.doesNotMatch(replyAbsent, /📎/);
-});
-
-test('formatDocsCompact: empty docs → empty string', async () => {
-  const { formatDocsCompact } = await import('../commands.mjs');
-  assert.equal(formatDocsCompact([]), '');
-  assert.equal(formatDocsCompact(null), '');
-});
-
-test('formatDocsCompact: groups, sorts, escapes', async () => {
-  const { formatDocsCompact } = await import('../commands.mjs');
-  const out = formatDocsCompact([
-    { id: 'd1', title: 'A & <B>.docx', documentType: 'tenderNotice',
-      datePublished: '2026-04-30T12:00:00+03:00', url: 'https://x?a=1&b=2' },
-    { id: 'd2', title: 'Old.docx', documentType: 'tenderNotice',
-      datePublished: '2026-04-29T10:00:00+03:00', url: 'https://x/old' },
-  ]);
-  assert.match(out, /A &amp; &lt;B&gt;\.docx/);
-  assert.match(out, /https:\/\/x\?a=1&amp;b=2/);
-  // Newer first
-  const idxNew = out.indexOf('A &amp;');
-  const idxOld = out.indexOf('Old');
-  assert.ok(idxNew < idxOld);
 });
 
 test('formatDocs: footer link to tender page', () => {

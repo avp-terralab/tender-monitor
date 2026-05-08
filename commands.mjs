@@ -189,8 +189,8 @@ function formatInfoEntry(g, runIso) {
       if (left) sections.push(`⏰ Залишилось: ${left}`);
     }
   }
-  if (Array.isArray(g.documents) && g.documents.length > 0) {
-    sections.push(`📎 Документи (${g.documents.length}):\n${formatDocsCompact(g.documents)}`);
+  if (typeof g.documents_count === 'number' && g.documents_count > 0) {
+    sections.push(`📎 Документи (${g.documents_count}): /docs ${g.tender_id}`);
   }
   return sections.join('\n');
 }
@@ -473,22 +473,6 @@ function groupDocsByType(docs) {
     label: key === '__other' ? OTHER_LABEL : DOC_TYPE_LABELS[key],
     docs: [...groups.get(key)].sort((a, b) => (b.datePublished || '').localeCompare(a.datePublished || '')),
   }));
-}
-
-export function formatDocsCompact(docs) {
-  if (!docs || docs.length === 0) return '';
-  const lines = [];
-  for (const group of groupDocsByType(docs)) {
-    lines.push(`  ${group.label}:`);
-    for (const d of group.docs) {
-      const title = escapeHtml(truncate(d.title || '(без назви)', 150));
-      const link = d.url
-        ? `<a href="${escapeHtml(d.url)}">завантажити</a>`
-        : '(URL недоступний)';
-      lines.push(`    • ${title} — ${link}`);
-    }
-  }
-  return lines.join('\n');
 }
 
 export function formatDocs({ tender_id, docs }) {
