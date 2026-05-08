@@ -71,6 +71,31 @@ export async function runOnce(deps) {
     });
   }
 
+  // Entity-watch: new tender announcements from watched EDRPOUs
+  if (deps.checkWatchedEntities) {
+    try {
+      const watchResult = await deps.checkWatchedEntities({
+        watchedEntities: deps.watchedEntities ?? [],
+        loadCursor: deps.loadCursor,
+        saveCursor: deps.saveCursor,
+        loadSeen: deps.loadSeen,
+        saveSeen: deps.saveSeen,
+      });
+      if (watchResult.alerts?.length) groups.push(...watchResult.alerts);
+      if (watchResult.errors?.length) {
+        for (const e of watchResult.errors) {
+          errors.push({
+            tender_id: e.tender_id ?? `[entity-watch ${e.source}]`,
+            error: e.error,
+            is_invalid: false,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('checkWatchedEntities failed:', err.message);
+    }
+  }
+
   const hasContent = groups.length > 0 || errors.length > 0;
 
   if (!hasContent && isHeartbeatHour(runIso)) {

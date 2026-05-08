@@ -1,6 +1,7 @@
 import { stripDkCode, truncate, fmtStatus, fmtDeadline, escapeHtml, formatMoney, formatPhone } from './telegram.mjs';
 
 const TENDER_ID_RE_STR = 'UA-\\d{4}-\\d{2}-\\d{2}-\\d{6}-[a-zA-Z]';
+const EDRPOU_RE = /^\d{8}$/;
 
 export function parseCommand(text) {
   if (typeof text !== 'string') return { cmd: null };
@@ -11,6 +12,7 @@ export function parseCommand(text) {
   if (/^\/help(?:@\w+)?$/i.test(trimmed)) return { cmd: 'help' };
   if (/^\/status(?:@\w+)?$/i.test(trimmed)) return { cmd: 'status' };
   if (/^\/info(?:@\w+)?$/i.test(trimmed)) return { cmd: 'info' };
+  if (/^\/watched(?:@\w+)?$/i.test(trimmed)) return { cmd: 'watched' };
 
   const addMatch = trimmed.match(/^\/add(?:@\w+)?(?:\s+(.*))?$/i);
   if (addMatch) {
@@ -34,6 +36,22 @@ export function parseCommand(text) {
     if (!idMatch) return { cmd: 'remove', error: 'invalid_id' };
     const id = idMatch[1].slice(0, -1) + idMatch[1].slice(-1).toLowerCase();
     return { cmd: 'remove', tender_id: id };
+  }
+
+  const watchMatch = trimmed.match(/^\/watch(?:@\w+)?(?:\s+(.*))?$/i);
+  if (watchMatch) {
+    const args = (watchMatch[1] || '').trim();
+    if (!args) return { cmd: 'watch', error: 'missing_edrpou' };
+    if (!EDRPOU_RE.test(args)) return { cmd: 'watch', error: 'invalid_edrpou' };
+    return { cmd: 'watch', edrpou: args };
+  }
+
+  const unwatchMatch = trimmed.match(/^\/unwatch(?:@\w+)?(?:\s+(.*))?$/i);
+  if (unwatchMatch) {
+    const args = (unwatchMatch[1] || '').trim();
+    if (!args) return { cmd: 'unwatch', error: 'missing_edrpou' };
+    if (!EDRPOU_RE.test(args)) return { cmd: 'unwatch', error: 'invalid_edrpou' };
+    return { cmd: 'unwatch', edrpou: args };
   }
 
   if (trimmed.startsWith('/')) return { cmd: 'unknown' };
@@ -218,6 +236,42 @@ export function handleRemove({ watchlist }, { tender_id }) {
   };
 }
 
+export function handleWatched({ watchedEntities }) {
+  if (!watchedEntities || watchedEntities.length === 0) {
+    return '📭 Не стежу за жодним замовником. Додай: /watch <EDRPOU>';
+  }
+  const rows = watchedEntities.map((e, i) => {
+    const icon = e.enabled ? '🟢' : '🔴';
+    const name = e.name && e.name !== '(unknown)'
+      ? ` — ${escapeHtml(truncate(abbreviateLegalForm(e.name), 100))}`
+      : '';
+    return `${i + 1}. ${icon} ${e.edrpou}${name}`;
+  });
+  return rows.join('\n\n') + `\n\nВсього: ${watchedEntities.length}`;
+}
+
+export function handleUnwatch({ watchedEntities }, { edrpou }) {
+  const existing = watchedEntities.find(e => e.edrpou === edrpou);
+  if (!existing) {
+    return { reply: `❓ ${edrpou} не у watched-списку`, mutation: null };
+  }
+  const namePart = existing.name && existing.name !== '(unknown)' ? ` (${existing.name})` : '';
+  return {
+    reply: `✅ Прибрав ${edrpou}${namePart}`,
+    mutation: { type: 'delete_entity', edrpou },
+  };
+}
+
+export function applyEntityMutation(watchedEntities, mutation) {
+  if (mutation.type === 'append') {
+    return [...watchedEntities, mutation.row];
+  }
+  if (mutation.type === 'delete_entity') {
+    return watchedEntities.filter(e => e.edrpou !== mutation.edrpou);
+  }
+  return watchedEntities;
+}
+
 export async function handleAdd(deps, { tender_id, notes }) {
   const { watchlist, fetchTender, extractSnapshot } = deps;
   const existing = watchlist.find(r => r.tender_id === tender_id);
@@ -268,12 +322,66 @@ export async function handleAdd(deps, { tender_id, notes }) {
   };
 }
 
+export async function handleWatch(deps, { edrpou }) {
+  const existing = deps.watchedEntities.find(e => e.edrpou === edrpou);
+  if (existing) {
+    const namePart = existing.name && existing.name !== '(unknown)' ? ` (${existing.name})` : '';
+    return {
+      reply: `⚠️ Вже стежу за ${edrpou}${namePart}`,
+      mutation: null,
+    };
+  }
+
+  let entityName = '(unknown)';
+  let bootstrapIds = [];
+  try {
+    const { items } = await deps.fetchTendersFeed({});
+    const matches = items.filter(t => t.procuringEntity?.identifier?.id === edrpou);
+    if (matches.length > 0) {
+      entityName = matches[0].procuringEntity.name ?? '(unknown)';
+      for (const m of matches) {
+        try {
+          const raw = await deps.fetchTender(m.tenderID);
+          const snap = deps.extractSnapshot(raw);
+          if (['active.tendering', 'active.pre-qualification'].includes(snap.status)) {
+            bootstrapIds.push(m.tenderID);
+          }
+        } catch {
+          // skip individual fetch failures
+        }
+      }
+    }
+  } catch (err) {
+    return {
+      reply: `⚠️ Не зміг перевірити EDRPOU: ${err.message}. Спробуй ще раз.`,
+      mutation: null,
+    };
+  }
+
+  const newRow = {
+    edrpou,
+    name: entityName,
+    enabled: true,
+    added_at: new Date().toISOString(),
+  };
+  const reply = entityName === '(unknown)'
+    ? `⚠️ Додав ${edrpou}, але не знайшов жодного тендера за останні ~100 публікацій. Перевір код. Якщо EDRPOU правильний — алерти прийдуть при наступному оголошенні.`
+    : `✅ Стежу за ${edrpou} — ${escapeHtml(abbreviateLegalForm(entityName))}\nПомічено як уже-побачені: ${bootstrapIds.length} активних тендерів. Алерт буде на нові.`;
+  return {
+    reply,
+    mutation: { type: 'append', row: newRow, bootstrap: { edrpou, ids: bootstrapIds } },
+  };
+}
+
 export const HELP_TEXT = [
   'Команди:',
   '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
   '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
   '/list — короткий список (id + Замовник)',
   '/info — детально по кожному (замовник, ДК, ціна, статус)',
+  '/watch EDRPOU — стежити за замовником',
+  '/unwatch EDRPOU — припинити стежити',
+  '/watched — список замовників',
   '/status — здоровʼя бота',
   '/help — це повідомлення',
 ].join('\n');

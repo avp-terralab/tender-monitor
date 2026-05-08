@@ -110,3 +110,15 @@ export async function fetchTender(tenderId) {
   }
   return cdbRes.json(); // {data: {...}}
 }
+
+export async function fetchTendersFeed({ pageOffset = null, fetch: fetchImpl = fetch } = {}) {
+  const base = 'https://public.api.openprocurement.org/api/2.5/tenders';
+  const opts = 'opt_fields=tenderID,procuringEntity,dateModified,dateCreated&descending=1&limit=100';
+  const url = pageOffset ? `${base}${pageOffset.replace(/^\/api\/2\.5\/tenders/, '')}` : `${base}?${opts}`;
+  const res = await fetchImpl(url);
+  if (!res.ok) {
+    throw new Error(`Prozorro feed ${res.status}: ${await res.text()}`);
+  }
+  const json = await res.json();
+  return { items: json.data ?? [], next: json.next_page?.path ?? null };
+}

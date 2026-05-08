@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   parseCommand, buildAutoNotes, formatAddReply, handleList,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
-  abbreviateLegalForm,
+  abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
+  handleWatch,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -690,4 +691,202 @@ test('formatInfo: abbreviates entity in 👥 line', () => {
   });
   assert.match(reply, /👥 Замовник: КП «Київтепло»/);
   assert.doesNotMatch(reply, /Комунальне підприємство/);
+});
+
+test('parseCommand: /watched', () => {
+  assert.deepEqual(parseCommand('/watched'), { cmd: 'watched' });
+});
+
+test('parseCommand: /watched with bot suffix', () => {
+  assert.deepEqual(parseCommand('/watched@my_bot'), { cmd: 'watched' });
+});
+
+test('parseCommand: /watch with valid EDRPOU', () => {
+  assert.deepEqual(parseCommand('/watch 12345678'), { cmd: 'watch', edrpou: '12345678' });
+});
+
+test('parseCommand: /watch with bot suffix', () => {
+  assert.deepEqual(parseCommand('/watch@my_bot 12345678'), { cmd: 'watch', edrpou: '12345678' });
+});
+
+test('parseCommand: /watch without args → error', () => {
+  assert.deepEqual(parseCommand('/watch'), { cmd: 'watch', error: 'missing_edrpou' });
+});
+
+test('parseCommand: /watch with non-8-digit → error', () => {
+  assert.deepEqual(parseCommand('/watch 12345'), { cmd: 'watch', error: 'invalid_edrpou' });
+  assert.deepEqual(parseCommand('/watch 123456789'), { cmd: 'watch', error: 'invalid_edrpou' });
+  assert.deepEqual(parseCommand('/watch abcdefgh'), { cmd: 'watch', error: 'invalid_edrpou' });
+});
+
+test('parseCommand: /unwatch with valid EDRPOU', () => {
+  assert.deepEqual(parseCommand('/unwatch 12345678'), { cmd: 'unwatch', edrpou: '12345678' });
+});
+
+test('parseCommand: /unwatch without args → error', () => {
+  assert.deepEqual(parseCommand('/unwatch'), { cmd: 'unwatch', error: 'missing_edrpou' });
+});
+
+test('parseCommand: /unwatch invalid → error', () => {
+  assert.deepEqual(parseCommand('/unwatch 12345'), { cmd: 'unwatch', error: 'invalid_edrpou' });
+});
+
+test('handleWatched: empty list', () => {
+  assert.match(handleWatched({ watchedEntities: [] }), /порожн|жодним/i);
+});
+
+test('handleWatched: list with entities and abbreviation', () => {
+  const reply = handleWatched({ watchedEntities: [
+    { edrpou: '02000010', name: 'Комунальне підприємство «Х»', enabled: true },
+    { edrpou: '11111111', name: '(unknown)', enabled: true },
+  ]});
+  assert.match(reply, /1\. 🟢 02000010 — КП «Х»/);
+  assert.match(reply, /2\. 🟢 11111111$/m);
+  assert.match(reply, /Всього: 2/);
+});
+
+test('handleUnwatch: existing → mutation:delete_entity + ✅', () => {
+  const result = handleUnwatch(
+    { watchedEntities: [{ edrpou: '02000010', name: 'Test', enabled: true }] },
+    { edrpou: '02000010' }
+  );
+  assert.match(result.reply, /✅ Прибрав 02000010/);
+  assert.deepEqual(result.mutation, { type: 'delete_entity', edrpou: '02000010' });
+});
+
+test('handleUnwatch: not in list → ❓ + null mutation', () => {
+  const result = handleUnwatch(
+    { watchedEntities: [] },
+    { edrpou: '02000010' }
+  );
+  assert.match(result.reply, /❓ 02000010 не у watched/);
+  assert.equal(result.mutation, null);
+});
+
+test('applyEntityMutation: append', () => {
+  const wl = [{ edrpou: '11111111', enabled: true }];
+  const result = applyEntityMutation(wl, {
+    type: 'append',
+    row: { edrpou: '22222222', enabled: true },
+  });
+  assert.equal(result.length, 2);
+  assert.equal(result[1].edrpou, '22222222');
+});
+
+test('applyEntityMutation: delete_entity', () => {
+  const wl = [
+    { edrpou: '11111111', enabled: true },
+    { edrpou: '22222222', enabled: true },
+  ];
+  const result = applyEntityMutation(wl, { type: 'delete_entity', edrpou: '11111111' });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].edrpou, '22222222');
+});
+
+test('applyEntityMutation: unknown type → unchanged', () => {
+  const wl = [{ edrpou: '11111111', enabled: true }];
+  const result = applyEntityMutation(wl, { type: 'foo' });
+  assert.deepEqual(result, wl);
+});
+
+test('handleWatch: existing edrpou → ⚠️ no mutation', async () => {
+  const result = await handleWatch(
+    {
+      watchedEntities: [{ edrpou: '11111111', name: 'X', enabled: true }],
+      fetchTendersFeed: async () => ({ items: [], next: null }),
+      fetchTender: async () => ({ data: {} }),
+      extractSnapshot: (r) => r.data,
+    },
+    { edrpou: '11111111' }
+  );
+  assert.match(result.reply, /⚠️ Вже стежу/);
+  assert.equal(result.mutation, null);
+});
+
+test('handleWatch: new EDRPOU + feed has matches + active.tendering → bootstrap with ids', async () => {
+  const result = await handleWatch(
+    {
+      watchedEntities: [],
+      fetchTendersFeed: async () => ({
+        items: [
+          { tenderID: 'UA-OPEN', procuringEntity: { identifier: { id: '11111111' }, name: 'КНП Тест' } },
+          { tenderID: 'UA-CLOSED', procuringEntity: { identifier: { id: '11111111' } } },
+        ],
+        next: null,
+      }),
+      fetchTender: async (id) => ({
+        data: {
+          tenderID: id,
+          status: id === 'UA-OPEN' ? 'active.tendering' : 'complete',
+          procuringEntity: { name: 'КНП Тест', identifier: { id: '11111111' } },
+          items: [],
+        },
+      }),
+      extractSnapshot: (r) => r.data,
+    },
+    { edrpou: '11111111' }
+  );
+  assert.match(result.reply, /✅ Стежу за 11111111/);
+  assert.match(result.reply, /КНП Тест/);
+  assert.match(result.reply, /1 активних тендерів/);
+  assert.equal(result.mutation.type, 'append');
+  assert.equal(result.mutation.row.edrpou, '11111111');
+  assert.equal(result.mutation.row.name, 'КНП Тест');
+  assert.equal(result.mutation.row.enabled, true);
+  assert.deepEqual(result.mutation.bootstrap, { edrpou: '11111111', ids: ['UA-OPEN'] });
+});
+
+test('handleWatch: new EDRPOU + feed has zero matches → warn but accept', async () => {
+  const result = await handleWatch(
+    {
+      watchedEntities: [],
+      fetchTendersFeed: async () => ({
+        items: [{ tenderID: 'UA-OTHER', procuringEntity: { identifier: { id: '99999999' } } }],
+        next: null,
+      }),
+      fetchTender: async () => ({ data: {} }),
+      extractSnapshot: (r) => r.data,
+    },
+    { edrpou: '11111111' }
+  );
+  assert.match(result.reply, /⚠️ Додав 11111111/);
+  assert.match(result.reply, /не знайшов жодного тендера/i);
+  assert.equal(result.mutation.type, 'append');
+  assert.equal(result.mutation.row.edrpou, '11111111');
+  assert.equal(result.mutation.row.name, '(unknown)');
+  assert.deepEqual(result.mutation.bootstrap, { edrpou: '11111111', ids: [] });
+});
+
+test('handleWatch: feed throws → ⚠️ + null mutation', async () => {
+  const result = await handleWatch(
+    {
+      watchedEntities: [],
+      fetchTendersFeed: async () => { throw new Error('Prozorro 503'); },
+      fetchTender: async () => ({ data: {} }),
+      extractSnapshot: (r) => r.data,
+    },
+    { edrpou: '11111111' }
+  );
+  assert.match(result.reply, /⚠️ Не зміг перевірити EDRPOU/);
+  assert.equal(result.mutation, null);
+});
+
+test('handleWatch: fetchTender failure during bootstrap is silently skipped', async () => {
+  const result = await handleWatch(
+    {
+      watchedEntities: [],
+      fetchTendersFeed: async () => ({
+        items: [{ tenderID: 'UA-X', procuringEntity: { identifier: { id: '11111111' }, name: 'Замовник' } }],
+        next: null,
+      }),
+      fetchTender: async () => { throw new Error('Prozorro 404'); },
+      extractSnapshot: (r) => r.data,
+    },
+    { edrpou: '11111111' }
+  );
+  // Reply still positive (entity name from feed match)
+  assert.match(result.reply, /✅ Стежу за 11111111/);
+  assert.equal(result.mutation.row.name, 'Замовник');
+  // Bootstrap ids empty since fetch failed
+  assert.deepEqual(result.mutation.bootstrap.ids, []);
 });

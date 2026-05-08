@@ -1,6 +1,7 @@
 import { runOnce } from './monitor.mjs';
 import { fetchTender, extractSnapshot } from './prozorro.mjs';
 import { sendDigest as tgSend } from './telegram.mjs';
+import { checkWatchedEntities } from './entity_watch.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,14 @@ if (!existsSync(watchlistPath)) {
 
 const watchlist = JSON.parse(readFileSync(watchlistPath, 'utf-8'));
 
+const watchedEntitiesPath = join(REPO, 'watched_entities.json');
+const watchedEntities = existsSync(watchedEntitiesPath)
+  ? JSON.parse(readFileSync(watchedEntitiesPath, 'utf-8'))
+  : [];
+
+const cursorPath = join(stateDir, '_watched_feed_cursor.json');
+const seenPath = join(stateDir, '_watched_seen.json');
+
 const result = await runOnce({
   runIso: new Date().toISOString(),
   watchlist,
@@ -46,6 +55,22 @@ const result = await runOnce({
   },
   sendDigest: async (text) => tgSend({ token, chatId }, text),
   updateSheet: async () => { /* no-op in CI */ },
+  watchedEntities,
+  checkWatchedEntities,
+  loadCursor: async () => {
+    if (!existsSync(cursorPath)) return null;
+    return JSON.parse(readFileSync(cursorPath, 'utf-8'));
+  },
+  saveCursor: async (c) => {
+    writeFileSync(cursorPath, JSON.stringify(c, null, 2));
+  },
+  loadSeen: async () => {
+    if (!existsSync(seenPath)) return null;
+    return JSON.parse(readFileSync(seenPath, 'utf-8'));
+  },
+  saveSeen: async (s) => {
+    writeFileSync(seenPath, JSON.stringify(s, null, 2));
+  },
   disableTender: async (tenderId, reason) => {
     const wl = JSON.parse(readFileSync(watchlistPath, 'utf-8'));
     for (const row of wl) {

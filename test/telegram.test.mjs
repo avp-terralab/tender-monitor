@@ -475,3 +475,16 @@ test('sendReply: throws on telegram-level not-ok', async () => {
     /chat not found/
   );
 });
+
+test('formatDigest: renders new_tender_announced event with 🆕 icon', () => {
+  const text = formatDigest('2026-05-08T13:00:00+03:00', [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    title: 'Реактиви',
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-2026-04-30-010542-a',
+    procuring_entity: { name: 'КНП', edrpou: '12345678' },
+    classification: { id: '72260000-5', description: 'Послуги' },
+    value: { amount: 100000, currency: 'UAH', valueAddedTaxIncluded: true },
+    events: [{ type: 'new_tender_announced' }],
+  }]);
+  assert.match(text, /🆕 Нове оголошення замовника/);
+});

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWatchlist, ConflictError, saveWatchlist } from '../src/github.mjs';
+import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen } from '../src/github.mjs';
 
 const ENV = { GITHUB_PAT: 'PAT_VALUE' };
 
@@ -146,4 +146,77 @@ test('saveWatchlist: encodes UTF-8 (Cyrillic round-trips through base64)', async
   const decodedJson = decodedBytes.toString('utf-8');
   assert.match(decodedJson, /Рівне ОКЛ/);
   assert.deepEqual(JSON.parse(decodedJson), wl);
+});
+
+test('loadWatchedEntities: GET watched_entities.json', async () => {
+  const json = JSON.stringify([{ edrpou: '12345678', name: 'X', enabled: true }]);
+  const content = Buffer.from(json, 'utf-8').toString('base64');
+  const calls = [];
+  const fakeFetch = async (url) => {
+    calls.push(url);
+    return { ok: true, json: async () => ({ content, sha: 'sha1' }) };
+  };
+  const result = await loadWatchedEntities(ENV, { fetch: fakeFetch });
+  assert.match(calls[0], /watched_entities\.json/);
+  assert.deepEqual(result.entities, [{ edrpou: '12345678', name: 'X', enabled: true }]);
+  assert.equal(result.sha, 'sha1');
+});
+
+test('loadWatchedEntities: 404 returns empty array (file may not exist)', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 404, text: async () => 'Not Found' });
+  const result = await loadWatchedEntities(ENV, { fetch: fakeFetch });
+  assert.deepEqual(result.entities, []);
+  assert.equal(result.sha, null);
+});
+
+test('saveWatchedEntities: PUT to correct path with sha', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, opts });
+    return { ok: true, json: async () => ({}) };
+  };
+  await saveWatchedEntities(ENV, [{ edrpou: '12345678', enabled: true }], 'sha1', { fetch: fakeFetch });
+  assert.match(calls[0].url, /watched_entities\.json/);
+  assert.equal(calls[0].opts.method, 'PUT');
+  const body = JSON.parse(calls[0].opts.body);
+  assert.equal(body.sha, 'sha1');
+});
+
+test('saveWatchedEntities: handles null sha (file does not exist yet)', async () => {
+  const fakeFetch = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    assert.equal(body.sha, undefined); // omit sha when null
+    return { ok: true, json: async () => ({}) };
+  };
+  await saveWatchedEntities(ENV, [], null, { fetch: fakeFetch });
+});
+
+test('loadWatchedSeen: GET _state/_watched_seen.json', async () => {
+  const seen = { '12345678': ['UA-A'] };
+  const content = Buffer.from(JSON.stringify(seen), 'utf-8').toString('base64');
+  const calls = [];
+  const fakeFetch = async (url) => {
+    calls.push(url);
+    return { ok: true, json: async () => ({ content, sha: 's' }) };
+  };
+  const result = await loadWatchedSeen(ENV, { fetch: fakeFetch });
+  assert.match(calls[0], /_state\/_watched_seen\.json/);
+  assert.deepEqual(result.seen, seen);
+});
+
+test('loadWatchedSeen: 404 → empty object', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 404, text: async () => 'Not Found' });
+  const result = await loadWatchedSeen(ENV, { fetch: fakeFetch });
+  assert.deepEqual(result.seen, {});
+  assert.equal(result.sha, null);
+});
+
+test('saveWatchedSeen: PUT to _state/_watched_seen.json', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, opts });
+    return { ok: true, json: async () => ({}) };
+  };
+  await saveWatchedSeen(ENV, { '12345678': ['UA-A'] }, 'sha1', { fetch: fakeFetch });
+  assert.match(calls[0].url, /_state\/_watched_seen\.json/);
 });
