@@ -74,7 +74,7 @@ export async function checkWatchedEntities(deps) {
 
 function buildAlertGroup(snap) {
   return {
-    tender_id: snap.tender_id ?? snap.tenderID,
+    tender_id: snap.tender_id,
     title: snap.title,
     status: snap.status,
     deadline: snap.tenderPeriod?.endDate ?? null,

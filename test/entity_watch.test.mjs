@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { checkWatchedEntities } from '../entity_watch.mjs';
+import { extractSnapshot } from '../prozorro.mjs';
 
 const baseDeps = (overrides = {}) => {
   const cursorStore = { value: null };
@@ -15,7 +16,7 @@ const baseDeps = (overrides = {}) => {
       saveSeen: async (s) => { seenStore.value = s; },
       fetchTendersFeed: async () => ({ items: [], next: null }),
       fetchTender: async () => ({ data: {} }),
-      extractSnapshot: (raw) => raw.data,
+      extractSnapshot,
       ...overrides,
     },
   };
