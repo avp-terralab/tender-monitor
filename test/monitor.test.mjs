@@ -242,3 +242,64 @@ test('runOnce: non-heartbeat hour with no events stays silent', async () => {
   });
   assert.equal(sent.length, 0);
 });
+
+test('runOnce: appends entity-watch alerts to digest groups', async () => {
+  const sent = [];
+  await runOnce({
+    runIso: '2026-05-08T13:00:00+03:00',
+    watchlist: [],
+    fetchTender: async () => ({ data: {} }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => null,
+    saveState: async () => {},
+    sendDigest: async (text) => { sent.push(text); },
+    updateSheet: async () => {},
+    checkWatchedEntities: async () => ({
+      alerts: [{
+        tender_id: 'UA-NEW',
+        title: 'Test',
+        prozorro_url: 'https://prozorro.gov.ua/tender/UA-NEW',
+        procuring_entity: { name: 'КНП Тест', edrpou: '12345678' },
+        events: [{ type: 'new_tender_announced' }],
+      }],
+      errors: [],
+    }),
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /🆕 Нове оголошення замовника/);
+  assert.match(sent[0], /UA-NEW/);
+});
+
+test('runOnce: works when checkWatchedEntities not provided (backward compat)', async () => {
+  const result = await runOnce({
+    runIso: '2026-05-08T13:00:00+03:00',
+    watchlist: [],
+    fetchTender: async () => ({ data: {} }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => null,
+    saveState: async () => {},
+    sendDigest: async () => {},
+    updateSheet: async () => {},
+  });
+  assert.equal(result.sent, false);
+});
+
+test('runOnce: entity-watch errors propagate to digest', async () => {
+  const sent = [];
+  await runOnce({
+    runIso: '2026-05-08T13:00:00+03:00',
+    watchlist: [],
+    fetchTender: async () => ({ data: {} }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => null,
+    saveState: async () => {},
+    sendDigest: async (text) => { sent.push(text); },
+    updateSheet: async () => {},
+    checkWatchedEntities: async () => ({
+      alerts: [],
+      errors: [{ source: 'feed', error: 'Prozorro 503' }],
+    }),
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /Prozorro 503/);
+});
