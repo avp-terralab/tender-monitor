@@ -365,7 +365,7 @@ export async function handleWatch(deps, { edrpou }) {
     added_at: new Date().toISOString(),
   };
   const reply = entityName === '(unknown)'
-    ? `⚠️ Додав ${edrpou}, але не знайшов жодного тендера за останні ~100 публікацій. Перевір код. Якщо EDRPOU правильний — алерти прийдуть при наступному оголошенні.`
+    ? `✅ ${edrpou} збережено. Серед 100 останніх публікацій Prozorro тендерів від цього замовника не виявлено — нормально, якщо замовник публікує рідко. Алерт прийде коли він опублікує новий тендер. Якщо EDRPOU помилковий — /unwatch ${edrpou}.`
     : `✅ Стежу за ${edrpou} — ${escapeHtml(abbreviateLegalForm(entityName))}\nПомічено як уже-побачені: ${bootstrapIds.length} активних тендерів. Алерт буде на нові.`;
   return {
     reply,

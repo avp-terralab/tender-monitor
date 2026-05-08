@@ -849,8 +849,8 @@ test('handleWatch: new EDRPOU + feed has zero matches → warn but accept', asyn
     },
     { edrpou: '11111111' }
   );
-  assert.match(result.reply, /⚠️ Додав 11111111/);
-  assert.match(result.reply, /не знайшов жодного тендера/i);
+  assert.match(result.reply, /✅ 11111111 збережено/);
+  assert.match(result.reply, /нормально, якщо замовник публікує рідко/i);
   assert.equal(result.mutation.type, 'append');
   assert.equal(result.mutation.row.edrpou, '11111111');
   assert.equal(result.mutation.row.name, '(unknown)');
