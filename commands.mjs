@@ -322,6 +322,57 @@ export async function handleAdd(deps, { tender_id, notes }) {
   };
 }
 
+export async function handleWatch(deps, { edrpou }) {
+  const existing = deps.watchedEntities.find(e => e.edrpou === edrpou);
+  if (existing) {
+    const namePart = existing.name && existing.name !== '(unknown)' ? ` (${existing.name})` : '';
+    return {
+      reply: `⚠️ Вже стежу за ${edrpou}${namePart}`,
+      mutation: null,
+    };
+  }
+
+  let entityName = '(unknown)';
+  let bootstrapIds = [];
+  try {
+    const { items } = await deps.fetchTendersFeed({});
+    const matches = items.filter(t => t.procuringEntity?.identifier?.id === edrpou);
+    if (matches.length > 0) {
+      entityName = matches[0].procuringEntity.name ?? '(unknown)';
+      for (const m of matches) {
+        try {
+          const raw = await deps.fetchTender(m.tenderID);
+          const snap = deps.extractSnapshot(raw);
+          if (['active.tendering', 'active.pre-qualification'].includes(snap.status)) {
+            bootstrapIds.push(m.tenderID);
+          }
+        } catch {
+          // skip individual fetch failures
+        }
+      }
+    }
+  } catch (err) {
+    return {
+      reply: `⚠️ Не зміг перевірити EDRPOU: ${err.message}. Спробуй ще раз.`,
+      mutation: null,
+    };
+  }
+
+  const newRow = {
+    edrpou,
+    name: entityName,
+    enabled: true,
+    added_at: new Date().toISOString(),
+  };
+  const reply = entityName === '(unknown)'
+    ? `⚠️ Додав ${edrpou}, але не знайшов жодного тендера за останні ~100 публікацій. Перевір код. Якщо EDRPOU правильний — алерти прийдуть при наступному оголошенні.`
+    : `✅ Стежу за ${edrpou} — ${escapeHtml(abbreviateLegalForm(entityName))}\nПомічено як уже-побачені: ${bootstrapIds.length} активних тендерів. Алерт буде на нові.`;
+  return {
+    reply,
+    mutation: { type: 'append', row: newRow, bootstrap: { edrpou, ids: bootstrapIds } },
+  };
+}
+
 export const HELP_TEXT = [
   'Команди:',
   '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
