@@ -25,6 +25,7 @@ const ICONS = {
   unsuccessful: '🛑',
   complete: '✅',
   status_changed: '🔄',
+  new_tender_announced: '🆕',
 };
 
 const STATUS_LABELS = {
@@ -167,6 +168,8 @@ function fmtEvent(e) {
       return `${icon} Відповідь на питання: «${escapeHtml(e.title)}»\n     ↳ ${escapeHtml(e.answer)}`;
     case 'td_amended':
       return `${icon} Виправлення/новий документ ТД: «${escapeHtml(e.title)}»`;
+    case 'new_tender_announced':
+      return `${icon} Нове оголошення замовника`;
     case 'new_complaint':
       return `${icon} Подано скаргу (статус: ${e.status})`;
     case 'complaint_status_changed':
