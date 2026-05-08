@@ -119,6 +119,19 @@ export async function runHandler({ update, env, deps = {} }) {
       console.error('worker: info loadWatchlist failed:', err.message);
       reply = '⚠️ GitHub недоступний, спробуй ще раз';
     }
+  } else if (cmd.cmd === 'unwatch') {
+    if (cmd.error === 'invalid_edrpou') {
+      reply = '❌ EDRPOU має бути 8 цифр';
+    } else if (cmd.error === 'missing_edrpou') {
+      reply = '❌ Не вказано EDRPOU. /unwatch 12345678';
+    } else {
+      reply = await applyEntityMutationWithRetry({
+        env,
+        loadWatchedEntities: _loadWatchedEntities,
+        saveWatchedEntities: _saveWatchedEntities,
+        computeMutation: ({ entities }) => handleUnwatch({ watchedEntities: entities }, cmd),
+      });
+    }
   } else if (cmd.cmd === 'watched') {
     try {
       const { entities } = await _loadWatchedEntities(env);
@@ -160,6 +173,29 @@ async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, compu
       if (err instanceof ConflictError && attempt === 0) continue;
       if (err instanceof ConflictError) break;
       console.error('worker: applyMutationWithRetry failed:', err.message);
+      if (err.message.includes('GitHub')) {
+        return '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+      }
+      return '⚠️ Сталася помилка на стороні бота';
+    }
+  }
+  return '⚠️ Не зміг зберегти, спробуй за хвилину';
+}
+
+async function applyEntityMutationWithRetry({ env, loadWatchedEntities, saveWatchedEntities, computeMutation, onSuccess }) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { entities, sha } = await loadWatchedEntities(env);
+      const result = await computeMutation({ entities });
+      if (!result.mutation) return result.reply;
+      const newEntities = applyEntityMutation(entities, result.mutation);
+      await saveWatchedEntities(env, newEntities, sha);
+      if (onSuccess) await onSuccess(result.mutation);
+      return result.reply;
+    } catch (err) {
+      if (err instanceof ConflictError && attempt === 0) continue;
+      if (err instanceof ConflictError) break;
+      console.error('worker: applyEntityMutation failed:', err.message);
       if (err.message.includes('GitHub')) {
         return '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
       }

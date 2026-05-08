@@ -552,3 +552,61 @@ test('runHandler: /watched when GitHub fails → ⚠️ reply', async () => {
   });
   assert.match(sent[0].text, /⚠️ GitHub/);
 });
+
+test('runHandler: /unwatch invalid edrpou → ❌ reply, no save', async () => {
+  let saveCalled = false;
+  const { deps, sent } = await makeDeps({
+    saveWatchedEntities: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/unwatch abc', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /EDRPOU має бути 8 цифр/);
+  assert.equal(saveCalled, false);
+});
+
+test('runHandler: /unwatch missing edrpou → "Не вказано" reply', async () => {
+  const { deps, sent } = await makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/unwatch', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /Не вказано/);
+});
+
+test('runHandler: /unwatch existing → save + reply ✅', async () => {
+  const saved = [];
+  const { deps, sent } = await makeDeps({
+    loadWatchedEntities: async () => ({
+      entities: [{ edrpou: '11111111', name: 'X', enabled: true }],
+      sha: 'sha1',
+    }),
+    saveWatchedEntities: async (env, entities, sha) => { saved.push({ entities, sha }); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/unwatch 11111111', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /✅ Прибрав 11111111/);
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].entities.length, 0);
+});
+
+test('runHandler: /unwatch non-existing → ❓, no save', async () => {
+  let saveCalled = false;
+  const { deps, sent } = await makeDeps({
+    loadWatchedEntities: async () => ({ entities: [], sha: 'sha1' }),
+    saveWatchedEntities: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/unwatch 11111111', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /❓ 11111111/);
+  assert.equal(saveCalled, false);
+});
