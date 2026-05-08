@@ -691,3 +691,41 @@ test('formatInfo: abbreviates entity in 👥 line', () => {
   assert.match(reply, /👥 Замовник: КП «Київтепло»/);
   assert.doesNotMatch(reply, /Комунальне підприємство/);
 });
+
+test('parseCommand: /watched', () => {
+  assert.deepEqual(parseCommand('/watched'), { cmd: 'watched' });
+});
+
+test('parseCommand: /watched with bot suffix', () => {
+  assert.deepEqual(parseCommand('/watched@my_bot'), { cmd: 'watched' });
+});
+
+test('parseCommand: /watch with valid EDRPOU', () => {
+  assert.deepEqual(parseCommand('/watch 12345678'), { cmd: 'watch', edrpou: '12345678' });
+});
+
+test('parseCommand: /watch with bot suffix', () => {
+  assert.deepEqual(parseCommand('/watch@my_bot 12345678'), { cmd: 'watch', edrpou: '12345678' });
+});
+
+test('parseCommand: /watch without args → error', () => {
+  assert.deepEqual(parseCommand('/watch'), { cmd: 'watch', error: 'missing_edrpou' });
+});
+
+test('parseCommand: /watch with non-8-digit → error', () => {
+  assert.deepEqual(parseCommand('/watch 12345'), { cmd: 'watch', error: 'invalid_edrpou' });
+  assert.deepEqual(parseCommand('/watch 123456789'), { cmd: 'watch', error: 'invalid_edrpou' });
+  assert.deepEqual(parseCommand('/watch abcdefgh'), { cmd: 'watch', error: 'invalid_edrpou' });
+});
+
+test('parseCommand: /unwatch with valid EDRPOU', () => {
+  assert.deepEqual(parseCommand('/unwatch 12345678'), { cmd: 'unwatch', edrpou: '12345678' });
+});
+
+test('parseCommand: /unwatch without args → error', () => {
+  assert.deepEqual(parseCommand('/unwatch'), { cmd: 'unwatch', error: 'missing_edrpou' });
+});
+
+test('parseCommand: /unwatch invalid → error', () => {
+  assert.deepEqual(parseCommand('/unwatch 12345'), { cmd: 'unwatch', error: 'invalid_edrpou' });
+});
