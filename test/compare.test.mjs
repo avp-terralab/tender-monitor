@@ -284,3 +284,88 @@ test('diff: complaint_status_changed on award-level complaint', () => {
   const events = diff(prev, curr);
   assert.ok(events.some(e => e.type === 'complaint_status_changed' && e.old === 'pending' && e.new === 'declined'));
 });
+
+// ─── deadline_approaching ────────────────────────────────────────────────────
+const baseSnap = (deadline) => ({
+  status: 'active.tendering',
+  title: 'X',
+  dateModified: '2026-05-01',
+  tenderPeriod: { endDate: deadline },
+  documents: [], questions: [], complaints: [], awards: [], contracts: [], cancellations: [],
+});
+
+test('diff: deadline_approaching emits 24h when 23h left and not previously notified', () => {
+  const now = '2026-05-15T15:00:00Z';
+  const deadline = '2026-05-16T14:00:00Z'; // ~23h ahead
+  const prev = baseSnap(deadline);
+  const curr = clone(prev);
+  curr.dateModified = '2026-05-15T15:00:00Z';
+  const events = diff(prev, curr, now);
+  const e = events.find(x => x.type === 'deadline_approaching');
+  assert.ok(e, `expected deadline_approaching, got ${JSON.stringify(events)}`);
+  assert.equal(e.threshold, '24h');
+  assert.equal(e.deadline, deadline);
+});
+
+test('diff: deadline_approaching emits 24h+12h+3h when only 2h left and never notified', () => {
+  const now = '2026-05-16T12:00:00Z';
+  const deadline = '2026-05-16T14:00:00Z'; // 2h ahead
+  const prev = baseSnap(deadline);
+  const curr = clone(prev); curr.dateModified = '2026-05-16T12:00:00Z';
+  const events = diff(prev, curr, now);
+  const thresholds = events.filter(x => x.type === 'deadline_approaching').map(x => x.threshold);
+  assert.deepEqual(thresholds, ['24h', '12h', '3h']);
+});
+
+test('diff: deadline_approaching does NOT re-emit thresholds already in _notifiedDeadlines', () => {
+  const now = '2026-05-16T12:00:00Z';
+  const deadline = '2026-05-16T14:00:00Z'; // 2h ahead
+  const prev = { ...baseSnap(deadline), _notifiedDeadlines: ['24h', '12h'] };
+  const curr = clone(prev); curr.dateModified = '2026-05-16T12:00:00Z';
+  const events = diff(prev, curr, now);
+  const thresholds = events.filter(x => x.type === 'deadline_approaching').map(x => x.threshold);
+  assert.deepEqual(thresholds, ['3h']);
+});
+
+test('diff: deadline_approaching not emitted after deadline (negative hoursLeft)', () => {
+  const now = '2026-05-16T16:00:00Z';
+  const deadline = '2026-05-16T14:00:00Z'; // 2h ago
+  const prev = baseSnap(deadline);
+  const curr = clone(prev); curr.dateModified = '2026-05-16T16:00:00Z';
+  const events = diff(prev, curr, now);
+  assert.equal(events.filter(e => e.type === 'deadline_approaching').length, 0);
+});
+
+test('diff: deadline_approaching re-fires after deadline_changed (notified reset)', () => {
+  const now = '2026-05-16T12:00:00Z';
+  const oldDeadline = '2026-05-16T13:00:00Z'; // already in past for the prev side
+  const newDeadline = '2026-05-16T14:00:00Z'; // 2h ahead in current
+  const prev = { ...baseSnap(oldDeadline), _notifiedDeadlines: ['24h', '12h', '3h'] };
+  const curr = baseSnap(newDeadline);
+  curr.dateModified = '2026-05-16T12:00:00Z';
+  const events = diff(prev, curr, now);
+  // deadline_changed fires + deadline_approaching for all three thresholds again
+  assert.ok(events.some(e => e.type === 'deadline_changed'));
+  const thresholds = events.filter(x => x.type === 'deadline_approaching').map(x => x.threshold);
+  assert.deepEqual(thresholds, ['24h', '12h', '3h']);
+});
+
+test('diff: monitoring_started + deadline_approaching when freshly added near deadline', () => {
+  const now = '2026-05-16T12:00:00Z';
+  const deadline = '2026-05-16T14:00:00Z'; // 2h ahead
+  const curr = baseSnap(deadline);
+  const events = diff(null, curr, now);
+  assert.equal(events[0].type, 'monitoring_started');
+  const thresholds = events.filter(x => x.type === 'deadline_approaching').map(x => x.threshold);
+  assert.deepEqual(thresholds, ['24h', '12h', '3h']);
+});
+
+test('diff: deadline_approaching ignored when no deadline on snapshot', () => {
+  const now = '2026-05-16T12:00:00Z';
+  const noDeadline = { ...baseSnap('2026-05-16T14:00:00Z'), tenderPeriod: null };
+  const prev = clone(noDeadline);
+  const curr = clone(noDeadline);
+  curr.dateModified = '2026-05-16T12:00:00Z';
+  const events = diff(prev, curr, now);
+  assert.equal(events.filter(e => e.type === 'deadline_approaching').length, 0);
+});

@@ -29,7 +29,16 @@ export async function runOnce(deps) {
       const raw = await fetchTender(row.tender_id);
       const curr = extractSnapshot(raw);
       const prev = await loadState(row.tender_id);
-      const events = diff(prev, curr);
+      const events = diff(prev, curr, runIso);
+      const newThresholds = events
+        .filter(e => e.type === 'deadline_approaching')
+        .map(e => e.threshold);
+      const prevDeadline = prev?.tenderPeriod?.endDate ?? null;
+      const currDeadline = curr.tenderPeriod?.endDate ?? null;
+      const deadlineChanged = prevDeadline && prevDeadline !== currDeadline;
+      const baseNotified = deadlineChanged ? [] : (prev?._notifiedDeadlines ?? []);
+      const merged = [...new Set([...baseNotified, ...newThresholds])];
+      if (merged.length > 0) curr._notifiedDeadlines = merged;
       return { row, curr, events, error: null };
     } catch (err) {
       return { row, curr: null, events: [], error: err.message };

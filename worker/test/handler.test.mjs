@@ -397,6 +397,78 @@ test('runHandler: /info with active tenders → fetch each + reply', async () =>
   assert.doesNotMatch(sent[0].text, /UA-C/);
 });
 
+test('runHandler: /info UA-... existing in watchlist → fetches just that one', async () => {
+  const RAW = (id) => ({
+    data: {
+      tenderID: id, title: 'X', status: 'active.tendering',
+      tenderPeriod: { endDate: '2026-05-15T14:00:00+03:00' },
+      procuringEntity: { name: 'T', identifier: { id: '1' } },
+      items: [],
+    },
+  });
+  const fetched = [];
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [
+        { tender_id: 'UA-2026-04-30-010542-a', enabled: true },
+        { tender_id: 'UA-2026-04-30-010543-a', enabled: true },
+      ],
+      sha: 'abc',
+    }),
+    fetchTender: async (id) => { fetched.push(id); return RAW(id); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/info UA-2026-04-30-010542-a', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.deepEqual(fetched, ['UA-2026-04-30-010542-a']);
+  assert.match(sent[0].text, /UA-2026-04-30-010542-a/);
+  assert.doesNotMatch(sent[0].text, /UA-2026-04-30-010543-a/);
+});
+
+test('runHandler: /info UA-... not in watchlist → ❓ reply, no fetch', async () => {
+  let fetched = false;
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 'x' }),
+    fetchTender: async () => { fetched = true; return RAW_OK; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/info UA-2026-04-30-010542-a', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(fetched, false);
+  assert.match(sent[0].text, /❓ UA-2026-04-30-010542-a не у watchlist/);
+  assert.match(sent[0].text, /\/add UA-2026-04-30-010542-a/);
+});
+
+test('runHandler: /info UA-... existing but disabled → still fetched and shown', async () => {
+  const fetched = [];
+  const RAW = {
+    data: {
+      tenderID: ID, title: 'X', status: 'complete',
+      tenderPeriod: { endDate: '2026-05-15T14:00:00+03:00' },
+      procuringEntity: { name: 'T', identifier: { id: '1' } },
+      items: [],
+    },
+  };
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [{ tender_id: ID, enabled: false, notes: 'auto-disabled: 404' }],
+      sha: 'x',
+    }),
+    fetchTender: async (id) => { fetched.push(id); return RAW; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/info ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.deepEqual(fetched, [ID]);
+  assert.match(sent[0].text, new RegExp(ID));
+});
+
 test('runHandler: /info empty enabled watchlist → friendly reply', async () => {
   const { deps, sent } = await makeDeps({
     loadWatchlist: async () => ({

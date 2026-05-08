@@ -89,11 +89,22 @@ export async function runHandler({ update, env, deps = {} }) {
   } else if (cmd.cmd === 'info') {
     try {
       const { watchlist } = await _loadWatchlist(env);
-      const enabled = watchlist.filter(r => r.enabled);
-      if (enabled.length === 0) {
-        reply = '📭 Немає активних тендерів.';
+      let targets;
+      if (cmd.tender_id) {
+        const row = watchlist.find(r => r.tender_id === cmd.tender_id);
+        if (!row) {
+          reply = `❓ ${cmd.tender_id} не у watchlist. Додай: /add ${cmd.tender_id}`;
+          targets = null;
+        } else {
+          targets = [row];
+        }
       } else {
-        const results = await Promise.all(enabled.map(async r => {
+        targets = watchlist.filter(r => r.enabled);
+      }
+      if (targets && targets.length === 0) {
+        reply = '📭 Немає активних тендерів.';
+      } else if (targets) {
+        const results = await Promise.all(targets.map(async r => {
           try {
             const raw = await _fetchTender(r.tender_id);
             const snap = _extractSnapshot(raw);

@@ -284,6 +284,45 @@ test('runOnce: works when checkWatchedEntities not provided (backward compat)', 
   assert.equal(result.sent, false);
 });
 
+test('runOnce: deadline_approaching → snapshot saved with merged _notifiedDeadlines', async () => {
+  // 2h before deadline → first run emits 24h+12h+3h, all merged into _notifiedDeadlines
+  const deadline = '2026-05-16T14:00:00Z';
+  const snap = baseSnap({ tenderPeriod: { endDate: deadline } });
+  const saved = [];
+  await runOnce({
+    runIso: '2026-05-16T12:00:00Z',
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: snap }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => snap, // identical → only deadline_approaching events fire
+    saveState: async (id, s) => saved.push(s),
+    sendDigest: async () => {},
+    updateSheet: async () => {},
+  });
+  assert.equal(saved.length, 1);
+  assert.deepEqual(saved[0]._notifiedDeadlines.sort(), ['12h', '24h', '3h']);
+});
+
+test('runOnce: deadline_approaching merges with prior _notifiedDeadlines (no dupes)', async () => {
+  // prev already has 24h notified; now 2h left, only 12h+3h should newly fire
+  const deadline = '2026-05-16T14:00:00Z';
+  const prev = { ...baseSnap({ tenderPeriod: { endDate: deadline } }), _notifiedDeadlines: ['24h'] };
+  const curr = { ...baseSnap({ tenderPeriod: { endDate: deadline } }) };
+  const saved = [];
+  await runOnce({
+    runIso: '2026-05-16T12:00:00Z',
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: curr }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => prev,
+    saveState: async (id, s) => saved.push(s),
+    sendDigest: async () => {},
+    updateSheet: async () => {},
+  });
+  assert.equal(saved.length, 1);
+  assert.deepEqual(saved[0]._notifiedDeadlines.sort(), ['12h', '24h', '3h']);
+});
+
 test('runOnce: entity-watch errors propagate to digest', async () => {
   const sent = [];
   await runOnce({

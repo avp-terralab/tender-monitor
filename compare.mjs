@@ -1,9 +1,40 @@
-export function diff(prev, curr) {
+const DEADLINE_THRESHOLDS = [
+  { key: '24h', hours: 24 },
+  { key: '12h', hours: 12 },
+  { key: '3h', hours: 3 },
+];
+
+function computeDeadlineApproaching(prev, curr, runIso) {
+  const deadline = curr.tenderPeriod?.endDate;
+  if (!deadline || !runIso) return [];
+  const ms = new Date(deadline) - new Date(runIso);
+  const hoursLeft = ms / 3_600_000;
+  if (hoursLeft <= 0) return [];
+
+  const prevDeadline = prev?.tenderPeriod?.endDate ?? null;
+  const deadlineChanged = prevDeadline && prevDeadline !== deadline;
+  const prevNotified = deadlineChanged ? [] : (prev?._notifiedDeadlines ?? []);
+
+  const events = [];
+  for (const t of DEADLINE_THRESHOLDS) {
+    if (hoursLeft <= t.hours && !prevNotified.includes(t.key)) {
+      events.push({
+        type: 'deadline_approaching',
+        threshold: t.key,
+        hoursLeft: Math.round(hoursLeft * 10) / 10,
+        deadline,
+      });
+    }
+  }
+  return events;
+}
+
+export function diff(prev, curr, runIso = new Date().toISOString()) {
   const events = [];
 
   // ── Task 1.1: first-time monitoring ───────────────────────────────────────
   if (!prev) {
-    return [{
+    events.push({
       type: 'monitoring_started',
       status: curr.status,
       title: curr.title,
@@ -11,7 +42,9 @@ export function diff(prev, curr) {
       docs_count: (curr.documents ?? []).length,
       questions_count: (curr.questions ?? []).length,
       complaints_count: (curr.complaints ?? []).length,
-    }];
+    });
+    events.push(...computeDeadlineApproaching(prev, curr, runIso));
+    return events;
   }
 
   // ── Task 1.3: status transitions ─────────────────────────────────────────
@@ -128,6 +161,8 @@ export function diff(prev, curr) {
   if (prevDeadline !== currDeadline) {
     events.push({ type: 'deadline_changed', old: prevDeadline, new: currDeadline });
   }
+
+  events.push(...computeDeadlineApproaching(prev, curr, runIso));
 
   return events;
 }

@@ -1,4 +1,4 @@
-import { stripDkCode, truncate, fmtStatus, fmtDeadline, escapeHtml, formatMoney, formatPhone } from './telegram.mjs';
+import { stripDkCode, truncate, fmtStatus, fmtDeadline, fmtTimeLeft, escapeHtml, formatMoney, formatPhone } from './telegram.mjs';
 
 const TENDER_ID_RE_STR = 'UA-\\d{4}-\\d{2}-\\d{2}-\\d{6}-[a-zA-Z]';
 const EDRPOU_RE = /^\d{8}$/;
@@ -11,8 +11,17 @@ export function parseCommand(text) {
   if (/^\/list(?:@\w+)?$/i.test(trimmed)) return { cmd: 'list' };
   if (/^\/help(?:@\w+)?$/i.test(trimmed)) return { cmd: 'help' };
   if (/^\/status(?:@\w+)?$/i.test(trimmed)) return { cmd: 'status' };
-  if (/^\/info(?:@\w+)?$/i.test(trimmed)) return { cmd: 'info' };
   if (/^\/watched(?:@\w+)?$/i.test(trimmed)) return { cmd: 'watched' };
+
+  const infoMatch = trimmed.match(/^\/info(?:@\w+)?(?:\s+(.+))?$/i);
+  if (infoMatch) {
+    const args = (infoMatch[1] || '').trim();
+    if (!args) return { cmd: 'info' };
+    const idMatch = args.match(new RegExp(`^(${TENDER_ID_RE_STR})$`));
+    if (!idMatch) return { cmd: 'unknown' };
+    const id = idMatch[1].slice(0, -1) + idMatch[1].slice(-1).toLowerCase();
+    return { cmd: 'info', tender_id: id };
+  }
 
   const addMatch = trimmed.match(/^\/add(?:@\w+)?(?:\s+(.*))?$/i);
   if (addMatch) {
@@ -69,7 +78,7 @@ export function buildAutoNotes(snapshot) {
   return truncate(combined, 200);
 }
 
-export function formatAddReply(snapshot, { reEnable }) {
+export function formatAddReply(snapshot, { reEnable, nowIso }) {
   const lines = [];
   const verb = reEnable ? 'Поновив моніторинг' : 'Додано';
   lines.push(`✅ ${verb} ${snapshot.tender_id}`);
@@ -83,6 +92,11 @@ export function formatAddReply(snapshot, { reEnable }) {
     const deadline = snapshot.tenderPeriod?.endDate;
     if (deadline) line += `, дедлайн ${fmtDeadline(deadline)}`;
     lines.push(line);
+    const deadline2 = snapshot.tenderPeriod?.endDate;
+    if (deadline2 && nowIso) {
+      const left = fmtTimeLeft(deadline2, nowIso);
+      if (left) lines.push(`⏰ Залишилось: ${left}`);
+    }
   }
   lines.push('Перший snapshot — на наступному monitor-тіку (09/13/18 Київ).');
   return lines.join('\n');
@@ -133,7 +147,7 @@ export function handleList({ watchlist }) {
   return rows.join('\n\n') + `\n\nВсього: ${watchlist.length} (${active} active)`;
 }
 
-function formatInfoEntry(g) {
+function formatInfoEntry(g, runIso) {
   const sections = [];
   sections.push(`🆔 Ідентифікатор закупівлі: <a href="${escapeHtml(g.prozorro_url)}">${escapeHtml(g.tender_id)}</a>`);
   if (g.procuring_entity?.name) {
@@ -160,6 +174,10 @@ function formatInfoEntry(g) {
     let statusLine = `ℹ️ Статус: ${fmtStatus(g.status)}`;
     if (g.deadline) statusLine += ` до ${fmtDeadline(g.deadline)}`;
     sections.push(statusLine);
+    if (g.deadline && runIso) {
+      const left = fmtTimeLeft(g.deadline, runIso);
+      if (left) sections.push(`⏰ Залишилось: ${left}`);
+    }
   }
   return sections.join('\n');
 }
@@ -178,7 +196,7 @@ export function formatInfo({ runIso, groups, errors = [] }) {
   const date = KYIV_DATE.format(new Date(runIso));
   const lines = [`📋 Статус тендерів (${time}, ${date})`, ''];
   for (let i = 0; i < groups.length; i++) {
-    lines.push(`${i + 1}. ${formatInfoEntry(groups[i])}`);
+    lines.push(`${i + 1}. ${formatInfoEntry(groups[i], runIso)}`);
     if (i < groups.length - 1) {
       lines.push('');
       lines.push('━'.repeat(24));
@@ -274,6 +292,7 @@ export function applyEntityMutation(watchedEntities, mutation) {
 
 export async function handleAdd(deps, { tender_id, notes }) {
   const { watchlist, fetchTender, extractSnapshot } = deps;
+  const nowIso = deps.nowIso ?? new Date().toISOString();
   const existing = watchlist.find(r => r.tender_id === tender_id);
 
   if (existing?.enabled) {
@@ -304,7 +323,7 @@ export async function handleAdd(deps, { tender_id, notes }) {
 
   if (existing) {
     return {
-      reply: formatAddReply(snapshot, { reEnable: true }),
+      reply: formatAddReply(snapshot, { reEnable: true, nowIso }),
       mutation: {
         type: 'update',
         tender_id,
@@ -314,7 +333,7 @@ export async function handleAdd(deps, { tender_id, notes }) {
   }
 
   return {
-    reply: formatAddReply(snapshot, { reEnable: false }),
+    reply: formatAddReply(snapshot, { reEnable: false, nowIso }),
     mutation: {
       type: 'append',
       row: { tender_id, enabled: true, notes: finalNotes },
@@ -392,7 +411,7 @@ export const HELP_TEXT = [
   '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
   '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
   '/list — короткий список (id + Замовник)',
-  '/info — детально по кожному (замовник, ДК, ціна, статус)',
+  '/info [UA-...] — детально (всі або один)',
   '',
   'Моніторинг замовників за EDRPOU:',
   '/watch EDRPOU — стежити за замовником',

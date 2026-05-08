@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, getUpdates, sendReply } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -487,4 +487,23 @@ test('formatDigest: renders new_tender_announced event with 🆕 icon', () => {
     events: [{ type: 'new_tender_announced' }],
   }]);
   assert.match(text, /🆕 Нове оголошення замовника/);
+});
+
+test('fmtTimeLeft: exported and renders future delta', () => {
+  const out = fmtTimeLeft('2026-05-16T14:00:00Z', '2026-05-16T11:00:00Z');
+  assert.match(out, /3 год/);
+});
+
+test('formatDigest: renders deadline_approaching event with hour label', () => {
+  const text24 = formatDigest('2026-05-16T12:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X', prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'deadline_approaching', threshold: '24h', deadline: '2026-05-17T10:00:00+03:00' }],
+  }]);
+  assert.match(text24, /⏰ До дедлайну подачі менше 24 годин/);
+
+  const text3 = formatDigest('2026-05-16T12:00:00+03:00', [{
+    tender_id: 'UA-X', title: 'X', prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    events: [{ type: 'deadline_approaching', threshold: '3h', deadline: '2026-05-16T14:00:00+03:00' }],
+  }]);
+  assert.match(text3, /⏰ До дедлайну подачі менше 3 годин/);
 });

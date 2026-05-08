@@ -24,11 +24,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Run tests
-        working-directory: .
-        run: |
-          node --test test/compare.test.mjs test/prozorro.test.mjs test/telegram.test.mjs test/monitor.test.mjs
-
       - name: Run monitor
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

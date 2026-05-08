@@ -871,6 +871,88 @@ test('handleWatch: feed throws → ⚠️ + null mutation', async () => {
   assert.equal(result.mutation, null);
 });
 
+test('parseCommand: /info with valid tender_id', () => {
+  assert.deepEqual(
+    parseCommand('/info UA-2026-04-30-010542-a'),
+    { cmd: 'info', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /info with bot suffix and id', () => {
+  assert.deepEqual(
+    parseCommand('/info@my_bot UA-2026-04-30-010542-a'),
+    { cmd: 'info', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /info normalizes uppercase suffix to lowercase', () => {
+  assert.deepEqual(
+    parseCommand('/info UA-2026-04-30-010542-A'),
+    { cmd: 'info', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /info bad-id → unknown (strict)', () => {
+  assert.deepEqual(parseCommand('/info bad-id'), { cmd: 'unknown' });
+});
+
+test('formatAddReply: countdown line when nowIso provided and deadline future', () => {
+  const reply = formatAddReply(FULL_SNAP, {
+    reEnable: false,
+    nowIso: '2026-05-15T11:30:00+03:00', // FULL_SNAP deadline 14:30 same day → 3h
+  });
+  assert.match(reply, /⏰ Залишилось:.*3 год/);
+});
+
+test('formatAddReply: no countdown line when nowIso missing', () => {
+  const reply = formatAddReply(FULL_SNAP, { reEnable: false });
+  assert.doesNotMatch(reply, /⏰ Залишилось/);
+});
+
+test('formatAddReply: no countdown when deadline missing', () => {
+  const reply = formatAddReply(
+    { ...FULL_SNAP, tenderPeriod: null },
+    { reEnable: false, nowIso: '2026-05-15T11:30:00+03:00' }
+  );
+  assert.doesNotMatch(reply, /⏰ Залишилось/);
+});
+
+test('formatInfo: countdown ⏰ Залишилось appears when runIso < deadline', () => {
+  const reply = formatInfo({
+    runIso: '2026-05-15T11:30:00+03:00',
+    groups: [{
+      tender_id: 'UA-X',
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+      status: 'active.tendering',
+      deadline: '2026-05-15T14:30:00+03:00', // 3h ahead
+    }],
+  });
+  assert.match(reply, /⏰ Залишилось:.*3 год/);
+});
+
+test('formatInfo: countdown shows "минув" for past deadline', () => {
+  const reply = formatInfo({
+    runIso: '2026-05-15T15:30:00+03:00',
+    groups: [{
+      tender_id: 'UA-X',
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+      status: 'active.qualification',
+      deadline: '2026-05-15T14:30:00+03:00', // 1h ago
+    }],
+  });
+  assert.match(reply, /⏰ Залишилось:.*минув/);
+});
+
+test('handleAdd: passes nowIso through deps to formatAddReply countdown', async () => {
+  const result = await handleAdd(
+    await mockDeps({
+      nowIso: '2026-05-15T11:30:00+03:00', // 3h before RAW_OK deadline 14:30
+    }),
+    { tender_id: ID, notes: null }
+  );
+  assert.match(result.reply, /⏰ Залишилось:.*3 год/);
+});
+
 test('handleWatch: fetchTender failure during bootstrap is silently skipped', async () => {
   const result = await handleWatch(
     {
