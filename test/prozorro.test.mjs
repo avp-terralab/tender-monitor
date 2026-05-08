@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { extractSnapshot, extractDocuments } from '../prozorro.mjs';
+import { extractSnapshot } from '../prozorro.mjs';
 
 const raw = JSON.parse(
   readFileSync(new URL('./fixtures/raw_prozorro_response.json', import.meta.url))
@@ -85,63 +85,6 @@ test('extractSnapshot supplier shape preserved for awards', () => {
   assert.equal(snap.awards[0].suppliers[0].identifier.id, '12345678');
   // contactPoint should NOT be in the slim snapshot
   assert.equal(snap.awards[0].suppliers[0].contactPoint, undefined);
-});
-
-test('extractDocuments: empty / missing documents → []', () => {
-  assert.deepEqual(extractDocuments({ data: {} }), []);
-  assert.deepEqual(extractDocuments({}), []);
-  assert.deepEqual(extractDocuments({ data: { documents: [] } }), []);
-});
-
-test('extractDocuments: preserves all required fields', () => {
-  const raw = {
-    data: {
-      documents: [{
-        id: 'd1',
-        title: 'ТД.docx',
-        documentType: 'tenderNotice',
-        format: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        datePublished: '2026-04-30T12:00:00+03:00',
-        dateModified: '2026-04-30T12:00:00+03:00',
-        url: 'https://public-docs-prozorro.s3.example/abc',
-        hash: 'md5:xxx',
-      }],
-    },
-  };
-  const docs = extractDocuments(raw);
-  assert.equal(docs.length, 1);
-  assert.equal(docs[0].id, 'd1');
-  assert.equal(docs[0].title, 'ТД.docx');
-  assert.equal(docs[0].documentType, 'tenderNotice');
-  assert.match(docs[0].format, /wordprocessingml/);
-  assert.equal(docs[0].datePublished, '2026-04-30T12:00:00+03:00');
-  assert.equal(docs[0].url, 'https://public-docs-prozorro.s3.example/abc');
-  // hash NOT in output
-  assert.equal(docs[0].hash, undefined);
-});
-
-test('extractDocuments: missing optional fields → null', () => {
-  const raw = { data: { documents: [{ id: 'd1', title: 'X' }] } };
-  const docs = extractDocuments(raw);
-  assert.equal(docs[0].documentType, null);
-  assert.equal(docs[0].format, null);
-  assert.equal(docs[0].url, null);
-  assert.equal(docs[0].datePublished, null);
-});
-
-test('extractDocuments: accepts unwrapped data', () => {
-  const docs = extractDocuments({ documents: [{ id: 'd1', title: 'X' }] });
-  assert.equal(docs.length, 1);
-});
-
-test('extractDocuments on real fixture: returns documents from raw', () => {
-  const docs = extractDocuments(raw);
-  for (const d of docs) {
-    assert.ok(d.id);
-    assert.equal(typeof d.title, 'string');
-    assert.equal(Object.keys(d).sort().join(','),
-      'datePublished,dateModified,documentType,format,id,title,url'.split(',').sort().join(','));
-  }
 });
 
 import { fetchTendersFeed } from '../prozorro.mjs';
