@@ -334,9 +334,19 @@ export async function handleWatch(deps, { edrpou }) {
 
   let entityName = '(unknown)';
   let bootstrapIds = [];
+  // Walk up to 5 pages (~500 tenders) to better cover rare publishers when discovering name + bootstrap
+  const WATCH_PAGE_CAP = 5;
   try {
-    const { items } = await deps.fetchTendersFeed({});
-    const matches = items.filter(t => t.procuringEntity?.identifier?.id === edrpou);
+    const allItems = [];
+    let pageOffset = null;
+    for (let page = 0; page < WATCH_PAGE_CAP; page++) {
+      const { items, next } = await deps.fetchTendersFeed({ pageOffset });
+      if (items.length === 0) break;
+      allItems.push(...items);
+      if (!next) break;
+      pageOffset = next;
+    }
+    const matches = allItems.filter(t => t.procuringEntity?.identifier?.id === edrpou);
     if (matches.length > 0) {
       entityName = matches[0].procuringEntity.name ?? '(unknown)';
       for (const m of matches) {
@@ -365,7 +375,7 @@ export async function handleWatch(deps, { edrpou }) {
     added_at: new Date().toISOString(),
   };
   const reply = entityName === '(unknown)'
-    ? `✅ ${edrpou} збережено. Серед 100 останніх публікацій Prozorro тендерів від цього замовника не виявлено — нормально, якщо замовник публікує рідко. Алерт прийде коли він опублікує новий тендер. Якщо EDRPOU помилковий — /unwatch ${edrpou}.`
+    ? `✅ ${edrpou} збережено. Серед ~500 останніх публікацій Prozorro тендерів від цього замовника не виявлено — нормально, якщо замовник публікує рідко. Назва замовника зʼявиться у /watched коли bot знайде його перший новий тендер. Якщо EDRPOU помилковий — /unwatch ${edrpou}.`
     : `✅ Стежу за ${edrpou} — ${escapeHtml(abbreviateLegalForm(entityName))}\nПомічено як уже-побачені: ${bootstrapIds.length} активних тендерів. Алерт буде на нові.`;
   return {
     reply,

@@ -91,6 +91,19 @@ export async function runOnce(deps) {
           });
         }
       }
+      // Lazy-resolve entity names: persist any newly-discovered names back to watched_entities.json
+      if (watchResult.discoveredNames && Object.keys(watchResult.discoveredNames).length > 0 && deps.saveWatchedEntities) {
+        const updated = (deps.watchedEntities ?? []).map(e =>
+          watchResult.discoveredNames[e.edrpou]
+            ? { ...e, name: watchResult.discoveredNames[e.edrpou] }
+            : e
+        );
+        try {
+          await deps.saveWatchedEntities(updated);
+        } catch (err) {
+          console.error('saveWatchedEntities failed:', err.message);
+        }
+      }
     } catch (err) {
       console.error('checkWatchedEntities failed:', err.message);
     }

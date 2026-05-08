@@ -52,6 +52,10 @@ export async function checkWatchedEntities(deps) {
 
   const alerts = [];
   const errors = [];
+  // Lazy-resolve names: when we fetch a tender for an entity whose stored name is "(unknown)",
+  // capture the real name so the caller can persist it back to watched_entities.json
+  const discoveredNames = {};
+  const watchedByEdrpou = new Map((watchedEntities ?? []).map(e => [e.edrpou, e]));
   for (const cand of candidates) {
     const edrpou = cand.procuringEntity.identifier.id;
     const seenForEntity = new Set(seen[edrpou] ?? []);
@@ -62,6 +66,10 @@ export async function checkWatchedEntities(deps) {
       if (!ALERT_STATUSES.has(snap.status)) continue;
       alerts.push(buildAlertGroup(snap));
       seen[edrpou] = [...seenForEntity, cand.tenderID];
+      const watchedRow = watchedByEdrpou.get(edrpou);
+      if (watchedRow && (!watchedRow.name || watchedRow.name === '(unknown)') && snap.procuringEntity?.name) {
+        discoveredNames[edrpou] = snap.procuringEntity.name;
+      }
     } catch (err) {
       errors.push({ tender_id: cand.tenderID, error: err.message });
     }
@@ -69,7 +77,7 @@ export async function checkWatchedEntities(deps) {
 
   await saveCursor({ last_dateModified: newestSeen });
   await saveSeen(seen);
-  return { alerts, errors };
+  return { alerts, errors, discoveredNames };
 }
 
 function buildAlertGroup(snap) {

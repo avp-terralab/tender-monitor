@@ -71,6 +71,9 @@ const result = await runOnce({
   saveSeen: async (s) => {
     writeFileSync(seenPath, JSON.stringify(s, null, 2));
   },
+  saveWatchedEntities: async (entities) => {
+    writeFileSync(watchedEntitiesPath, JSON.stringify(entities, null, 2) + '\n');
+  },
   disableTender: async (tenderId, reason) => {
     const wl = JSON.parse(readFileSync(watchlistPath, 'utf-8'));
     for (const row of wl) {
