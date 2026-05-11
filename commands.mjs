@@ -430,6 +430,30 @@ export async function handleWatch(deps, { edrpou }) {
   };
 }
 
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function handleInvite(deps, { label }) {
+  const token = deps.generateToken();
+  const now = deps.now();
+  const createdAt = now.toISOString();
+  const expiresAt = new Date(now.getTime() + INVITE_TTL_MS).toISOString();
+  const row = {
+    token,
+    label,
+    created_at: createdAt,
+    expires_at: expiresAt,
+    status: 'pending',
+    redeemed_by: null,
+    redeemed_at: null,
+  };
+  const link = `https://t.me/${deps.botUsername}?start=${token}`;
+  const reply = `🔗 Invite для <b>${escapeHtml(label)}</b>\n\n${link}\n\nПерешли цій людині. Дійсне 7 днів.`;
+  return {
+    mutation: { type: 'append_invite', row },
+    reply,
+  };
+}
+
 export const HELP_TEXT = [
   'Загальні команди:',
   '/help — список команд',

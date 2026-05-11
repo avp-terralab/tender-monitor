@@ -4,7 +4,7 @@ import {
   parseCommand, buildAutoNotes, formatAddReply, handleList,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
-  handleWatch,
+  handleWatch, handleInvite,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -1045,4 +1045,24 @@ test('parseCommand: /start with invalid token (wrong length)', () => {
 test('parseCommand: /start with bot suffix and token', () => {
   const tok = '0123456789abcdef0123456789abcdef';
   assert.deepEqual(parseCommand(`/start@my_bot ${tok}`), { cmd: 'start', token: tok });
+});
+
+test('handleInvite: creates invite with given label, 7-day expiry, returns deep-link', () => {
+  const result = handleInvite({
+    invites: [],
+    generateToken: () => 'a'.repeat(32),
+    now: () => new Date('2026-05-12T10:00:00Z'),
+    botUsername: 'terralab_tenders_bot',
+  }, { label: 'Olha' });
+  assert.equal(result.mutation.type, 'append_invite');
+  assert.equal(result.mutation.row.token, 'a'.repeat(32));
+  assert.equal(result.mutation.row.label, 'Olha');
+  assert.equal(result.mutation.row.status, 'pending');
+  assert.equal(result.mutation.row.created_at, '2026-05-12T10:00:00.000Z');
+  assert.equal(result.mutation.row.expires_at, '2026-05-19T10:00:00.000Z');
+  assert.equal(result.mutation.row.redeemed_by, null);
+  assert.equal(result.mutation.row.redeemed_at, null);
+  assert.match(result.reply, /t\.me\/terralab_tenders_bot\?start=a{32}/);
+  assert.match(result.reply, /Olha/);
+  assert.match(result.reply, /7 днів/);
 });
