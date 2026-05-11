@@ -5,7 +5,7 @@ import {
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
-  handleRedeem, handleRevoke,
+  handleRedeem, handleRevoke, handleUsersList, handleInvitesList,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -1305,4 +1305,53 @@ test('handleRevoke: chat_id not in allowlist', () => {
   const result = handleRevoke({ allowedUsers: [{ chat_id: '1' }], adminChatId: '99' }, { chat_id: '7' });
   assert.equal(result.mutation, null);
   assert.match(result.reply, /не у allowlist/);
+});
+
+test('handleUsersList: empty → only admin row', () => {
+  const reply = handleUsersList({
+    allowedUsers: [],
+    adminChatId: '1744078008',
+  });
+  assert.match(reply, /1744078008/);
+  assert.match(reply, /admin/i);
+  assert.match(reply, /Всього: 1/);
+});
+
+test('handleUsersList: with users', () => {
+  const reply = handleUsersList({
+    allowedUsers: [
+      { chat_id: '111', label: 'Olha', invited_via: 'Olha', added_at: '2026-05-10T10:00:00Z' },
+      { chat_id: '222', label: '(migrated)', invited_via: null, added_at: '2026-05-11T10:00:00Z' },
+    ],
+    adminChatId: '999',
+  });
+  assert.match(reply, /999/);
+  assert.match(reply, /111/);
+  assert.match(reply, /Olha/);
+  assert.match(reply, /222/);
+  assert.match(reply, /Всього: 3/);
+});
+
+test('handleInvitesList: empty', () => {
+  const reply = handleInvitesList({
+    invites: [],
+    now: () => new Date('2026-05-12T10:00:00Z'),
+  });
+  assert.match(reply, /Немає активних invite/);
+});
+
+test('handleInvitesList: shows only pending non-expired', () => {
+  const invites = [
+    { token: 'a'.repeat(32), label: 'Pending1', status: 'pending', created_at: '2026-05-11T10:00:00Z', expires_at: '2026-05-18T10:00:00Z' },
+    { token: 'b'.repeat(32), label: 'Redeemed', status: 'redeemed', created_at: '2026-05-10T10:00:00Z', expires_at: '2026-05-17T10:00:00Z' },
+    { token: 'c'.repeat(32), label: 'Expired',  status: 'pending', created_at: '2026-04-01T10:00:00Z', expires_at: '2026-04-08T10:00:00Z' },
+  ];
+  const reply = handleInvitesList({
+    invites,
+    now: () => new Date('2026-05-12T10:00:00Z'),
+  });
+  assert.match(reply, /Pending1/);
+  assert.doesNotMatch(reply, /Redeemed/);
+  assert.doesNotMatch(reply, /Expired/);
+  assert.match(reply, new RegExp('a'.repeat(6)));
 });

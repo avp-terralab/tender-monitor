@@ -539,6 +539,35 @@ export function handleRedeem(deps, { token }) {
   };
 }
 
+export function handleUsersList({ allowedUsers, adminChatId }) {
+  const lines = [`👥 Користувачі бота:`, ''];
+  lines.push(`1. <code>${adminChatId}</code> — admin`);
+  allowedUsers.forEach((u, i) => {
+    const via = u.invited_via ? ` (від: ${escapeHtml(u.invited_via)})` : '';
+    lines.push(`${i + 2}. <code>${u.chat_id}</code> — ${escapeHtml(u.label)}${via}`);
+  });
+  lines.push('', `Всього: ${allowedUsers.length + 1}`);
+  return lines.join('\n');
+}
+
+export function handleInvitesList({ invites, now }) {
+  const nowDate = now();
+  const active = invites.filter(i =>
+    i.status === 'pending' && new Date(i.expires_at) > nowDate
+  );
+  if (active.length === 0) {
+    return '📭 Немає активних invite-посилань.';
+  }
+  const lines = [`🔗 Активні invite-посилання:`, ''];
+  active.forEach((inv, i) => {
+    const suffix = inv.token.slice(-6);
+    const exp = inv.expires_at.slice(0, 10);
+    lines.push(`${i + 1}. <b>${escapeHtml(inv.label)}</b> — …${suffix} (до ${exp})`);
+  });
+  lines.push('', `Всього: ${active.length}`);
+  return lines.join('\n');
+}
+
 export function handleRevoke({ allowedUsers, adminChatId }, { chat_id }) {
   if (chat_id === adminChatId) {
     return { reply: '❌ Не можу видалити адміна', mutation: null };
