@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen } from '../src/github.mjs';
+import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers } from '../src/github.mjs';
 
 const ENV = { GITHUB_PAT: 'PAT_VALUE' };
 
@@ -219,4 +219,58 @@ test('saveWatchedSeen: PUT to _state/_watched_seen.json', async () => {
   };
   await saveWatchedSeen(ENV, { '12345678': ['UA-A'] }, 'sha1', { fetch: fakeFetch });
   assert.match(calls[0].url, /_state\/_watched_seen\.json/);
+});
+
+test('loadInvites: missing file returns empty list + null sha', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 404, text: async () => '' });
+  const { invites, sha } = await loadInvites(ENV, { fetch: fakeFetch });
+  assert.deepEqual(invites, []);
+  assert.equal(sha, null);
+});
+
+test('loadInvites: parses array', async () => {
+  const json = JSON.stringify([{ token: 't', label: 'X' }]);
+  const content = Buffer.from(json).toString('base64');
+  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ content, sha: 'abc' }) });
+  const { invites, sha } = await loadInvites(ENV, { fetch: fakeFetch });
+  assert.deepEqual(invites, [{ token: 't', label: 'X' }]);
+  assert.equal(sha, 'abc');
+});
+
+test('saveInvites: PUTs JSON body with sha', async () => {
+  let captured;
+  const fakeFetch = async (url, opts) => {
+    captured = { url, opts };
+    return { ok: true, status: 200, json: async () => ({}) };
+  };
+  await saveInvites(ENV, [{ token: 't', label: 'X' }], 'abc', { fetch: fakeFetch });
+  assert.equal(captured.opts.method, 'PUT');
+  const body = JSON.parse(captured.opts.body);
+  assert.equal(body.sha, 'abc');
+  const decoded = Buffer.from(body.content, 'base64').toString('utf8');
+  assert.deepEqual(JSON.parse(decoded), [{ token: 't', label: 'X' }]);
+});
+
+test('loadAllowedUsers: 404 returns empty', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 404, text: async () => '' });
+  const { users, sha } = await loadAllowedUsers(ENV, { fetch: fakeFetch });
+  assert.deepEqual(users, []);
+  assert.equal(sha, null);
+});
+
+test('loadAllowedUsers: parses array', async () => {
+  const json = JSON.stringify([{ chat_id: '1', label: 'A' }]);
+  const content = Buffer.from(json).toString('base64');
+  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ content, sha: 'def' }) });
+  const { users, sha } = await loadAllowedUsers(ENV, { fetch: fakeFetch });
+  assert.deepEqual(users, [{ chat_id: '1', label: 'A' }]);
+  assert.equal(sha, 'def');
+});
+
+test('saveAllowedUsers: PUTs with sha', async () => {
+  let captured;
+  const fakeFetch = async (url, opts) => { captured = { url, opts }; return { ok: true, status: 200, json: async () => ({}) }; };
+  await saveAllowedUsers(ENV, [{ chat_id: '1' }], 'def', { fetch: fakeFetch });
+  const body = JSON.parse(captured.opts.body);
+  assert.equal(body.sha, 'def');
 });

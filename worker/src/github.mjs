@@ -136,3 +136,28 @@ export async function saveWatchedSeen(env, seen, sha, opts = {}) {
   const text = JSON.stringify(seen, null, 2) + '\n';
   return saveFile(env, SEEN_FILE, text, sha, opts);
 }
+
+const INVITES_FILE = '_state/invites.json';
+const ALLOWED_USERS_FILE = '_state/allowed_users.json';
+
+export async function loadInvites(env, opts = {}) {
+  const { content, sha } = await loadFile(env, INVITES_FILE, opts);
+  if (content === null) return { invites: [], sha: null };
+  return { invites: JSON.parse(content), sha };
+}
+
+export async function saveInvites(env, invites, sha, opts = {}) {
+  const text = JSON.stringify(invites, null, 2) + '\n';
+  return saveFile(env, INVITES_FILE, text, sha, opts);
+}
+
+export async function loadAllowedUsers(env, opts = {}) {
+  const { content, sha } = await loadFile(env, ALLOWED_USERS_FILE, opts);
+  if (content === null) return { users: [], sha: null };
+  return { users: JSON.parse(content), sha };
+}
+
+export async function saveAllowedUsers(env, users, sha, opts = {}) {
+  const text = JSON.stringify(users, null, 2) + '\n';
+  return saveFile(env, ALLOWED_USERS_FILE, text, sha, opts);
+}
