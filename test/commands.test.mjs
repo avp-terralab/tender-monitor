@@ -5,7 +5,7 @@ import {
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
-  handleRedeem,
+  handleRedeem, handleRevoke,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -1282,4 +1282,27 @@ test('handleRedeem: admin redeems own token → "вже маєш доступ", 
   assert.equal(result.inviteMutation, null);
   assert.equal(result.userMutation, null);
   assert.match(result.reply, /вже маєш доступ/);
+});
+
+test('handleRevoke: removes user', () => {
+  const users = [
+    { chat_id: '1', label: 'A' },
+    { chat_id: '2', label: 'B' },
+  ];
+  const result = handleRevoke({ allowedUsers: users, adminChatId: '99' }, { chat_id: '1' });
+  assert.deepEqual(result.mutation, { type: 'remove_user', chat_id: '1' });
+  assert.match(result.reply, /✅/);
+  assert.match(result.reply, /A/);
+});
+
+test('handleRevoke: refuses to remove admin', () => {
+  const result = handleRevoke({ allowedUsers: [], adminChatId: '99' }, { chat_id: '99' });
+  assert.equal(result.mutation, null);
+  assert.match(result.reply, /Не можу видалити адміна/);
+});
+
+test('handleRevoke: chat_id not in allowlist', () => {
+  const result = handleRevoke({ allowedUsers: [{ chat_id: '1' }], adminChatId: '99' }, { chat_id: '7' });
+  assert.equal(result.mutation, null);
+  assert.match(result.reply, /не у allowlist/);
 });

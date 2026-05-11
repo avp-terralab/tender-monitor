@@ -539,6 +539,20 @@ export function handleRedeem(deps, { token }) {
   };
 }
 
+export function handleRevoke({ allowedUsers, adminChatId }, { chat_id }) {
+  if (chat_id === adminChatId) {
+    return { reply: '❌ Не можу видалити адміна', mutation: null };
+  }
+  const user = allowedUsers.find(u => u.chat_id === chat_id);
+  if (!user) {
+    return { reply: `❓ chat_id <code>${chat_id}</code> не у allowlist`, mutation: null };
+  }
+  return {
+    reply: `✅ <b>${escapeHtml(user.label)}</b> видалено (chat_id: <code>${chat_id}</code>)`,
+    mutation: { type: 'remove_user', chat_id },
+  };
+}
+
 export const HELP_TEXT = [
   'Загальні команди:',
   '/help — список команд',
