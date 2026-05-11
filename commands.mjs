@@ -505,6 +505,9 @@ export function handleRedeem(deps, { token }) {
       reply: '❌ Посилання застаріло (>7 днів)',
     };
   }
+  // Token NOT consumed when redeemer already has access — preserves a fresh
+  // invite for its intended recipient if it was accidentally tapped by an
+  // existing user (e.g. admin or an already-invited person).
   const alreadyAllowed =
     chatId === adminChatId ||
     allowedUsers.some(u => u.chat_id === chatId);
