@@ -4,7 +4,7 @@ import {
   parseCommand, buildAutoNotes, formatAddReply, handleList,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
-  handleWatch, handleInvite,
+  handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -1077,4 +1077,44 @@ test('handleInvite: creates invite with given label, 7-day expiry, returns deep-
   assert.match(result.reply, /t\.me\/terralab_tenders_bot\?start=a{32}/);
   assert.match(result.reply, /Olha/);
   assert.match(result.reply, /7 днів/);
+});
+
+test('applyInviteMutation: append_invite adds row', () => {
+  const row = { token: 'a'.repeat(32), label: 'X', status: 'pending' };
+  assert.deepEqual(
+    applyInviteMutation([], { type: 'append_invite', row }),
+    [row]
+  );
+});
+
+test('applyInviteMutation: update_invite_status changes status', () => {
+  const existing = [
+    { token: 't1', label: 'A', status: 'pending', redeemed_by: null, redeemed_at: null },
+    { token: 't2', label: 'B', status: 'pending', redeemed_by: null, redeemed_at: null },
+  ];
+  const result = applyInviteMutation(existing, {
+    type: 'update_invite_status',
+    token: 't1',
+    fields: { status: 'redeemed', redeemed_by: '999', redeemed_at: '2026-05-12T10:00:00Z' },
+  });
+  assert.equal(result[0].status, 'redeemed');
+  assert.equal(result[0].redeemed_by, '999');
+  assert.equal(result[1].status, 'pending'); // unchanged
+});
+
+test('applyAllowedUsersMutation: append_user adds row', () => {
+  const row = { chat_id: '123', label: 'X', invited_via: 'X', added_at: '2026-05-12T10:00:00Z' };
+  assert.deepEqual(
+    applyAllowedUsersMutation([], { type: 'append_user', row }),
+    [row]
+  );
+});
+
+test('applyAllowedUsersMutation: remove_user filters by chat_id', () => {
+  const users = [
+    { chat_id: '1', label: 'A' },
+    { chat_id: '2', label: 'B' },
+  ];
+  const result = applyAllowedUsersMutation(users, { type: 'remove_user', chat_id: '1' });
+  assert.deepEqual(result, [{ chat_id: '2', label: 'B' }]);
 });

@@ -453,6 +453,28 @@ export function handleInvite(deps, { label }) {
   };
 }
 
+export function applyInviteMutation(invites, mutation) {
+  if (mutation.type === 'append_invite') {
+    return [...invites, mutation.row];
+  }
+  if (mutation.type === 'update_invite_status') {
+    return invites.map(inv =>
+      inv.token === mutation.token ? { ...inv, ...mutation.fields } : inv
+    );
+  }
+  return invites;
+}
+
+export function applyAllowedUsersMutation(users, mutation) {
+  if (mutation.type === 'append_user') {
+    return [...users, mutation.row];
+  }
+  if (mutation.type === 'remove_user') {
+    return users.filter(u => u.chat_id !== mutation.chat_id);
+  }
+  return users;
+}
+
 export const HELP_TEXT = [
   'Загальні команди:',
   '/help — список команд',
