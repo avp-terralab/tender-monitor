@@ -2,6 +2,8 @@ import { stripDkCode, truncate, fmtStatus, fmtDeadline, fmtTimeLeft, escapeHtml,
 
 const TENDER_ID_RE_STR = 'UA-\\d{4}-\\d{2}-\\d{2}-\\d{6}-[a-zA-Z]';
 const EDRPOU_RE = /^\d{8}$/;
+const TOKEN_RE = /^[a-f0-9]{32}$/i;
+const NUMERIC_RE = /^\d+$/;
 
 export function parseCommand(text) {
   if (typeof text !== 'string') return { cmd: null };
@@ -61,6 +63,32 @@ export function parseCommand(text) {
     if (!args) return { cmd: 'unwatch', error: 'missing_edrpou' };
     if (!EDRPOU_RE.test(args)) return { cmd: 'unwatch', error: 'invalid_edrpou' };
     return { cmd: 'unwatch', edrpou: args };
+  }
+
+  const startMatch = trimmed.match(/^\/start(?:@\w+)?(?:\s+(.+))?$/i);
+  if (startMatch) {
+    const arg = (startMatch[1] || '').trim();
+    if (!arg) return { cmd: 'start' };
+    if (!TOKEN_RE.test(arg)) return { cmd: 'start', error: 'invalid_token' };
+    return { cmd: 'start', token: arg.toLowerCase() };
+  }
+
+  const inviteMatch = trimmed.match(/^\/invite(?:@\w+)?(?:\s+(.+))?$/i);
+  if (inviteMatch) {
+    const label = (inviteMatch[1] || '').trim();
+    if (!label) return { cmd: 'invite', error: 'missing_label' };
+    return { cmd: 'invite', label };
+  }
+
+  if (/^\/invites(?:@\w+)?$/i.test(trimmed)) return { cmd: 'invites' };
+  if (/^\/users(?:@\w+)?$/i.test(trimmed)) return { cmd: 'users' };
+
+  const revokeMatch = trimmed.match(/^\/revoke(?:@\w+)?(?:\s+(.+))?$/i);
+  if (revokeMatch) {
+    const arg = (revokeMatch[1] || '').trim();
+    if (!arg) return { cmd: 'revoke', error: 'missing_chat_id' };
+    if (!NUMERIC_RE.test(arg)) return { cmd: 'revoke', error: 'invalid_chat_id' };
+    return { cmd: 'revoke', chat_id: arg };
   }
 
   if (trimmed.startsWith('/')) return { cmd: 'unknown' };

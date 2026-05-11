@@ -972,3 +972,65 @@ test('handleWatch: fetchTender failure during bootstrap is silently skipped', as
   // Bootstrap ids empty since fetch failed
   assert.deepEqual(result.mutation.bootstrap.ids, []);
 });
+
+test('parseCommand: /invite with label', () => {
+  assert.deepEqual(parseCommand('/invite Olha'), { cmd: 'invite', label: 'Olha' });
+});
+
+test('parseCommand: /invite with multi-word label', () => {
+  assert.deepEqual(parseCommand('/invite Olha Petrenko'), { cmd: 'invite', label: 'Olha Petrenko' });
+});
+
+test('parseCommand: /invite with Cyrillic label', () => {
+  assert.deepEqual(parseCommand('/invite Ольга'), { cmd: 'invite', label: 'Ольга' });
+});
+
+test('parseCommand: /invite without label → error', () => {
+  assert.deepEqual(parseCommand('/invite'), { cmd: 'invite', error: 'missing_label' });
+});
+
+test('parseCommand: /invite with bot suffix', () => {
+  assert.deepEqual(parseCommand('/invite@my_bot Olha'), { cmd: 'invite', label: 'Olha' });
+});
+
+test('parseCommand: /invite trims label whitespace', () => {
+  assert.deepEqual(parseCommand('/invite   Olha   '), { cmd: 'invite', label: 'Olha' });
+});
+
+test('parseCommand: /invites', () => {
+  assert.deepEqual(parseCommand('/invites'), { cmd: 'invites' });
+});
+
+test('parseCommand: /users', () => {
+  assert.deepEqual(parseCommand('/users'), { cmd: 'users' });
+});
+
+test('parseCommand: /revoke with numeric chat_id', () => {
+  assert.deepEqual(parseCommand('/revoke 123456789'), { cmd: 'revoke', chat_id: '123456789' });
+});
+
+test('parseCommand: /revoke without arg → error', () => {
+  assert.deepEqual(parseCommand('/revoke'), { cmd: 'revoke', error: 'missing_chat_id' });
+});
+
+test('parseCommand: /revoke with non-numeric → error', () => {
+  assert.deepEqual(parseCommand('/revoke abc'), { cmd: 'revoke', error: 'invalid_chat_id' });
+});
+
+test('parseCommand: /start without payload', () => {
+  assert.deepEqual(parseCommand('/start'), { cmd: 'start' });
+});
+
+test('parseCommand: /start with token payload', () => {
+  const tok = 'a'.repeat(32);
+  assert.deepEqual(parseCommand(`/start ${tok}`), { cmd: 'start', token: tok });
+});
+
+test('parseCommand: /start with invalid token (wrong length)', () => {
+  assert.deepEqual(parseCommand('/start abc'), { cmd: 'start', error: 'invalid_token' });
+});
+
+test('parseCommand: /start with bot suffix and token', () => {
+  const tok = '0123456789abcdef0123456789abcdef';
+  assert.deepEqual(parseCommand(`/start@my_bot ${tok}`), { cmd: 'start', token: tok });
+});
