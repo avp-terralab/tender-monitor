@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-04-30-010542-a",
-  "saved_at": "2026-05-09T09:58:13.902Z",
+  "saved_at": "2026-05-11T16:17:19.270Z",
   "snapshot": {
     "tender_id": "UA-2026-04-30-010542-a",
     "title": "Консалтингові послуги з підготовки медичної лабораторії до акредитації згідно зі стандартом ISO 15189:2022 «Медичні лабораторії – Вимоги до якості та компетентності», код ДК 021:2015 – 71620000-0 - Аналітичні послуги",
-    "status": "active.auction",
-    "dateModified": "2026-05-08T23:00:18.618174+03:00",
+    "status": "active.qualification",
+    "dateModified": "2026-05-11T11:39:57.045899+03:00",
     "tenderPeriod": {
       "endDate": "2026-05-08T23:00:00+03:00"
     },
@@ -78,6 +78,12 @@
         "title": "sign.p7s",
         "documentType": "notice",
         "datePublished": "2026-04-30T16:51:40.365069+03:00"
+      },
+      {
+        "id": "0cb1fdcd575a4703acb5876a1fc2cb43",
+        "title": "audit_24bba48fbd154ca68690335ccf7d888e_6dee592f3cdc4059abf9a34341f05bb7.yaml",
+        "documentType": null,
+        "datePublished": "2026-05-11T11:39:51.567667+03:00"
       }
     ],
     "questions": [
@@ -88,7 +94,21 @@
       }
     ],
     "complaints": [],
-    "awards": [],
+    "awards": [
+      {
+        "id": "e6806f1c8922400aa52479e49122381c",
+        "status": "pending",
+        "suppliers": [
+          {
+            "name": "ДЕРЖАВНЕ ПІДПРИЄМСТВО \"КРИВОРІЗЬКИЙ ЕКСПЕРТНО-ТЕХНІЧНИЙ ЦЕНТР ДЕРЖПРАЦІ\"",
+            "identifier": {
+              "id": "31223828"
+            }
+          }
+        ],
+        "complaints": []
+      }
+    ],
     "contracts": [],
     "cancellations": [],
     "_notifiedDeadlines": [
