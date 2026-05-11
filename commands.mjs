@@ -475,6 +475,67 @@ export function applyAllowedUsersMutation(users, mutation) {
   return users;
 }
 
+export function handleRedeem(deps, { token }) {
+  const { invites, allowedUsers, adminChatId, chatId } = deps;
+  const now = deps.now();
+  const nowIso = now.toISOString();
+
+  const invite = invites.find(i => i.token === token);
+  if (!invite) {
+    return {
+      inviteMutation: null,
+      userMutation: null,
+      adminNotice: null,
+      reply: '❌ Невалідне посилання',
+    };
+  }
+  if (invite.status !== 'pending') {
+    return {
+      inviteMutation: null,
+      userMutation: null,
+      adminNotice: null,
+      reply: '❌ Посилання вже використане або відкликане',
+    };
+  }
+  if (new Date(invite.expires_at) <= now) {
+    return {
+      inviteMutation: null,
+      userMutation: null,
+      adminNotice: null,
+      reply: '❌ Посилання застаріло (>7 днів)',
+    };
+  }
+  const alreadyAllowed =
+    chatId === adminChatId ||
+    allowedUsers.some(u => u.chat_id === chatId);
+  if (alreadyAllowed) {
+    return {
+      inviteMutation: null,
+      userMutation: null,
+      adminNotice: null,
+      reply: '✅ Ти вже маєш доступ. /help',
+    };
+  }
+  return {
+    inviteMutation: {
+      type: 'update_invite_status',
+      token,
+      fields: { status: 'redeemed', redeemed_by: chatId, redeemed_at: nowIso },
+    },
+    userMutation: {
+      type: 'append_user',
+      row: {
+        chat_id: chatId,
+        label: invite.label,
+        invited_via: invite.label,
+        added_at: nowIso,
+      },
+    },
+    reply: `✅ Доступ надано: <b>${escapeHtml(invite.label)}</b>.\n\n/help — список команд.`,
+    adminNotice: `🆕 <b>${escapeHtml(invite.label)}</b> приєднався (chat_id: <code>${chatId}</code>)`,
+  };
+}
+
 export const HELP_TEXT = [
   'Загальні команди:',
   '/help — список команд',

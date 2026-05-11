@@ -5,6 +5,7 @@ import {
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
+  handleRedeem,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -1155,4 +1156,130 @@ test('applyAllowedUsersMutation: unknown type — returns input unchanged', () =
   const users = [{ chat_id: '1', label: 'A' }];
   const result = applyAllowedUsersMutation(users, { type: 'no_such_op' });
   assert.equal(result, users);
+});
+
+test('handleRedeem: valid pending token → both mutations + reply + adminNotice', () => {
+  const invite = {
+    token: 'a'.repeat(32),
+    label: 'Olha',
+    status: 'pending',
+    created_at: '2026-05-10T10:00:00Z',
+    expires_at: '2026-05-17T10:00:00Z',
+    redeemed_by: null,
+    redeemed_at: null,
+  };
+  const result = handleRedeem({
+    invites: [invite],
+    allowedUsers: [],
+    adminChatId: '1744078008',
+    chatId: '555',
+    now: () => new Date('2026-05-12T10:00:00Z'),
+  }, { token: 'a'.repeat(32) });
+
+  assert.equal(result.inviteMutation.type, 'update_invite_status');
+  assert.equal(result.inviteMutation.token, 'a'.repeat(32));
+  assert.equal(result.inviteMutation.fields.status, 'redeemed');
+  assert.equal(result.inviteMutation.fields.redeemed_by, '555');
+  assert.equal(result.inviteMutation.fields.redeemed_at, '2026-05-12T10:00:00.000Z');
+
+  assert.equal(result.userMutation.type, 'append_user');
+  assert.equal(result.userMutation.row.chat_id, '555');
+  assert.equal(result.userMutation.row.label, 'Olha');
+  assert.equal(result.userMutation.row.invited_via, 'Olha');
+  assert.equal(result.userMutation.row.added_at, '2026-05-12T10:00:00.000Z');
+
+  assert.match(result.reply, /✅/);
+  assert.match(result.reply, /Olha/);
+  assert.match(result.adminNotice, /🆕/);
+  assert.match(result.adminNotice, /Olha/);
+  assert.match(result.adminNotice, /555/);
+});
+
+test('handleRedeem: token not found', () => {
+  const result = handleRedeem({
+    invites: [],
+    allowedUsers: [],
+    adminChatId: '1744078008',
+    chatId: '555',
+    now: () => new Date('2026-05-12T10:00:00Z'),
+  }, { token: 'a'.repeat(32) });
+  assert.equal(result.inviteMutation, null);
+  assert.equal(result.userMutation, null);
+  assert.equal(result.adminNotice, null);
+  assert.match(result.reply, /Невалідне посилання/);
+});
+
+test('handleRedeem: token already redeemed', () => {
+  const invite = {
+    token: 'a'.repeat(32),
+    label: 'Olha',
+    status: 'redeemed',
+    expires_at: '2026-05-17T10:00:00Z',
+  };
+  const result = handleRedeem({
+    invites: [invite],
+    allowedUsers: [],
+    adminChatId: '1744078008',
+    chatId: '555',
+    now: () => new Date('2026-05-12T10:00:00Z'),
+  }, { token: 'a'.repeat(32) });
+  assert.equal(result.inviteMutation, null);
+  assert.equal(result.userMutation, null);
+  assert.match(result.reply, /вже використане/);
+});
+
+test('handleRedeem: token expired', () => {
+  const invite = {
+    token: 'a'.repeat(32),
+    label: 'Olha',
+    status: 'pending',
+    expires_at: '2026-05-01T10:00:00Z',
+  };
+  const result = handleRedeem({
+    invites: [invite],
+    allowedUsers: [],
+    adminChatId: '1744078008',
+    chatId: '555',
+    now: () => new Date('2026-05-12T10:00:00Z'),
+  }, { token: 'a'.repeat(32) });
+  assert.equal(result.inviteMutation, null);
+  assert.match(result.reply, /застаріло/);
+});
+
+test('handleRedeem: user already in allowlist → no consume, "вже маєш доступ"', () => {
+  const invite = {
+    token: 'a'.repeat(32),
+    label: 'Olha',
+    status: 'pending',
+    expires_at: '2026-05-17T10:00:00Z',
+  };
+  const result = handleRedeem({
+    invites: [invite],
+    allowedUsers: [{ chat_id: '555', label: 'Already' }],
+    adminChatId: '1744078008',
+    chatId: '555',
+    now: () => new Date('2026-05-12T10:00:00Z'),
+  }, { token: 'a'.repeat(32) });
+  assert.equal(result.inviteMutation, null);
+  assert.equal(result.userMutation, null);
+  assert.match(result.reply, /вже маєш доступ/);
+});
+
+test('handleRedeem: admin redeems own token → "вже маєш доступ", no consume', () => {
+  const invite = {
+    token: 'a'.repeat(32),
+    label: 'Self',
+    status: 'pending',
+    expires_at: '2026-05-17T10:00:00Z',
+  };
+  const result = handleRedeem({
+    invites: [invite],
+    allowedUsers: [],
+    adminChatId: '1744078008',
+    chatId: '1744078008',
+    now: () => new Date('2026-05-12T10:00:00Z'),
+  }, { token: 'a'.repeat(32) });
+  assert.equal(result.inviteMutation, null);
+  assert.equal(result.userMutation, null);
+  assert.match(result.reply, /вже маєш доступ/);
 });
