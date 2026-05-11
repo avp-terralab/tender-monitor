@@ -1118,3 +1118,41 @@ test('applyAllowedUsersMutation: remove_user filters by chat_id', () => {
   const result = applyAllowedUsersMutation(users, { type: 'remove_user', chat_id: '1' });
   assert.deepEqual(result, [{ chat_id: '2', label: 'B' }]);
 });
+
+test('applyAllowedUsersMutation: remove_user non-existent id — no change', () => {
+  const users = [{ chat_id: '1', label: 'A' }];
+  const result = applyAllowedUsersMutation(users, { type: 'remove_user', chat_id: '999' });
+  assert.deepEqual(result, users);
+});
+
+test('applyInviteMutation: append does not mutate input', () => {
+  const invites = [];
+  const result = applyInviteMutation(invites, {
+    type: 'append_invite',
+    row: { token: 'a'.repeat(32), label: 'X' },
+  });
+  assert.notEqual(result, invites);
+  assert.equal(invites.length, 0);
+});
+
+test('applyAllowedUsersMutation: append does not mutate input', () => {
+  const users = [];
+  const result = applyAllowedUsersMutation(users, {
+    type: 'append_user',
+    row: { chat_id: '1', label: 'A' },
+  });
+  assert.notEqual(result, users);
+  assert.equal(users.length, 0);
+});
+
+test('applyInviteMutation: unknown type — returns input unchanged', () => {
+  const invites = [{ token: 't1', label: 'A' }];
+  const result = applyInviteMutation(invites, { type: 'no_such_op' });
+  assert.equal(result, invites);
+});
+
+test('applyAllowedUsersMutation: unknown type — returns input unchanged', () => {
+  const users = [{ chat_id: '1', label: 'A' }];
+  const result = applyAllowedUsersMutation(users, { type: 'no_such_op' });
+  assert.equal(result, users);
+});
