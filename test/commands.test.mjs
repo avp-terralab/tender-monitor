@@ -5,7 +5,7 @@ import {
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
-  handleRedeem, handleRevoke, handleUsersList, handleInvitesList,
+  handleRedeem, handleRevoke, handleUsersList, handleInvitesList, HELP_TEXT,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -1354,4 +1354,10 @@ test('handleInvitesList: shows only pending non-expired', () => {
   assert.doesNotMatch(reply, /Redeemed/);
   assert.doesNotMatch(reply, /Expired/);
   assert.match(reply, new RegExp('a'.repeat(6)));
+});
+
+test('HELP_TEXT mentions admin commands', () => {
+  assert.match(HELP_TEXT, /\/invite/);
+  assert.match(HELP_TEXT, /\/users/);
+  assert.match(HELP_TEXT, /\/revoke/);
 });

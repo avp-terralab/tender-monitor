@@ -597,4 +597,10 @@ export const HELP_TEXT = [
   '/watch EDRPOU — стежити за замовником',
   '/unwatch EDRPOU — припинити стежити',
   '/watched — список замовників',
+  '',
+  'Адмін-команди:',
+  '/invite <ім\'я> — створити invite-посилання',
+  '/invites — активні invite-посилання',
+  '/users — список користувачів',
+  '/revoke <chat_id> — видалити користувача',
 ].join('\n');
