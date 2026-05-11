@@ -4,6 +4,7 @@ const TENDER_ID_RE_STR = 'UA-\\d{4}-\\d{2}-\\d{2}-\\d{6}-[a-zA-Z]';
 const EDRPOU_RE = /^\d{8}$/;
 const TOKEN_RE = /^[a-f0-9]{32}$/i;
 const NUMERIC_RE = /^\d+$/;
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function parseCommand(text) {
   if (typeof text !== 'string') return { cmd: null };
@@ -430,8 +431,6 @@ export async function handleWatch(deps, { edrpou }) {
   };
 }
 
-const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
 export function handleInvite(deps, { label }) {
   const token = deps.generateToken();
   const now = deps.now();
@@ -449,8 +448,8 @@ export function handleInvite(deps, { label }) {
   const link = `https://t.me/${deps.botUsername}?start=${token}`;
   const reply = `🔗 Invite для <b>${escapeHtml(label)}</b>\n\n${link}\n\nПерешли цій людині. Дійсне 7 днів.`;
   return {
-    mutation: { type: 'append_invite', row },
     reply,
+    mutation: { type: 'append_invite', row },
   };
 }
 

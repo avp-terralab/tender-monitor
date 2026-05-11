@@ -1047,6 +1047,18 @@ test('parseCommand: /start with bot suffix and token', () => {
   assert.deepEqual(parseCommand(`/start@my_bot ${tok}`), { cmd: 'start', token: tok });
 });
 
+test('handleInvite: escapes HTML in label', () => {
+  const result = handleInvite({
+    invites: [],
+    generateToken: () => 'a'.repeat(32),
+    now: () => new Date('2026-05-12T10:00:00Z'),
+    botUsername: 'terralab_tenders_bot',
+  }, { label: '<script>&"' });
+  assert.match(result.reply, /&lt;script&gt;&amp;/);
+  assert.doesNotMatch(result.reply, /<script>/);
+  assert.equal(result.mutation.row.label, '<script>&"'); // raw label stored, only display escaped
+});
+
 test('handleInvite: creates invite with given label, 7-day expiry, returns deep-link', () => {
   const result = handleInvite({
     invites: [],
