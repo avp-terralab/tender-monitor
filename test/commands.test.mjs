@@ -1001,12 +1001,24 @@ test('parseCommand: /invites', () => {
   assert.deepEqual(parseCommand('/invites'), { cmd: 'invites' });
 });
 
+test('parseCommand: /invites with bot suffix', () => {
+  assert.deepEqual(parseCommand('/invites@my_bot'), { cmd: 'invites' });
+});
+
 test('parseCommand: /users', () => {
   assert.deepEqual(parseCommand('/users'), { cmd: 'users' });
 });
 
+test('parseCommand: /users with bot suffix', () => {
+  assert.deepEqual(parseCommand('/users@my_bot'), { cmd: 'users' });
+});
+
 test('parseCommand: /revoke with numeric chat_id', () => {
   assert.deepEqual(parseCommand('/revoke 123456789'), { cmd: 'revoke', chat_id: '123456789' });
+});
+
+test('parseCommand: /revoke with bot suffix', () => {
+  assert.deepEqual(parseCommand('/revoke@my_bot 123'), { cmd: 'revoke', chat_id: '123' });
 });
 
 test('parseCommand: /revoke without arg → error', () => {
