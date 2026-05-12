@@ -1,10 +1,15 @@
-import { fetchTendersChangesFeed, fetchTender, extractSnapshot } from './prozorro.mjs';
+import { fetchTendersChangesFeed, fetchTendersFeed, fetchTender, extractSnapshot } from './prozorro.mjs';
 
 const ALERT_STATUSES = new Set(['active.tendering', 'active.pre-qualification']);
 // Safety cap on forward feed pagination — 100 pages × 100 items = 10000 tenders ≈ 12-15h of
 // publishing on a busy day. A typical tick (every few hours) reads 1-2 pages; the cap only
 // matters as a safety net for very long downtime / cold-start recovery.
 const FEED_PAGE_CAP = 100;
+// Per-entity backfill: descending walk of 10 pages (~1000 tenders, ~1.5h of publishing).
+// Runs only for entities with name="(unknown)" — i.e. before we've ever resolved a tender
+// for them. Closes the gap where /watch <edrpou> happens BEFORE the entity publishes
+// (forward feed only catches future publications).
+const BACKFILL_PAGE_CAP = 10;
 
 export async function checkWatchedEntities(deps) {
   const {
@@ -14,6 +19,7 @@ export async function checkWatchedEntities(deps) {
     loadSeen,
     saveSeen,
     fetchChangesFeed: _feed = fetchTendersChangesFeed,
+    fetchDescendingFeed: _descFeed = fetchTendersFeed,
     fetchTender: _fetch = fetchTender,
     extractSnapshot: _extract = extractSnapshot,
   } = deps;
@@ -38,6 +44,7 @@ export async function checkWatchedEntities(deps) {
   let lastOffset = offset;
 
   const candidates = [];
+  const errors = [];
 
   for (let page = 0; page < FEED_PAGE_CAP; page++) {
     let result;
@@ -57,8 +64,32 @@ export async function checkWatchedEntities(deps) {
     offset = nextOffset;
   }
 
+  // Backfill: for each enabled entity whose name we haven't resolved yet,
+  // do a per-entity descending walk to catch tenders published BEFORE the
+  // forward cursor was set (e.g. before /watch or before the first tick).
+  // Disables itself automatically once name resolves (no longer "(unknown)").
+  const unknownEntities = enabled.filter(e => !e.name || e.name === '(unknown)');
+  for (const entity of unknownEntities) {
+    let pageOffset = null;
+    for (let page = 0; page < BACKFILL_PAGE_CAP; page++) {
+      let result;
+      try {
+        result = await _descFeed({ pageOffset });
+      } catch (err) {
+        errors.push({ source: 'backfill', edrpou: entity.edrpou, error: err.message });
+        break;
+      }
+      const { items, next } = result;
+      if (items.length === 0) break;
+      for (const item of items) {
+        if (item.procuringEntity?.identifier?.id === entity.edrpou) candidates.push(item);
+      }
+      if (!next) break;
+      pageOffset = next;
+    }
+  }
+
   const alerts = [];
-  const errors = [];
   // Lazy-resolve names: when we fetch a tender for an entity whose stored name is "(unknown)",
   // capture the real name so the caller can persist it back to watched_entities.json.
   const discoveredNames = {};

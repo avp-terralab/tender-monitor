@@ -15,6 +15,7 @@ const baseDeps = (overrides = {}) => {
       loadSeen: async () => seenStore.value,
       saveSeen: async (s) => { seenStore.value = s; },
       fetchChangesFeed: async () => ({ items: [], nextOffset: null }),
+      fetchDescendingFeed: async () => ({ items: [], next: null }),
       fetchTender: async () => ({ data: {} }),
       extractSnapshot,
       ...overrides,
@@ -266,6 +267,134 @@ test('checkWatchedEntities: disabled entity ignored', async () => {
   });
   const result = await checkWatchedEntities(deps);
   assert.equal(result.alerts.length, 0);
+});
+
+test('checkWatchedEntities: backfill descending walk runs ONLY for entities with name="(unknown)"', async () => {
+  const descCalls = [];
+  const { deps } = baseDeps({
+    watchedEntities: [
+      { edrpou: '11111111', name: 'Відомий замовник', enabled: true },
+      { edrpou: '22222222', name: '(unknown)', enabled: true },
+    ],
+    fetchDescendingFeed: async ({ pageOffset }) => {
+      descCalls.push({ edrpou: 'check', pageOffset });
+      return { items: [], next: null };
+    },
+  });
+  await checkWatchedEntities(deps);
+  // Only 1 entity is (unknown) → 1 backfill walk × 1 page (empty result) = 1 call
+  assert.equal(descCalls.length, 1);
+});
+
+test('checkWatchedEntities: backfill finds tender published before cursor, alerts on it', async () => {
+  // Scenario: /watch 02007472 at T0, first monitor tick sets forward cursor at T1.
+  // Tender published at T0+1h (between T0 and T1). Forward feed (cursor=T1) misses it.
+  // Backfill descending walk catches it.
+  let descPage = 0;
+  const { deps, state } = baseDeps({
+    watchedEntities: [{ edrpou: '02007472', name: '(unknown)', enabled: true }],
+    loadCursor: async () => ({ offset: 'past-cursor' }),
+    fetchChangesFeed: async () => ({ items: [], nextOffset: 'past-cursor' }),
+    fetchDescendingFeed: async () => {
+      if (descPage++ === 0) {
+        return {
+          items: [
+            { tenderID: 'UA-2026-05-08-005338-a', procuringEntity: { identifier: { id: '02007472' } } },
+            { tenderID: 'UA-OTHER', procuringEntity: { identifier: { id: '99999999' } } },
+          ],
+          next: '/path',
+        };
+      }
+      return { items: [], next: null };
+    },
+    fetchTender: async (id) => ({
+      data: {
+        tenderID: id,
+        title: 'ЛІС для лабораторії',
+        status: 'active.tendering',
+        procuringEntity: { name: 'КНП «Охтирська ЦРЛ»', identifier: { id: '02007472' } },
+        tenderPeriod: { endDate: '2026-05-16T08:00:00+03:00' },
+        items: [],
+      },
+    }),
+  });
+  const result = await checkWatchedEntities(deps);
+  assert.equal(result.alerts.length, 1);
+  assert.equal(result.alerts[0].tender_id, 'UA-2026-05-08-005338-a');
+  assert.deepEqual(state.seenStore.value['02007472'], ['UA-2026-05-08-005338-a']);
+  assert.equal(result.discoveredNames['02007472'], 'КНП «Охтирська ЦРЛ»');
+});
+
+test('checkWatchedEntities: backfill dedupes via seen (already-alerted tender NOT realerted)', async () => {
+  const { deps } = baseDeps({
+    watchedEntities: [{ edrpou: '11111111', name: '(unknown)', enabled: true }],
+    loadSeen: async () => ({ '11111111': ['UA-OLD'] }),
+    fetchDescendingFeed: async () => ({
+      items: [
+        { tenderID: 'UA-OLD', procuringEntity: { identifier: { id: '11111111' } } },
+      ],
+      next: null,
+    }),
+  });
+  const result = await checkWatchedEntities(deps);
+  assert.equal(result.alerts.length, 0);
+});
+
+test('checkWatchedEntities: backfill respects page cap (10 pages of descending feed)', async () => {
+  let calls = 0;
+  const { deps } = baseDeps({
+    watchedEntities: [{ edrpou: '11111111', name: '(unknown)', enabled: true }],
+    fetchDescendingFeed: async () => {
+      calls++;
+      return {
+        items: [{ tenderID: `UA-${calls}`, procuringEntity: { identifier: { id: '99999999' } } }],
+        next: '/path',
+      };
+    },
+  });
+  await checkWatchedEntities(deps);
+  assert.equal(calls, 10);
+});
+
+test('checkWatchedEntities: backfill feed error → recorded but does not block forward results', async () => {
+  const { deps, state } = baseDeps({
+    watchedEntities: [{ edrpou: '11111111', name: '(unknown)', enabled: true }],
+    fetchChangesFeed: async () => ({ items: [], nextOffset: 'forward-cp' }),
+    fetchDescendingFeed: async () => { throw new Error('Prozorro feed 503'); },
+  });
+  const result = await checkWatchedEntities(deps);
+  assert.equal(result.alerts.length, 0);
+  assert.equal(result.errors.length, 1);
+  assert.equal(result.errors[0].source, 'backfill');
+  assert.equal(result.errors[0].edrpou, '11111111');
+  // forward cursor still saved despite backfill failure
+  assert.equal(state.cursorStore.value.offset, 'forward-cp');
+});
+
+test('checkWatchedEntities: backfill skips when entity name is already known', async () => {
+  let called = false;
+  const { deps } = baseDeps({
+    watchedEntities: [{ edrpou: '11111111', name: 'Real Name', enabled: true }],
+    fetchDescendingFeed: async () => {
+      called = true;
+      return { items: [], next: null };
+    },
+  });
+  await checkWatchedEntities(deps);
+  assert.equal(called, false);
+});
+
+test('checkWatchedEntities: backfill skips disabled (unknown) entities', async () => {
+  let called = false;
+  const { deps } = baseDeps({
+    watchedEntities: [{ edrpou: '11111111', name: '(unknown)', enabled: false }],
+    fetchDescendingFeed: async () => {
+      called = true;
+      return { items: [], next: null };
+    },
+  });
+  await checkWatchedEntities(deps);
+  assert.equal(called, false);
 });
 
 test('checkWatchedEntities: discoveredNames populated when watched name is "(unknown)" and snapshot has real name', async () => {
