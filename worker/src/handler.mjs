@@ -1,7 +1,9 @@
 import {
   parseCommand, handleAdd, handleList, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
-  applyMutation, applyEntityMutation, formatInfo, HELP_TEXT,
+  handleInvite, handleRedeem, handleRevoke, handleUsersList, handleInvitesList,
+  applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
+  formatInfo, HELP_TEXT,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed } from '../../prozorro.mjs';
 import { sendReply } from '../../telegram.mjs';
@@ -9,8 +11,12 @@ import {
   loadWatchlist, saveWatchlist,
   loadWatchedEntities, saveWatchedEntities,
   loadWatchedSeen, saveWatchedSeen,
+  loadAllowedUsers, saveAllowedUsers,
+  loadInvites, saveInvites,
   ConflictError,
 } from './github.mjs';
+
+const BOT_USERNAME = 'terralab_tenders_bot';
 
 export async function runHandler({ update, env, deps = {} }) {
   const _loadWatchlist = deps.loadWatchlist ?? loadWatchlist;
@@ -23,19 +29,27 @@ export async function runHandler({ update, env, deps = {} }) {
   const _loadWatchedSeen = deps.loadWatchedSeen ?? loadWatchedSeen;
   const _saveWatchedSeen = deps.saveWatchedSeen ?? saveWatchedSeen;
   const _fetchTendersFeed = deps.fetchTendersFeed ?? fetchTendersFeed;
+  const _loadAllowedUsers = deps.loadAllowedUsers ?? loadAllowedUsers;
+  const _saveAllowedUsers = deps.saveAllowedUsers ?? saveAllowedUsers;
+  const _loadInvites = deps.loadInvites ?? loadInvites;
+  const _saveInvites = deps.saveInvites ?? saveInvites;
+  const _generateToken = deps.generateToken ?? (() => {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  });
+  const _now = deps.now ?? (() => new Date());
 
   const msg = update.message;
   if (!msg) return;
-  const allowedIds = String(env.ALLOWED_CHAT_ID ?? '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-  const chatId = String(msg.chat?.id);
-  const isAllowed = allowedIds.includes(chatId);
+  const chatId = String(msg.chat?.id ?? '');
+  const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
+  const isAdmin = chatId !== '' && chatId === adminChatId;
 
-  // /start works for everyone — reveals chat_id so non-allowed users can request access
-  if (typeof msg.text === 'string' && /^\/start(?:@\w+)?(?:\s|$)/i.test(msg.text)) {
-    const startReply = isAllowed
+  // /start works for everyone — reveals chat_id so non-allowed users can request access.
+  // /start <token> is handled in a later branch.
+  if (typeof msg.text === 'string' && /^\/start(?:@\w+)?\s*$/i.test(msg.text)) {
+    const startReply = isAdmin
       ? `👋 Привіт!\n\nТвій chat_id: <code>${chatId}</code>\n\n/help — список команд.`
       : `👋 Привіт!\n\nЦе приватний бот. Твій chat_id: <code>${chatId}</code>\n\nНадішли цей id адміну, щоб отримати доступ.`;
     try {
@@ -51,7 +65,21 @@ export async function runHandler({ update, env, deps = {} }) {
     return;
   }
 
-  if (!isAllowed) return;
+  // For non-admin chat, check allowlist file. Admin skips this (works during GH outages).
+  let isInvited = false;
+  if (!isAdmin) {
+    try {
+      const { users } = await _loadAllowedUsers(env);
+      isInvited = users.some(u => u.chat_id === chatId);
+    } catch (err) {
+      console.error('worker: loadAllowedUsers failed:', err.message);
+      // Fail closed — non-admin sees nothing if we can't verify.
+    }
+  }
+  const isAllowed = isAdmin || isInvited;
+  // /start <token> handled below regardless of allowlist (it grants access).
+  const isStartWithToken = typeof msg.text === 'string' && /^\/start(?:@\w+)?\s+\S/i.test(msg.text);
+  if (!isAllowed && !isStartWithToken) return;
   if (typeof msg.text !== 'string') return;
 
   const cmd = parseCommand(msg.text);

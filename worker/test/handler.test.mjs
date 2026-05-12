@@ -29,6 +29,7 @@ const makeDeps = (overrides = {}) => {
       loadWatchedSeen: async () => ({ seen: {}, sha: null }),
       saveWatchedSeen: async () => ({}),
       fetchTendersFeed: async () => ({ items: [], next: null }),
+      loadAllowedUsers: async () => ({ users: [], sha: null }),
       ...overrides,
     },
   };
@@ -36,7 +37,7 @@ const makeDeps = (overrides = {}) => {
 
 const ENV = {
   TELEGRAM_BOT_TOKEN: 'TOK',
-  ALLOWED_CHAT_ID: '123',
+  ADMIN_CHAT_ID: '123',
 };
 
 test('runHandler: no message → no-op', async () => {
@@ -65,24 +66,26 @@ test('runHandler: message from wrong chat → silent skip', async () => {
   assert.equal(sent.length, 0);
 });
 
-test('runHandler: comma-separated ALLOWED_CHAT_ID → both ids allowed', async () => {
-  const { deps, sent } = makeDeps();
-  const multiEnv = { ...ENV, ALLOWED_CHAT_ID: '123, 456' };
+test('runHandler: invited user from allowed_users.json is allowed', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Olha' }], sha: 'sha' }),
+  });
   await runHandler({
     update: { message: { chat: { id: 456 }, text: '/help', message_id: 9 } },
-    env: multiEnv,
+    env: ENV,
     deps,
   });
   assert.equal(sent.length, 1);
   assert.equal(sent[0].chatId, 456);
 });
 
-test('runHandler: comma-separated ALLOWED_CHAT_ID → unlisted id still rejected', async () => {
-  const { deps, sent } = makeDeps();
-  const multiEnv = { ...ENV, ALLOWED_CHAT_ID: '123,456' };
+test('runHandler: non-admin chat_id not in allowed_users.json is rejected', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'X' }], sha: 's' }),
+  });
   await runHandler({
     update: { message: { chat: { id: 789 }, text: '/help', message_id: 1 } },
-    env: multiEnv,
+    env: ENV,
     deps,
   });
   assert.equal(sent.length, 0);
@@ -834,4 +837,18 @@ test('runHandler: /watch existing → no save, no bootstrap', async () => {
   assert.match(sent[0].text, /⚠️ Вже стежу/);
   assert.equal(saveEntityCalled, false);
   assert.equal(saveSeenCalled, false);
+});
+
+test('runHandler: ADMIN_CHAT_ID always allowed without GitHub load', async () => {
+  let loadCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => { loadCalled = true; return { users: [], sha: null }; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/help', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(loadCalled, false);
 });
