@@ -96,7 +96,7 @@ test('runHandler: allowed user reply carries reply_markup keyboard', async () =>
     '📋 Моніторинг закупівель',
     '👁 Моніторинг замовників',
     '📦 Архів закупівель',
-    '❓ Допомога',
+    '❓ Допомога (список команд)',
   ]);
 });
 

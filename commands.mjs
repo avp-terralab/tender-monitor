@@ -13,7 +13,7 @@ const BUTTON_ALIASES = {
   '📋 Моніторинг закупівель': 'info',
   '👁 Моніторинг замовників': 'watched',
   '📦 Архів закупівель': 'archive',
-  '❓ Допомога': 'help',
+  '❓ Допомога (список команд)': 'help',
 };
 
 // Reply keyboard sent with each bot response to an allowed user. Telegram
@@ -24,7 +24,7 @@ const BUTTON_ALIASES = {
 export const MAIN_KEYBOARD = {
   keyboard: [
     [{ text: '📋 Моніторинг закупівель' }, { text: '👁 Моніторинг замовників' }],
-    [{ text: '📦 Архів закупівель' }, { text: '❓ Допомога' }],
+    [{ text: '📦 Архів закупівель' }, { text: '❓ Допомога (список команд)' }],
   ],
   resize_keyboard: true,
   is_persistent: true,

@@ -88,7 +88,7 @@ test('parseCommand: reply-keyboard button labels alias to commands', () => {
   assert.deepEqual(parseCommand('📋 Моніторинг закупівель'), { cmd: 'info' });
   assert.deepEqual(parseCommand('👁 Моніторинг замовників'), { cmd: 'watched' });
   assert.deepEqual(parseCommand('📦 Архів закупівель'), { cmd: 'archive' });
-  assert.deepEqual(parseCommand('❓ Допомога'), { cmd: 'help' });
+  assert.deepEqual(parseCommand('❓ Допомога (список команд)'), { cmd: 'help' });
 });
 
 test('parseCommand: button labels tolerate surrounding whitespace', () => {
