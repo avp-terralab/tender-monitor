@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseCommand, buildAutoNotes, formatAddReply, handleList,
+  parseCommand, buildAutoNotes, formatAddReply,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
@@ -10,16 +10,11 @@ import {
   handleUnarchive,
 } from '../commands.mjs';
 
-test('parseCommand: /list', () => {
-  assert.deepEqual(parseCommand('/list'), { cmd: 'list' });
+test('parseCommand: /list is treated as unknown after removal', () => {
+  assert.deepEqual(parseCommand('/list'), { cmd: 'unknown' });
 });
 
-test('parseCommand: /list with bot suffix', () => {
-  assert.deepEqual(parseCommand('/list@my_bot'), { cmd: 'list' });
-});
-
-test('parseCommand: /list and /help reject trailing text (strict)', () => {
-  assert.deepEqual(parseCommand('/list extra'), { cmd: 'unknown' });
+test('parseCommand: /help reject trailing text (strict)', () => {
   assert.deepEqual(parseCommand('/help please'), { cmd: 'unknown' });
 });
 
@@ -86,7 +81,7 @@ test('parseCommand: non-string input — null', () => {
 });
 
 test('parseCommand: leading/trailing whitespace tolerated', () => {
-  assert.deepEqual(parseCommand('  /list  '), { cmd: 'list' });
+  assert.deepEqual(parseCommand('  /help  '), { cmd: 'help' });
 });
 
 const SAMPLE_SNAP = {
@@ -188,36 +183,6 @@ test('formatAddReply: HTML-escapes user-controlled fields', () => {
   assert.match(reply, /A&amp;B&gt;/);
 });
 
-test('handleList: empty watchlist', () => {
-  assert.match(handleList({ watchlist: [] }), /порожній/i);
-});
-
-test('handleList: single enabled tender', () => {
-  const reply = handleList({ watchlist: [
-    { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'Рівне ОКЛ' }
-  ]});
-  assert.match(reply, /🟢 UA-2026-04-30-010542-a — Рівне ОКЛ/);
-  assert.match(reply, /Всього: 1 \(1 active\)/);
-});
-
-test('handleList: mix enabled and disabled', () => {
-  const reply = handleList({ watchlist: [
-    { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'Active' },
-    { tender_id: 'UA-2025-01-01-000001-a', enabled: false, notes: 'auto-disabled: 404' },
-  ]});
-  assert.match(reply, /🟢 UA-2026-04-30-010542-a — Active/);
-  assert.match(reply, /🔴 UA-2025-01-01-000001-a — auto-disabled: 404/);
-  assert.match(reply, /Всього: 2 \(1 active\)/);
-});
-
-test('handleList: customer truncated to 150 chars', () => {
-  const longCustomer = 'X'.repeat(200);
-  const reply = handleList({ watchlist: [
-    { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: longCustomer }
-  ]});
-  assert.ok(reply.includes('X'.repeat(149) + '…'));
-});
-
 test('abbreviateLegalForm: КНП', () => {
   assert.equal(
     abbreviateLegalForm('Комунальне некомерційне підприємство «Центральна районна лікарня»'),
@@ -268,50 +233,6 @@ test('abbreviateLegalForm: name without legal form returns unchanged', () => {
 test('abbreviateLegalForm: empty/null returns unchanged', () => {
   assert.equal(abbreviateLegalForm(''), '');
   assert.equal(abbreviateLegalForm(null), null);
-});
-
-test('handleList: applies legal-form abbreviation to customer', () => {
-  const reply = handleList({ watchlist: [
-    { tender_id: 'UA-A', enabled: true, notes: 'Комунальне некомерційне підприємство «Х» — Реактиви' }
-  ]});
-  assert.match(reply, /КНП «Х»/);
-  assert.doesNotMatch(reply, /Комунальне/);
-});
-
-test('handleList: extracts customer from auto-format "entity — title"', () => {
-  const reply = handleList({ watchlist: [
-    { tender_id: 'UA-A', enabled: true, notes: 'КНП «Рівненська ОКЛ» — Реактиви для лабораторії' }
-  ]});
-  assert.match(reply, /UA-A — КНП «Рівненська ОКЛ»/);
-  assert.doesNotMatch(reply, /Реактиви/);
-});
-
-test('handleList: numbers entries 1, 2, 3 with blank line between', () => {
-  const reply = handleList({ watchlist: [
-    { tender_id: 'UA-A', enabled: true },
-    { tender_id: 'UA-B', enabled: true },
-    { tender_id: 'UA-C', enabled: false },
-  ]});
-  assert.match(reply, /1\. 🟢 UA-A/);
-  assert.match(reply, /2\. 🟢 UA-B/);
-  assert.match(reply, /3\. 🔴 UA-C/);
-  // Blank line between entries (\n\n)
-  assert.match(reply, /UA-A\n\n2\. /);
-  assert.match(reply, /UA-B\n\n3\. /);
-});
-
-test('handleList: row without notes — id only', () => {
-  const reply = handleList({ watchlist: [
-    { tender_id: 'UA-2026-04-30-010542-a', enabled: true }
-  ]});
-  assert.match(reply, /🟢 UA-2026-04-30-010542-a$/m);
-});
-
-test('handleList: HTML-escapes notes', () => {
-  const reply = handleList({ watchlist: [
-    { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'A & <B>' }
-  ]});
-  assert.match(reply, /A &amp; &lt;B&gt;/);
 });
 
 test('applyMutation: append adds new row', () => {
@@ -645,26 +566,6 @@ test('formatInfo: multiple entries are numbered and separated by line', () => {
   assert.match(reply, /2\. 🆔.*UA-B/s);
   // Separator between entries
   assert.match(reply, /━{20,}/);
-});
-
-test('handleList: shows value when _value present on row', () => {
-  const reply = handleList({ watchlist: [
-    {
-      tender_id: 'UA-A',
-      enabled: true,
-      notes: 'КНП «Х»',
-      _value: { amount: 800147, currency: 'UAH', valueAddedTaxIncluded: true },
-    },
-  ]});
-  assert.match(reply, /UA-A — КНП «Х» — 800 147 UAH/);
-});
-
-test('handleList: omits value if _value missing (e.g. failed fetch)', () => {
-  const reply = handleList({ watchlist: [
-    { tender_id: 'UA-A', enabled: true, notes: 'КНП «Х»' },
-  ]});
-  assert.match(reply, /UA-A — КНП «Х»\n\nВсього/);
-  assert.doesNotMatch(reply, /UAH/);
 });
 
 test('formatAddReply: abbreviates entity legal form', () => {

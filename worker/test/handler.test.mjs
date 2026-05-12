@@ -135,7 +135,7 @@ test('runHandler: /start@botusername variant works', async () => {
 test('runHandler: non-/start command from non-allowed → still silent', async () => {
   const { deps, sent } = makeDeps();
   await runHandler({
-    update: { message: { chat: { id: 999 }, text: '/list', message_id: 1 } },
+    update: { message: { chat: { id: 999 }, text: '/help', message_id: 1 } },
     env: ENV,
     deps,
   });
@@ -186,36 +186,6 @@ test('runHandler: free text → no-op', async () => {
     deps,
   });
   assert.equal(sent.length, 0);
-});
-
-test('runHandler: /list with watchlist → formatted reply', async () => {
-  const { deps, sent } = makeDeps({
-    loadWatchlist: async () => ({
-      watchlist: [{ tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'X' }],
-      sha: 'abc',
-    }),
-  });
-  await runHandler({
-    update: { message: { chat: { id: 123 }, text: '/list', message_id: 1 } },
-    env: ENV,
-    deps,
-  });
-  assert.equal(sent.length, 1);
-  assert.match(sent[0].text, /🟢 UA-2026-04-30-010542-a/);
-  assert.match(sent[0].text, /Всього: 1 \(1 active\)/);
-});
-
-test('runHandler: /list when loadWatchlist throws → ⚠️ reply', async () => {
-  const { deps, sent } = makeDeps({
-    loadWatchlist: async () => { throw new Error('GitHub GET 503: timeout'); },
-  });
-  await runHandler({
-    update: { message: { chat: { id: 123 }, text: '/list', message_id: 1 } },
-    env: ENV,
-    deps,
-  });
-  assert.equal(sent.length, 1);
-  assert.match(sent[0].text, /⚠️ GitHub тимчасово недоступний/);
 });
 
 test('runHandler: /add invalid id → reply, no GitHub call', async () => {
@@ -605,57 +575,6 @@ test('runHandler: /info when loadWatchlist throws → ⚠️ reply', async () =>
     deps,
   });
   assert.match(sent[0].text, /⚠️ GitHub недоступний/);
-});
-
-test('runHandler: /list fetches value for enabled rows; skips disabled', async () => {
-  const fetched = [];
-  const RAW = (id) => ({
-    data: {
-      tenderID: id,
-      title: 'X',
-      status: 'active.tendering',
-      tenderPeriod: { endDate: '2026-05-15T14:00:00+03:00' },
-      procuringEntity: { name: 'Тест', identifier: { id: '1' } },
-      items: [],
-      value: { amount: 12345, currency: 'UAH', valueAddedTaxIncluded: true },
-    },
-  });
-  const { deps, sent } = await makeDeps({
-    loadWatchlist: async () => ({
-      watchlist: [
-        { tender_id: 'UA-A', enabled: true, notes: 'ТОВ «А»' },
-        { tender_id: 'UA-B', enabled: false, notes: 'ТОВ «Б»' },
-      ],
-      sha: 'x',
-    }),
-    fetchTender: async (id) => { fetched.push(id); return RAW(id); },
-  });
-  await runHandler({
-    update: { message: { chat: { id: 123 }, text: '/list', message_id: 1 } },
-    env: ENV,
-    deps,
-  });
-  assert.deepEqual(fetched, ['UA-A']);  // disabled UA-B not fetched
-  assert.match(sent[0].text, /UA-A — ТОВ «А» — 12 345 UAH/);
-  // UA-B disabled — no value
-  assert.match(sent[0].text, /🔴 UA-B — ТОВ «Б»\n\nВсього/);
-});
-
-test('runHandler: /list fetch failure on enabled row → list still works without value', async () => {
-  const { deps, sent } = await makeDeps({
-    loadWatchlist: async () => ({
-      watchlist: [{ tender_id: 'UA-A', enabled: true, notes: 'ТОВ «А»' }],
-      sha: 'x',
-    }),
-    fetchTender: async () => { throw new Error('Prozorro 503'); },
-  });
-  await runHandler({
-    update: { message: { chat: { id: 123 }, text: '/list', message_id: 1 } },
-    env: ENV,
-    deps,
-  });
-  assert.match(sent[0].text, /UA-A — ТОВ «А»/);
-  assert.doesNotMatch(sent[0].text, /UAH/);
 });
 
 test('runHandler: /watched empty → 📭 reply', async () => {

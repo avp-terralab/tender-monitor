@@ -11,7 +11,6 @@ export function parseCommand(text) {
   const trimmed = text.trim();
   if (trimmed === '') return { cmd: null };
 
-  if (/^\/list(?:@\w+)?$/i.test(trimmed)) return { cmd: 'list' };
   if (/^\/help(?:@\w+)?$/i.test(trimmed)) return { cmd: 'help' };
   if (/^\/status(?:@\w+)?$/i.test(trimmed)) return { cmd: 'status' };
   if (/^\/watched(?:@\w+)?$/i.test(trimmed)) return { cmd: 'watched' };
@@ -172,28 +171,6 @@ export function abbreviateLegalForm(name) {
     if (re.test(name)) return name.replace(re, replacement).trim();
   }
   return name;
-}
-
-export function handleList({ watchlist }) {
-  if (!watchlist || watchlist.length === 0) {
-    return '📭 Список порожній. Додай тендер: /add UA-...';
-  }
-  const rows = watchlist.map((r, i) => {
-    const icon = r.enabled ? '🟢' : '🔴';
-    // Auto-notes format is "<customer> — <title>"; show only customer.
-    const rawCustomer = r.notes ? r.notes.split(' — ')[0].trim() : '';
-    const customer = abbreviateLegalForm(rawCustomer);
-    const customerSuffix = customer ? ` — ${escapeHtml(truncate(customer, 150))}` : '';
-    // Optional value (provided by handler from Prozorro fetch on enabled rows)
-    let valueSuffix = '';
-    if (r._value && typeof r._value.amount === 'number') {
-      const amount = formatMoney(r._value.amount);
-      valueSuffix = ` — ${amount} ${r._value.currency}`;
-    }
-    return `${i + 1}. ${icon} ${r.tender_id}${customerSuffix}${valueSuffix}`;
-  });
-  const active = watchlist.filter(r => r.enabled).length;
-  return rows.join('\n\n') + `\n\nВсього: ${watchlist.length} (${active} active)`;
 }
 
 function formatInfoEntry(g, runIso) {
@@ -785,8 +762,7 @@ export const HELP_TEXT = [
   'Моніторинг закупівель за ID:',
   '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
   '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
-  '/list — короткий список (id + Замовник)',
-  '/info [UA-...] — детально (всі або один)',
+  '/info [UA-...] — список усіх або деталі одного тендера',
   '',
   'Моніторинг замовників за EDRPOU:',
   '/watch EDRPOU — стежити за замовником',
