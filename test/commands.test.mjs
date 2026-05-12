@@ -6,7 +6,7 @@ import {
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleUsersList, handleInvitesList, HELP_TEXT,
-  applyArchiveMutation, handleArchive, handleArchiveDetail,
+  applyArchiveMutation, handleArchive, handleArchiveDetail, handleContract,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -1577,4 +1577,69 @@ test('handleArchiveDetail: fresh fetch fails — show frozen, no contracts secti
   }, { tender_id: 'UA-2026-05-01-000003-a' });
   assert.match(reply, /Статус: Завершено/);
   assert.match(reply, /⚠️ Не вдалось отримати свіжі дані договору/);
+});
+
+test('handleContract: unknown id (not in archive)', async () => {
+  const reply = await handleContract({
+    archive: [],
+    fetchTender: async () => { throw new Error('should not call'); },
+    extractSnapshot: () => ({}),
+  }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(reply, /❓ UA-2026-04-30-010542-a не в архіві/);
+});
+
+test('handleContract: complete with docs', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    final_status: 'complete',
+    final_snapshot: {},
+  }];
+  const fresh = {
+    data: {
+      contracts: [{
+        id: 'C1',
+        documents: [
+          { id: 'D1', title: 'Договір №1', url: 'https://prozorro.gov.ua/doc/D1' },
+          { id: 'D2', title: 'Додаткова угода', url: 'https://prozorro.gov.ua/doc/D2' },
+        ],
+      }],
+    },
+  };
+  const reply = await handleContract({
+    archive,
+    fetchTender: async () => fresh,
+    extractSnapshot: (raw) => raw.data,
+  }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(reply, /📄 Договір UA-2026-04-30-010542-a/);
+  assert.match(reply, /Договір №1/);
+  assert.match(reply, /Додаткова угода/);
+});
+
+test('handleContract: cancelled — no contract', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-05-01-000002-a',
+    final_status: 'cancelled',
+    final_snapshot: {},
+  }];
+  const reply = await handleContract({
+    archive,
+    fetchTender: async () => ({ data: { contracts: [] } }),
+    extractSnapshot: (raw) => raw.data,
+  }, { tender_id: 'UA-2026-05-01-000002-a' });
+  assert.match(reply, /договір не укладено/);
+  assert.match(reply, /cancelled/);
+});
+
+test('handleContract: fresh fetch fails', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-05-01-000003-a',
+    final_status: 'complete',
+    final_snapshot: {},
+  }];
+  const reply = await handleContract({
+    archive,
+    fetchTender: async () => { throw new Error('Prozorro 500'); },
+    extractSnapshot: (raw) => raw.data,
+  }, { tender_id: 'UA-2026-05-01-000003-a' });
+  assert.match(reply, /⚠️ Не вдалось отримати дані договору/);
 });

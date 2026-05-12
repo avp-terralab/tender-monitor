@@ -610,6 +610,27 @@ export async function handleArchiveDetail(deps, { tender_id }) {
   return lines.join('\n');
 }
 
+export async function handleContract(deps, { tender_id }) {
+  const { archive, fetchTender, extractSnapshot } = deps;
+  const entry = archive.find(a => a.tender_id === tender_id);
+  if (!entry) return `❓ ${tender_id} не в архіві`;
+  if (entry.final_status !== 'complete') {
+    return `❓ У цій закупівлі договір не укладено (status: ${entry.final_status})`;
+  }
+  let fresh;
+  try {
+    const raw = await fetchTender(tender_id);
+    fresh = extractSnapshot(raw);
+  } catch (err) {
+    return `⚠️ Не вдалось отримати дані договору: ${err.message}`;
+  }
+  const block = formatContractsBlock(fresh.contracts);
+  if (!block) {
+    return `❓ У цій закупівлі договір не укладено (status: complete, але без contracts)`;
+  }
+  return `📄 Договір ${tender_id}${block}`;
+}
+
 export function handleRedeem(deps, { token }) {
   const { invites, allowedUsers, adminChatId, chatId } = deps;
   const now = deps.now();
