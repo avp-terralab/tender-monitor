@@ -76,16 +76,6 @@ export function parseCommand(text) {
     return { cmd: 'archive', tender_id: id };
   }
 
-  const contractMatch = trimmed.match(/^\/contract(?:@\w+)?(?:\s+(.+))?$/i);
-  if (contractMatch) {
-    const args = (contractMatch[1] || '').trim();
-    if (!args) return { cmd: 'contract', error: 'missing_id' };
-    const idMatch = args.match(new RegExp(`^(${TENDER_ID_RE_STR})$`));
-    if (!idMatch) return { cmd: 'contract', error: 'invalid_id' };
-    const id = idMatch[1].slice(0, -1) + idMatch[1].slice(-1).toLowerCase();
-    return { cmd: 'contract', tender_id: id };
-  }
-
   const unarchiveMatch = trimmed.match(/^\/unarchive(?:@\w+)?(?:\s+(.+))?$/i);
   if (unarchiveMatch) {
     const args = (unarchiveMatch[1] || '').trim();
@@ -537,6 +527,19 @@ function fmtArchivedDate(iso) {
   return `${d[3]}.${d[2]}.${d[1]}`;
 }
 
+// Find first signed-contract download URL in a frozen archive entry.
+// Skips documentType === 'notice' (those are КЕП-signature .p7s, not the contract PDF).
+function findContractDocUrl(entry) {
+  for (const c of entry.final_snapshot?.contracts ?? []) {
+    for (const d of c.documents ?? []) {
+      if (!d.url) continue;
+      if (d.documentType === 'notice') continue;
+      return d.url;
+    }
+  }
+  return null;
+}
+
 export function handleArchive({ archive }) {
   if (!archive || archive.length === 0) {
     return '📭 Архів порожній.';
@@ -554,7 +557,10 @@ export function handleArchive({ archive }) {
       value = ` — ${amt} ${a.final_snapshot.value.currency}`;
     }
     const dateSuffix = a.archived_at ? ` (${fmtArchivedDate(a.archived_at)})` : '';
-    return `${i + 1}. ${icon} ${a.tender_id}${customer}${value}${dateSuffix}`;
+    const mainLine = `${i + 1}. ${icon} ${a.tender_id}${customer}${value}${dateSuffix}`;
+    const docUrl = findContractDocUrl(a);
+    if (!docUrl) return mainLine;
+    return `${mainLine}\n📄 <a href="${escapeHtml(docUrl)}">Завантажити договір</a>`;
   });
   return rows.join('\n\n') + `\n\nВсього в архіві: ${archive.length}`;
 }
@@ -636,28 +642,6 @@ export async function handleArchiveDetail(deps, { tender_id }) {
     }
   }
   return lines.join('\n');
-}
-
-export async function handleContract(deps, { tender_id }) {
-  const { archive, fetchTender, extractSnapshot, fetchContract } = deps;
-  const entry = archive.find(a => a.tender_id === tender_id);
-  if (!entry) return `❓ ${tender_id} не в архіві`;
-  if (entry.final_status !== 'complete') {
-    return `❓ У цій закупівлі договір не укладено (status: ${entry.final_status})`;
-  }
-  let fresh;
-  try {
-    const raw = await fetchTender(tender_id);
-    fresh = extractSnapshot(raw);
-  } catch (err) {
-    return `⚠️ Не вдалось отримати дані договору: ${err.message}`;
-  }
-  await hydrateContractDocs(fresh.contracts, fetchContract);
-  const block = formatContractsBlock(fresh.contracts);
-  if (!block) {
-    return `❓ У цій закупівлі договір не укладено (status: complete, але без contracts)`;
-  }
-  return `📄 Договір ${tender_id}${block}`;
 }
 
 export function handleRedeem(deps, { token }) {
@@ -810,9 +794,8 @@ export const HELP_TEXT = [
   '/watched — список замовників',
   '',
   'Архів завершених закупівель:',
-  '/archive — список архіву',
+  '/archive — список архіву (з посиланнями на договори)',
   '/archive [UA-...] — деталі + договір',
-  '/contract [UA-...] — лише документи договору',
   '/unarchive [UA-...] — повернути в моніторинг',
   '',
   'Адмін-команди:',

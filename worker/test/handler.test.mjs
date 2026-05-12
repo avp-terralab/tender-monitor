@@ -1078,24 +1078,6 @@ test('runHandler: /archive UA-... uses fresh fetchTender for contracts', async (
   assert.match(sent[0].text, /📄 Договір/);
 });
 
-test('runHandler: /contract UA-... — only docs', async () => {
-  const archive = [{
-    tender_id: 'UA-2026-04-30-010542-a',
-    final_status: 'complete',
-    final_snapshot: {},
-  }];
-  const { deps, sent } = makeDeps({
-    loadArchivedTenders: async () => ({ archive, sha: null }),
-    fetchTender: async () => ({ data: { contracts: [{ id: 'C1', documents: [{ title: 'Договір', url: 'https://x' }] }] } }),
-  });
-  await runHandler({
-    update: { message: { chat: { id: 123 }, text: '/contract UA-2026-04-30-010542-a', message_id: 1 } },
-    env: ENV,
-    deps,
-  });
-  assert.match(sent[0].text, /Договір UA-2026-04-30-010542-a/);
-});
-
 test('runHandler: /unarchive moves UA → watchlist', async () => {
   const archive = [{
     tender_id: 'UA-2026-04-30-010542-a',

@@ -2,7 +2,7 @@ import {
   parseCommand, handleAdd, handleList, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
   handleInvite, handleRedeem, handleRevoke, handleUsersList, handleInvitesList,
-  handleArchive, handleArchiveDetail, handleContract, handleUnarchive,
+  handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
   formatInfo, HELP_TEXT,
@@ -376,23 +376,6 @@ export async function runHandler({ update, env, deps = {} }) {
     } catch (err) {
       console.error('worker: /archive failed:', err.message);
       reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
-    }
-  } else if (cmd.cmd === 'contract') {
-    if (cmd.error === 'invalid_id') {
-      reply = '❌ Невалідний tender_id. Формат: /contract UA-YYYY-MM-DD-NNNNNN-x';
-    } else if (cmd.error === 'missing_id') {
-      reply = '❌ Не вказано tender_id. /contract UA-YYYY-MM-DD-NNNNNN-x';
-    } else {
-      try {
-        const { archive } = await _loadArchivedTenders(env);
-        reply = await handleContract(
-          { archive, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot, fetchContract: _fetchContract },
-          cmd,
-        );
-      } catch (err) {
-        console.error('worker: /contract failed:', err.message);
-        reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
-      }
     }
   } else if (cmd.cmd === 'unarchive') {
     if (cmd.error === 'invalid_id') {

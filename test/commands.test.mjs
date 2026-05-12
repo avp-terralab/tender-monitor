@@ -6,7 +6,7 @@ import {
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleUsersList, handleInvitesList, HELP_TEXT,
-  applyArchiveMutation, handleArchive, handleArchiveDetail, handleContract,
+  applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
 } from '../commands.mjs';
 
@@ -1390,19 +1390,8 @@ test('parseCommand: /archive with invalid arg', () => {
   assert.deepEqual(parseCommand('/archive garbage'), { cmd: 'unknown' });
 });
 
-test('parseCommand: /contract requires id', () => {
-  assert.deepEqual(parseCommand('/contract'), { cmd: 'contract', error: 'missing_id' });
-});
-
-test('parseCommand: /contract with valid id', () => {
-  assert.deepEqual(
-    parseCommand('/contract UA-2026-04-30-010542-a'),
-    { cmd: 'contract', tender_id: 'UA-2026-04-30-010542-a' }
-  );
-});
-
-test('parseCommand: /contract with invalid id', () => {
-  assert.deepEqual(parseCommand('/contract garbage'), { cmd: 'contract', error: 'invalid_id' });
+test('parseCommand: /contract is treated as unknown after removal', () => {
+  assert.deepEqual(parseCommand('/contract UA-2026-04-30-010542-a'), { cmd: 'unknown' });
 });
 
 test('parseCommand: /unarchive requires id', () => {
@@ -1494,6 +1483,52 @@ test('handleArchive: maps statuses to icons', () => {
   assert.match(reply, /❌ UA-2026-05-01-000003-a/);
 });
 
+test('handleArchive: adds contract download link line when documents present', () => {
+  const reply = handleArchive({ archive: [{
+    tender_id: 'UA-2026-04-16-005830-a',
+    archived_at: '2026-05-12T08:30:00Z',
+    final_status: 'complete',
+    final_snapshot: {
+      procuringEntity: { name: 'КНП' },
+      contracts: [{
+        id: 'C1',
+        documents: [
+          { id: 'D1', title: 'Договір.pdf', url: 'https://x/d1', documentType: null },
+          { id: 'D2', title: 'sign.p7s', url: 'https://x/d2', documentType: 'notice' },
+        ],
+      }],
+    },
+  }]});
+  // Link should point to the non-'notice' document (signed PDF, not КЕП-signature)
+  assert.match(reply, /📄.*Завантажити договір/);
+  assert.match(reply, /https:\/\/x\/d1/);
+  assert.doesNotMatch(reply, /https:\/\/x\/d2/);
+});
+
+test('handleArchive: no link line when no contract docs', () => {
+  const reply = handleArchive({ archive: [{
+    tender_id: 'UA-2026-05-01-000002-a',
+    archived_at: '2026-05-12T08:00:00Z',
+    final_status: 'cancelled',
+    final_snapshot: { procuringEntity: { name: 'X' }, contracts: [] },
+  }]});
+  assert.doesNotMatch(reply, /Завантажити договір/);
+});
+
+test('handleArchive: no link line when only notice docs present', () => {
+  const reply = handleArchive({ archive: [{
+    tender_id: 'UA-2026-05-01-000003-a',
+    archived_at: '2026-05-12T08:00:00Z',
+    final_status: 'complete',
+    final_snapshot: {
+      contracts: [{ id: 'C1', documents: [
+        { id: 'D1', title: 'sign.p7s', url: 'https://x/sign', documentType: 'notice' },
+      ]}],
+    },
+  }]});
+  assert.doesNotMatch(reply, /Завантажити договір/);
+});
+
 test('handleArchive: sorts by archived_at desc', () => {
   const reply = handleArchive({ archive: [
     { tender_id: 'UA-2026-05-01-000001-a', archived_at: '2026-05-10T00:00:00Z', final_status: 'complete', final_snapshot: {} },
@@ -1578,118 +1613,6 @@ test('handleArchiveDetail: fresh fetch fails — show frozen, no contracts secti
   }, { tender_id: 'UA-2026-05-01-000003-a' });
   assert.match(reply, /Статус: Завершено/);
   assert.match(reply, /⚠️ Не вдалось отримати свіжі дані договору/);
-});
-
-test('handleContract: unknown id (not in archive)', async () => {
-  const reply = await handleContract({
-    archive: [],
-    fetchTender: async () => { throw new Error('should not call'); },
-    extractSnapshot: () => ({}),
-  }, { tender_id: 'UA-2026-04-30-010542-a' });
-  assert.match(reply, /❓ UA-2026-04-30-010542-a не в архіві/);
-});
-
-test('handleContract: complete with docs', async () => {
-  const archive = [{
-    tender_id: 'UA-2026-04-30-010542-a',
-    final_status: 'complete',
-    final_snapshot: {},
-  }];
-  const fresh = {
-    data: {
-      contracts: [{
-        id: 'C1',
-        documents: [
-          { id: 'D1', title: 'Договір №1', url: 'https://prozorro.gov.ua/doc/D1' },
-          { id: 'D2', title: 'Додаткова угода', url: 'https://prozorro.gov.ua/doc/D2' },
-        ],
-      }],
-    },
-  };
-  const reply = await handleContract({
-    archive,
-    fetchTender: async () => fresh,
-    extractSnapshot: (raw) => raw.data,
-  }, { tender_id: 'UA-2026-04-30-010542-a' });
-  assert.match(reply, /📄 Договір UA-2026-04-30-010542-a/);
-  assert.match(reply, /Договір №1/);
-  assert.match(reply, /Додаткова угода/);
-});
-
-test('handleContract: cancelled — no contract', async () => {
-  const archive = [{
-    tender_id: 'UA-2026-05-01-000002-a',
-    final_status: 'cancelled',
-    final_snapshot: {},
-  }];
-  const reply = await handleContract({
-    archive,
-    fetchTender: async () => ({ data: { contracts: [] } }),
-    extractSnapshot: (raw) => raw.data,
-  }, { tender_id: 'UA-2026-05-01-000002-a' });
-  assert.match(reply, /договір не укладено/);
-  assert.match(reply, /cancelled/);
-});
-
-test('handleContract: fresh fetch fails', async () => {
-  const archive = [{
-    tender_id: 'UA-2026-05-01-000003-a',
-    final_status: 'complete',
-    final_snapshot: {},
-  }];
-  const reply = await handleContract({
-    archive,
-    fetchTender: async () => { throw new Error('Prozorro 500'); },
-    extractSnapshot: (raw) => raw.data,
-  }, { tender_id: 'UA-2026-05-01-000003-a' });
-  assert.match(reply, /⚠️ Не вдалось отримати дані договору/);
-});
-
-test('handleContract: hydrates docs via fetchContract when tender contracts lack documents', async () => {
-  // Real Prozorro response: tender contracts[] has only summary (id, status, value);
-  // documents (signed PDF, КЕП) live at /contracts/{id}. fetchContract bridges this.
-  const archive = [{
-    tender_id: 'UA-2026-04-16-005830-a',
-    final_status: 'complete',
-    final_snapshot: {},
-  }];
-  const reply = await handleContract({
-    archive,
-    fetchTender: async () => ({ data: {
-      contracts: [{ id: 'C-UUID', status: 'active' }], // no documents inline
-    }}),
-    extractSnapshot: (raw) => raw.data,
-    fetchContract: async (id) => {
-      assert.equal(id, 'C-UUID');
-      return {
-        id, status: 'active',
-        documents: [
-          { id: 'D1', title: 'Scan_договору.pdf', url: 'https://public-api.prozorro.gov.ua/api/2.5/contracts/C-UUID/documents/D1' },
-          { id: 'D2', title: 'sign.p7s', url: 'https://x/sign.p7s' },
-        ],
-      };
-    },
-  }, { tender_id: 'UA-2026-04-16-005830-a' });
-  assert.match(reply, /📄 Договір UA-2026-04-16-005830-a/);
-  assert.match(reply, /Scan_договору\.pdf/);
-  assert.match(reply, /sign\.p7s/);
-});
-
-test('handleContract: fetchContract failure leaves contract without docs → "без contracts"', async () => {
-  const archive = [{
-    tender_id: 'UA-2026-04-16-005830-a',
-    final_status: 'complete',
-    final_snapshot: {},
-  }];
-  const reply = await handleContract({
-    archive,
-    fetchTender: async () => ({ data: {
-      contracts: [{ id: 'C-UUID', status: 'active' }],
-    }}),
-    extractSnapshot: (raw) => raw.data,
-    fetchContract: async () => { throw new Error('Prozorro 503'); },
-  }, { tender_id: 'UA-2026-04-16-005830-a' });
-  assert.match(reply, /договір не укладено \(status: complete, але без contracts\)/);
 });
 
 test('handleArchiveDetail: hydrates contract docs via fetchContract', async () => {
@@ -1792,10 +1715,10 @@ test('handleAdd: archive missing → falls through to existing fetch path', asyn
   assert.equal(result.mutation.type, 'append');
 });
 
-test('HELP_TEXT: mentions /archive, /contract, /unarchive', () => {
+test('HELP_TEXT: mentions /archive, /unarchive (no /contract — removed)', () => {
   assert.match(HELP_TEXT, /\/archive/);
-  assert.match(HELP_TEXT, /\/contract/);
   assert.match(HELP_TEXT, /\/unarchive/);
+  assert.doesNotMatch(HELP_TEXT, /\/contract/);
 });
 
 test('HELP_TEXT: uses square brackets for placeholders (no <...>)', () => {

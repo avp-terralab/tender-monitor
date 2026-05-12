@@ -74,7 +74,37 @@
         {
           "id": "3362bce92aba4d3a81515b1c2a07dbe1",
           "status": "active",
-          "documents": []
+          "documents": [
+            {
+              "confidentiality": "public",
+              "title_en": "Scan_20260512_102529.pdf",
+              "title_ru": "Scan_20260512_102529.pdf",
+              "description": "SHA1: 5427bb6dd2a1c44d5ec55a824dbfd851516c5046",
+              "id": "089832fab5234843a3d93e567d1b0db3",
+              "hash": "md5:c8f98e2dcf5e0eaa68a277146f619aa7",
+              "title": "Scan_20260512_102529.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/3362bce92aba4d3a81515b1c2a07dbe1/documents/089832fab5234843a3d93e567d1b0db3?download=1ec302f8ee144c83ba87bb2013a9ebd6",
+              "documentOf": "contract",
+              "datePublished": "2026-05-12T10:26:54.423150+03:00",
+              "dateModified": "2026-05-12T10:26:54.423150+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "documentType": "notice",
+              "title_en": "sign.p7s",
+              "title_ru": "sign.p7s",
+              "description": "SHA1: 125dc72cd3e252a61cc9d57dd72f9845c71c7325",
+              "id": "f95f82567e7c4e958ca3386ce27c3be5",
+              "hash": "md5:b2ef6506e963560000049674beb33ec4",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/3362bce92aba4d3a81515b1c2a07dbe1/documents/f95f82567e7c4e958ca3386ce27c3be5?download=c38e6c174a794f05a24d9aa6d447c578",
+              "documentOf": "contract",
+              "datePublished": "2026-05-12T10:28:12.140258+03:00",
+              "dateModified": "2026-05-12T10:28:12.140258+03:00"
+            }
+          ]
         }
       ],
       "cancellations": []

@@ -1,5 +1,5 @@
 import { runOnce } from './monitor.mjs';
-import { fetchTender, extractSnapshot } from './prozorro.mjs';
+import { fetchTender, extractSnapshot, fetchContract } from './prozorro.mjs';
 import { sendDigest as tgSend } from './telegram.mjs';
 import { checkWatchedEntities } from './entity_watch.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
@@ -93,6 +93,18 @@ const result = await runOnce({
     // Idempotent: skip if already archived.
     const arr = JSON.parse(readFileSync(archivePath, 'utf-8'));
     if (arr.some(a => a.tender_id === tenderId)) return false;
+    // Hydrate contract docs from /contracts/{id} resource — tender response only
+    // returns contract summary without `documents`. /archive list reads from the
+    // frozen snapshot so the download link is available without a live fetch.
+    for (const c of snapshot.contracts ?? []) {
+      if (!c.id) continue;
+      try {
+        const full = await fetchContract(c.id);
+        c.documents = full.documents ?? [];
+      } catch (err) {
+        console.error('archiveTender: fetchContract failed for', c.id, err.message);
+      }
+    }
     // Pull notes from current watchlist (re-read disk to capture any concurrent updates).
     const wl = JSON.parse(readFileSync(watchlistPath, 'utf-8'));
     const row = wl.find(r => r.tender_id === tenderId);
