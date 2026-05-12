@@ -516,7 +516,8 @@ test('formatInfo: full entry contains all fields from spec', () => {
     groups: [SAMPLE_GROUP],
   });
   assert.match(reply, /📋 Статус тендерів \(13:00, 08\.05\.2026\)/);
-  assert.match(reply, /1\. 🆔 Ідентифікатор закупівлі: <a href=".*">UA-2026-04-29-008605-a<\/a>/);
+  assert.match(reply, /━+ 1 ━+/);
+  assert.match(reply, /🆔 Ідентифікатор закупівлі: <a href=".*">UA-2026-04-29-008605-a<\/a>/);
   assert.match(reply, /👥 Замовник: КНП «Центральна районна лікарня» \(ЄДРПОУ 33578224\)/);
   assert.match(reply, /🔖 ДК: 72260000-5 — Послуги, пов'язані з програмним забезпеченням/);
   assert.match(reply, /💰 Вартість: 800 147 UAH \(з ПДВ\)/);
@@ -554,7 +555,7 @@ test('formatInfo: skips fields when null', () => {
   assert.doesNotMatch(reply, /📞/);
 });
 
-test('formatInfo: multiple entries are numbered and separated by line', () => {
+test('formatInfo: each entry preceded by ━ N ━ header (number in separator)', () => {
   const reply = formatInfo({
     runIso: '2026-05-08T13:00:00+03:00',
     groups: [
@@ -562,10 +563,8 @@ test('formatInfo: multiple entries are numbered and separated by line', () => {
       { tender_id: 'UA-B', prozorro_url: 'https://prozorro.gov.ua/tender/UA-B', status: 'active.tendering' },
     ],
   });
-  assert.match(reply, /1\. 🆔.*UA-A/s);
-  assert.match(reply, /2\. 🆔.*UA-B/s);
-  // Separator between entries
-  assert.match(reply, /━{20,}/);
+  assert.match(reply, /━+ 1 ━+\n🆔.*UA-A/s);
+  assert.match(reply, /━+ 2 ━+\n🆔.*UA-B/s);
 });
 
 test('formatAddReply: abbreviates entity legal form', () => {
