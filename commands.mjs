@@ -534,7 +534,9 @@ export function handleArchive({ archive }) {
       value = ` — ${amt} ${a.final_snapshot.value.currency}`;
     }
     const dateSuffix = a.archived_at ? ` (${fmtArchivedDate(a.archived_at)})` : '';
-    const mainLine = `${i + 1}. ${icon} ${a.tender_id}${customer}${value}${dateSuffix}`;
+    const tenderUrl = `https://prozorro.gov.ua/tender/${a.tender_id}`;
+    const idLink = `<a href="${escapeHtml(tenderUrl)}">${escapeHtml(a.tender_id)}</a>`;
+    const mainLine = `${i + 1}. ${icon} ${idLink}${customer}${value}${dateSuffix}`;
     const docUrl = findContractDocUrl(a);
     if (!docUrl) return mainLine;
     return `${mainLine}\n📄 <a href="${escapeHtml(docUrl)}">Завантажити договір</a>`;

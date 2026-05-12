@@ -1347,6 +1347,16 @@ test('applyArchiveMutation: unknown type is no-op', () => {
   assert.deepEqual(applyArchiveMutation(arr, { type: 'wat' }), arr);
 });
 
+test('handleArchive: tender_id is rendered as Prozorro link', () => {
+  const reply = handleArchive({ archive: [{
+    tender_id: 'UA-2026-04-16-005830-a',
+    archived_at: '2026-05-12T08:30:00Z',
+    final_status: 'complete',
+    final_snapshot: {},
+  }]});
+  assert.match(reply, /<a href="https:\/\/prozorro\.gov\.ua\/tender\/UA-2026-04-16-005830-a">UA-2026-04-16-005830-a<\/a>/);
+});
+
 test('handleArchive: empty', () => {
   assert.equal(
     handleArchive({ archive: [] }),
@@ -1366,7 +1376,7 @@ test('handleArchive: lists complete with icon and money', () => {
       },
     },
   ]});
-  assert.match(reply, /✅ UA-2026-04-30-010542-a/);
+  assert.match(reply, /✅ <a [^>]+>UA-2026-04-30-010542-a<\/a>/);
   assert.match(reply, /КНП Лікарня/);
   assert.match(reply, /350 000 UAH/);
   assert.match(reply, /12\.05\.2026/);
@@ -1379,9 +1389,9 @@ test('handleArchive: maps statuses to icons', () => {
     { tender_id: 'UA-2026-05-01-000002-a', archived_at: '2026-05-12T08:00:00Z', final_status: 'cancelled', final_snapshot: {} },
     { tender_id: 'UA-2026-05-01-000003-a', archived_at: '2026-05-12T08:00:00Z', final_status: 'unsuccessful', final_snapshot: {} },
   ]});
-  assert.match(reply, /✅ UA-2026-05-01-000001-a/);
-  assert.match(reply, /⊘ UA-2026-05-01-000002-a/);
-  assert.match(reply, /❌ UA-2026-05-01-000003-a/);
+  assert.match(reply, /✅ <a [^>]+>UA-2026-05-01-000001-a/);
+  assert.match(reply, /⊘ <a [^>]+>UA-2026-05-01-000002-a/);
+  assert.match(reply, /❌ <a [^>]+>UA-2026-05-01-000003-a/);
 });
 
 test('handleArchive: adds contract download link line when documents present', () => {
