@@ -81,6 +81,58 @@ test('runHandler: invited user from allowed_users.json is allowed', async () => 
   assert.equal(sent[0].chatId, 456);
 });
 
+test('runHandler: allowed user reply carries reply_markup keyboard', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/help', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0].replyMarkup, 'replyMarkup must be set for allowed user');
+  assert.ok(Array.isArray(sent[0].replyMarkup.keyboard));
+  // 4 buttons in 2 rows
+  const flat = sent[0].replyMarkup.keyboard.flat().map(b => b.text);
+  assert.deepEqual(flat, ['📋 Активні', '📦 Архів', '👁 Замовн.', '❓ Допомога']);
+});
+
+test('runHandler: button label "📋 Активні" triggers /info logic and replies with keyboard', async () => {
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '📋 Активні', message_id: 2 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  // Empty watchlist → /info renders "📭 Немає активних тендерів."
+  assert.match(sent[0].text, /Немає активних тендерів/);
+  assert.ok(sent[0].replyMarkup);
+});
+
+test('runHandler: /start for allowed user also carries the keyboard', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/start', message_id: 7 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0].replyMarkup);
+});
+
+test('runHandler: /start for non-allowed user does NOT carry keyboard', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 999 }, text: '/start', message_id: 7 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].replyMarkup, undefined);
+});
+
 test('runHandler: non-admin chat_id not in allowed_users.json is rejected', async () => {
   const { deps, sent } = makeDeps({
     loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'X' }], sha: 's' }),

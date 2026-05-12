@@ -6,10 +6,38 @@ const TOKEN_RE = /^[a-f0-9]{32}$/i;
 const NUMERIC_RE = /^\d+$/;
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Reply-keyboard button labels. Tapping a button sends its text as a normal
+// message; parseCommand maps the exact label to the matching slash command.
+// Keep labels in sync with MAIN_KEYBOARD below.
+const BUTTON_ALIASES = {
+  '📋 Активні': 'info',
+  '📦 Архів': 'archive',
+  '👁 Замовн.': 'watched',
+  '❓ Допомога': 'help',
+};
+
+// Reply keyboard sent with each bot response to an allowed user. Telegram
+// renders it persistently above the text input. Buttons with arguments
+// (/add, /watch, /remove, /unwatch, /info UA-..., /archive UA-...,
+// /unarchive UA-...) stay text-only since you can't put a tender_id on a
+// button label.
+export const MAIN_KEYBOARD = {
+  keyboard: [
+    [{ text: '📋 Активні' }, { text: '📦 Архів' }],
+    [{ text: '👁 Замовн.' }, { text: '❓ Допомога' }],
+  ],
+  resize_keyboard: true,
+  is_persistent: true,
+};
+
 export function parseCommand(text) {
   if (typeof text !== 'string') return { cmd: null };
   const trimmed = text.trim();
   if (trimmed === '') return { cmd: null };
+
+  if (Object.prototype.hasOwnProperty.call(BUTTON_ALIASES, trimmed)) {
+    return { cmd: BUTTON_ALIASES[trimmed] };
+  }
 
   if (/^\/help(?:@\w+)?$/i.test(trimmed)) return { cmd: 'help' };
   if (/^\/status(?:@\w+)?$/i.test(trimmed)) return { cmd: 'status' };

@@ -5,7 +5,7 @@ import {
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
-  formatInfo, HELP_TEXT,
+  formatInfo, HELP_TEXT, MAIN_KEYBOARD,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract } from '../../prozorro.mjs';
 import { sendReply } from '../../telegram.mjs';
@@ -64,6 +64,7 @@ export async function runHandler({ update, env, deps = {} }) {
         chatId: msg.chat.id,
         text: startReply,
         replyToMessageId: msg.message_id,
+        replyMarkup: isAdmin ? MAIN_KEYBOARD : undefined,
       });
     } catch (err) {
       console.error('worker: sendReply /start failed:', err.message);
@@ -387,6 +388,7 @@ export async function runHandler({ update, env, deps = {} }) {
       chatId: msg.chat.id,
       text: reply,
       replyToMessageId: msg.message_id,
+      replyMarkup: isAllowed ? MAIN_KEYBOARD : undefined,
     });
   } catch (err) {
     console.error('worker: sendReply failed:', err.message);

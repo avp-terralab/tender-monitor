@@ -465,6 +465,31 @@ test('sendReply: retries on transient 5xx then succeeds', async () => {
   assert.equal(result.ok, true);
 });
 
+test('sendReply: replyMarkup serialised as JSON in reply_markup field', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, body: Object.fromEntries(opts.body) });
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  const keyboard = {
+    keyboard: [[{ text: '📋 Активні' }]],
+    resize_keyboard: true,
+    is_persistent: true,
+  };
+  await sendReply({ token: 'TOK', chatId: '12345', text: 'hi', replyMarkup: keyboard, fetch: fakeFetch });
+  assert.equal(calls[0].body.reply_markup, JSON.stringify(keyboard));
+});
+
+test('sendReply: omits reply_markup when not provided', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, body: Object.fromEntries(opts.body) });
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendReply({ token: 'TOK', chatId: '12345', text: 'hi', fetch: fakeFetch });
+  assert.equal(calls[0].body.reply_markup, undefined);
+});
+
 test('sendReply: throws on telegram-level not-ok', async () => {
   const fakeFetch = async () => ({
     ok: true,

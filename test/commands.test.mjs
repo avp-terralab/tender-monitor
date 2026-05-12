@@ -84,6 +84,22 @@ test('parseCommand: leading/trailing whitespace tolerated', () => {
   assert.deepEqual(parseCommand('  /help  '), { cmd: 'help' });
 });
 
+test('parseCommand: reply-keyboard button labels alias to commands', () => {
+  assert.deepEqual(parseCommand('📋 Активні'), { cmd: 'info' });
+  assert.deepEqual(parseCommand('📦 Архів'), { cmd: 'archive' });
+  assert.deepEqual(parseCommand('👁 Замовн.'), { cmd: 'watched' });
+  assert.deepEqual(parseCommand('❓ Допомога'), { cmd: 'help' });
+});
+
+test('parseCommand: button labels tolerate surrounding whitespace', () => {
+  assert.deepEqual(parseCommand('  📋 Активні  '), { cmd: 'info' });
+});
+
+test('parseCommand: free text that just contains an emoji stays null', () => {
+  assert.deepEqual(parseCommand('📋'), { cmd: null });
+  assert.deepEqual(parseCommand('Активні'), { cmd: null });
+});
+
 const SAMPLE_SNAP = {
   tender_id: 'UA-2026-04-30-010542-a',
   title: 'Реактиви для лабораторії, код ДК 33696500-0',

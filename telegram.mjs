@@ -345,7 +345,7 @@ export async function getUpdates({ token, offset, fetch: fetchImpl = fetch }) {
   return json.result ?? [];
 }
 
-export async function sendReply({ token, chatId, text, replyToMessageId, fetch: fetchImpl = fetch }) {
+export async function sendReply({ token, chatId, text, replyToMessageId, replyMarkup, fetch: fetchImpl = fetch }) {
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   const params = {
     chat_id: String(chatId),
@@ -354,6 +354,7 @@ export async function sendReply({ token, chatId, text, replyToMessageId, fetch: 
     disable_web_page_preview: 'true',
   };
   if (replyToMessageId != null) params.reply_to_message_id = String(replyToMessageId);
+  if (replyMarkup != null) params.reply_markup = JSON.stringify(replyMarkup);
 
   let lastErr;
   for (let attempt = 0; attempt < 2; attempt++) {
