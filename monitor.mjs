@@ -3,6 +3,14 @@ import { formatDigest, formatHeartbeat } from './telegram.mjs';
 
 const TENDER_ID_RE = /^UA-\d{4}-\d{2}-\d{2}-\d{6}-[a-z]$/;
 
+const TERMINAL_STATUSES = new Set(['complete', 'cancelled', 'unsuccessful']);
+
+const STATUS_ICONS = {
+  complete: '✅',
+  cancelled: '⊘',
+  unsuccessful: '❌',
+};
+
 function isHeartbeatHour(runIso) {
   const hour = new Intl.DateTimeFormat('uk-UA', {
     timeZone: 'Europe/Kyiv',
@@ -120,7 +128,22 @@ export async function runOnce(deps) {
 
   const hasContent = groups.length > 0 || errors.length > 0;
 
-  if (!hasContent && isHeartbeatHour(runIso)) {
+  // Collect terminal-status archival candidates.
+  const archivedNow = [];
+  if (deps.archiveTender) {
+    for (const r of results) {
+      if (r.error || !r.curr) continue;
+      if (!TERMINAL_STATUSES.has(r.curr.status)) continue;
+      try {
+        const ok = await deps.archiveTender(r.row.tender_id, r.curr);
+        if (ok) archivedNow.push({ tender_id: r.row.tender_id, status: r.curr.status });
+      } catch (err) {
+        console.error('archiveTender failed:', r.row.tender_id, err.message);
+      }
+    }
+  }
+
+  if (!hasContent && archivedNow.length === 0 && isHeartbeatHour(runIso)) {
     const heartbeat = formatHeartbeat(runIso, results
       .filter(r => !r.error && r.curr)
       .map(r => ({
@@ -144,16 +167,25 @@ export async function runOnce(deps) {
 
   const isSilent = !hasContent;
 
-  if (!isSilent) {
-    let text = formatDigest(runIso, groups);
-    if (errors.length > 0) {
-      text += '\n\n⚠️ не вдалось перевірити:\n' +
-        errors.map(e => {
-          const line = e.is_invalid
-            ? `  • ${e.tender_id} — не знайдено в Prozorro або невалідний формат, відключено від моніторингу`
-            : `  • ${e.tender_id} — ${e.error}`;
-          return line;
-        }).join('\n');
+  if (!isSilent || archivedNow.length > 0) {
+    let text = '';
+    if (!isSilent) {
+      text = formatDigest(runIso, groups);
+      if (errors.length > 0) {
+        text += '\n\n⚠️ не вдалось перевірити:\n' +
+          errors.map(e => {
+            const line = e.is_invalid
+              ? `  • ${e.tender_id} — не знайдено в Prozorro або невалідний формат, відключено від моніторингу`
+              : `  • ${e.tender_id} — ${e.error}`;
+            return line;
+          }).join('\n');
+      }
+    }
+    if (archivedNow.length > 0) {
+      const block = '📦 Архівовано:\n' + archivedNow.map(a =>
+        `  ${STATUS_ICONS[a.status] ?? '📦'} ${a.tender_id} — ${a.status}`
+      ).join('\n');
+      text = text ? `${text}\n\n${block}` : block;
     }
     await sendDigest(text);
 
@@ -174,7 +206,7 @@ export async function runOnce(deps) {
   ));
 
   return {
-    sent: !isSilent,
+    sent: !isSilent || archivedNow.length > 0,
     groups: groups.length,
     errors: errors.length,
   };
