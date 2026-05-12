@@ -6,7 +6,7 @@ import {
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleUsersList, handleInvitesList, HELP_TEXT,
-  applyArchiveMutation, handleArchive,
+  applyArchiveMutation, handleArchive, handleArchiveDetail,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -1501,4 +1501,80 @@ test('handleArchive: sorts by archived_at desc', () => {
   const idx1 = reply.indexOf('UA-2026-05-01-000001-a');
   const idx2 = reply.indexOf('UA-2026-05-01-000002-a');
   assert.ok(idx2 < idx1, 'newer should come first');
+});
+
+test('handleArchiveDetail: unknown id', async () => {
+  const reply = await handleArchiveDetail({
+    archive: [],
+    fetchTender: async () => { throw new Error('should not call'); },
+    extractSnapshot: () => ({}),
+  }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(reply, /❓ UA-2026-04-30-010542-a не в архіві/);
+});
+
+test('handleArchiveDetail: complete with contract docs', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    archived_at: '2026-05-12T08:30:00Z',
+    final_status: 'complete',
+    final_snapshot: {
+      procuringEntity: { name: 'КНП Лікарня', edrpou: '11111111' },
+      value: { amount: 350000, currency: 'UAH', valueAddedTaxIncluded: true },
+      classification: { id: '33696500-0', description: 'Реактиви' },
+    },
+  }];
+  const fresh = {
+    data: {
+      contracts: [{
+        id: 'C1',
+        status: 'signed',
+        documents: [{ id: 'D1', title: 'Договір №1', url: 'https://prozorro.gov.ua/doc/D1', datePublished: '2026-05-12T10:00:00Z' }],
+      }],
+    },
+  };
+  const reply = await handleArchiveDetail({
+    archive,
+    fetchTender: async () => fresh,
+    extractSnapshot: (raw) => raw.data,
+  }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(reply, /КНП Лікарня/);
+  assert.match(reply, /33696500-0 — Реактиви/);
+  assert.match(reply, /350 000 UAH/);
+  assert.match(reply, /Статус: Завершено/);
+  assert.match(reply, /Архівовано: 12\.05\.2026/);
+  assert.match(reply, /📄 Договір/);
+  assert.match(reply, /Договір №1/);
+  assert.match(reply, /prozorro\.gov\.ua\/doc\/D1/);
+});
+
+test('handleArchiveDetail: cancelled — no contract section', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-05-01-000002-a',
+    archived_at: '2026-05-12T08:00:00Z',
+    final_status: 'cancelled',
+    final_snapshot: { procuringEntity: { name: 'X' } },
+  }];
+  const reply = await handleArchiveDetail({
+    archive,
+    fetchTender: async () => ({ data: { contracts: [] } }),
+    extractSnapshot: (raw) => raw.data,
+  }, { tender_id: 'UA-2026-05-01-000002-a' });
+  assert.match(reply, /Статус: Скасовано/);
+  assert.doesNotMatch(reply, /📄 Договір/);
+});
+
+test('handleArchiveDetail: fresh fetch fails — show frozen, no contracts section', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-05-01-000003-a',
+    archived_at: '2026-05-12T08:00:00Z',
+    final_status: 'complete',
+    final_snapshot: { procuringEntity: { name: 'X' } },
+  }];
+  const reply = await handleArchiveDetail({
+    archive,
+    fetchTender: async () => { throw new Error('Prozorro 503'); },
+    extractSnapshot: (raw) => raw.data,
+  }, { tender_id: 'UA-2026-05-01-000003-a' });
+  assert.match(reply, /Статус: Завершено/);
+  assert.match(reply, /⚠️ Не вдалось отримати свіжі дані договору/);
 });

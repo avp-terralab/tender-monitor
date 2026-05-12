@@ -550,6 +550,66 @@ export function handleArchive({ archive }) {
   return rows.join('\n\n') + `\n\nВсього в архіві: ${archive.length}`;
 }
 
+function formatContractsBlock(contracts) {
+  if (!contracts || contracts.length === 0) return null;
+  const lines = ['', '📄 Договір:'];
+  for (const c of contracts) {
+    for (const d of c.documents ?? []) {
+      const title = escapeHtml(d.title ?? d.id ?? 'документ');
+      if (d.url) {
+        lines.push(`  • <a href="${escapeHtml(d.url)}">${title}</a>`);
+      } else {
+        lines.push(`  • ${title}`);
+      }
+    }
+  }
+  if (lines.length === 2) return null; // no docs across all contracts
+  return lines.join('\n');
+}
+
+export async function handleArchiveDetail(deps, { tender_id }) {
+  const { archive, fetchTender, extractSnapshot } = deps;
+  const entry = archive.find(a => a.tender_id === tender_id);
+  if (!entry) return `❓ ${tender_id} не в архіві`;
+  const snap = entry.final_snapshot ?? {};
+  const url = `https://prozorro.gov.ua/tender/${tender_id}`;
+  const lines = [];
+  lines.push(`🆔 <a href="${escapeHtml(url)}">${escapeHtml(tender_id)}</a>`);
+  if (snap.procuringEntity?.name) {
+    const edrpou = snap.procuringEntity.edrpou ? ` (ЄДРПОУ ${snap.procuringEntity.edrpou})` : '';
+    lines.push(`👥 Замовник: ${escapeHtml(abbreviateLegalForm(snap.procuringEntity.name))}${edrpou}`);
+  }
+  if (snap.classification?.id) {
+    const desc = snap.classification.description ? ` — ${escapeHtml(snap.classification.description)}` : '';
+    lines.push(`🔖 ДК: ${snap.classification.id}${desc}`);
+  }
+  if (snap.value?.amount != null) {
+    const amt = formatMoney(snap.value.amount);
+    const vatTag = snap.value.valueAddedTaxIncluded ? 'з ПДВ' : 'без ПДВ';
+    lines.push(`💰 Вартість: ${amt} ${snap.value.currency} (${vatTag})`);
+  }
+  if (snap.contact?.name) {
+    const tel = formatPhone(snap.contact.telephone ?? '');
+    lines.push(`📞 ${escapeHtml(snap.contact.name)}: ${escapeHtml(tel)}`);
+    if (snap.contact.email) lines.push(`✉️ ${escapeHtml(snap.contact.email)}`);
+  }
+  lines.push(`ℹ️ Статус: ${fmtStatus(entry.final_status)}`);
+  lines.push(`📦 Архівовано: ${fmtArchivedDate(entry.archived_at)}`);
+  // Fresh contract fetch — only meaningful for complete tenders.
+  if (entry.final_status === 'complete') {
+    try {
+      const raw = await fetchTender(tender_id);
+      const fresh = extractSnapshot(raw);
+      const block = formatContractsBlock(fresh.contracts);
+      if (block) lines.push(block);
+    } catch (err) {
+      lines.push('');
+      lines.push(`⚠️ Не вдалось отримати свіжі дані договору: ${escapeHtml(err.message)}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 export function handleRedeem(deps, { token }) {
   const { invites, allowedUsers, adminChatId, chatId } = deps;
   const now = deps.now();
