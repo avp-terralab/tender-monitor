@@ -10,5 +10,11 @@
     "label": "(migrated)",
     "invited_via": null,
     "added_at": "2026-05-12T00:00:00Z"
+  },
+  {
+    "chat_id": "1008367741",
+    "label": "TestUser",
+    "invited_via": "TestUser",
+    "added_at": "2026-05-12T08:18:31.570Z"
   }
 ]
