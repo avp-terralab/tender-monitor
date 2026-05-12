@@ -1,12 +1,12 @@
 # tender-monitor-bot — Cloudflare Worker
 
-Telegram webhook handler для команд `/add`, `/list`, `/help`. Замінює GHA cron polling sub-second response.
+Telegram webhook handler для команд бота (`/add`, `/list`, `/info`, `/watch`, `/help`, ... + адмін-команди `/invite`, `/invites`, `/users`, `/revoke`). Замінює GHA cron polling sub-second response.
 
 ## Архітектура
 
 - `src/index.mjs` — entrypoint: secret verify + dispatch
-- `src/handler.mjs` — pure orchestrator (`runHandler({ update, env, deps })`)
-- `src/github.mjs` — `loadWatchlist`/`saveWatchlist` через GitHub Contents API
+- `src/handler.mjs` — orchestrator (`runHandler({ update, env, deps })`); auth gate (ADMIN_CHAT_ID env + `_state/allowed_users.json` file)
+- `src/github.mjs` — load/save для `watchlist.json`, `watched_entities.json`, `_state/_watched_seen.json`, `_state/invites.json`, `_state/allowed_users.json` через GitHub Contents API
 
 Імпортує існуючі pure модулі з `../`: `commands.mjs`, `telegram.mjs`, `prozorro.mjs`.
 
@@ -35,7 +35,7 @@ cd worker
 npx wrangler secret put TELEGRAM_BOT_TOKEN     # bot token from BotFather
 npx wrangler secret put TELEGRAM_WEBHOOK_SECRET # random 32-char string
 npx wrangler secret put GITHUB_PAT              # fine-grained PAT, Contents:R+W on this repo
-npx wrangler secret put ALLOWED_CHAT_ID         # 1744078008 (or comma-separated: 1744078008,5551234567)
+npx wrangler secret put ADMIN_CHAT_ID           # admin chat_id (e.g. 1744078008); all others onboarded via /invite
 ```
 
 ## Setup webhook (one-time)

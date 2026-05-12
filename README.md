@@ -33,10 +33,17 @@ Set in repo Settings → Secrets and variables → Actions:
 
 **Telegram (recommended):**
 - `/add UA-YYYY-MM-DD-NNNNNN-x` — додати тендер. Опційно: `/add UA-... мої нотатки`.
-- `/list` — побачити повний watchlist.
-- `/help` — список команд.
+- `/list` / `/info` — переглянути watchlist (короткий / детальний).
+- `/watch <EDRPOU>` / `/unwatch` / `/watched` — стежити за всіма новими тендерами замовника.
+- `/help` — повний список команд.
 
-Bot реагує тільки на повідомлення з `ALLOWED_CHAT_ID` (інші ігноруються мовчки). `ALLOWED_CHAT_ID` — comma-separated список chat_id (наприклад `1744078008,5551234567`). Webhook через Cloudflare Worker — sub-second response. Зміна watchlist комітиться у репо одразу після reply від бота.
+Адмін-команди (тільки для `ADMIN_CHAT_ID`):
+- `/invite [ім'я]` — створити одноразове invite-посилання (TTL 7 днів). Бот видає `t.me/terralab_tenders_bot?start=<token>`, отримувач тапає → доступ автоматично.
+- `/invites` — активні (pending) invite-посилання.
+- `/users` — список усіх допущених юзерів.
+- `/revoke [chat_id]` — прибрати юзера з allowlist.
+
+Auth: адмін гейтиться `ADMIN_CHAT_ID` env (single id, не залежить від GitHub); інші юзери — у `_state/allowed_users.json` (заповнюється через `/invite` redeem). Інвайти зберігаються у `_state/invites.json` зі статусом pending/redeemed (audit-trail). Webhook через Cloudflare Worker — sub-second response. Зміна watchlist/allowlist комітиться у репо одразу після reply від бота.
 
 **Manual edit (для bulk-операцій або видалення):**
 
