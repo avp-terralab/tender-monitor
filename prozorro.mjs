@@ -135,3 +135,23 @@ export async function fetchTendersFeed({ pageOffset = null, fetch: fetchImpl = f
   const json = await res.json();
   return { items: json.data ?? [], next: json.next_page?.path ?? null };
 }
+
+// Forward "changes" feed: items are returned in ascending dateModified order,
+// pagination via opaque offset (epoch.microsec.shard.hash). Unlike descending=1
+// (used by fetchTendersFeed for /watch bootstrap), this guarantees no items are
+// missed between ticks: the next call resumes exactly where the previous ended.
+// Empty data still returns a nextOffset checkpoint.
+export async function fetchTendersChangesFeed({ offset = null, fetch: fetchImpl = fetch } = {}) {
+  const base = 'https://public.api.openprocurement.org/api/2.5/tenders';
+  const params = new URLSearchParams({
+    opt_fields: 'tenderID,procuringEntity,dateModified',
+    limit: '100',
+  });
+  if (offset) params.set('offset', offset);
+  const res = await fetchImpl(`${base}?${params}`);
+  if (!res.ok) {
+    throw new Error(`Prozorro changes feed ${res.status}: ${await res.text()}`);
+  }
+  const json = await res.json();
+  return { items: json.data ?? [], nextOffset: json.next_page?.offset ?? null };
+}

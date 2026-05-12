@@ -87,7 +87,69 @@ test('extractSnapshot supplier shape preserved for awards', () => {
   assert.equal(snap.awards[0].suppliers[0].contactPoint, undefined);
 });
 
-import { fetchTendersFeed } from '../prozorro.mjs';
+import { fetchTendersFeed, fetchTendersChangesFeed } from '../prozorro.mjs';
+
+test('fetchTendersChangesFeed: builds initial URL without offset, no descending', async () => {
+  const calls = [];
+  const fakeFetch = async (url) => {
+    calls.push(url);
+    return {
+      ok: true,
+      json: async () => ({
+        data: [{ tenderID: 'UA-A', dateModified: '2026-05-12T10:00:00Z' }],
+        next_page: { offset: '1715000000.123.1.abc' },
+      }),
+    };
+  };
+  const result = await fetchTendersChangesFeed({ fetch: fakeFetch });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /^https:\/\/public\.api\.openprocurement\.org\/api\/2\.5\/tenders\?/);
+  assert.match(calls[0], /opt_fields=tenderID/);
+  assert.match(calls[0], /limit=100/);
+  assert.doesNotMatch(calls[0], /descending/);
+  assert.doesNotMatch(calls[0], /offset=/);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.nextOffset, '1715000000.123.1.abc');
+});
+
+test('fetchTendersChangesFeed: passes offset query when given', async () => {
+  const calls = [];
+  const fakeFetch = async (url) => {
+    calls.push(url);
+    return { ok: true, json: async () => ({ data: [], next_page: { offset: '1715000099.0.0.x' } }) };
+  };
+  await fetchTendersChangesFeed({ offset: '1715000000', fetch: fakeFetch });
+  assert.match(calls[0], /offset=1715000000/);
+});
+
+test('fetchTendersChangesFeed: empty data + still returns nextOffset (checkpoint)', async () => {
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({ data: [], next_page: { offset: '1715000099.0.0.x' } }),
+  });
+  const result = await fetchTendersChangesFeed({ offset: '1715000099', fetch: fakeFetch });
+  assert.deepEqual(result.items, []);
+  assert.equal(result.nextOffset, '1715000099.0.0.x');
+});
+
+test('fetchTendersChangesFeed: throws on non-ok', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 503, text: async () => 'busy' });
+  await assert.rejects(
+    () => fetchTendersChangesFeed({ fetch: fakeFetch }),
+    /Prozorro changes feed 503/
+  );
+});
+
+test('fetchTendersChangesFeed: includes procuringEntity in opt_fields', async () => {
+  const calls = [];
+  const fakeFetch = async (url) => {
+    calls.push(url);
+    return { ok: true, json: async () => ({ data: [], next_page: { offset: 'x' } }) };
+  };
+  await fetchTendersChangesFeed({ fetch: fakeFetch });
+  // opt_fields contains comma-separated list — URLSearchParams encodes commas as %2C
+  assert.match(calls[0], /opt_fields=tenderID(?:%2C|,)procuringEntity(?:%2C|,)dateModified/);
+});
 
 test('fetchTendersFeed: builds initial URL with default opts', async () => {
   const calls = [];

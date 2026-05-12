@@ -1,7 +1,10 @@
-import { fetchTendersFeed, fetchTender, extractSnapshot } from './prozorro.mjs';
+import { fetchTendersChangesFeed, fetchTender, extractSnapshot } from './prozorro.mjs';
 
 const ALERT_STATUSES = new Set(['active.tendering', 'active.pre-qualification']);
-const FEED_PAGE_CAP = 10;
+// Safety cap on forward feed pagination — 100 pages × 100 items = 10000 tenders ≈ 12-15h of
+// publishing on a busy day. A typical tick (every few hours) reads 1-2 pages; the cap only
+// matters as a safety net for very long downtime / cold-start recovery.
+const FEED_PAGE_CAP = 100;
 
 export async function checkWatchedEntities(deps) {
   const {
@@ -10,7 +13,7 @@ export async function checkWatchedEntities(deps) {
     saveCursor,
     loadSeen,
     saveSeen,
-    fetchTendersFeed: _feed = fetchTendersFeed,
+    fetchChangesFeed: _feed = fetchTendersChangesFeed,
     fetchTender: _fetch = fetchTender,
     extractSnapshot: _extract = extractSnapshot,
   } = deps;
@@ -19,41 +22,45 @@ export async function checkWatchedEntities(deps) {
   if (enabled.length === 0) return { alerts: [], errors: [] };
 
   const watchedEdrpous = new Set(enabled.map(e => e.edrpou));
-  const cursor = (await loadCursor()) ?? { last_dateModified: null };
+  const rawCursor = await loadCursor();
   const seen = (await loadSeen()) ?? {};
 
+  // Forward feed cursor. Resume formats, in priority order:
+  //   1. { offset: "<opaque>" } — written by previous tick
+  //   2. { last_dateModified: "<ISO>" } — legacy descending-feed cursor; convert to
+  //      unix-seconds, which Prozorro accepts as a coarse offset (microsec.shard.hash
+  //      defaults to 0 → API returns items strictly after that second).
+  //   3. null — cold start (first tick ever / fresh deploy); read from start
+  let offset = rawCursor?.offset
+    ?? (rawCursor?.last_dateModified
+        ? String(Math.floor(new Date(rawCursor.last_dateModified).getTime() / 1000))
+        : null);
+  let lastOffset = offset;
+
   const candidates = [];
-  let pageCursor = null;
-  let newestSeen = cursor.last_dateModified;
 
   for (let page = 0; page < FEED_PAGE_CAP; page++) {
     let result;
     try {
-      result = await _feed({ pageOffset: pageCursor });
+      result = await _feed({ offset });
     } catch (err) {
       return { alerts: [], errors: [{ source: 'feed', error: err.message }] };
     }
-    const { items, next } = result;
-    if (items.length === 0) break;
-    if (page === 0 && items[0].dateModified) newestSeen = items[0].dateModified;
-    let reachedCursor = false;
+    const { items, nextOffset } = result;
     for (const item of items) {
-      if (cursor.last_dateModified && item.dateModified <= cursor.last_dateModified) {
-        reachedCursor = true;
-        break;
-      }
       const edrpou = item.procuringEntity?.identifier?.id;
       if (edrpou && watchedEdrpous.has(edrpou)) candidates.push(item);
     }
-    if (reachedCursor) break;
-    pageCursor = next;
-    if (!pageCursor) break;
+    if (nextOffset) lastOffset = nextOffset;
+    if (items.length === 0) break;
+    if (!nextOffset) break;
+    offset = nextOffset;
   }
 
   const alerts = [];
   const errors = [];
   // Lazy-resolve names: when we fetch a tender for an entity whose stored name is "(unknown)",
-  // capture the real name so the caller can persist it back to watched_entities.json
+  // capture the real name so the caller can persist it back to watched_entities.json.
   const discoveredNames = {};
   const watchedByEdrpou = new Map((watchedEntities ?? []).map(e => [e.edrpou, e]));
   for (const cand of candidates) {
@@ -75,7 +82,7 @@ export async function checkWatchedEntities(deps) {
     }
   }
 
-  await saveCursor({ last_dateModified: newestSeen });
+  await saveCursor({ offset: lastOffset });
   await saveSeen(seen);
   return { alerts, errors, discoveredNames };
 }
