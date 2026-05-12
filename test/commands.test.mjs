@@ -1722,3 +1722,14 @@ test('handleAdd: archive missing → falls through to existing fetch path', asyn
   }, { tender_id: 'UA-2026-04-30-010542-a', notes: null });
   assert.equal(result.mutation.type, 'append');
 });
+
+test('HELP_TEXT: mentions /archive, /contract, /unarchive', () => {
+  assert.match(HELP_TEXT, /\/archive/);
+  assert.match(HELP_TEXT, /\/contract/);
+  assert.match(HELP_TEXT, /\/unarchive/);
+});
+
+test('HELP_TEXT: uses square brackets for placeholders (no <...>)', () => {
+  // <...> breaks Telegram HTML parse_mode — re-check post-edit.
+  assert.doesNotMatch(HELP_TEXT, /<UA-/);
+});
