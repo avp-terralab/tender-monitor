@@ -136,7 +136,7 @@ test('formatAddReply: new tender — full template', () => {
   assert.match(reply, /📦 Реактиви для лабораторії/);
   assert.match(reply, /👥 КНП «Рівненська ОКЛ»/);
   assert.match(reply, /Статус: Приймання пропозицій/);
-  assert.match(reply, /дедлайн 15\.05\.2026 до 14:30/);
+  assert.match(reply, /⏰ Подача пропозиції до: 15\.05\.2026 до 14:30/);
   assert.match(reply, /Перший snapshot/);
 });
 
@@ -522,7 +522,7 @@ test('formatInfo: full entry contains all fields from spec', () => {
   assert.match(reply, /💰 Вартість: 800 147 UAH \(з ПДВ\)/);
   assert.match(reply, /📞 Дмитерчук Микола: \+380 95 662-36-51/);
   assert.match(reply, /✉️ mykola@ukr\.net/);
-  assert.match(reply, /ℹ️ Статус: Приймання пропозицій до 07\.05\.2026 до 01:00/);
+  assert.match(reply, /ℹ️ Статус: Приймання пропозицій\n⏰ Подача пропозиції до: 07\.05\.2026 до 01:00/);
 });
 
 test('formatInfo: empty groups → reply about no tenders', () => {
@@ -800,55 +800,34 @@ test('parseCommand: /info bad-id → unknown (strict)', () => {
   assert.deepEqual(parseCommand('/info bad-id'), { cmd: 'unknown' });
 });
 
-test('formatAddReply: countdown line when nowIso provided and deadline future', () => {
-  const reply = formatAddReply(FULL_SNAP, {
-    reEnable: false,
-    nowIso: '2026-05-15T11:30:00+03:00', // FULL_SNAP deadline 14:30 same day → 3h
-  });
-  assert.match(reply, /⏰ Залишилось:.*3 год/);
-});
-
-test('formatAddReply: no countdown line when nowIso missing', () => {
+test('formatAddReply: deadline line for active.tendering', () => {
   const reply = formatAddReply(FULL_SNAP, { reEnable: false });
-  assert.doesNotMatch(reply, /⏰ Залишилось/);
+  assert.match(reply, /⏰ Подача пропозиції до: 15\.05\.2026 до 14:30/);
 });
 
-test('formatAddReply: no countdown when deadline missing', () => {
+test('formatAddReply: no deadline line when deadline missing', () => {
   const reply = formatAddReply(
     { ...FULL_SNAP, tenderPeriod: null },
-    { reEnable: false, nowIso: '2026-05-15T11:30:00+03:00' }
+    { reEnable: false }
   );
-  assert.doesNotMatch(reply, /⏰ Залишилось/);
+  assert.doesNotMatch(reply, /⏰ Подача пропозиції/);
 });
 
-test('formatInfo: countdown ⏰ Залишилось appears when runIso < deadline', () => {
+test('formatInfo: deadline line for active.tendering', () => {
   const reply = formatInfo({
     runIso: '2026-05-15T11:30:00+03:00',
     groups: [{
       tender_id: 'UA-X',
       prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
       status: 'active.tendering',
-      deadline: '2026-05-15T14:30:00+03:00', // 3h ahead
+      deadline: '2026-05-15T14:30:00+03:00',
     }],
   });
-  assert.match(reply, /⏰ Залишилось:.*3 год/);
-});
-
-test('formatInfo: countdown shows "минув" for past deadline (active.tendering)', () => {
-  const reply = formatInfo({
-    runIso: '2026-05-15T15:30:00+03:00',
-    groups: [{
-      tender_id: 'UA-X',
-      prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
-      status: 'active.tendering',
-      deadline: '2026-05-15T14:30:00+03:00', // 1h ago — submissions just closed
-    }],
-  });
-  assert.match(reply, /⏰ Залишилось:.*минув/);
+  assert.match(reply, /⏰ Подача пропозиції до: 15\.05\.2026 до 14:30/);
 });
 
 test('formatInfo: no deadline/countdown when status != active.tendering', () => {
-  // The tenderPeriod.endDate is only meaningful while submissions are open.
+  // tenderPeriod.endDate is only meaningful while submissions are open.
   // For active.awarded / active.qualification / complete / cancelled — the
   // submission deadline is in the past and showing it is misleading.
   const reply = formatInfo({
@@ -861,18 +840,8 @@ test('formatInfo: no deadline/countdown when status != active.tendering', () => 
     }],
   });
   assert.match(reply, /ℹ️ Статус: Очікування підписання договору/);
-  assert.doesNotMatch(reply, /до 30\.04\.2026/);
-  assert.doesNotMatch(reply, /⏰ Залишилось:/);
-});
-
-test('handleAdd: passes nowIso through deps to formatAddReply countdown', async () => {
-  const result = await handleAdd(
-    await mockDeps({
-      nowIso: '2026-05-15T11:30:00+03:00', // 3h before RAW_OK deadline 14:30
-    }),
-    { tender_id: ID, notes: null }
-  );
-  assert.match(result.reply, /⏰ Залишилось:.*3 год/);
+  assert.doesNotMatch(reply, /Подача пропозиції/);
+  assert.doesNotMatch(reply, /30\.04\.2026/);
 });
 
 test('handleWatch: fetchTender failure during bootstrap is silently skipped', async () => {

@@ -1,4 +1,4 @@
-import { stripDkCode, truncate, fmtStatus, fmtDeadline, fmtTimeLeft, escapeHtml, formatMoney, formatPhone } from './telegram.mjs';
+import { stripDkCode, truncate, fmtStatus, fmtDeadline, escapeHtml, formatMoney, formatPhone } from './telegram.mjs';
 
 const TENDER_ID_RE_STR = 'UA-\\d{4}-\\d{2}-\\d{2}-\\d{6}-[a-zA-Z]';
 const EDRPOU_RE = /^\d{8}$/;
@@ -136,14 +136,10 @@ export function formatAddReply(snapshot, { reEnable, nowIso }) {
     lines.push(`👥 ${escapeHtml(abbreviateLegalForm(snapshot.procuringEntity.name))}`);
   }
   if (snapshot.status) {
+    lines.push(`ℹ️ Статус: ${fmtStatus(snapshot.status)}`);
     const deadline = snapshot.tenderPeriod?.endDate;
-    const showDeadline = snapshot.status === 'active.tendering' && deadline;
-    let line = `ℹ️ Статус: ${fmtStatus(snapshot.status)}`;
-    if (showDeadline) line += `, дедлайн ${fmtDeadline(deadline)}`;
-    lines.push(line);
-    if (showDeadline && nowIso) {
-      const left = fmtTimeLeft(deadline, nowIso);
-      if (left) lines.push(`⏰ Залишилось: ${left}`);
+    if (snapshot.status === 'active.tendering' && deadline) {
+      lines.push(`⏰ Подача пропозиції до: ${fmtDeadline(deadline)}`);
     }
   }
   lines.push('Перший snapshot — на наступному monitor-тіку (09/12/15/18 Київ).');
@@ -197,17 +193,11 @@ function formatInfoEntry(g, runIso) {
     sections.push(emailLine ? `${phoneLine}\n${emailLine}` : phoneLine);
   }
   if (g.status) {
-    // tenderPeriod.endDate is the submission deadline — only meaningful while
-    // bidders can still submit (active.tendering). After that, the date is in
-    // the past and misleading (e.g. for active.awarded — winner picked but
-    // contract pending — the submission deadline tells nothing useful).
-    const showDeadline = g.status === 'active.tendering' && g.deadline;
-    let statusLine = `ℹ️ Статус: ${fmtStatus(g.status)}`;
-    if (showDeadline) statusLine += ` до ${fmtDeadline(g.deadline)}`;
-    sections.push(statusLine);
-    if (showDeadline && runIso) {
-      const left = fmtTimeLeft(g.deadline, runIso);
-      if (left) sections.push(`⏰ Залишилось: ${left}`);
+    sections.push(`ℹ️ Статус: ${fmtStatus(g.status)}`);
+    // Submission deadline is only meaningful while bidders can still submit
+    // (active.tendering). For other statuses tenderPeriod.endDate is in the past.
+    if (g.status === 'active.tendering' && g.deadline) {
+      sections.push(`⏰ Подача пропозиції до: ${fmtDeadline(g.deadline)}`);
     }
   }
   return sections.join('\n');
