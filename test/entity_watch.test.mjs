@@ -18,6 +18,7 @@ const baseDeps = (overrides = {}) => {
       fetchDescendingFeed: async () => ({ items: [], next: null }),
       fetchTender: async () => ({ data: {} }),
       extractSnapshot,
+      searchTenderByEdrpou: async () => ({ name: null }),
       ...overrides,
     },
   };
@@ -395,6 +396,85 @@ test('checkWatchedEntities: backfill skips disabled (unknown) entities', async (
   });
   await checkWatchedEntities(deps);
   assert.equal(called, false);
+});
+
+test('checkWatchedEntities: BFF name-resolve fills discoveredNames for unknown entity with no feed/backfill matches', async () => {
+  // Real scenario: entity added long ago with name="(unknown)", neither forward
+  // feed nor backfill descending walk yields any tender (rare publisher). BFF
+  // text-search should still resolve the legalName from historical Prozorro data.
+  let searchedEdrpou = null;
+  const { deps } = baseDeps({
+    watchedEntities: [{ edrpou: '02071091', name: '(unknown)', enabled: true }],
+    searchTenderByEdrpou: async (edrpou) => {
+      searchedEdrpou = edrpou;
+      return { name: 'Одеський національний університет імені І. І. Мечникова' };
+    },
+  });
+  const result = await checkWatchedEntities(deps);
+  assert.equal(searchedEdrpou, '02071091');
+  assert.equal(result.discoveredNames['02071091'], 'Одеський національний університет імені І. І. Мечникова');
+});
+
+test('checkWatchedEntities: BFF name-resolve NOT called when entity name is already known', async () => {
+  let called = false;
+  const { deps } = baseDeps({
+    watchedEntities: [{ edrpou: '11111111', name: 'Реальна назва', enabled: true }],
+    searchTenderByEdrpou: async () => { called = true; return { name: 'Other' }; },
+  });
+  await checkWatchedEntities(deps);
+  assert.equal(called, false);
+});
+
+test('checkWatchedEntities: BFF name-resolve NOT called when backfill already discovered the name', async () => {
+  // If backfill descending walk found an active.tendering tender in step 2,
+  // discoveredNames[edrpou] is already set — don't waste a BFF call.
+  let searchCalled = false;
+  let descPage = 0;
+  const { deps } = baseDeps({
+    watchedEntities: [{ edrpou: '02007472', name: '(unknown)', enabled: true }],
+    fetchDescendingFeed: async () => {
+      if (descPage++ === 0) {
+        return {
+          items: [{ tenderID: 'UA-X', procuringEntity: { identifier: { id: '02007472' } } }],
+          next: null,
+        };
+      }
+      return { items: [], next: null };
+    },
+    fetchTender: async (id) => ({
+      data: {
+        tenderID: id,
+        title: 't', status: 'active.tendering',
+        procuringEntity: { name: 'Backfill resolved name', identifier: { id: '02007472' } },
+        items: [],
+      },
+    }),
+    searchTenderByEdrpou: async () => { searchCalled = true; return { name: 'BFF name' }; },
+  });
+  const result = await checkWatchedEntities(deps);
+  assert.equal(searchCalled, false);
+  assert.equal(result.discoveredNames['02007472'], 'Backfill resolved name');
+});
+
+test('checkWatchedEntities: BFF name-resolve returning null leaves entity unknown (graceful)', async () => {
+  const { deps } = baseDeps({
+    watchedEntities: [{ edrpou: '11111111', name: '(unknown)', enabled: true }],
+    searchTenderByEdrpou: async () => ({ name: null }),
+  });
+  const result = await checkWatchedEntities(deps);
+  assert.equal(result.discoveredNames?.['11111111'], undefined);
+});
+
+test('checkWatchedEntities: BFF name-resolve skipped when dep not provided', async () => {
+  // Avoids breaking existing callers that don't wire searchTenderByEdrpou.
+  // Use undefined explicitly because baseDeps always includes the stub.
+  const { deps } = baseDeps({
+    watchedEntities: [{ edrpou: '11111111', name: '(unknown)', enabled: true }],
+    searchTenderByEdrpou: undefined,
+  });
+  // Should complete without error.
+  const result = await checkWatchedEntities(deps);
+  assert.equal(result.discoveredNames?.['11111111'], undefined);
 });
 
 test('checkWatchedEntities: discoveredNames populated when watched name is "(unknown)" and snapshot has real name', async () => {

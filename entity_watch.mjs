@@ -1,4 +1,4 @@
-import { fetchTendersChangesFeed, fetchTendersFeed, fetchTender, extractSnapshot } from './prozorro.mjs';
+import { fetchTendersChangesFeed, fetchTendersFeed, fetchTender, extractSnapshot, searchTenderByEdrpou } from './prozorro.mjs';
 
 const ALERT_STATUSES = new Set(['active.tendering', 'active.pre-qualification']);
 // Safety cap on forward feed pagination — 100 pages × 100 items = 10000 tenders ≈ 12-15h of
@@ -22,6 +22,7 @@ export async function checkWatchedEntities(deps) {
     fetchDescendingFeed: _descFeed = fetchTendersFeed,
     fetchTender: _fetch = fetchTender,
     extractSnapshot: _extract = extractSnapshot,
+    searchTenderByEdrpou: _search = searchTenderByEdrpou,
   } = deps;
 
   const enabled = (watchedEntities ?? []).filter(e => e.enabled);
@@ -110,6 +111,19 @@ export async function checkWatchedEntities(deps) {
       }
     } catch (err) {
       errors.push({ tender_id: cand.tenderID, error: err.message });
+    }
+  }
+
+  // Step 3 — BFF name-resolve: for each still-unknown entity (no name from feed
+  // walk OR backfill), try the BFF text-search to pull legalName from historical
+  // Prozorro data. Cheap (one HTTP per still-unknown entity per tick) and
+  // self-extinguishing — once name is resolved, this loop skips that entity
+  // on future ticks because it's no longer "(unknown)".
+  if (_search) {
+    for (const entity of unknownEntities) {
+      if (discoveredNames[entity.edrpou]) continue;
+      const { name } = await _search(entity.edrpou);
+      if (name) discoveredNames[entity.edrpou] = name;
     }
   }
 
