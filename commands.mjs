@@ -516,6 +516,40 @@ export function applyArchiveMutation(archive, mutation) {
   return archive;
 }
 
+const ARCHIVE_ICONS = {
+  complete: '✅',
+  cancelled: '⊘',
+  unsuccessful: '❌',
+};
+
+function fmtArchivedDate(iso) {
+  const d = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!d) return '';
+  return `${d[3]}.${d[2]}.${d[1]}`;
+}
+
+export function handleArchive({ archive }) {
+  if (!archive || archive.length === 0) {
+    return '📭 Архів порожній.';
+  }
+  const sorted = [...archive].sort((a, b) =>
+    (b.archived_at ?? '').localeCompare(a.archived_at ?? '')
+  );
+  const rows = sorted.map((a, i) => {
+    const icon = ARCHIVE_ICONS[a.final_status] ?? '📦';
+    const customerRaw = a.final_snapshot?.procuringEntity?.name ?? '';
+    const customer = customerRaw ? ` — ${escapeHtml(truncate(abbreviateLegalForm(customerRaw), 100))}` : '';
+    let value = '';
+    if (a.final_snapshot?.value?.amount != null) {
+      const amt = formatMoney(a.final_snapshot.value.amount);
+      value = ` — ${amt} ${a.final_snapshot.value.currency}`;
+    }
+    const dateSuffix = a.archived_at ? ` (${fmtArchivedDate(a.archived_at)})` : '';
+    return `${i + 1}. ${icon} ${a.tender_id}${customer}${value}${dateSuffix}`;
+  });
+  return rows.join('\n\n') + `\n\nВсього в архіві: ${archive.length}`;
+}
+
 export function handleRedeem(deps, { token }) {
   const { invites, allowedUsers, adminChatId, chatId } = deps;
   const now = deps.now();
