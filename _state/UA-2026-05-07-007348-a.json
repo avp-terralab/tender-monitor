@@ -1,0 +1,59 @@
+{
+  "tender_id": "UA-2026-05-07-007348-a",
+  "saved_at": "2026-05-12T18:55:28.115Z",
+  "snapshot": {
+    "tender_id": "UA-2026-05-07-007348-a",
+    "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії (Код ДК 021:2015 72260000-5 Послуги, пов’язані з програмним забезпеченням)",
+    "status": "active.tendering",
+    "dateModified": "2026-05-07T13:08:32.543628+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-05-15T08:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО ОБУХІВСЬКОЇ МІСЬКОЇ РАДИ \"ОБУХІВСЬКА БАГАТОПРОФІЛЬНА ЛІКАРНЯ ІНТЕНСИВНОГО ЛІКУВАННЯ\"",
+      "edrpou": "01994155"
+    },
+    "value": {
+      "amount": 342720,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": true
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "contact": {
+      "name": "Антосієв Сергій ",
+      "email": "s_antos@ukr.net",
+      "telephone": "380969128911"
+    },
+    "documents": [
+      {
+        "id": "3ecc11517d654114a4bc3fbfb71c3a29",
+        "title": "Тендерна_документація_ЛІС_.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-05-07T13:07:29.538659+03:00"
+      },
+      {
+        "id": "0c8b0fc4db124968bdbddfb03a3d4366",
+        "title": "Додаток 4  Договір (проєкт)_ЛІС_.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-05-07T13:07:29.538659+03:00"
+      },
+      {
+        "id": "79d44692e1e24f0785634acece1b4cfd",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-05-07T13:08:18.325174+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
