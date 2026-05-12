@@ -576,8 +576,26 @@ function formatContractsBlock(contracts) {
   return lines.join('\n');
 }
 
+// Prozorro tender response returns contract SUMMARY only — documents (signed PDF,
+// КЕП) live at /contracts/{id}. Fetch each contract and replace its empty
+// `documents` array with the real one. fetchContract failures are tolerated:
+// the contract keeps its original (likely empty) documents and downstream
+// formatContractsBlock returns null.
+async function hydrateContractDocs(contracts, fetchContract) {
+  if (!fetchContract || !contracts) return;
+  for (const c of contracts) {
+    if (!c.id) continue;
+    try {
+      const full = await fetchContract(c.id);
+      c.documents = full.documents ?? [];
+    } catch (err) {
+      console.error('fetchContract failed:', c.id, err.message);
+    }
+  }
+}
+
 export async function handleArchiveDetail(deps, { tender_id }) {
-  const { archive, fetchTender, extractSnapshot } = deps;
+  const { archive, fetchTender, extractSnapshot, fetchContract } = deps;
   const entry = archive.find(a => a.tender_id === tender_id);
   if (!entry) return `❓ ${tender_id} не в архіві`;
   const snap = entry.final_snapshot ?? {};
@@ -609,6 +627,7 @@ export async function handleArchiveDetail(deps, { tender_id }) {
     try {
       const raw = await fetchTender(tender_id);
       const fresh = extractSnapshot(raw);
+      await hydrateContractDocs(fresh.contracts, fetchContract);
       const block = formatContractsBlock(fresh.contracts);
       if (block) lines.push(block);
     } catch (err) {
@@ -620,7 +639,7 @@ export async function handleArchiveDetail(deps, { tender_id }) {
 }
 
 export async function handleContract(deps, { tender_id }) {
-  const { archive, fetchTender, extractSnapshot } = deps;
+  const { archive, fetchTender, extractSnapshot, fetchContract } = deps;
   const entry = archive.find(a => a.tender_id === tender_id);
   if (!entry) return `❓ ${tender_id} не в архіві`;
   if (entry.final_status !== 'complete') {
@@ -633,6 +652,7 @@ export async function handleContract(deps, { tender_id }) {
   } catch (err) {
     return `⚠️ Не вдалось отримати дані договору: ${err.message}`;
   }
+  await hydrateContractDocs(fresh.contracts, fetchContract);
   const block = formatContractsBlock(fresh.contracts);
   if (!block) {
     return `❓ У цій закупівлі договір не укладено (status: complete, але без contracts)`;

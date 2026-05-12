@@ -1645,6 +1645,75 @@ test('handleContract: fresh fetch fails', async () => {
   assert.match(reply, /⚠️ Не вдалось отримати дані договору/);
 });
 
+test('handleContract: hydrates docs via fetchContract when tender contracts lack documents', async () => {
+  // Real Prozorro response: tender contracts[] has only summary (id, status, value);
+  // documents (signed PDF, КЕП) live at /contracts/{id}. fetchContract bridges this.
+  const archive = [{
+    tender_id: 'UA-2026-04-16-005830-a',
+    final_status: 'complete',
+    final_snapshot: {},
+  }];
+  const reply = await handleContract({
+    archive,
+    fetchTender: async () => ({ data: {
+      contracts: [{ id: 'C-UUID', status: 'active' }], // no documents inline
+    }}),
+    extractSnapshot: (raw) => raw.data,
+    fetchContract: async (id) => {
+      assert.equal(id, 'C-UUID');
+      return {
+        id, status: 'active',
+        documents: [
+          { id: 'D1', title: 'Scan_договору.pdf', url: 'https://public-api.prozorro.gov.ua/api/2.5/contracts/C-UUID/documents/D1' },
+          { id: 'D2', title: 'sign.p7s', url: 'https://x/sign.p7s' },
+        ],
+      };
+    },
+  }, { tender_id: 'UA-2026-04-16-005830-a' });
+  assert.match(reply, /📄 Договір UA-2026-04-16-005830-a/);
+  assert.match(reply, /Scan_договору\.pdf/);
+  assert.match(reply, /sign\.p7s/);
+});
+
+test('handleContract: fetchContract failure leaves contract without docs → "без contracts"', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-16-005830-a',
+    final_status: 'complete',
+    final_snapshot: {},
+  }];
+  const reply = await handleContract({
+    archive,
+    fetchTender: async () => ({ data: {
+      contracts: [{ id: 'C-UUID', status: 'active' }],
+    }}),
+    extractSnapshot: (raw) => raw.data,
+    fetchContract: async () => { throw new Error('Prozorro 503'); },
+  }, { tender_id: 'UA-2026-04-16-005830-a' });
+  assert.match(reply, /договір не укладено \(status: complete, але без contracts\)/);
+});
+
+test('handleArchiveDetail: hydrates contract docs via fetchContract', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-16-005830-a',
+    archived_at: '2026-05-12T08:30:00Z',
+    final_status: 'complete',
+    final_snapshot: { procuringEntity: { name: 'КНП' } },
+  }];
+  const reply = await handleArchiveDetail({
+    archive,
+    fetchTender: async () => ({ data: {
+      contracts: [{ id: 'C-UUID', status: 'active' }],
+    }}),
+    extractSnapshot: (raw) => raw.data,
+    fetchContract: async () => ({
+      id: 'C-UUID',
+      documents: [{ id: 'D1', title: 'Договір.pdf', url: 'https://x/d1' }],
+    }),
+  }, { tender_id: 'UA-2026-04-16-005830-a' });
+  assert.match(reply, /📄 Договір/);
+  assert.match(reply, /Договір\.pdf/);
+});
+
 test('handleUnarchive: unknown id', () => {
   const result = handleUnarchive({
     archive: [],

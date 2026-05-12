@@ -7,7 +7,7 @@ import {
   applyArchiveMutation,
   formatInfo, HELP_TEXT,
 } from '../../commands.mjs';
-import { fetchTender, extractSnapshot, fetchTendersFeed } from '../../prozorro.mjs';
+import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract } from '../../prozorro.mjs';
 import { sendReply } from '../../telegram.mjs';
 import {
   loadWatchlist, saveWatchlist,
@@ -32,6 +32,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const _loadWatchedSeen = deps.loadWatchedSeen ?? loadWatchedSeen;
   const _saveWatchedSeen = deps.saveWatchedSeen ?? saveWatchedSeen;
   const _fetchTendersFeed = deps.fetchTendersFeed ?? fetchTendersFeed;
+  const _fetchContract = deps.fetchContract ?? fetchContract;
   const _loadAllowedUsers = deps.loadAllowedUsers ?? loadAllowedUsers;
   const _saveAllowedUsers = deps.saveAllowedUsers ?? saveAllowedUsers;
   const _loadInvites = deps.loadInvites ?? loadInvites;
@@ -366,7 +367,7 @@ export async function runHandler({ update, env, deps = {} }) {
       const { archive } = await _loadArchivedTenders(env);
       if (cmd.tender_id) {
         reply = await handleArchiveDetail(
-          { archive, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot },
+          { archive, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot, fetchContract: _fetchContract },
           cmd,
         );
       } else {
@@ -385,7 +386,7 @@ export async function runHandler({ update, env, deps = {} }) {
       try {
         const { archive } = await _loadArchivedTenders(env);
         reply = await handleContract(
-          { archive, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot },
+          { archive, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot, fetchContract: _fetchContract },
           cmd,
         );
       } catch (err) {

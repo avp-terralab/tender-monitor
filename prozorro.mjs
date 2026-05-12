@@ -111,6 +111,19 @@ export async function fetchTender(tenderId) {
   return cdbRes.json(); // {data: {...}}
 }
 
+export async function fetchContract(contractId, { fetch: fetchImpl = fetch } = {}) {
+  // Contract documents (signed PDF, КЕП) live in a separate resource — the
+  // tender response only includes contract summary without `documents`.
+  const res = await fetchImpl(
+    `https://public-api.prozorro.gov.ua/api/2.5/contracts/${encodeURIComponent(contractId)}`
+  );
+  if (!res.ok) {
+    throw new Error(`Prozorro contract ${res.status}: ${contractId}`);
+  }
+  const json = await res.json();
+  return json.data;
+}
+
 export async function fetchTendersFeed({ pageOffset = null, fetch: fetchImpl = fetch } = {}) {
   const base = 'https://public.api.openprocurement.org/api/2.5/tenders';
   const opts = 'opt_fields=tenderID,procuringEntity,dateModified,dateCreated&descending=1&limit=100';
