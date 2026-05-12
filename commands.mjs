@@ -738,6 +738,32 @@ export function handleRevoke({ allowedUsers, adminChatId }, { chat_id }) {
   };
 }
 
+export function handleUnarchive({ archive, watchlist }, { tender_id }) {
+  const entry = archive.find(a => a.tender_id === tender_id);
+  if (!entry) {
+    return {
+      reply: `❓ ${tender_id} не в архіві`,
+      archiveMutation: null,
+      watchlistMutation: null,
+    };
+  }
+  if (watchlist.some(r => r.tender_id === tender_id)) {
+    return {
+      reply: `⚠️ ${tender_id} вже у watchlist`,
+      archiveMutation: null,
+      watchlistMutation: null,
+    };
+  }
+  return {
+    reply: `✅ ${tender_id} повернуто в моніторинг.`,
+    archiveMutation: { type: 'remove_archive', tender_id },
+    watchlistMutation: {
+      type: 'append',
+      row: { tender_id, enabled: true, notes: entry.notes ?? '' },
+    },
+  };
+}
+
 export const HELP_TEXT = [
   'Загальні команди:',
   '/help — список команд',

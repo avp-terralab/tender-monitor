@@ -7,6 +7,7 @@ import {
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleUsersList, handleInvitesList, HELP_TEXT,
   applyArchiveMutation, handleArchive, handleArchiveDetail, handleContract,
+  handleUnarchive,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -1642,4 +1643,42 @@ test('handleContract: fresh fetch fails', async () => {
     extractSnapshot: (raw) => raw.data,
   }, { tender_id: 'UA-2026-05-01-000003-a' });
   assert.match(reply, /⚠️ Не вдалось отримати дані договору/);
+});
+
+test('handleUnarchive: unknown id', () => {
+  const result = handleUnarchive({
+    archive: [],
+    watchlist: [],
+  }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(result.reply, /❓ UA-2026-04-30-010542-a не в архіві/);
+  assert.equal(result.archiveMutation, null);
+  assert.equal(result.watchlistMutation, null);
+});
+
+test('handleUnarchive: already in watchlist', () => {
+  const archive = [{ tender_id: 'UA-2026-04-30-010542-a', notes: 'X', final_snapshot: {} }];
+  const watchlist = [{ tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'X' }];
+  const result = handleUnarchive({ archive, watchlist }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(result.reply, /⚠️ UA-2026-04-30-010542-a вже у watchlist/);
+  assert.equal(result.archiveMutation, null);
+  assert.equal(result.watchlistMutation, null);
+});
+
+test('handleUnarchive: success', () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    notes: 'КНП — Реактиви',
+    final_status: 'complete',
+    final_snapshot: {},
+  }];
+  const result = handleUnarchive({ archive, watchlist: [] }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(result.reply, /✅ UA-2026-04-30-010542-a повернуто/);
+  assert.deepEqual(result.archiveMutation, {
+    type: 'remove_archive',
+    tender_id: 'UA-2026-04-30-010542-a',
+  });
+  assert.deepEqual(result.watchlistMutation, {
+    type: 'append',
+    row: { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'КНП — Реактиви' },
+  });
 });
