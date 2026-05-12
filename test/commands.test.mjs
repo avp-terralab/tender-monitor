@@ -660,6 +660,13 @@ test('handleWatched: empty list', () => {
   assert.match(handleWatched({ watchedEntities: [] }), /порожн|жодним/i);
 });
 
+test('handleWatched: empty-list reply uses [EDRPOU], not <EDRPOU> (HTML parse_mode safety)', () => {
+  // <EDRPOU> would be parsed by Telegram as an invalid tag → Bad Request →
+  // sendReply silently catches → user sees nothing.
+  const reply = handleWatched({ watchedEntities: [] });
+  assert.doesNotMatch(reply, /<[A-Za-z]/);
+});
+
 test('handleWatched: list with entities and abbreviation', () => {
   const reply = handleWatched({ watchedEntities: [
     { edrpou: '02000010', name: 'Комунальне підприємство «Х»', enabled: true },

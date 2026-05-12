@@ -303,7 +303,7 @@ export function handleRemove({ watchlist }, { tender_id }) {
 
 export function handleWatched({ watchedEntities }) {
   if (!watchedEntities || watchedEntities.length === 0) {
-    return '📭 Не стежу за жодним замовником. Додай: /watch <EDRPOU>';
+    return '📭 Не стежу за жодним замовником. Додай: /watch [EDRPOU]';
   }
   const rows = watchedEntities.map((e, i) => {
     const icon = e.enabled ? '🟢' : '🔴';
