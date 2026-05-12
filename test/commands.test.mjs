@@ -1361,3 +1361,59 @@ test('HELP_TEXT mentions admin commands', () => {
   assert.match(HELP_TEXT, /\/users/);
   assert.match(HELP_TEXT, /\/revoke/);
 });
+
+test('parseCommand: /archive (no arg)', () => {
+  assert.deepEqual(parseCommand('/archive'), { cmd: 'archive' });
+});
+
+test('parseCommand: /archive with bot suffix', () => {
+  assert.deepEqual(parseCommand('/archive@my_bot'), { cmd: 'archive' });
+});
+
+test('parseCommand: /archive UA-...', () => {
+  assert.deepEqual(
+    parseCommand('/archive UA-2026-04-30-010542-a'),
+    { cmd: 'archive', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /archive normalizes uppercase suffix', () => {
+  assert.deepEqual(
+    parseCommand('/archive UA-2026-04-30-010542-A'),
+    { cmd: 'archive', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /archive with invalid arg', () => {
+  assert.deepEqual(parseCommand('/archive garbage'), { cmd: 'unknown' });
+});
+
+test('parseCommand: /contract requires id', () => {
+  assert.deepEqual(parseCommand('/contract'), { cmd: 'contract', error: 'missing_id' });
+});
+
+test('parseCommand: /contract with valid id', () => {
+  assert.deepEqual(
+    parseCommand('/contract UA-2026-04-30-010542-a'),
+    { cmd: 'contract', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /contract with invalid id', () => {
+  assert.deepEqual(parseCommand('/contract garbage'), { cmd: 'contract', error: 'invalid_id' });
+});
+
+test('parseCommand: /unarchive requires id', () => {
+  assert.deepEqual(parseCommand('/unarchive'), { cmd: 'unarchive', error: 'missing_id' });
+});
+
+test('parseCommand: /unarchive with valid id', () => {
+  assert.deepEqual(
+    parseCommand('/unarchive UA-2026-04-30-010542-a'),
+    { cmd: 'unarchive', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /unarchive with invalid id', () => {
+  assert.deepEqual(parseCommand('/unarchive xxx'), { cmd: 'unarchive', error: 'invalid_id' });
+});

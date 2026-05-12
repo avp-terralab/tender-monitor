@@ -66,6 +66,36 @@ export function parseCommand(text) {
     return { cmd: 'unwatch', edrpou: args };
   }
 
+  const archiveMatch = trimmed.match(/^\/archive(?:@\w+)?(?:\s+(.+))?$/i);
+  if (archiveMatch) {
+    const args = (archiveMatch[1] || '').trim();
+    if (!args) return { cmd: 'archive' };
+    const idMatch = args.match(new RegExp(`^(${TENDER_ID_RE_STR})$`));
+    if (!idMatch) return { cmd: 'unknown' };
+    const id = idMatch[1].slice(0, -1) + idMatch[1].slice(-1).toLowerCase();
+    return { cmd: 'archive', tender_id: id };
+  }
+
+  const contractMatch = trimmed.match(/^\/contract(?:@\w+)?(?:\s+(.+))?$/i);
+  if (contractMatch) {
+    const args = (contractMatch[1] || '').trim();
+    if (!args) return { cmd: 'contract', error: 'missing_id' };
+    const idMatch = args.match(new RegExp(`^(${TENDER_ID_RE_STR})$`));
+    if (!idMatch) return { cmd: 'contract', error: 'invalid_id' };
+    const id = idMatch[1].slice(0, -1) + idMatch[1].slice(-1).toLowerCase();
+    return { cmd: 'contract', tender_id: id };
+  }
+
+  const unarchiveMatch = trimmed.match(/^\/unarchive(?:@\w+)?(?:\s+(.+))?$/i);
+  if (unarchiveMatch) {
+    const args = (unarchiveMatch[1] || '').trim();
+    if (!args) return { cmd: 'unarchive', error: 'missing_id' };
+    const idMatch = args.match(new RegExp(`^(${TENDER_ID_RE_STR})$`));
+    if (!idMatch) return { cmd: 'unarchive', error: 'invalid_id' };
+    const id = idMatch[1].slice(0, -1) + idMatch[1].slice(-1).toLowerCase();
+    return { cmd: 'unarchive', tender_id: id };
+  }
+
   const startMatch = trimmed.match(/^\/start(?:@\w+)?(?:\s+(.+))?$/i);
   if (startMatch) {
     const arg = (startMatch[1] || '').trim();
