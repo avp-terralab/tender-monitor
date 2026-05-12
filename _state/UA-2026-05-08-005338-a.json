@@ -1,0 +1,71 @@
+{
+  "tender_id": "UA-2026-05-08-005338-a",
+  "saved_at": "2026-05-12T19:15:26.601Z",
+  "snapshot": {
+    "tender_id": "UA-2026-05-08-005338-a",
+    "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії за кодом ДК 021:2015 - 72260000-5 Послуги, пов’язані з програмним забезпеченням",
+    "status": "active.tendering",
+    "dateModified": "2026-05-08T11:56:23.634118+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-05-16T08:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "Комунальне некомерційне підприємство Охтирської міської ради «Охтирська  центральна районна лікарня»",
+      "edrpou": "02007472"
+    },
+    "value": {
+      "amount": 284200,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": true
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "contact": {
+      "name": "Ольвач Людмила Анатоліївна",
+      "email": "ocrl76@ukr.net",
+      "telephone": "+380544641972"
+    },
+    "documents": [
+      {
+        "id": "cd6780f3f8264294a6660fed39adaa90",
+        "title": "Тендерна документація.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-05-08T11:54:29.906621+03:00"
+      },
+      {
+        "id": "02adf0f0612748eab605f3610e1f2cf4",
+        "title": "Додаток 1 до тендерної документації.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-05-08T11:54:29.906621+03:00"
+      },
+      {
+        "id": "c0774f809775443f8723bec8cc18eb78",
+        "title": "Додаток 2 до тендерної документації.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-05-08T11:54:29.906621+03:00"
+      },
+      {
+        "id": "a35178029e404d3d8797ac82a0c12b47",
+        "title": "Додаток 3 до тендерної документації.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-05-08T11:54:29.906621+03:00"
+      },
+      {
+        "id": "c667c253abc7445688154c51614001a1",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-05-08T11:56:15.113320+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
