@@ -287,6 +287,19 @@ export async function runHandler({ update, env, deps = {} }) {
       console.error('worker: /watched failed:', err.message);
       reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
     }
+  } else if (cmd.cmd === 'invite') {
+    if (!isAdmin) return;
+    if (cmd.error === 'missing_label') {
+      reply = '❌ Вкажи назву: /invite Olha';
+    } else {
+      reply = await applyInviteMutationWithRetry({
+        env,
+        loadInvites: _loadInvites,
+        saveInvites: _saveInvites,
+        computeMutation: ({ invites }) =>
+          handleInvite({ invites, generateToken: _generateToken, now: _now, botUsername: BOT_USERNAME }, cmd),
+      });
+    }
   } else if (cmd.cmd === 'help') {
     reply = HELP_TEXT;
   } else if (cmd.cmd === 'unknown') {
@@ -324,6 +337,27 @@ async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, compu
         return '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
       }
       return '⚠️ Сталася помилка на стороні бота';
+    }
+  }
+  return '⚠️ Не зміг зберегти, спробуй за хвилину';
+}
+
+async function applyInviteMutationWithRetry({ env, loadInvites, saveInvites, computeMutation }) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { invites, sha } = await loadInvites(env);
+      const result = computeMutation({ invites });
+      if (!result.mutation) return result.reply;
+      const next = applyInviteMutation(invites, result.mutation);
+      await saveInvites(env, next, sha);
+      return result.reply;
+    } catch (err) {
+      if (err instanceof ConflictError && attempt === 0) continue;
+      if (err instanceof ConflictError) break;
+      console.error('worker: applyInviteMutationWithRetry failed:', err.message);
+      return err.message.includes('GitHub')
+        ? '⚠️ GitHub тимчасово недоступний, спробуй за хвилину'
+        : '⚠️ Сталася помилка на стороні бота';
     }
   }
   return '⚠️ Не зміг зберегти, спробуй за хвилину';

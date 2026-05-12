@@ -919,3 +919,47 @@ test('runHandler: /start with malformed token → invalid_token reply', async ()
   assert.equal(sent.length, 1);
   assert.match(sent[0].text, /Невалідне посилання/);
 });
+
+// Task 11: /invite admin-only command
+test('runHandler: /invite as admin → appends invite, replies with link', async () => {
+  let savedInvites = null;
+  const { deps, sent } = makeDeps({
+    loadInvites: async () => ({ invites: [], sha: 'i-sha' }),
+    saveInvites: async (env, next, sha) => { savedInvites = next; return {}; },
+    generateToken: () => 'c'.repeat(32),
+    now: () => new Date('2026-05-12T10:00:00Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/invite Olha', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(savedInvites.length, 1);
+  assert.equal(savedInvites[0].label, 'Olha');
+  assert.equal(savedInvites[0].token, 'c'.repeat(32));
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /t\.me\/terralab_tenders_bot\?start=c{32}/);
+});
+
+test('runHandler: /invite as non-admin → silently ignored', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'X' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/invite Y', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 0);
+});
+
+test('runHandler: /invite without label → error reply (admin)', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/invite', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /Вкажи назву/);
+});
