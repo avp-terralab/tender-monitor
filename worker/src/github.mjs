@@ -161,3 +161,16 @@ export async function saveAllowedUsers(env, users, sha, opts = {}) {
   const text = JSON.stringify(users, null, 2) + '\n';
   return saveFile(env, ALLOWED_USERS_FILE, text, sha, opts);
 }
+
+const ARCHIVED_TENDERS_FILE = '_state/archived_tenders.json';
+
+export async function loadArchivedTenders(env, opts = {}) {
+  const { content, sha } = await loadFile(env, ARCHIVED_TENDERS_FILE, opts);
+  if (content === null) return { archive: [], sha: null };
+  return { archive: JSON.parse(content), sha };
+}
+
+export async function saveArchivedTenders(env, archive, sha, opts = {}) {
+  const text = JSON.stringify(archive, null, 2) + '\n';
+  return saveFile(env, ARCHIVED_TENDERS_FILE, text, sha, opts);
+}
