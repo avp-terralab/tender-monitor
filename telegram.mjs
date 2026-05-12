@@ -84,7 +84,37 @@ export function truncate(s, max) {
 
 export function stripDkCode(title) {
   if (!title) return '';
-  return title.replace(/\s*[,;]\s*код\s+ДК\s+.+$/i, '').trim();
+  // Covers ", код ДК ..." (canonical) and "за кодом ДК ..." / "за ДК ..." forms
+  // that appear in many real Prozorro titles (e.g. "...за кодом ДК 021:2015 - 72260000-5 ...").
+  return title
+    .replace(/\s*[,;]?\s*за\s+кодом\s+ДК\s+.+$/i, '')
+    .replace(/\s*[,;]?\s*за\s+ДК\s+.+$/i, '')
+    .replace(/\s*[,;]\s*код\s+ДК\s+.+$/i, '')
+    .trim();
+}
+
+// Note: JS regex \b is ASCII-only — use \s+ to require whitespace separator.
+const LEGAL_FORM_ABBREVIATIONS = [
+  // [іи] tolerates the "некомерцийне" typo seen in some Prozorro registry entries.
+  // (підприємство|товариство): standard form is "підприємство", but registry has
+  // entries like "Комунальне некомерцийне товариство" that are semantically КНП too.
+  [/^Комунальне\s+некомерц[іи]йне\s+(?:підприємство|товариство)\s+/i, 'КНП '],
+  [/^Комунальне\s+підприємство\s+/i, 'КП '],
+  [/^Товариство\s+з\s+обмеженою\s+відповідальністю\s+/i, 'ТОВ '],
+  [/^Приватне\s+акціонерне\s+товариство\s+/i, 'ПрАТ '],
+  [/^Публічне\s+акціонерне\s+товариство\s+/i, 'ПАТ '],
+  [/^Акціонерне\s+товариство\s+/i, 'АТ '],
+  [/^Державне\s+підприємство\s+/i, 'ДП '],
+  [/^Приватне\s+підприємство\s+/i, 'ПП '],
+  [/^Фізична\s+особа[-\s]+підприємець\s+/i, 'ФОП '],
+];
+
+export function abbreviateLegalForm(name) {
+  if (!name) return name;
+  for (const [re, replacement] of LEGAL_FORM_ABBREVIATIONS) {
+    if (re.test(name)) return name.replace(re, replacement).trim();
+  }
+  return name;
 }
 
 function fmtDate(iso) {
@@ -216,7 +246,7 @@ export function formatDigest(runIso, groups) {
     sections.push(`  🆔 Ідентифікатор закупівлі: <a href="${escapeHtml(g.prozorro_url)}">${escapeHtml(g.tender_id)}</a>`);
     if (g.procuring_entity?.name) {
       const edrpou = g.procuring_entity.edrpou ? ` (ЄДРПОУ ${g.procuring_entity.edrpou})` : '';
-      sections.push(`  👥 Замовник: ${escapeHtml(g.procuring_entity.name)}${edrpou}`);
+      sections.push(`  👥 Замовник: ${escapeHtml(abbreviateLegalForm(g.procuring_entity.name))}${edrpou}`);
     }
     sections.push(`  📦 Предмет закупівлі: ${escapeHtml(truncate(stripDkCode(g.title), 200))}`);
     if (g.classification?.id) {
@@ -238,11 +268,12 @@ export function formatDigest(runIso, groups) {
       const emailLine = g.contact.email ? `  ✉ ${escapeHtml(g.contact.email)}` : '';
       sections.push(emailLine ? `${phoneLine}\n${emailLine}` : phoneLine);
     }
-    if (g.status && g.deadline) {
-      sections.push(`  ℹ️ Статус: ${fmtStatus(g.status)}, дедлайн ${fmtDeadline(g.deadline)}`);
-      if (runIso) {
-        const left = fmtTimeLeft(g.deadline, runIso);
-        if (left) sections.push(`  ⏰ Залишилось: ${left}`);
+    if (g.status) {
+      sections.push(`  ℹ️ Статус: ${fmtStatus(g.status)}`);
+      // Submission deadline only renders while bidders can still submit.
+      // For other statuses tenderPeriod.endDate is in the past and misleading.
+      if (g.status === 'active.tendering' && g.deadline) {
+        sections.push(`  ⏰ Подача пропозиції до: ${fmtDeadline(g.deadline)}`);
       }
     }
     if (g.events.length > 0) {
