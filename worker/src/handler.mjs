@@ -85,7 +85,61 @@ export async function runHandler({ update, env, deps = {} }) {
   const cmd = parseCommand(msg.text);
   let reply;
 
-  if (cmd.cmd === 'add') {
+  if (cmd.cmd === 'start') {
+    // /start without payload was handled earlier; here we only see /start <token>.
+    if (cmd.error === 'invalid_token') {
+      reply = '❌ Невалідне посилання';
+    } else if (cmd.token) {
+      try {
+        const { invites, sha: inviteSha } = await _loadInvites(env);
+        const { users, sha: usersSha } = await _loadAllowedUsers(env);
+        const result = handleRedeem(
+          { invites, allowedUsers: users, adminChatId, chatId, now: _now },
+          { token: cmd.token },
+        );
+        reply = result.reply;
+        if (result.inviteMutation && result.userMutation) {
+          // Mutation A: invites.json — consume token
+          try {
+            const newInvites = applyInviteMutation(invites, result.inviteMutation);
+            await _saveInvites(env, newInvites, inviteSha);
+          } catch (err) {
+            console.error('worker: saveInvites in redeem failed:', err.message);
+            reply = '⚠️ Помилка збереження. Спробуй ще раз.';
+            // No partial state created since Mutation A failed before Mutation B.
+          }
+          // Mutation B only if A succeeded (reply not overwritten above).
+          if (reply === result.reply) {
+            try {
+              const newUsers = applyAllowedUsersMutation(users, result.userMutation);
+              await _saveAllowedUsers(env, newUsers, usersSha);
+            } catch (err) {
+              console.error('worker: saveAllowedUsers in redeem failed:', err.message);
+              reply = '⚠️ Токен спалено, але доступ не додано. Напиши адміну chat_id.';
+            }
+          }
+          // Notify admin if both mutations succeeded.
+          if (reply === result.reply && result.adminNotice && adminChatId) {
+            try {
+              await _sendReply({
+                token: env.TELEGRAM_BOT_TOKEN,
+                chatId: Number(adminChatId),
+                text: result.adminNotice,
+              });
+            } catch (err) {
+              console.error('worker: admin notification failed:', err.message);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('worker: redeem load failed:', err.message);
+        reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+      }
+    } else {
+      // /start without payload was supposed to be handled earlier — defensive only
+      return;
+    }
+  } else if (cmd.cmd === 'add') {
     if (cmd.error === 'invalid_id') {
       reply = '❌ Невалідний tender_id. Формат: UA-YYYY-MM-DD-NNNNNN-x';
     } else if (cmd.error === 'missing_id') {

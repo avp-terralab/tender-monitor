@@ -852,3 +852,70 @@ test('runHandler: ADMIN_CHAT_ID always allowed without GitHub load', async () =>
   assert.equal(sent.length, 1);
   assert.equal(loadCalled, false);
 });
+
+// Task 10: /start <token> redeem branch
+test('runHandler: /start <token> valid → mutates both files, replies, notifies admin', async () => {
+  const invite = {
+    token: 'a'.repeat(32),
+    label: 'Olha',
+    status: 'pending',
+    expires_at: '2099-01-01T00:00:00Z',
+    redeemed_by: null,
+    redeemed_at: null,
+  };
+  let savedInvites = null;
+  let savedUsers = null;
+  const { deps, sent } = makeDeps({
+    loadInvites: async () => ({ invites: [invite], sha: 'inv-sha' }),
+    saveInvites: async (env, next, sha) => { savedInvites = { next, sha }; return {}; },
+    loadAllowedUsers: async () => ({ users: [], sha: 'usr-sha' }),
+    saveAllowedUsers: async (env, next, sha) => { savedUsers = { next, sha }; return {}; },
+    now: () => new Date('2026-05-12T10:00:00Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 555 }, text: `/start ${'a'.repeat(32)}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(savedInvites.sha, 'inv-sha');
+  assert.equal(savedInvites.next[0].status, 'redeemed');
+  assert.equal(savedInvites.next[0].redeemed_by, '555');
+  assert.equal(savedUsers.sha, 'usr-sha');
+  assert.equal(savedUsers.next[0].chat_id, '555');
+  assert.equal(savedUsers.next[0].label, 'Olha');
+
+  assert.equal(sent.length, 2);
+  const toUser = sent.find(s => s.chatId === 555);
+  const toAdmin = sent.find(s => String(s.chatId) === '123');
+  assert.ok(toUser);
+  assert.ok(toAdmin);
+  assert.match(toUser.text, /Доступ надано/);
+  assert.match(toAdmin.text, /приєднався/);
+});
+
+test('runHandler: /start <token> invalid → reply, no mutations', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadInvites: async () => ({ invites: [], sha: null }),
+    saveInvites: async () => { saveCalled = true; return {}; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 555 }, text: `/start ${'b'.repeat(32)}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /Невалідне посилання/);
+});
+
+test('runHandler: /start with malformed token → invalid_token reply', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 555 }, text: '/start xyz', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /Невалідне посилання/);
+});
