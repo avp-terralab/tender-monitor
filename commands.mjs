@@ -179,7 +179,10 @@ export function formatAddReply(snapshot, { reEnable, nowIso }) {
 // longer phrases must be matched before their shorter prefixes.
 // Note: JS regex \b is ASCII-only — use \s+ to require whitespace separator.
 const LEGAL_FORM_ABBREVIATIONS = [
-  [/^Комунальне\s+некомерційне\s+підприємство\s+/i, 'КНП '],
+  // [іи] tolerates the "некомерцийне" typo seen in some Prozorro registry entries.
+  // (підприємство|товариство): standard form is "підприємство", but registry has
+  // entries like "Комунальне некомерцийне товариство" that are semantically КНП too.
+  [/^Комунальне\s+некомерц[іи]йне\s+(?:підприємство|товариство)\s+/i, 'КНП '],
   [/^Комунальне\s+підприємство\s+/i, 'КП '],
   [/^Товариство\s+з\s+обмеженою\s+відповідальністю\s+/i, 'ТОВ '],
   [/^Приватне\s+акціонерне\s+товариство\s+/i, 'ПрАТ '],

@@ -205,6 +205,27 @@ test('formatAddReply: HTML-escapes user-controlled fields', () => {
   assert.match(reply, /A&amp;B&gt;/);
 });
 
+test('abbreviateLegalForm: КНП — accepts "некомерцийне" typo from Prozorro registry', () => {
+  // Real example: EDRPOU 01985423 — Prozorro stores "некомерцийне" (и instead of і)
+  assert.equal(
+    abbreviateLegalForm('Комунальне некомерцийне підприємство «Тест»'),
+    'КНП «Тест»'
+  );
+});
+
+test('abbreviateLegalForm: КНП — accepts "товариство" alt form (still semantically КНП)', () => {
+  // Real example: EDRPOU 01985423 — "Дніпропетровська обласна клінічна лікарня"
+  // registered as "товариство" instead of standard "підприємство"
+  assert.equal(
+    abbreviateLegalForm('Комунальне некомерційне товариство «Тест»'),
+    'КНП «Тест»'
+  );
+  assert.equal(
+    abbreviateLegalForm('Комунальне некомерцийне товариство "Дніпропетровська обласна клінічна лікарня ім. І. І. Мечникова"'),
+    'КНП "Дніпропетровська обласна клінічна лікарня ім. І. І. Мечникова"'
+  );
+});
+
 test('abbreviateLegalForm: КНП', () => {
   assert.equal(
     abbreviateLegalForm('Комунальне некомерційне підприємство «Центральна районна лікарня»'),
