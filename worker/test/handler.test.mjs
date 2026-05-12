@@ -30,6 +30,8 @@ const makeDeps = (overrides = {}) => {
       saveWatchedSeen: async () => ({}),
       fetchTendersFeed: async () => ({ items: [], next: null }),
       loadAllowedUsers: async () => ({ users: [], sha: null }),
+      loadArchivedTenders: async () => ({ archive: [], sha: null }),
+      saveArchivedTenders: async () => ({}),
       ...overrides,
     },
   };
@@ -1037,4 +1039,128 @@ test('runHandler: /revoke admin chat_id → refused', async () => {
     deps,
   });
   assert.match(sent[0].text, /Не можу видалити адміна/);
+});
+
+test('runHandler: /archive (no arg) renders empty', async () => {
+  const { deps, sent } = makeDeps({
+    loadArchivedTenders: async () => ({ archive: [], sha: null }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/archive', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /📭 Архів порожній/);
+});
+
+test('runHandler: /archive UA-... uses fresh fetchTender for contracts', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    archived_at: '2026-05-12T08:30:00Z',
+    final_status: 'complete',
+    final_snapshot: { procuringEntity: { name: 'КНП' } },
+  }];
+  let fetched = false;
+  const { deps, sent } = makeDeps({
+    loadArchivedTenders: async () => ({ archive, sha: 'sha-arch' }),
+    fetchTender: async () => {
+      fetched = true;
+      return { data: { contracts: [{ id: 'C1', documents: [{ title: 'D1', url: 'https://x' }] }] } };
+    },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/archive UA-2026-04-30-010542-a', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(fetched, true);
+  assert.match(sent[0].text, /📄 Договір/);
+});
+
+test('runHandler: /contract UA-... — only docs', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    final_status: 'complete',
+    final_snapshot: {},
+  }];
+  const { deps, sent } = makeDeps({
+    loadArchivedTenders: async () => ({ archive, sha: null }),
+    fetchTender: async () => ({ data: { contracts: [{ id: 'C1', documents: [{ title: 'Договір', url: 'https://x' }] }] } }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/contract UA-2026-04-30-010542-a', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /Договір UA-2026-04-30-010542-a/);
+});
+
+test('runHandler: /unarchive moves UA → watchlist', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    notes: 'КНП — Реактиви',
+    final_status: 'complete',
+    final_snapshot: {},
+  }];
+  const savedWatchlists = [];
+  const savedArchives = [];
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 'wl-sha' }),
+    saveWatchlist: async (env, wl) => { savedWatchlists.push(wl); return {}; },
+    loadArchivedTenders: async () => ({ archive, sha: 'arch-sha' }),
+    saveArchivedTenders: async (env, arr) => { savedArchives.push(arr); return {}; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/unarchive UA-2026-04-30-010542-a', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /✅ UA-2026-04-30-010542-a повернуто/);
+  assert.equal(savedWatchlists.length, 1);
+  assert.equal(savedWatchlists[0][0].tender_id, 'UA-2026-04-30-010542-a');
+  assert.equal(savedWatchlists[0][0].enabled, true);
+  assert.equal(savedArchives.length, 1);
+  assert.equal(savedArchives[0].length, 0);
+});
+
+test('runHandler: /add for archived UA → warning, no Prozorro fetch', async () => {
+  let fetched = false;
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    final_status: 'complete',
+    notes: 'X',
+  }];
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 'wl-sha' }),
+    loadArchivedTenders: async () => ({ archive, sha: 'arch-sha' }),
+    fetchTender: async () => { fetched = true; return RAW_OK; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/add UA-2026-04-30-010542-a', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(fetched, false);
+  assert.match(sent[0].text, /архівована \(complete\)/);
+  assert.match(sent[0].text, /\/unarchive UA-2026-04-30-010542-a/);
+});
+
+test('runHandler: /info UA-... for archived → redirect', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    final_status: 'complete',
+    final_snapshot: {},
+  }];
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 'wl-sha' }),
+    loadArchivedTenders: async () => ({ archive, sha: null }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/info UA-2026-04-30-010542-a', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /📦 Ця закупівля в архіві/);
+  assert.match(sent[0].text, /\/archive UA-2026-04-30-010542-a/);
 });

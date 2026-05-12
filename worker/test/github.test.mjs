@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers } from '../src/github.mjs';
+import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers, loadArchivedTenders } from '../src/github.mjs';
 
 const ENV = { GITHUB_PAT: 'PAT_VALUE' };
 
@@ -273,4 +273,26 @@ test('saveAllowedUsers: PUTs with sha', async () => {
   await saveAllowedUsers(ENV, [{ chat_id: '1' }], 'def', { fetch: fakeFetch });
   const body = JSON.parse(captured.opts.body);
   assert.equal(body.sha, 'def');
+});
+
+test('loadArchivedTenders: parses array', async () => {
+  const payload = JSON.stringify([{ tender_id: 'UA-X', final_status: 'complete' }]);
+  const b64 = Buffer.from(payload, 'utf-8').toString('base64');
+  const env = { GITHUB_PAT: 'pat' };
+  const fetchImpl = async () => ({
+    ok: true, status: 200,
+    json: async () => ({ content: b64, sha: 'sha-arch' }),
+  });
+  const { archive, sha } = await loadArchivedTenders(env, { fetch: fetchImpl });
+  assert.equal(archive.length, 1);
+  assert.equal(archive[0].tender_id, 'UA-X');
+  assert.equal(sha, 'sha-arch');
+});
+
+test('loadArchivedTenders: 404 → empty + sha null', async () => {
+  const env = { GITHUB_PAT: 'pat' };
+  const fetchImpl = async () => ({ ok: false, status: 404, text: async () => 'not found' });
+  const { archive, sha } = await loadArchivedTenders(env, { fetch: fetchImpl });
+  assert.deepEqual(archive, []);
+  assert.equal(sha, null);
 });

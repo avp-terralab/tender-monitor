@@ -6,6 +6,8 @@ import {
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleUsersList, handleInvitesList, HELP_TEXT,
+  applyArchiveMutation, handleArchive, handleArchiveDetail, handleContract,
+  handleUnarchive,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -1360,4 +1362,374 @@ test('HELP_TEXT mentions admin commands', () => {
   assert.match(HELP_TEXT, /\/invite/);
   assert.match(HELP_TEXT, /\/users/);
   assert.match(HELP_TEXT, /\/revoke/);
+});
+
+test('parseCommand: /archive (no arg)', () => {
+  assert.deepEqual(parseCommand('/archive'), { cmd: 'archive' });
+});
+
+test('parseCommand: /archive with bot suffix', () => {
+  assert.deepEqual(parseCommand('/archive@my_bot'), { cmd: 'archive' });
+});
+
+test('parseCommand: /archive UA-...', () => {
+  assert.deepEqual(
+    parseCommand('/archive UA-2026-04-30-010542-a'),
+    { cmd: 'archive', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /archive normalizes uppercase suffix', () => {
+  assert.deepEqual(
+    parseCommand('/archive UA-2026-04-30-010542-A'),
+    { cmd: 'archive', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /archive with invalid arg', () => {
+  assert.deepEqual(parseCommand('/archive garbage'), { cmd: 'unknown' });
+});
+
+test('parseCommand: /contract requires id', () => {
+  assert.deepEqual(parseCommand('/contract'), { cmd: 'contract', error: 'missing_id' });
+});
+
+test('parseCommand: /contract with valid id', () => {
+  assert.deepEqual(
+    parseCommand('/contract UA-2026-04-30-010542-a'),
+    { cmd: 'contract', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /contract with invalid id', () => {
+  assert.deepEqual(parseCommand('/contract garbage'), { cmd: 'contract', error: 'invalid_id' });
+});
+
+test('parseCommand: /unarchive requires id', () => {
+  assert.deepEqual(parseCommand('/unarchive'), { cmd: 'unarchive', error: 'missing_id' });
+});
+
+test('parseCommand: /unarchive with valid id', () => {
+  assert.deepEqual(
+    parseCommand('/unarchive UA-2026-04-30-010542-a'),
+    { cmd: 'unarchive', tender_id: 'UA-2026-04-30-010542-a' }
+  );
+});
+
+test('parseCommand: /unarchive with invalid id', () => {
+  assert.deepEqual(parseCommand('/unarchive xxx'), { cmd: 'unarchive', error: 'invalid_id' });
+});
+
+test('applyArchiveMutation: append_archive', () => {
+  const result = applyArchiveMutation([], {
+    type: 'append_archive',
+    row: { tender_id: 'UA-2026-04-30-010542-a', final_status: 'complete' },
+  });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].tender_id, 'UA-2026-04-30-010542-a');
+});
+
+test('applyArchiveMutation: append_archive is idempotent on tender_id', () => {
+  const existing = [{ tender_id: 'UA-2026-04-30-010542-a', final_status: 'complete' }];
+  const result = applyArchiveMutation(existing, {
+    type: 'append_archive',
+    row: { tender_id: 'UA-2026-04-30-010542-a', final_status: 'cancelled' },
+  });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].final_status, 'complete'); // first wins
+});
+
+test('applyArchiveMutation: remove_archive', () => {
+  const existing = [
+    { tender_id: 'UA-2026-04-30-010542-a' },
+    { tender_id: 'UA-2026-05-01-000002-a' },
+  ];
+  const result = applyArchiveMutation(existing, {
+    type: 'remove_archive',
+    tender_id: 'UA-2026-04-30-010542-a',
+  });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].tender_id, 'UA-2026-05-01-000002-a');
+});
+
+test('applyArchiveMutation: unknown type is no-op', () => {
+  const arr = [{ tender_id: 'X' }];
+  assert.deepEqual(applyArchiveMutation(arr, { type: 'wat' }), arr);
+});
+
+test('handleArchive: empty', () => {
+  assert.equal(
+    handleArchive({ archive: [] }),
+    '📭 Архів порожній.'
+  );
+});
+
+test('handleArchive: lists complete with icon and money', () => {
+  const reply = handleArchive({ archive: [
+    {
+      tender_id: 'UA-2026-04-30-010542-a',
+      archived_at: '2026-05-12T08:30:00Z',
+      final_status: 'complete',
+      final_snapshot: {
+        procuringEntity: { name: 'КНП Лікарня', edrpou: '11111111' },
+        value: { amount: 350000, currency: 'UAH' },
+      },
+    },
+  ]});
+  assert.match(reply, /✅ UA-2026-04-30-010542-a/);
+  assert.match(reply, /КНП Лікарня/);
+  assert.match(reply, /350 000 UAH/);
+  assert.match(reply, /12\.05\.2026/);
+  assert.match(reply, /Всього в архіві: 1/);
+});
+
+test('handleArchive: maps statuses to icons', () => {
+  const reply = handleArchive({ archive: [
+    { tender_id: 'UA-2026-05-01-000001-a', archived_at: '2026-05-12T08:00:00Z', final_status: 'complete', final_snapshot: {} },
+    { tender_id: 'UA-2026-05-01-000002-a', archived_at: '2026-05-12T08:00:00Z', final_status: 'cancelled', final_snapshot: {} },
+    { tender_id: 'UA-2026-05-01-000003-a', archived_at: '2026-05-12T08:00:00Z', final_status: 'unsuccessful', final_snapshot: {} },
+  ]});
+  assert.match(reply, /✅ UA-2026-05-01-000001-a/);
+  assert.match(reply, /⊘ UA-2026-05-01-000002-a/);
+  assert.match(reply, /❌ UA-2026-05-01-000003-a/);
+});
+
+test('handleArchive: sorts by archived_at desc', () => {
+  const reply = handleArchive({ archive: [
+    { tender_id: 'UA-2026-05-01-000001-a', archived_at: '2026-05-10T00:00:00Z', final_status: 'complete', final_snapshot: {} },
+    { tender_id: 'UA-2026-05-01-000002-a', archived_at: '2026-05-12T00:00:00Z', final_status: 'complete', final_snapshot: {} },
+  ]});
+  const idx1 = reply.indexOf('UA-2026-05-01-000001-a');
+  const idx2 = reply.indexOf('UA-2026-05-01-000002-a');
+  assert.ok(idx2 < idx1, 'newer should come first');
+});
+
+test('handleArchiveDetail: unknown id', async () => {
+  const reply = await handleArchiveDetail({
+    archive: [],
+    fetchTender: async () => { throw new Error('should not call'); },
+    extractSnapshot: () => ({}),
+  }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(reply, /❓ UA-2026-04-30-010542-a не в архіві/);
+});
+
+test('handleArchiveDetail: complete with contract docs', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    archived_at: '2026-05-12T08:30:00Z',
+    final_status: 'complete',
+    final_snapshot: {
+      procuringEntity: { name: 'КНП Лікарня', edrpou: '11111111' },
+      value: { amount: 350000, currency: 'UAH', valueAddedTaxIncluded: true },
+      classification: { id: '33696500-0', description: 'Реактиви' },
+    },
+  }];
+  const fresh = {
+    data: {
+      contracts: [{
+        id: 'C1',
+        status: 'signed',
+        documents: [{ id: 'D1', title: 'Договір №1', url: 'https://prozorro.gov.ua/doc/D1', datePublished: '2026-05-12T10:00:00Z' }],
+      }],
+    },
+  };
+  const reply = await handleArchiveDetail({
+    archive,
+    fetchTender: async () => fresh,
+    extractSnapshot: (raw) => raw.data,
+  }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(reply, /КНП Лікарня/);
+  assert.match(reply, /33696500-0 — Реактиви/);
+  assert.match(reply, /350 000 UAH/);
+  assert.match(reply, /Статус: Завершено/);
+  assert.match(reply, /Архівовано: 12\.05\.2026/);
+  assert.match(reply, /📄 Договір/);
+  assert.match(reply, /Договір №1/);
+  assert.match(reply, /prozorro\.gov\.ua\/doc\/D1/);
+});
+
+test('handleArchiveDetail: cancelled — no contract section', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-05-01-000002-a',
+    archived_at: '2026-05-12T08:00:00Z',
+    final_status: 'cancelled',
+    final_snapshot: { procuringEntity: { name: 'X' } },
+  }];
+  const reply = await handleArchiveDetail({
+    archive,
+    fetchTender: async () => ({ data: { contracts: [] } }),
+    extractSnapshot: (raw) => raw.data,
+  }, { tender_id: 'UA-2026-05-01-000002-a' });
+  assert.match(reply, /Статус: Скасовано/);
+  assert.doesNotMatch(reply, /📄 Договір/);
+});
+
+test('handleArchiveDetail: fresh fetch fails — show frozen, no contracts section', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-05-01-000003-a',
+    archived_at: '2026-05-12T08:00:00Z',
+    final_status: 'complete',
+    final_snapshot: { procuringEntity: { name: 'X' } },
+  }];
+  const reply = await handleArchiveDetail({
+    archive,
+    fetchTender: async () => { throw new Error('Prozorro 503'); },
+    extractSnapshot: (raw) => raw.data,
+  }, { tender_id: 'UA-2026-05-01-000003-a' });
+  assert.match(reply, /Статус: Завершено/);
+  assert.match(reply, /⚠️ Не вдалось отримати свіжі дані договору/);
+});
+
+test('handleContract: unknown id (not in archive)', async () => {
+  const reply = await handleContract({
+    archive: [],
+    fetchTender: async () => { throw new Error('should not call'); },
+    extractSnapshot: () => ({}),
+  }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(reply, /❓ UA-2026-04-30-010542-a не в архіві/);
+});
+
+test('handleContract: complete with docs', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    final_status: 'complete',
+    final_snapshot: {},
+  }];
+  const fresh = {
+    data: {
+      contracts: [{
+        id: 'C1',
+        documents: [
+          { id: 'D1', title: 'Договір №1', url: 'https://prozorro.gov.ua/doc/D1' },
+          { id: 'D2', title: 'Додаткова угода', url: 'https://prozorro.gov.ua/doc/D2' },
+        ],
+      }],
+    },
+  };
+  const reply = await handleContract({
+    archive,
+    fetchTender: async () => fresh,
+    extractSnapshot: (raw) => raw.data,
+  }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(reply, /📄 Договір UA-2026-04-30-010542-a/);
+  assert.match(reply, /Договір №1/);
+  assert.match(reply, /Додаткова угода/);
+});
+
+test('handleContract: cancelled — no contract', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-05-01-000002-a',
+    final_status: 'cancelled',
+    final_snapshot: {},
+  }];
+  const reply = await handleContract({
+    archive,
+    fetchTender: async () => ({ data: { contracts: [] } }),
+    extractSnapshot: (raw) => raw.data,
+  }, { tender_id: 'UA-2026-05-01-000002-a' });
+  assert.match(reply, /договір не укладено/);
+  assert.match(reply, /cancelled/);
+});
+
+test('handleContract: fresh fetch fails', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-05-01-000003-a',
+    final_status: 'complete',
+    final_snapshot: {},
+  }];
+  const reply = await handleContract({
+    archive,
+    fetchTender: async () => { throw new Error('Prozorro 500'); },
+    extractSnapshot: (raw) => raw.data,
+  }, { tender_id: 'UA-2026-05-01-000003-a' });
+  assert.match(reply, /⚠️ Не вдалось отримати дані договору/);
+});
+
+test('handleUnarchive: unknown id', () => {
+  const result = handleUnarchive({
+    archive: [],
+    watchlist: [],
+  }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(result.reply, /❓ UA-2026-04-30-010542-a не в архіві/);
+  assert.equal(result.archiveMutation, null);
+  assert.equal(result.watchlistMutation, null);
+});
+
+test('handleUnarchive: already in watchlist', () => {
+  const archive = [{ tender_id: 'UA-2026-04-30-010542-a', notes: 'X', final_snapshot: {} }];
+  const watchlist = [{ tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'X' }];
+  const result = handleUnarchive({ archive, watchlist }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(result.reply, /⚠️ UA-2026-04-30-010542-a вже у watchlist/);
+  assert.equal(result.archiveMutation, null);
+  assert.equal(result.watchlistMutation, null);
+});
+
+test('handleUnarchive: success', () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    notes: 'КНП — Реактиви',
+    final_status: 'complete',
+    final_snapshot: {},
+  }];
+  const result = handleUnarchive({ archive, watchlist: [] }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(result.reply, /✅ UA-2026-04-30-010542-a повернуто/);
+  assert.deepEqual(result.archiveMutation, {
+    type: 'remove_archive',
+    tender_id: 'UA-2026-04-30-010542-a',
+  });
+  assert.deepEqual(result.watchlistMutation, {
+    type: 'append',
+    row: { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'КНП — Реактиви' },
+  });
+});
+
+test('handleAdd: tender already in archive → warning, no fetch', async () => {
+  let fetchCalls = 0;
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    final_status: 'complete',
+    notes: 'КНП — Реактиви',
+  }];
+  const result = await handleAdd({
+    watchlist: [],
+    archive,
+    fetchTender: async () => { fetchCalls++; throw new Error('should not call'); },
+    extractSnapshot: () => ({}),
+    nowIso: '2026-05-12T10:00:00Z',
+  }, { tender_id: 'UA-2026-04-30-010542-a', notes: null });
+  assert.match(result.reply, /⚠️ UA-2026-04-30-010542-a архівована \(complete\)/);
+  assert.match(result.reply, /\/unarchive UA-2026-04-30-010542-a/);
+  assert.equal(result.mutation, null);
+  assert.equal(fetchCalls, 0);
+});
+
+test('handleAdd: archive missing → falls through to existing fetch path', async () => {
+  // Smoke test that explicit `archive: []` does not break the happy path.
+  const result = await handleAdd({
+    watchlist: [],
+    archive: [],
+    fetchTender: async () => ({ data: {
+      tenderID: 'UA-2026-04-30-010542-a',
+      status: 'active.tendering',
+      title: 'X',
+    }}),
+    extractSnapshot: (raw) => ({
+      tender_id: raw.data.tenderID,
+      status: raw.data.status,
+      title: raw.data.title,
+    }),
+    nowIso: '2026-05-12T10:00:00Z',
+  }, { tender_id: 'UA-2026-04-30-010542-a', notes: null });
+  assert.equal(result.mutation.type, 'append');
+});
+
+test('HELP_TEXT: mentions /archive, /contract, /unarchive', () => {
+  assert.match(HELP_TEXT, /\/archive/);
+  assert.match(HELP_TEXT, /\/contract/);
+  assert.match(HELP_TEXT, /\/unarchive/);
+});
+
+test('HELP_TEXT: uses square brackets for placeholders (no <...>)', () => {
+  // <...> breaks Telegram HTML parse_mode — re-check post-edit.
+  assert.doesNotMatch(HELP_TEXT, /<UA-/);
 });

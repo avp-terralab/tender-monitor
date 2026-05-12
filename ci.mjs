@@ -2,7 +2,7 @@ import { runOnce } from './monitor.mjs';
 import { fetchTender, extractSnapshot } from './prozorro.mjs';
 import { sendDigest as tgSend } from './telegram.mjs';
 import { checkWatchedEntities } from './entity_watch.mjs';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +13,11 @@ const REPO = dirname(fileURLToPath(import.meta.url));
 const watchlistPath = join(REPO, 'watchlist.json');
 const stateDir = join(REPO, '_state');
 mkdirSync(stateDir, { recursive: true });
+
+const archivePath = join(stateDir, 'archived_tenders.json');
+if (!existsSync(archivePath)) {
+  writeFileSync(archivePath, '[]\n');
+}
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -83,6 +88,28 @@ const result = await runOnce({
       }
     }
     writeFileSync(watchlistPath, JSON.stringify(wl, null, 2));
+  },
+  archiveTender: async (tenderId, snapshot) => {
+    // Idempotent: skip if already archived.
+    const arr = JSON.parse(readFileSync(archivePath, 'utf-8'));
+    if (arr.some(a => a.tender_id === tenderId)) return false;
+    // Pull notes from current watchlist (re-read disk to capture any concurrent updates).
+    const wl = JSON.parse(readFileSync(watchlistPath, 'utf-8'));
+    const row = wl.find(r => r.tender_id === tenderId);
+    arr.push({
+      tender_id: tenderId,
+      notes: row?.notes ?? '',
+      archived_at: new Date().toISOString(),
+      final_status: snapshot.status,
+      final_snapshot: snapshot,
+    });
+    writeFileSync(archivePath, JSON.stringify(arr, null, 2) + '\n');
+    // Remove from watchlist
+    const newWl = wl.filter(r => r.tender_id !== tenderId);
+    writeFileSync(watchlistPath, JSON.stringify(newWl, null, 2) + '\n');
+    // Unlink snapshot (best-effort)
+    try { unlinkSync(join(stateDir, `${tenderId}.json`)); } catch {}
+    return true;
   },
 });
 

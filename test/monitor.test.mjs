@@ -342,3 +342,84 @@ test('runOnce: entity-watch errors propagate to digest', async () => {
   assert.equal(sent.length, 1);
   assert.match(sent[0], /Prozorro 503/);
 });
+
+// ─── Task 9: terminal-status archival ─────────────────────────────────────────
+const T_DONE = 'UA-2026-05-01-000010-a';
+const T_CANC = 'UA-2026-05-01-000011-a';
+
+test('runOnce: calls archiveTender once per terminal-status tender', async () => {
+  const snapDone = baseSnap({ tender_id: T_DONE, status: 'complete' });
+  const snapCanc = baseSnap({ tender_id: T_CANC, status: 'cancelled' });
+  const archived = [];
+  await runOnce({
+    runIso: '2026-05-12T13:00:00+03:00',
+    watchlist: [
+      { tender_id: T_DONE, enabled: true, notes: 'A' },
+      { tender_id: T_CANC, enabled: true, notes: 'B' },
+    ],
+    fetchTender: async (id) => ({ data: id === T_DONE ? snapDone : snapCanc }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => null,
+    saveState: async () => {},
+    sendDigest: async () => {},
+    updateSheet: async () => {},
+    archiveTender: async (tid, snap) => {
+      archived.push({ tid, status: snap.status });
+      return true;
+    },
+  });
+  assert.equal(archived.length, 2);
+  assert.deepEqual(archived.map(a => a.tid).sort(), [T_DONE, T_CANC].sort());
+});
+
+test('runOnce: does NOT call archiveTender for active.tendering', async () => {
+  const snap = baseSnap({ status: 'active.tendering' });
+  const archived = [];
+  await runOnce({
+    runIso: '2026-05-12T13:00:00+03:00',
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: snap }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => snap,
+    saveState: async () => {},
+    sendDigest: async () => {},
+    updateSheet: async () => {},
+    archiveTender: async (tid) => { archived.push(tid); return true; },
+  });
+  assert.equal(archived.length, 0);
+});
+
+test('runOnce: digest contains "📦 Архівовано:" block when archived', async () => {
+  const snap = baseSnap({ tender_id: T_DONE, status: 'complete' });
+  let sentText = '';
+  await runOnce({
+    runIso: '2026-05-12T13:00:00+03:00',
+    watchlist: [{ tender_id: T_DONE, enabled: true, notes: 'X' }],
+    fetchTender: async () => ({ data: snap }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => null,
+    saveState: async () => {},
+    sendDigest: async (text) => { sentText = text; },
+    updateSheet: async () => {},
+    archiveTender: async () => true,
+  });
+  assert.match(sentText, /📦 Архівовано:/);
+  assert.match(sentText, new RegExp(T_DONE));
+});
+
+test('runOnce: no archive block when archiveTender returns false', async () => {
+  const snap = baseSnap({ tender_id: T_DONE, status: 'complete' });
+  let sentText = '';
+  await runOnce({
+    runIso: '2026-05-12T13:00:00+03:00',
+    watchlist: [{ tender_id: T_DONE, enabled: true }],
+    fetchTender: async () => ({ data: snap }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => null,
+    saveState: async () => {},
+    sendDigest: async (text) => { sentText = text; },
+    updateSheet: async () => {},
+    archiveTender: async () => false, // already archived → idempotent skip
+  });
+  assert.doesNotMatch(sentText, /📦 Архівовано:/);
+});
