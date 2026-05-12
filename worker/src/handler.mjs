@@ -99,27 +99,31 @@ export async function runHandler({ update, env, deps = {} }) {
         );
         reply = result.reply;
         if (result.inviteMutation && result.userMutation) {
+          let mutationASucceeded = false;
+          let mutationBSucceeded = false;
           // Mutation A: invites.json — consume token
           try {
             const newInvites = applyInviteMutation(invites, result.inviteMutation);
             await _saveInvites(env, newInvites, inviteSha);
+            mutationASucceeded = true;
           } catch (err) {
             console.error('worker: saveInvites in redeem failed:', err.message);
             reply = '⚠️ Помилка збереження. Спробуй ще раз.';
             // No partial state created since Mutation A failed before Mutation B.
           }
-          // Mutation B only if A succeeded (reply not overwritten above).
-          if (reply === result.reply) {
+          // Mutation B only if A succeeded.
+          if (mutationASucceeded) {
             try {
               const newUsers = applyAllowedUsersMutation(users, result.userMutation);
               await _saveAllowedUsers(env, newUsers, usersSha);
+              mutationBSucceeded = true;
             } catch (err) {
               console.error('worker: saveAllowedUsers in redeem failed:', err.message);
               reply = '⚠️ Токен спалено, але доступ не додано. Напиши адміну chat_id.';
             }
           }
-          // Notify admin if both mutations succeeded.
-          if (reply === result.reply && result.adminNotice && adminChatId) {
+          // Notify admin only if both mutations succeeded.
+          if (mutationBSucceeded && result.adminNotice && adminChatId) {
             try {
               await _sendReply({
                 token: env.TELEGRAM_BOT_TOKEN,
