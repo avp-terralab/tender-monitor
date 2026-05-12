@@ -136,13 +136,13 @@ export function formatAddReply(snapshot, { reEnable, nowIso }) {
     lines.push(`👥 ${escapeHtml(abbreviateLegalForm(snapshot.procuringEntity.name))}`);
   }
   if (snapshot.status) {
-    let line = `ℹ️ Статус: ${fmtStatus(snapshot.status)}`;
     const deadline = snapshot.tenderPeriod?.endDate;
-    if (deadline) line += `, дедлайн ${fmtDeadline(deadline)}`;
+    const showDeadline = snapshot.status === 'active.tendering' && deadline;
+    let line = `ℹ️ Статус: ${fmtStatus(snapshot.status)}`;
+    if (showDeadline) line += `, дедлайн ${fmtDeadline(deadline)}`;
     lines.push(line);
-    const deadline2 = snapshot.tenderPeriod?.endDate;
-    if (deadline2 && nowIso) {
-      const left = fmtTimeLeft(deadline2, nowIso);
+    if (showDeadline && nowIso) {
+      const left = fmtTimeLeft(deadline, nowIso);
       if (left) lines.push(`⏰ Залишилось: ${left}`);
     }
   }
@@ -197,10 +197,15 @@ function formatInfoEntry(g, runIso) {
     sections.push(emailLine ? `${phoneLine}\n${emailLine}` : phoneLine);
   }
   if (g.status) {
+    // tenderPeriod.endDate is the submission deadline — only meaningful while
+    // bidders can still submit (active.tendering). After that, the date is in
+    // the past and misleading (e.g. for active.awarded — winner picked but
+    // contract pending — the submission deadline tells nothing useful).
+    const showDeadline = g.status === 'active.tendering' && g.deadline;
     let statusLine = `ℹ️ Статус: ${fmtStatus(g.status)}`;
-    if (g.deadline) statusLine += ` до ${fmtDeadline(g.deadline)}`;
+    if (showDeadline) statusLine += ` до ${fmtDeadline(g.deadline)}`;
     sections.push(statusLine);
-    if (g.deadline && runIso) {
+    if (showDeadline && runIso) {
       const left = fmtTimeLeft(g.deadline, runIso);
       if (left) sections.push(`⏰ Залишилось: ${left}`);
     }

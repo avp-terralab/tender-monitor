@@ -502,7 +502,7 @@ test('parseCommand: /info with trailing text → unknown', () => {
 const SAMPLE_GROUP = {
   tender_id: 'UA-2026-04-29-008605-a',
   prozorro_url: 'https://prozorro.gov.ua/tender/UA-2026-04-29-008605-a',
-  status: 'active.qualification',
+  status: 'active.tendering',
   deadline: '2026-05-07T01:00:00+03:00',
   procuring_entity: { name: 'КНП «Центральна районна лікарня»', edrpou: '33578224' },
   value: { amount: 800147, currency: 'UAH', valueAddedTaxIncluded: true },
@@ -522,7 +522,7 @@ test('formatInfo: full entry contains all fields from spec', () => {
   assert.match(reply, /💰 Вартість: 800 147 UAH \(з ПДВ\)/);
   assert.match(reply, /📞 Дмитерчук Микола: \+380 95 662-36-51/);
   assert.match(reply, /✉️ mykola@ukr\.net/);
-  assert.match(reply, /ℹ️ Статус: Розгляд пропозицій до 07\.05\.2026 до 01:00/);
+  assert.match(reply, /ℹ️ Статус: Приймання пропозицій до 07\.05\.2026 до 01:00/);
 });
 
 test('formatInfo: empty groups → reply about no tenders', () => {
@@ -834,17 +834,35 @@ test('formatInfo: countdown ⏰ Залишилось appears when runIso < deadl
   assert.match(reply, /⏰ Залишилось:.*3 год/);
 });
 
-test('formatInfo: countdown shows "минув" for past deadline', () => {
+test('formatInfo: countdown shows "минув" for past deadline (active.tendering)', () => {
   const reply = formatInfo({
     runIso: '2026-05-15T15:30:00+03:00',
     groups: [{
       tender_id: 'UA-X',
       prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
-      status: 'active.qualification',
-      deadline: '2026-05-15T14:30:00+03:00', // 1h ago
+      status: 'active.tendering',
+      deadline: '2026-05-15T14:30:00+03:00', // 1h ago — submissions just closed
     }],
   });
   assert.match(reply, /⏰ Залишилось:.*минув/);
+});
+
+test('formatInfo: no deadline/countdown when status != active.tendering', () => {
+  // The tenderPeriod.endDate is only meaningful while submissions are open.
+  // For active.awarded / active.qualification / complete / cancelled — the
+  // submission deadline is in the past and showing it is misleading.
+  const reply = formatInfo({
+    runIso: '2026-05-15T15:30:00+03:00',
+    groups: [{
+      tender_id: 'UA-X',
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+      status: 'active.awarded',
+      deadline: '2026-04-30T00:00:00+03:00',
+    }],
+  });
+  assert.match(reply, /ℹ️ Статус: Очікування підписання договору/);
+  assert.doesNotMatch(reply, /до 30\.04\.2026/);
+  assert.doesNotMatch(reply, /⏰ Залишилось:/);
 });
 
 test('handleAdd: passes nowIso through deps to formatAddReply countdown', async () => {
