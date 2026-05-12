@@ -85,19 +85,25 @@ test('parseCommand: leading/trailing whitespace tolerated', () => {
 });
 
 test('parseCommand: reply-keyboard button labels alias to commands', () => {
-  assert.deepEqual(parseCommand('📋 Активні'), { cmd: 'info' });
-  assert.deepEqual(parseCommand('📦 Архів'), { cmd: 'archive' });
-  assert.deepEqual(parseCommand('👁 Замовн.'), { cmd: 'watched' });
+  assert.deepEqual(parseCommand('📋 Моніторинг закупівель'), { cmd: 'info' });
+  assert.deepEqual(parseCommand('👁 Моніторинг замовників'), { cmd: 'watched' });
+  assert.deepEqual(parseCommand('📦 Архів закупівель'), { cmd: 'archive' });
   assert.deepEqual(parseCommand('❓ Допомога'), { cmd: 'help' });
 });
 
 test('parseCommand: button labels tolerate surrounding whitespace', () => {
-  assert.deepEqual(parseCommand('  📋 Активні  '), { cmd: 'info' });
+  assert.deepEqual(parseCommand('  📋 Моніторинг закупівель  '), { cmd: 'info' });
 });
 
 test('parseCommand: free text that just contains an emoji stays null', () => {
   assert.deepEqual(parseCommand('📋'), { cmd: null });
-  assert.deepEqual(parseCommand('Активні'), { cmd: null });
+  assert.deepEqual(parseCommand('Моніторинг'), { cmd: null });
+});
+
+test('parseCommand: /menu → cmd: menu', () => {
+  assert.deepEqual(parseCommand('/menu'), { cmd: 'menu' });
+  assert.deepEqual(parseCommand('/menu@my_bot'), { cmd: 'menu' });
+  assert.deepEqual(parseCommand('  /menu  '), { cmd: 'menu' });
 });
 
 const SAMPLE_SNAP = {

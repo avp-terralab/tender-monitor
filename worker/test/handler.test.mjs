@@ -91,17 +91,21 @@ test('runHandler: allowed user reply carries reply_markup keyboard', async () =>
   assert.equal(sent.length, 1);
   assert.ok(sent[0].replyMarkup, 'replyMarkup must be set for allowed user');
   assert.ok(Array.isArray(sent[0].replyMarkup.keyboard));
-  // 4 buttons in 2 rows
   const flat = sent[0].replyMarkup.keyboard.flat().map(b => b.text);
-  assert.deepEqual(flat, ['📋 Активні', '📦 Архів', '👁 Замовн.', '❓ Допомога']);
+  assert.deepEqual(flat, [
+    '📋 Моніторинг закупівель',
+    '👁 Моніторинг замовників',
+    '📦 Архів закупівель',
+    '❓ Допомога',
+  ]);
 });
 
-test('runHandler: button label "📋 Активні" triggers /info logic and replies with keyboard', async () => {
+test('runHandler: button label "📋 Моніторинг закупівель" triggers /info logic and replies with keyboard', async () => {
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
   });
   await runHandler({
-    update: { message: { chat: { id: 123 }, text: '📋 Активні', message_id: 2 } },
+    update: { message: { chat: { id: 123 }, text: '📋 Моніторинг закупівель', message_id: 2 } },
     env: ENV,
     deps,
   });
@@ -109,6 +113,20 @@ test('runHandler: button label "📋 Активні" triggers /info logic and re
   // Empty watchlist → /info renders "📭 Немає активних тендерів."
   assert.match(sent[0].text, /Немає активних тендерів/);
   assert.ok(sent[0].replyMarkup);
+});
+
+test('runHandler: /menu replies with short hint + the keyboard', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/menu', message_id: 3 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0].replyMarkup);
+  // The /menu reply should be a deliberate menu hint, not the unknown-command fallback
+  assert.doesNotMatch(sent[0].text, /Не розумію/);
+  assert.ok(sent[0].text.length < 200, 'menu reply should be a short hint');
 });
 
 test('runHandler: /start for allowed user also carries the keyboard', async () => {

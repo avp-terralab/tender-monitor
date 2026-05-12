@@ -10,9 +10,9 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // message; parseCommand maps the exact label to the matching slash command.
 // Keep labels in sync with MAIN_KEYBOARD below.
 const BUTTON_ALIASES = {
-  '📋 Активні': 'info',
-  '📦 Архів': 'archive',
-  '👁 Замовн.': 'watched',
+  '📋 Моніторинг закупівель': 'info',
+  '👁 Моніторинг замовників': 'watched',
+  '📦 Архів закупівель': 'archive',
   '❓ Допомога': 'help',
 };
 
@@ -23,8 +23,8 @@ const BUTTON_ALIASES = {
 // button label.
 export const MAIN_KEYBOARD = {
   keyboard: [
-    [{ text: '📋 Активні' }, { text: '📦 Архів' }],
-    [{ text: '👁 Замовн.' }, { text: '❓ Допомога' }],
+    [{ text: '📋 Моніторинг закупівель' }, { text: '👁 Моніторинг замовників' }],
+    [{ text: '📦 Архів закупівель' }, { text: '❓ Допомога' }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -40,6 +40,7 @@ export function parseCommand(text) {
   }
 
   if (/^\/help(?:@\w+)?$/i.test(trimmed)) return { cmd: 'help' };
+  if (/^\/menu(?:@\w+)?$/i.test(trimmed)) return { cmd: 'menu' };
   if (/^\/status(?:@\w+)?$/i.test(trimmed)) return { cmd: 'status' };
   if (/^\/watched(?:@\w+)?$/i.test(trimmed)) return { cmd: 'watched' };
 
@@ -779,6 +780,7 @@ export function handleUnarchive({ archive, watchlist }, { tender_id }) {
 export const HELP_TEXT = [
   'Загальні команди:',
   '/help — список команд',
+  '/menu — показати швидкі кнопки',
   '/status — здоровʼя бота',
   '',
   'Моніторинг закупівель за ID:',

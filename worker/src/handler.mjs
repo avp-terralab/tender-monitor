@@ -376,6 +376,8 @@ export async function runHandler({ update, env, deps = {} }) {
     }
   } else if (cmd.cmd === 'help') {
     reply = HELP_TEXT;
+  } else if (cmd.cmd === 'menu') {
+    reply = '⚡ Швидкі дії — внизу. Команди з аргументами (/add, /watch …) пиши текстом.';
   } else if (cmd.cmd === 'unknown') {
     reply = '❓ Не розумію. /help';
   } else {
