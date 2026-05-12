@@ -300,6 +300,39 @@ export async function runHandler({ update, env, deps = {} }) {
           handleInvite({ invites, generateToken: _generateToken, now: _now, botUsername: BOT_USERNAME }, cmd),
       });
     }
+  } else if (cmd.cmd === 'invites') {
+    if (!isAdmin) return;
+    try {
+      const { invites } = await _loadInvites(env);
+      reply = handleInvitesList({ invites, now: _now });
+    } catch (err) {
+      console.error('worker: /invites failed:', err.message);
+      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+    }
+  } else if (cmd.cmd === 'users') {
+    if (!isAdmin) return;
+    try {
+      const { users } = await _loadAllowedUsers(env);
+      reply = handleUsersList({ allowedUsers: users, adminChatId });
+    } catch (err) {
+      console.error('worker: /users failed:', err.message);
+      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+    }
+  } else if (cmd.cmd === 'revoke') {
+    if (!isAdmin) return;
+    if (cmd.error === 'missing_chat_id') {
+      reply = '❌ Не вказано chat_id. /revoke 12345';
+    } else if (cmd.error === 'invalid_chat_id') {
+      reply = '❌ chat_id має бути числом';
+    } else {
+      reply = await applyAllowedUsersMutationWithRetry({
+        env,
+        loadAllowedUsers: _loadAllowedUsers,
+        saveAllowedUsers: _saveAllowedUsers,
+        computeMutation: ({ users }) =>
+          handleRevoke({ allowedUsers: users, adminChatId }, cmd),
+      });
+    }
   } else if (cmd.cmd === 'help') {
     reply = HELP_TEXT;
   } else if (cmd.cmd === 'unknown') {
@@ -337,6 +370,27 @@ async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, compu
         return '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
       }
       return '⚠️ Сталася помилка на стороні бота';
+    }
+  }
+  return '⚠️ Не зміг зберегти, спробуй за хвилину';
+}
+
+async function applyAllowedUsersMutationWithRetry({ env, loadAllowedUsers, saveAllowedUsers, computeMutation }) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { users, sha } = await loadAllowedUsers(env);
+      const result = computeMutation({ users });
+      if (!result.mutation) return result.reply;
+      const next = applyAllowedUsersMutation(users, result.mutation);
+      await saveAllowedUsers(env, next, sha);
+      return result.reply;
+    } catch (err) {
+      if (err instanceof ConflictError && attempt === 0) continue;
+      if (err instanceof ConflictError) break;
+      console.error('worker: applyAllowedUsersMutationWithRetry failed:', err.message);
+      return err.message.includes('GitHub')
+        ? '⚠️ GitHub тимчасово недоступний, спробуй за хвилину'
+        : '⚠️ Сталася помилка на стороні бота';
     }
   }
   return '⚠️ Не зміг зберегти, спробуй за хвилину';

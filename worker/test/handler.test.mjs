@@ -963,3 +963,78 @@ test('runHandler: /invite without label → error reply (admin)', async () => {
   assert.equal(sent.length, 1);
   assert.match(sent[0].text, /Вкажи назву/);
 });
+
+// Task 12: /invites, /users, /revoke admin commands
+test('runHandler: /invites as admin → lists active invites', async () => {
+  const { deps, sent } = makeDeps({
+    loadInvites: async () => ({
+      invites: [{
+        token: 'd'.repeat(32), label: 'Olha', status: 'pending',
+        created_at: '2026-05-11T10:00:00Z', expires_at: '2099-01-01T00:00:00Z',
+      }],
+      sha: 's',
+    }),
+    now: () => new Date('2026-05-12T10:00:00Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/invites', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /Olha/);
+});
+
+test('runHandler: /invites as non-admin → silent', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'X' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/invites', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 0);
+});
+
+test('runHandler: /users as admin → shows admin + invited', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({
+      users: [{ chat_id: '789', label: 'Olha', invited_via: 'Olha', added_at: '2026-05-11T10:00:00Z' }],
+      sha: 's',
+    }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/users', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /123/);
+  assert.match(sent[0].text, /789/);
+  assert.match(sent[0].text, /Olha/);
+});
+
+test('runHandler: /revoke as admin → removes user', async () => {
+  let savedUsers = null;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '789', label: 'Olha' }], sha: 's' }),
+    saveAllowedUsers: async (env, next) => { savedUsers = next; return {}; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/revoke 789', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.deepEqual(savedUsers, []);
+  assert.match(sent[0].text, /видалено/);
+});
+
+test('runHandler: /revoke admin chat_id → refused', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/revoke 123', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /Не можу видалити адміна/);
+});
