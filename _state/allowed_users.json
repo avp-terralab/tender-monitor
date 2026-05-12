@@ -16,5 +16,11 @@
     "label": "TestUser",
     "invited_via": "TestUser",
     "added_at": "2026-05-12T08:18:31.570Z"
+  },
+  {
+    "chat_id": "1725058653",
+    "label": "Ліля Цісар",
+    "invited_via": "Ліля Цісар",
+    "added_at": "2026-05-12T08:22:32.666Z"
   }
 ]
