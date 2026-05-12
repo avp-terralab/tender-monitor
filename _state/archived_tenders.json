@@ -1,1 +1,83 @@
-[]
+[
+  {
+    "tender_id": "UA-2026-04-16-005830-a",
+    "notes": "Комунальне некомерційне підприємство \"Коростишівська ЦРЛ ім.Д.І.Потєхіна\" — 72260000-5 - Послуги, пов’язані з програмним забезпеченням",
+    "archived_at": "2026-05-12T12:29:09.157Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-04-16-005830-a",
+      "title": "72260000-5 - Послуги, пов’язані з програмним забезпеченням",
+      "status": "complete",
+      "dateModified": "2026-05-12T10:28:21.598495+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-04-24T12:30:34+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне некомерційне підприємство \"Коростишівська ЦРЛ ім.Д.І.Потєхіна\"",
+        "edrpou": "01991731"
+      },
+      "value": {
+        "amount": 303000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "contact": {
+        "name": "Блудова Юлія Едуардівна",
+        "email": "gulliyablydova@gmail.com",
+        "telephone": "+380413050362"
+      },
+      "documents": [
+        {
+          "id": "e886168bedcf43e09fe6e0293cf1ebad",
+          "title": "ТД 7226.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-04-16T12:25:45.404285+03:00"
+        },
+        {
+          "id": "5dbb0a28f0364d58b903e98304acd9d2",
+          "title": "Шаблон_Тендерного_договору 7226.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-04-16T12:25:45.404285+03:00"
+        },
+        {
+          "id": "078dc22ecdff45dbb71131d33336940d",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-04-16T12:28:32.639769+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "6c240c61a860408eb00de1f1cc23e831",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "3362bce92aba4d3a81515b1c2a07dbe1",
+          "status": "active",
+          "documents": []
+        }
+      ],
+      "cancellations": []
+    }
+  }
+]

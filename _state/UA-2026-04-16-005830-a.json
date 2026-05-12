@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-04-16-005830-a",
-  "saved_at": "2026-05-08T10:54:47.458Z",
+  "saved_at": "2026-05-12T12:29:09.695Z",
   "snapshot": {
     "tender_id": "UA-2026-04-16-005830-a",
     "title": "72260000-5 - Послуги, пов’язані з програмним забезпеченням",
-    "status": "active.awarded",
-    "dateModified": "2026-04-30T12:54:51.436805+03:00",
+    "status": "complete",
+    "dateModified": "2026-05-12T10:28:21.598495+03:00",
     "tenderPeriod": {
       "endDate": "2026-04-24T12:30:34+03:00"
     },
@@ -70,7 +70,7 @@
     "contracts": [
       {
         "id": "3362bce92aba4d3a81515b1c2a07dbe1",
-        "status": "pending",
+        "status": "active",
         "documents": []
       }
     ],
