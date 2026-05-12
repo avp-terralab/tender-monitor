@@ -505,6 +505,17 @@ export function applyAllowedUsersMutation(users, mutation) {
   return users;
 }
 
+export function applyArchiveMutation(archive, mutation) {
+  if (mutation.type === 'append_archive') {
+    if (archive.some(a => a.tender_id === mutation.row.tender_id)) return archive;
+    return [...archive, mutation.row];
+  }
+  if (mutation.type === 'remove_archive') {
+    return archive.filter(a => a.tender_id !== mutation.tender_id);
+  }
+  return archive;
+}
+
 export function handleRedeem(deps, { token }) {
   const { invites, allowedUsers, adminChatId, chatId } = deps;
   const now = deps.now();

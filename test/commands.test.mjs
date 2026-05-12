@@ -6,6 +6,7 @@ import {
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleUsersList, handleInvitesList, HELP_TEXT,
+  applyArchiveMutation,
 } from '../commands.mjs';
 
 test('parseCommand: /list', () => {
@@ -1416,4 +1417,41 @@ test('parseCommand: /unarchive with valid id', () => {
 
 test('parseCommand: /unarchive with invalid id', () => {
   assert.deepEqual(parseCommand('/unarchive xxx'), { cmd: 'unarchive', error: 'invalid_id' });
+});
+
+test('applyArchiveMutation: append_archive', () => {
+  const result = applyArchiveMutation([], {
+    type: 'append_archive',
+    row: { tender_id: 'UA-2026-04-30-010542-a', final_status: 'complete' },
+  });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].tender_id, 'UA-2026-04-30-010542-a');
+});
+
+test('applyArchiveMutation: append_archive is idempotent on tender_id', () => {
+  const existing = [{ tender_id: 'UA-2026-04-30-010542-a', final_status: 'complete' }];
+  const result = applyArchiveMutation(existing, {
+    type: 'append_archive',
+    row: { tender_id: 'UA-2026-04-30-010542-a', final_status: 'cancelled' },
+  });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].final_status, 'complete'); // first wins
+});
+
+test('applyArchiveMutation: remove_archive', () => {
+  const existing = [
+    { tender_id: 'UA-2026-04-30-010542-a' },
+    { tender_id: 'UA-2026-05-01-000002-a' },
+  ];
+  const result = applyArchiveMutation(existing, {
+    type: 'remove_archive',
+    tender_id: 'UA-2026-04-30-010542-a',
+  });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].tender_id, 'UA-2026-05-01-000002-a');
+});
+
+test('applyArchiveMutation: unknown type is no-op', () => {
+  const arr = [{ tender_id: 'X' }];
+  assert.deepEqual(applyArchiveMutation(arr, { type: 'wat' }), arr);
 });
