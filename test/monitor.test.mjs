@@ -423,3 +423,46 @@ test('runOnce: no archive block when archiveTender returns false', async () => {
   });
   assert.doesNotMatch(sentText, /📦 Архівовано:/);
 });
+
+test('runOnce: does NOT saveState for archived tenders', async () => {
+  // Regression: archiveTender unlinks the snapshot file; saveState afterwards
+  // would recreate a stale snapshot for a tender that is no longer in watchlist.
+  const snapDone = baseSnap({ tender_id: T_DONE, status: 'complete' });
+  const snapActive = baseSnap({ tender_id: T_OK, status: 'active.tendering' });
+  const savedIds = [];
+  await runOnce({
+    runIso: '2026-05-12T13:00:00+03:00',
+    watchlist: [
+      { tender_id: T_DONE, enabled: true },
+      { tender_id: T_OK, enabled: true },
+    ],
+    fetchTender: async (id) => ({ data: id === T_DONE ? snapDone : snapActive }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => null, // both produce monitoring_started event
+    saveState: async (id) => { savedIds.push(id); },
+    sendDigest: async () => {},
+    updateSheet: async () => {},
+    archiveTender: async (id) => id === T_DONE, // archived
+  });
+  assert.deepEqual(savedIds, [T_OK], 'saveState should run only for the non-archived tender');
+});
+
+test('runOnce: still saveState for tender when archiveTender returns false', async () => {
+  // If archive was a no-op (already archived elsewhere), the snapshot is irrelevant
+  // anyway because the row will be gone next cycle — but we keep this behavior
+  // simple: only the in-this-cycle archived rows are skipped.
+  const snap = baseSnap({ tender_id: T_DONE, status: 'complete' });
+  const savedIds = [];
+  await runOnce({
+    runIso: '2026-05-12T13:00:00+03:00',
+    watchlist: [{ tender_id: T_DONE, enabled: true }],
+    fetchTender: async () => ({ data: snap }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => null,
+    saveState: async (id) => { savedIds.push(id); },
+    sendDigest: async () => {},
+    updateSheet: async () => {},
+    archiveTender: async () => false,
+  });
+  assert.deepEqual(savedIds, [T_DONE]);
+});

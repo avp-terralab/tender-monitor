@@ -189,9 +189,13 @@ export async function runOnce(deps) {
     }
     await sendDigest(text);
 
-    // Save state only for tenders with events (errors → no save, retry next run)
+    // Save state only for tenders with events (errors → no save, retry next run).
+    // Archived tenders are skipped — their snapshot was unlinked by archiveTender
+    // and saving here would recreate a stale file for a row no longer in watchlist.
+    const archivedIds = new Set(archivedNow.map(a => a.tender_id));
     await Promise.all(results.map(async r => {
       if (r.error || r.events.length === 0) return;
+      if (archivedIds.has(r.row.tender_id)) return;
       await saveState(r.row.tender_id, r.curr);
     }));
   }
