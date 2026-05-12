@@ -351,12 +351,21 @@ export function applyEntityMutation(watchedEntities, mutation) {
 
 export async function handleAdd(deps, { tender_id, notes }) {
   const { watchlist, fetchTender, extractSnapshot } = deps;
+  const archive = deps.archive ?? [];
   const nowIso = deps.nowIso ?? new Date().toISOString();
   const existing = watchlist.find(r => r.tender_id === tender_id);
 
   if (existing?.enabled) {
     return {
       reply: `⚠️ Вже моніторю ${tender_id}`,
+      mutation: null,
+    };
+  }
+
+  const archived = archive.find(a => a.tender_id === tender_id);
+  if (archived) {
+    return {
+      reply: `⚠️ ${tender_id} архівована (${archived.final_status}). Поверну? /unarchive ${tender_id}`,
       mutation: null,
     };
   }

@@ -1682,3 +1682,43 @@ test('handleUnarchive: success', () => {
     row: { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'КНП — Реактиви' },
   });
 });
+
+test('handleAdd: tender already in archive → warning, no fetch', async () => {
+  let fetchCalls = 0;
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    final_status: 'complete',
+    notes: 'КНП — Реактиви',
+  }];
+  const result = await handleAdd({
+    watchlist: [],
+    archive,
+    fetchTender: async () => { fetchCalls++; throw new Error('should not call'); },
+    extractSnapshot: () => ({}),
+    nowIso: '2026-05-12T10:00:00Z',
+  }, { tender_id: 'UA-2026-04-30-010542-a', notes: null });
+  assert.match(result.reply, /⚠️ UA-2026-04-30-010542-a архівована \(complete\)/);
+  assert.match(result.reply, /\/unarchive UA-2026-04-30-010542-a/);
+  assert.equal(result.mutation, null);
+  assert.equal(fetchCalls, 0);
+});
+
+test('handleAdd: archive missing → falls through to existing fetch path', async () => {
+  // Smoke test that explicit `archive: []` does not break the happy path.
+  const result = await handleAdd({
+    watchlist: [],
+    archive: [],
+    fetchTender: async () => ({ data: {
+      tenderID: 'UA-2026-04-30-010542-a',
+      status: 'active.tendering',
+      title: 'X',
+    }}),
+    extractSnapshot: (raw) => ({
+      tender_id: raw.data.tenderID,
+      status: raw.data.status,
+      title: raw.data.title,
+    }),
+    nowIso: '2026-05-12T10:00:00Z',
+  }, { tender_id: 'UA-2026-04-30-010542-a', notes: null });
+  assert.equal(result.mutation.type, 'append');
+});
