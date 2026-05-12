@@ -2,7 +2,9 @@ import {
   parseCommand, handleAdd, handleList, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
   handleInvite, handleRedeem, handleRevoke, handleUsersList, handleInvitesList,
+  handleArchive, handleArchiveDetail, handleContract, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
+  applyArchiveMutation,
   formatInfo, HELP_TEXT,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed } from '../../prozorro.mjs';
@@ -13,6 +15,7 @@ import {
   loadWatchedSeen, saveWatchedSeen,
   loadAllowedUsers, saveAllowedUsers,
   loadInvites, saveInvites,
+  loadArchivedTenders, saveArchivedTenders,
   ConflictError,
 } from './github.mjs';
 
@@ -33,6 +36,8 @@ export async function runHandler({ update, env, deps = {} }) {
   const _saveAllowedUsers = deps.saveAllowedUsers ?? saveAllowedUsers;
   const _loadInvites = deps.loadInvites ?? loadInvites;
   const _saveInvites = deps.saveInvites ?? saveInvites;
+  const _loadArchivedTenders = deps.loadArchivedTenders ?? loadArchivedTenders;
+  const _saveArchivedTenders = deps.saveArchivedTenders ?? saveArchivedTenders;
   const _generateToken = deps.generateToken ?? (() => {
     const bytes = new Uint8Array(16);
     crypto.getRandomValues(bytes);
@@ -149,12 +154,19 @@ export async function runHandler({ update, env, deps = {} }) {
     } else if (cmd.error === 'missing_id') {
       reply = '❌ Не вказано tender_id. /add UA-YYYY-MM-DD-NNNNNN-x';
     } else {
+      let archive = [];
+      try {
+        ({ archive } = await _loadArchivedTenders(env));
+      } catch (err) {
+        console.error('worker: /add loadArchivedTenders failed:', err.message);
+        // continue without archive cross-check on transient failures
+      }
       reply = await applyMutationWithRetry({
         env,
         loadWatchlist: _loadWatchlist,
         saveWatchlist: _saveWatchlist,
         computeMutation: ({ watchlist }) =>
-          handleAdd({ watchlist, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot }, cmd),
+          handleAdd({ watchlist, archive, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot }, cmd),
       });
     }
   } else if (cmd.cmd === 'remove') {
@@ -204,8 +216,20 @@ export async function runHandler({ update, env, deps = {} }) {
       if (cmd.tender_id) {
         const row = watchlist.find(r => r.tender_id === cmd.tender_id);
         if (!row) {
-          reply = `❓ ${cmd.tender_id} не у watchlist. Додай: /add ${cmd.tender_id}`;
-          targets = null;
+          // Check archive before saying "not in watchlist"
+          try {
+            const { archive } = await _loadArchivedTenders(env);
+            if (archive.some(a => a.tender_id === cmd.tender_id)) {
+              reply = `📦 Ця закупівля в архіві. /archive ${cmd.tender_id}`;
+              targets = null;
+            } else {
+              reply = `❓ ${cmd.tender_id} не у watchlist. Додай: /add ${cmd.tender_id}`;
+              targets = null;
+            }
+          } catch (err) {
+            reply = `❓ ${cmd.tender_id} не у watchlist. Додай: /add ${cmd.tender_id}`;
+            targets = null;
+          }
         } else {
           targets = [row];
         }
@@ -337,6 +361,53 @@ export async function runHandler({ update, env, deps = {} }) {
           handleRevoke({ allowedUsers: users, adminChatId }, cmd),
       });
     }
+  } else if (cmd.cmd === 'archive') {
+    try {
+      const { archive } = await _loadArchivedTenders(env);
+      if (cmd.tender_id) {
+        reply = await handleArchiveDetail(
+          { archive, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot },
+          cmd,
+        );
+      } else {
+        reply = handleArchive({ archive });
+      }
+    } catch (err) {
+      console.error('worker: /archive failed:', err.message);
+      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+    }
+  } else if (cmd.cmd === 'contract') {
+    if (cmd.error === 'invalid_id') {
+      reply = '❌ Невалідний tender_id. Формат: /contract UA-YYYY-MM-DD-NNNNNN-x';
+    } else if (cmd.error === 'missing_id') {
+      reply = '❌ Не вказано tender_id. /contract UA-YYYY-MM-DD-NNNNNN-x';
+    } else {
+      try {
+        const { archive } = await _loadArchivedTenders(env);
+        reply = await handleContract(
+          { archive, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot },
+          cmd,
+        );
+      } catch (err) {
+        console.error('worker: /contract failed:', err.message);
+        reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+      }
+    }
+  } else if (cmd.cmd === 'unarchive') {
+    if (cmd.error === 'invalid_id') {
+      reply = '❌ Невалідний tender_id. Формат: /unarchive UA-YYYY-MM-DD-NNNNNN-x';
+    } else if (cmd.error === 'missing_id') {
+      reply = '❌ Не вказано tender_id. /unarchive UA-YYYY-MM-DD-NNNNNN-x';
+    } else {
+      reply = await applyUnarchive({
+        env,
+        loadWatchlist: _loadWatchlist,
+        saveWatchlist: _saveWatchlist,
+        loadArchivedTenders: _loadArchivedTenders,
+        saveArchivedTenders: _saveArchivedTenders,
+        tender_id: cmd.tender_id,
+      });
+    }
   } else if (cmd.cmd === 'help') {
     reply = HELP_TEXT;
   } else if (cmd.cmd === 'unknown') {
@@ -442,4 +513,33 @@ async function applyEntityMutationWithRetry({ env, loadWatchedEntities, saveWatc
     }
   }
   return '⚠️ Не зміг зберегти, спробуй за хвилину';
+}
+
+async function applyUnarchive({ env, loadWatchlist, saveWatchlist, loadArchivedTenders, saveArchivedTenders, tender_id }) {
+  try {
+    const { archive, sha: archSha } = await loadArchivedTenders(env);
+    const { watchlist, sha: wlSha } = await loadWatchlist(env);
+    const result = handleUnarchive({ archive, watchlist }, { tender_id });
+    if (!result.watchlistMutation) return result.reply;
+    // Append to watchlist first
+    const newWatchlist = applyMutation(watchlist, result.watchlistMutation);
+    await saveWatchlist(env, newWatchlist, wlSha);
+    // Remove from archive
+    const newArchive = applyArchiveMutation(archive, result.archiveMutation);
+    try {
+      await saveArchivedTenders(env, newArchive, archSha);
+    } catch (err) {
+      console.error('worker: unarchive saveArchive failed:', err.message);
+      return `⚠️ ${tender_id} додано до watchlist, але не видалено з архіву. Наступний monitor-тік може його повторно архівувати — спробуй /unarchive ще раз.`;
+    }
+    return result.reply;
+  } catch (err) {
+    if (err instanceof ConflictError) {
+      return '⚠️ Конфлікт версій, спробуй ще раз';
+    }
+    console.error('worker: applyUnarchive failed:', err.message);
+    return err.message.includes('GitHub')
+      ? '⚠️ GitHub тимчасово недоступний, спробуй за хвилину'
+      : '⚠️ Сталася помилка на стороні бота';
+  }
 }
