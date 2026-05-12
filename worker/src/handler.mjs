@@ -7,7 +7,7 @@ import {
   applyArchiveMutation,
   formatInfo, HELP_TEXT, MAIN_KEYBOARD,
 } from '../../commands.mjs';
-import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract } from '../../prozorro.mjs';
+import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply } from '../../telegram.mjs';
 import {
   loadWatchlist, saveWatchlist,
@@ -32,6 +32,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const _loadWatchedSeen = deps.loadWatchedSeen ?? loadWatchedSeen;
   const _saveWatchedSeen = deps.saveWatchedSeen ?? saveWatchedSeen;
   const _fetchTendersFeed = deps.fetchTendersFeed ?? fetchTendersFeed;
+  const _searchTenderByEdrpou = deps.searchTenderByEdrpou ?? searchTenderByEdrpou;
   const _fetchContract = deps.fetchContract ?? fetchContract;
   const _loadAllowedUsers = deps.loadAllowedUsers ?? loadAllowedUsers;
   const _saveAllowedUsers = deps.saveAllowedUsers ?? saveAllowedUsers;
@@ -263,6 +264,7 @@ export async function runHandler({ update, env, deps = {} }) {
           fetchTendersFeed: _fetchTendersFeed,
           fetchTender: _fetchTender,
           extractSnapshot: _extractSnapshot,
+          searchTenderByEdrpou: _searchTenderByEdrpou,
         }, cmd),
         onSuccess: async (mutation) => {
           if (mutation.bootstrap && mutation.bootstrap.ids.length > 0) {

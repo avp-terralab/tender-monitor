@@ -768,7 +768,7 @@ test('handleWatch: new EDRPOU + feed has matches + active.tendering → bootstra
   assert.deepEqual(result.mutation.bootstrap, { edrpou: '11111111', ids: ['UA-OPEN'] });
 });
 
-test('handleWatch: new EDRPOU + feed has zero matches → warn but accept', async () => {
+test('handleWatch: new EDRPOU + feed has zero matches but search resolves name → name saved', async () => {
   const result = await handleWatch(
     {
       watchedEntities: [],
@@ -778,15 +778,69 @@ test('handleWatch: new EDRPOU + feed has zero matches → warn but accept', asyn
       }),
       fetchTender: async () => ({ data: {} }),
       extractSnapshot: (r) => r.data,
+      searchTenderByEdrpou: async () => ({ name: 'Одеський національний університет' }),
+    },
+    { edrpou: '02071091' }
+  );
+  assert.match(result.reply, /Стежу за 02071091/);
+  assert.match(result.reply, /Одеський|ОНУ/);
+  assert.equal(result.mutation.row.name, 'Одеський національний університет');
+  // Still no bootstrapped ids because feed walk found no active tender
+  assert.deepEqual(result.mutation.bootstrap.ids, []);
+});
+
+test('handleWatch: new EDRPOU + feed empty + search returns null → falls back to "(unknown)"', async () => {
+  const result = await handleWatch(
+    {
+      watchedEntities: [],
+      fetchTendersFeed: async () => ({ items: [], next: null }),
+      fetchTender: async () => ({ data: {} }),
+      extractSnapshot: (r) => r.data,
+      searchTenderByEdrpou: async () => ({ name: null }),
     },
     { edrpou: '11111111' }
   );
   assert.match(result.reply, /✅ 11111111 збережено/);
   assert.match(result.reply, /нормально, якщо замовник публікує рідко/i);
-  assert.equal(result.mutation.type, 'append');
-  assert.equal(result.mutation.row.edrpou, '11111111');
   assert.equal(result.mutation.row.name, '(unknown)');
-  assert.deepEqual(result.mutation.bootstrap, { edrpou: '11111111', ids: [] });
+});
+
+test('handleWatch: feed has matches → does NOT call searchTenderByEdrpou (feed name is authoritative)', async () => {
+  let searchCalled = false;
+  const result = await handleWatch(
+    {
+      watchedEntities: [],
+      fetchTendersFeed: async () => ({
+        items: [{
+          tenderID: 'UA-MATCH',
+          procuringEntity: { identifier: { id: '11111111' }, name: 'Замовник з feed' },
+        }],
+        next: null,
+      }),
+      fetchTender: async () => ({
+        data: { tenderID: 'UA-MATCH', status: 'complete', procuringEntity: { identifier: { id: '11111111' } } },
+      }),
+      extractSnapshot: (r) => r.data,
+      searchTenderByEdrpou: async () => { searchCalled = true; return { name: 'Searched' }; },
+    },
+    { edrpou: '11111111' }
+  );
+  assert.equal(searchCalled, false);
+  assert.equal(result.mutation.row.name, 'Замовник з feed');
+});
+
+test('handleWatch: search dep not provided → falls back to "(unknown)" without crashing', async () => {
+  const result = await handleWatch(
+    {
+      watchedEntities: [],
+      fetchTendersFeed: async () => ({ items: [], next: null }),
+      fetchTender: async () => ({ data: {} }),
+      extractSnapshot: (r) => r.data,
+      // no searchTenderByEdrpou
+    },
+    { edrpou: '11111111' }
+  );
+  assert.equal(result.mutation.row.name, '(unknown)');
 });
 
 test('handleWatch: feed throws → ⚠️ + null mutation', async () => {

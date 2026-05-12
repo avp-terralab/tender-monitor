@@ -136,6 +136,33 @@ export async function fetchTendersFeed({ pageOffset = null, fetch: fetchImpl = f
   return { items: json.data ?? [], next: json.next_page?.path ?? null };
 }
 
+// BFF text-search on prozorro.gov.ua — used as an entity-name enrichment when
+// the descending-feed walk in /watch yields no tender for the EDRPOU. It accepts
+// a free-text query (no server-side filter API is public for procuringEntity).
+// Returns the first hit's legalName ONLY if its EDRPOU matches — otherwise null,
+// because full-text search may surface unrelated tenders that mention the digits.
+// Soft enrichment: any failure returns { name: null } without throwing.
+export async function searchTenderByEdrpou(edrpou, { fetch: fetchImpl = fetch } = {}) {
+  try {
+    const res = await fetchImpl('https://prozorro.gov.ua/api/search/tenders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: edrpou, page: 1, pageSize: 1 }),
+    });
+    if (!res.ok) return { name: null };
+    const json = await res.json();
+    const first = json.data?.[0];
+    if (!first) return { name: null };
+    if (first.procuringEntity?.identifier?.id !== edrpou) return { name: null };
+    const name = first.procuringEntity.identifier.legalName
+      ?? first.procuringEntity.name
+      ?? null;
+    return { name };
+  } catch {
+    return { name: null };
+  }
+}
+
 // Forward "changes" feed: items are returned in ascending dateModified order,
 // pagination via opaque offset (epoch.microsec.shard.hash). Unlike descending=1
 // (used by fetchTendersFeed for /watch bootstrap), this guarantees no items are

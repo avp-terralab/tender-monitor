@@ -87,7 +87,81 @@ test('extractSnapshot supplier shape preserved for awards', () => {
   assert.equal(snap.awards[0].suppliers[0].contactPoint, undefined);
 });
 
-import { fetchTendersFeed, fetchTendersChangesFeed } from '../prozorro.mjs';
+import { fetchTendersFeed, fetchTendersChangesFeed, searchTenderByEdrpou } from '../prozorro.mjs';
+
+test('searchTenderByEdrpou: POSTs to /api/search/tenders with text=edrpou', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, opts });
+    return {
+      ok: true,
+      json: async () => ({
+        total: 1, data: [{
+          procuringEntity: { identifier: { id: '02071091', legalName: 'Одеський університет' } },
+        }],
+      }),
+    };
+  };
+  const result = await searchTenderByEdrpou('02071091', { fetch: fakeFetch });
+  assert.equal(calls[0].url, 'https://prozorro.gov.ua/api/search/tenders');
+  assert.equal(calls[0].opts.method, 'POST');
+  const body = JSON.parse(calls[0].opts.body);
+  assert.equal(body.text, '02071091');
+  assert.equal(result.name, 'Одеський університет');
+});
+
+test('searchTenderByEdrpou: returns null when first match has different EDRPOU', async () => {
+  // text-search is full-text — a non-existent EDRPOU may surface unrelated tenders
+  // that merely mention the digits. Only trust the result when first hit's EDRPOU matches.
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({
+      total: 5, data: [{
+        procuringEntity: { identifier: { id: '99999999', legalName: 'Інший замовник' } },
+      }],
+    }),
+  });
+  const result = await searchTenderByEdrpou('12345678', { fetch: fakeFetch });
+  assert.equal(result.name, null);
+});
+
+test('searchTenderByEdrpou: returns null when no results', async () => {
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({ total: 0, data: [] }),
+  });
+  const result = await searchTenderByEdrpou('99999999', { fetch: fakeFetch });
+  assert.equal(result.name, null);
+});
+
+test('searchTenderByEdrpou: prefers legalName but falls back to name when legalName missing', async () => {
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({
+      total: 1, data: [{
+        procuringEntity: {
+          name: 'Display name',
+          identifier: { id: '02071091' },
+        },
+      }],
+    }),
+  });
+  const result = await searchTenderByEdrpou('02071091', { fetch: fakeFetch });
+  assert.equal(result.name, 'Display name');
+});
+
+test('searchTenderByEdrpou: returns null on non-ok HTTP response (does not throw)', async () => {
+  // BFF search is a soft enrichment — failure should degrade gracefully, not break /watch.
+  const fakeFetch = async () => ({ ok: false, status: 500, text: async () => 'oops' });
+  const result = await searchTenderByEdrpou('02071091', { fetch: fakeFetch });
+  assert.equal(result.name, null);
+});
+
+test('searchTenderByEdrpou: returns null on network error (does not throw)', async () => {
+  const fakeFetch = async () => { throw new Error('ENOTFOUND'); };
+  const result = await searchTenderByEdrpou('02071091', { fetch: fakeFetch });
+  assert.equal(result.name, null);
+});
 
 test('fetchTendersChangesFeed: builds initial URL without offset, no descending', async () => {
   const calls = [];

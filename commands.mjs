@@ -443,6 +443,19 @@ export async function handleWatch(deps, { edrpou }) {
     };
   }
 
+  // Name fallback: when the descending feed walk found no tender for this EDRPOU
+  // (rare publisher, or no publication in the last ~1000 fresh tenders), try the
+  // BFF text-search endpoint — it can pull the legalName from historical tenders
+  // anywhere in Prozorro. Soft enrichment: failure leaves name as "(unknown)".
+  if (entityName === '(unknown)' && deps.searchTenderByEdrpou) {
+    try {
+      const { name } = await deps.searchTenderByEdrpou(edrpou);
+      if (name) entityName = name;
+    } catch {
+      // ignore — keep "(unknown)"
+    }
+  }
+
   const newRow = {
     edrpou,
     name: entityName,
