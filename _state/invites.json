@@ -43,5 +43,14 @@
     "status": "redeemed",
     "redeemed_by": "7321709183",
     "redeemed_at": "2026-05-14T07:14:45.140Z"
+  },
+  {
+    "token": "37ca7ef7c40793d10e8b475e6cbd1410",
+    "label": "Андрій Парасина 1511",
+    "created_at": "2026-05-14T14:43:00.089Z",
+    "expires_at": "2026-05-21T14:43:00.089Z",
+    "status": "pending",
+    "redeemed_by": null,
+    "redeemed_at": null
   }
 ]
