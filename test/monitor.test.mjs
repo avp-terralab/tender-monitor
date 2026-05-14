@@ -466,3 +466,49 @@ test('runOnce: still saveState for tender when archiveTender returns false', asy
   });
   assert.deepEqual(savedIds, [T_DONE]);
 });
+
+test('runOnce: passes addButtonsForTenders for entity-watch alerts (new_tender_announced)', async () => {
+  const sent = [];
+  await runOnce({
+    runIso: '2026-05-14T12:00:00Z',
+    watchlist: [],
+    fetchTender: async () => { throw new Error('not used'); },
+    extractSnapshot: () => ({}),
+    loadState: async () => null,
+    saveState: async () => {},
+    sendDigest: async (text, opts) => { sent.push({ text, opts }); },
+    updateSheet: async () => {},
+    watchedEntities: [{ edrpou: '01998644', enabled: true }],
+    checkWatchedEntities: async () => ({
+      alerts: [{
+        tender_id: 'UA-2026-05-14-008910-a',
+        title: 'X',
+        events: [{ type: 'new_tender_announced' }],
+        prozorro_url: 'https://prozorro.gov.ua/tender/UA-2026-05-14-008910-a',
+      }],
+      errors: [],
+    }),
+    loadCursor: async () => null,
+    saveCursor: async () => {},
+    loadSeen: async () => ({}),
+    saveSeen: async () => {},
+  });
+  assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0].opts, { addButtonsForTenders: ['UA-2026-05-14-008910-a'] });
+});
+
+test('runOnce: heartbeat path passes no addButtonsForTenders', async () => {
+  const sent = [];
+  await runOnce({
+    runIso: '2026-05-14T09:00:00+03:00', // 09:00 Kyiv = isHeartbeatHour
+    watchlist: [],
+    fetchTender: async () => { throw new Error('skipped'); },
+    extractSnapshot: () => ({}),
+    loadState: async () => null,
+    saveState: async () => {},
+    sendDigest: async (text, opts) => { sent.push({ text, opts }); },
+    updateSheet: async () => {},
+  });
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0].opts === undefined || (sent[0].opts.addButtonsForTenders ?? []).length === 0);
+});

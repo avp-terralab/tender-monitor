@@ -58,7 +58,7 @@ const result = await runOnce({
       snapshot: snap,
     }, null, 2));
   },
-  sendDigest: async (text) => tgSend({ token, chatId }, text),
+  sendDigest: async (text, opts) => tgSend({ token, chatId }, text, opts),
   updateSheet: async () => { /* no-op in CI */ },
   watchedEntities,
   checkWatchedEntities,

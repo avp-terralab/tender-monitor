@@ -187,7 +187,10 @@ export async function runOnce(deps) {
       ).join('\n');
       text = text ? `${text}\n\n${block}` : block;
     }
-    await sendDigest(text);
+    const addButtonsForTenders = groups
+      .filter(g => g.events?.some(e => e.type === 'new_tender_announced'))
+      .map(g => g.tender_id);
+    await sendDigest(text, addButtonsForTenders.length > 0 ? { addButtonsForTenders } : undefined);
 
     // Save state only for tenders with events (errors → no save, retry next run).
     // Archived tenders are skipped — their snapshot was unlinked by archiveTender
