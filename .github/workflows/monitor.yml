@@ -1,9 +1,11 @@
 name: tender-monitor
 
 on:
-  # 06:00, 09:00, 12:00, 15:00 UTC = 09:00, 12:00, 15:00, 18:00 Europe/Kyiv (EEST = UTC+3)
+  # Hourly. GitHub Actions free-tier cron drops scheduled runs under load — running every
+  # hour gives ≥1 successful tick per few hours even during drops, and keeps the per-tick
+  # forward-feed backlog small (~1h ≈ 500 items) so watched-entity alerts don't lag.
   schedule:
-    - cron: '0 6,9,12,15 * * *'
+    - cron: '0 * * * *'
   # Allow manual trigger from Actions tab
   workflow_dispatch:
 

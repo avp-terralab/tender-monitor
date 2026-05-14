@@ -215,8 +215,8 @@ test('checkWatchedEntities: page cap stops infinite walk on full pages', async (
     },
   });
   await checkWatchedEntities(deps);
-  // Safety cap kicks in (current FEED_PAGE_CAP = 100). Must be finite.
-  assert.ok(calls <= 100 && calls >= 1, `expected bounded walk, got ${calls} calls`);
+  // Safety cap kicks in (current FEED_PAGE_CAP = 500). Must be finite.
+  assert.ok(calls <= 500 && calls >= 1, `expected bounded walk, got ${calls} calls`);
 });
 
 test('checkWatchedEntities: fetchTender 404 → goes to errors, alert NOT generated, seen NOT updated', async () => {

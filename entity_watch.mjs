@@ -1,10 +1,12 @@
 import { fetchTendersChangesFeed, fetchTendersFeed, fetchTender, extractSnapshot, searchTenderByEdrpou } from './prozorro.mjs';
 
 const ALERT_STATUSES = new Set(['active.tendering', 'active.pre-qualification']);
-// Safety cap on forward feed pagination — 100 pages × 100 items = 10000 tenders ≈ 12-15h of
-// publishing on a busy day. A typical tick (every few hours) reads 1-2 pages; the cap only
-// matters as a safety net for very long downtime / cold-start recovery.
-const FEED_PAGE_CAP = 100;
+// Safety cap on forward feed pagination — 500 pages × 100 items = 50000 tenders ≈ 2.5–4 days
+// of publishing. With hourly cron a tick reads ~5 pages on the happy path; the cap is a
+// safety net for GitHub Actions schedule drops (free-tier may skip several consecutive ticks)
+// and cold-start recovery. Was 100 (~19h coverage); raised after a missed-tick backlog left
+// the cursor short of a freshly-published watched-entity tender.
+const FEED_PAGE_CAP = 500;
 // Per-entity backfill: descending walk of 10 pages (~1000 tenders, ~1.5h of publishing).
 // Runs only for entities with name="(unknown)" — i.e. before we've ever resolved a tender
 // for them. Closes the gap where /watch <edrpou> happens BEFORE the entity publishes
