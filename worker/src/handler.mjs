@@ -412,6 +412,10 @@ export async function runHandler({ update, env, deps = {} }) {
 
 const TENDER_ID_RE = /^UA-\d{4}-\d{2}-\d{2}-\d{6}-[a-zA-Z]$/;
 
+const KYIV_TIME_FMT = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
+});
+
 async function handleCallbackQuery({
   cq, env, _editMessageReplyMarkup, _answerCallbackQuery,
   _loadAllowedUsers, _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
@@ -457,7 +461,11 @@ async function handleCallbackQuery({
       saveWatchlist: _saveWatchlist,
       computeMutation: async ({ watchlist }) => {
         let archive = [];
-        try { ({ archive } = await _loadArchivedTenders(env)); } catch {}
+        try {
+          ({ archive } = await _loadArchivedTenders(env));
+        } catch (err) {
+          console.error('worker: callback add loadArchivedTenders failed:', err.message);
+        }
         return handleAdd({
           watchlist, archive,
           fetchTender: _fetchTender, extractSnapshot: _extractSnapshot,
@@ -619,7 +627,5 @@ async function safeEditKeyboard(_edit, env, chatId, messageId, label) {
 }
 
 function formatKyivTime(d) {
-  return new Intl.DateTimeFormat('uk-UA', {
-    timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(d);
+  return KYIV_TIME_FMT.format(d);
 }
