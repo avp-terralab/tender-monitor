@@ -563,3 +563,67 @@ test('sendDigest: passes text + chat_id to fetch with parse_mode=HTML', async ()
   assert.match(calls[0].body, /text=hello/);
   assert.match(calls[0].body, /parse_mode=HTML/);
 });
+
+test('sendDigest: addButtonsForTenders attaches inline_keyboard to chunk containing the id', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'before\n\nUA-2026-05-14-008910-a in here\n\nafter',
+    { addButtonsForTenders: ['UA-2026-05-14-008910-a'] },
+  );
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /reply_markup=/);
+  const body = decodeURIComponent(calls[0].replace(/\+/g, ' '));
+  assert.match(body, /"callback_data":"add:UA-2026-05-14-008910-a"/);
+  assert.match(body, /Додати в моніторинг/);
+});
+
+test('sendDigest: addButtonsForTenders only attaches button to chunks containing the id', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  // Force chunking by exceeding 4000 chars; tender_id is in second chunk only.
+  const filler = 'X'.repeat(4001);
+  const text = `${filler}\n\nplain group\n\nUA-2026-05-14-008910-a here`;
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    text,
+    { addButtonsForTenders: ['UA-2026-05-14-008910-a'] },
+  );
+  assert.ok(calls.length >= 2, `expected at least 2 chunks, got ${calls.length}`);
+  // First chunk has no tender_id → no reply_markup
+  assert.doesNotMatch(calls[0], /reply_markup/);
+  // Last chunk has tender_id → has reply_markup with the button
+  const last = decodeURIComponent(calls[calls.length - 1].replace(/\+/g, ' '));
+  assert.match(last, /"callback_data":"add:UA-2026-05-14-008910-a"/);
+});
+
+test('sendDigest: no options → no reply_markup (backward compat)', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest({ token: 'TOK', chatId: '1', fetch: fakeFetch }, 'plain text');
+  assert.doesNotMatch(calls[0], /reply_markup/);
+});
+
+test('sendDigest: addButtonsForTenders entries that do NOT appear in any chunk are silently skipped', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'no tender ids in this body at all',
+    { addButtonsForTenders: ['UA-2026-05-14-008910-a'] },
+  );
+  assert.doesNotMatch(calls[0], /reply_markup/);
+});

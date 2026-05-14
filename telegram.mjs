@@ -353,14 +353,22 @@ async function sendOne({ token, chatId, fetch: fetchImpl = fetch }, text, replyM
   throw lastErr;
 }
 
-export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, text) {
+export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, text, { addButtonsForTenders = [] } = {}) {
   const chunks = chunkMessage(text, 4000);
   let last;
   for (let i = 0; i < chunks.length; i++) {
     const annotated = chunks.length > 1
       ? `${chunks[i]}\n\n— ${i + 1}/${chunks.length} —`
       : chunks[i];
-    last = await sendOne({ token, chatId, fetch: fetchImpl }, annotated);
+    const buttonsHere = addButtonsForTenders.filter(id => annotated.includes(id));
+    const replyMarkup = buttonsHere.length > 0
+      ? {
+          inline_keyboard: buttonsHere.map(id => [
+            { text: `➕ Додати в моніторинг ${id}`, callback_data: `add:${id}` },
+          ]),
+        }
+      : null;
+    last = await sendOne({ token, chatId, fetch: fetchImpl }, annotated, replyMarkup);
   }
   return last;
 }
