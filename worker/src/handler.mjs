@@ -8,7 +8,7 @@ import {
   formatInfo, HELP_TEXT, MAIN_KEYBOARD,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
-import { sendReply } from '../../telegram.mjs';
+import { sendReply, editMessageReplyMarkup, answerCallbackQuery } from '../../telegram.mjs';
 import {
   loadWatchlist, saveWatchlist,
   loadWatchedEntities, saveWatchedEntities,
@@ -46,6 +46,17 @@ export async function runHandler({ update, env, deps = {} }) {
     return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
   });
   const _now = deps.now ?? (() => new Date());
+  const _editMessageReplyMarkup = deps.editMessageReplyMarkup ?? editMessageReplyMarkup;
+  const _answerCallbackQuery = deps.answerCallbackQuery ?? answerCallbackQuery;
+
+  const cq = update.callback_query;
+  if (cq) {
+    return handleCallbackQuery({
+      cq, env, _sendReply, _editMessageReplyMarkup, _answerCallbackQuery,
+      _loadAllowedUsers, _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
+      _fetchTender, _extractSnapshot,
+    });
+  }
 
   const msg = update.message;
   if (!msg) return;
@@ -397,6 +408,55 @@ export async function runHandler({ update, env, deps = {} }) {
   } catch (err) {
     console.error('worker: sendReply failed:', err.message);
   }
+}
+
+const TENDER_ID_RE = /^UA-\d{4}-\d{2}-\d{2}-\d{6}-[a-zA-Z]$/;
+
+async function handleCallbackQuery({
+  cq, env, _sendReply, _editMessageReplyMarkup, _answerCallbackQuery,
+  _loadAllowedUsers, _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
+  _fetchTender, _extractSnapshot,
+}) {
+  const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
+  const chatId = String(cq.message?.chat?.id ?? '');
+  const messageId = cq.message?.message_id;
+  const isAdmin = chatId !== '' && chatId === adminChatId;
+
+  let isInvited = false;
+  if (!isAdmin) {
+    try {
+      const { users } = await _loadAllowedUsers(env);
+      isInvited = users.some(u => u.chat_id === chatId);
+    } catch (err) {
+      console.error('worker: callback loadAllowedUsers failed:', err.message);
+    }
+  }
+  const isAllowed = isAdmin || isInvited;
+
+  const ack = (text, showAlert = false) => _answerCallbackQuery({
+    token: env.TELEGRAM_BOT_TOKEN, callbackQueryId: cq.id, text, showAlert,
+  });
+
+  if (!isAllowed) {
+    await ack('🚫 Доступ заборонено', true);
+    return;
+  }
+
+  const data = String(cq.data ?? '');
+  if (data === 'noop') { await ack(); return; }
+
+  if (data.startsWith('add:')) {
+    const tenderId = data.slice(4);
+    if (!TENDER_ID_RE.test(tenderId)) {
+      await ack('❌ Невалідний tender_id');
+      return;
+    }
+    // Add path implemented in next task — for now stub to avoid compile errors.
+    await ack('TODO');
+    return;
+  }
+
+  await ack('❓ Невідома кнопка');
 }
 
 async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, computeMutation }) {

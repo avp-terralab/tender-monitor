@@ -1135,3 +1135,99 @@ test('runHandler: /info UA-... for archived → redirect', async () => {
   assert.match(sent[0].text, /📦 Ця закупівля в архіві/);
   assert.match(sent[0].text, /\/archive UA-2026-04-30-010542-a/);
 });
+
+test('runHandler: callback_query from non-allowed user → answers "Доступ заборонено", no edit, no add', async () => {
+  const sent = [];
+  const acks = [];
+  const edits = [];
+  const adds = [];
+  await runHandler({
+    update: {
+      callback_query: {
+        id: 'cbq1',
+        data: 'add:UA-2026-05-14-008910-a',
+        message: { chat: { id: 999 }, message_id: 42 },
+      },
+    },
+    env: ENV,
+    deps: {
+      ...makeDeps().deps,
+      sendReply: async (a) => sent.push(a),
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageReplyMarkup: async (a) => edits.push(a),
+      saveWatchlist: async () => adds.push('called'),
+      loadAllowedUsers: async () => ({ users: [], sha: null }),
+    },
+  });
+  assert.equal(sent.length, 0);
+  assert.equal(edits.length, 0);
+  assert.equal(adds.length, 0);
+  assert.equal(acks.length, 1);
+  assert.match(acks[0].text, /Доступ заборонено/);
+});
+
+test('runHandler: callback_query data="noop" → empty answer, nothing else', async () => {
+  const acks = [];
+  const edits = [];
+  await runHandler({
+    update: {
+      callback_query: {
+        id: 'cbq1', data: 'noop',
+        message: { chat: { id: 123 }, message_id: 42 },
+      },
+    },
+    env: ENV,
+    deps: {
+      ...makeDeps().deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageReplyMarkup: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(edits.length, 0);
+  assert.equal(acks.length, 1);
+  assert.equal(acks[0].text, undefined);
+});
+
+test('runHandler: callback_query data="add:bad-format" → answers with error toast, no add, no edit', async () => {
+  const acks = [];
+  const edits = [];
+  const adds = [];
+  await runHandler({
+    update: {
+      callback_query: {
+        id: 'cbq1', data: 'add:not-a-tender',
+        message: { chat: { id: 123 }, message_id: 42 },
+      },
+    },
+    env: ENV,
+    deps: {
+      ...makeDeps().deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageReplyMarkup: async (a) => edits.push(a),
+      saveWatchlist: async () => adds.push('x'),
+    },
+  });
+  assert.equal(adds.length, 0);
+  assert.equal(edits.length, 0);
+  assert.equal(acks.length, 1);
+  assert.match(acks[0].text, /Невалідний tender_id/);
+});
+
+test('runHandler: callback_query data="something-unknown" → answers with unknown-button toast', async () => {
+  const acks = [];
+  await runHandler({
+    update: {
+      callback_query: {
+        id: 'cbq1', data: 'frobnicate',
+        message: { chat: { id: 123 }, message_id: 42 },
+      },
+    },
+    env: ENV,
+    deps: {
+      ...makeDeps().deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+    },
+  });
+  assert.equal(acks.length, 1);
+  assert.match(acks[0].text, /Невідома кнопка/);
+});
