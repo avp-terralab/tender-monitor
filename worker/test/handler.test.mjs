@@ -1232,6 +1232,84 @@ test('runHandler: callback_query data="something-unknown" → answers with unkno
   assert.match(acks[0].text, /Невідома кнопка/);
 });
 
+test('runHandler: callback add when tender already in watchlist → keyboard ℹ️ Вже додано, toast', async () => {
+  const acks = [];
+  const edits = [];
+  await runHandler({
+    update: {
+      callback_query: {
+        id: 'cbq1', data: `add:${ID}`,
+        message: { chat: { id: 123 }, message_id: 42 },
+      },
+    },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true }], sha: 'sha1' }),
+      }).deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageReplyMarkup: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(edits.length, 1);
+  assert.match(JSON.stringify(edits[0].replyMarkup), /Вже додано/);
+  assert.equal(acks.length, 1);
+  assert.match(acks[0].text, /Вже моніторю/);
+});
+
+test('runHandler: callback add when tender in archive → keyboard 📦 В архіві, toast', async () => {
+  const acks = [];
+  const edits = [];
+  await runHandler({
+    update: {
+      callback_query: {
+        id: 'cbq1', data: `add:${ID}`,
+        message: { chat: { id: 123 }, message_id: 42 },
+      },
+    },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [], sha: 'sha1' }),
+        loadArchivedTenders: async () => ({ archive: [{ tender_id: ID, final_status: 'cancelled' }], sha: null }),
+      }).deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageReplyMarkup: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(edits.length, 1);
+  assert.match(JSON.stringify(edits[0].replyMarkup), /В архіві/);
+  assert.equal(acks.length, 1);
+  assert.match(acks[0].text, /архів/i);
+});
+
+test('runHandler: callback add when GitHub conflict → keyboard NOT edited, error toast', async () => {
+  const acks = [];
+  const edits = [];
+  // Simulate persistent ConflictError to exhaust applyMutationWithRetry retries.
+  const { ConflictError } = await import('../src/github.mjs');
+  await runHandler({
+    update: {
+      callback_query: {
+        id: 'cbq1', data: `add:${ID}`,
+        message: { chat: { id: 123 }, message_id: 42 },
+      },
+    },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [], sha: 'sha1' }),
+        saveWatchlist: async () => { throw new ConflictError('409'); },
+      }).deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageReplyMarkup: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(edits.length, 0, 'keyboard should NOT be edited on error');
+  assert.equal(acks.length, 1);
+  assert.match(acks[0].text, /спробуй за хвилину/i);
+});
+
 test('runHandler: callback_query "add:UA-…" success → handleAdd, edit keyboard to ✅, toast', async () => {
   const acks = [];
   const edits = [];
