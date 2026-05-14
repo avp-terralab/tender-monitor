@@ -8,10 +8,16 @@ const snap = (name) =>
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
 
+// snap_initial fixture has tenderPeriod.endDate = 2026-05-15T14:00+03. Tests that don't care
+// about deadline_approaching must pass a runIso far enough before that to keep all thresholds
+// (24h/12h/3h) silent — otherwise they become time-bombs once wall-clock approaches the fixture
+// date. SAFE_RUN_ISO sits 14 days before the fixture deadline.
+const SAFE_RUN_ISO = '2026-05-01T00:00:00Z';
+
 // ─── Task 1.1 ─────────────────────────────────────────────────────────────────
 test('diff(null, initial): returns monitoring_started', () => {
   const curr = snap('snap_initial');
-  const events = diff(null, curr);
+  const events = diff(null, curr, SAFE_RUN_ISO);
   assert.equal(events.length, 1);
   assert.equal(events[0].type, 'monitoring_started');
   assert.equal(events[0].status, 'active.tendering');
@@ -22,7 +28,9 @@ test('diff(null, initial): returns monitoring_started', () => {
 test('diff(initial, deadline_changed): returns deadline_changed', () => {
   const prev = snap('snap_initial');
   const curr = snap('snap_deadline_changed');
-  const events = diff(prev, curr);
+  // SAFE_RUN_ISO needed: snap_deadline_changed has endDate 2026-05-20; without explicit runIso
+  // this test would start failing on 2026-05-19 once wall-clock crosses the 24h threshold.
+  const events = diff(prev, curr, SAFE_RUN_ISO);
   assert.equal(events.length, 1);
   assert.equal(events[0].type, 'deadline_changed');
   assert.equal(events[0].old, '2026-05-15T14:00:00+03:00');
@@ -57,14 +65,14 @@ test('noise filter: bumped dateModified only → []', () => {
   const prev = snap('snap_initial');
   const curr = clone(prev);
   curr.dateModified = '2026-05-04T10:00:00+03:00'; // only timestamp change
-  const events = diff(prev, curr);
+  const events = diff(prev, curr, SAFE_RUN_ISO);
   assert.equal(events.length, 0, `Expected [] but got ${JSON.stringify(events)}`);
 });
 
 test('noise filter: deep-equal snapshot → []', () => {
   const prev = snap('snap_initial');
   const curr = clone(prev); // identical deep copy, same dateModified
-  const events = diff(prev, curr);
+  const events = diff(prev, curr, SAFE_RUN_ISO);
   assert.equal(events.length, 0, `Expected [] but got ${JSON.stringify(events)}`);
 });
 
@@ -233,7 +241,7 @@ test('diff(initial, initial-with-bumped-dateModified): returns []', () => {
   const prev = snap('snap_initial');
   const curr = clone(prev);
   curr.dateModified = '2026-05-03T10:00:00+03:00';
-  const events = diff(prev, curr);
+  const events = diff(prev, curr, SAFE_RUN_ISO);
   assert.equal(events.length, 0);
 });
 
