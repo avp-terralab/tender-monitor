@@ -510,5 +510,33 @@ test('runOnce: heartbeat path passes no addButtonsForTenders', async () => {
     updateSheet: async () => {},
   });
   assert.equal(sent.length, 1);
-  assert.ok(sent[0].opts === undefined || (sent[0].opts.addButtonsForTenders ?? []).length === 0);
+  assert.equal(sent[0].opts, undefined);
+});
+
+test('runOnce: watchlist-only events without new_tender_announced → opts undefined', async () => {
+  const sent = [];
+  await runOnce({
+    runIso: '2026-05-14T12:00:00Z',
+    watchlist: [{ tender_id: 'UA-2026-04-30-010542-a', enabled: true }],
+    fetchTender: async () => ({
+      data: {
+        tenderID: 'UA-2026-04-30-010542-a',
+        title: 'X',
+        status: 'active.tendering',
+        tenderPeriod: { endDate: '2026-06-15T14:00:00+03:00' },
+      },
+    }),
+    extractSnapshot: (raw) => raw.data,
+    loadState: async () => ({
+      tender_id: 'UA-2026-04-30-010542-a',
+      title: 'X',
+      status: 'active.qualification', // status changed → produces a status_changed event
+      tenderPeriod: { endDate: '2026-06-15T14:00:00+03:00' },
+    }),
+    saveState: async () => {},
+    sendDigest: async (text, opts) => { sent.push({ text, opts }); },
+    updateSheet: async () => {},
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].opts, undefined);
 });
