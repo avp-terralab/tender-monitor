@@ -61,7 +61,7 @@ test('checkWatchedEntities: candidate matches EDRPOU + status active.tendering +
         status: 'active.tendering',
         tenderPeriod: { endDate: '2026-05-15T14:00:00+03:00' },
         procuringEntity: { name: 'Замовник', identifier: { id: '11111111' } },
-        items: [],
+        items: [{ classification: { id: '72250000-2', scheme: 'ДК021' } }],
         value: { amount: 1000, currency: 'UAH' },
       },
     }),
@@ -131,7 +131,7 @@ test('checkWatchedEntities: walks pages forward until items empty, advances offs
         title: 't',
         status: 'active.tendering',
         procuringEntity: { name: 'X', identifier: { id: '11111111' } },
-        items: [],
+        items: [{ classification: { id: '72250000-2', scheme: 'ДК021' } }],
       },
     }),
   });
@@ -315,7 +315,7 @@ test('checkWatchedEntities: backfill finds tender published before cursor, alert
         status: 'active.tendering',
         procuringEntity: { name: 'КНП «Охтирська ЦРЛ»', identifier: { id: '02007472' } },
         tenderPeriod: { endDate: '2026-05-16T08:00:00+03:00' },
-        items: [],
+        items: [{ classification: { id: '72250000-2', scheme: 'ДК021' } }],
       },
     }),
   });
@@ -496,4 +496,50 @@ test('checkWatchedEntities: discoveredNames populated when watched name is "(unk
   });
   const result = await checkWatchedEntities(deps);
   assert.equal(result.discoveredNames['11111111'], 'Реальна назва');
+});
+
+// ─── CPV filter (TerraLab business: only 48xx software / 72xx IT services) ───
+const cpvFilterDeps = (cpvId) => baseDeps({
+  watchedEntities: [{ edrpou: '11111111', enabled: true }],
+  fetchChangesFeed: async () => ({
+    items: [{ tenderID: 'UA-CPV', procuringEntity: { identifier: { id: '11111111' } } }],
+    nextOffset: 'cp',
+  }),
+  fetchTender: async () => ({
+    data: {
+      tenderID: 'UA-CPV',
+      title: 't',
+      status: 'active.tendering',
+      procuringEntity: { name: 'X', identifier: { id: '11111111' } },
+      items: cpvId ? [{ classification: { id: cpvId, scheme: 'ДК021' } }] : [],
+    },
+  }),
+});
+
+test('checkWatchedEntities: CPV starts with 48 → alert generated', async () => {
+  const { deps, state } = cpvFilterDeps('48000000-1');
+  const result = await checkWatchedEntities(deps);
+  assert.equal(result.alerts.length, 1);
+  assert.deepEqual(state.seenStore.value['11111111'], ['UA-CPV']);
+});
+
+test('checkWatchedEntities: CPV starts with 72 → alert generated', async () => {
+  const { deps, state } = cpvFilterDeps('72250000-2');
+  const result = await checkWatchedEntities(deps);
+  assert.equal(result.alerts.length, 1);
+  assert.deepEqual(state.seenStore.value['11111111'], ['UA-CPV']);
+});
+
+test('checkWatchedEntities: CPV outside 48/72 (e.g. 33xxx medical) → no alert, seen NOT updated', async () => {
+  const { deps, state } = cpvFilterDeps('33141000-0');
+  const result = await checkWatchedEntities(deps);
+  assert.equal(result.alerts.length, 0);
+  assert.equal(state.seenStore.value['11111111'], undefined);
+});
+
+test('checkWatchedEntities: tender with no classification → no alert, seen NOT updated', async () => {
+  const { deps, state } = cpvFilterDeps(null);
+  const result = await checkWatchedEntities(deps);
+  assert.equal(result.alerts.length, 0);
+  assert.equal(state.seenStore.value['11111111'], undefined);
 });

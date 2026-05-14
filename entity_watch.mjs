@@ -1,6 +1,11 @@
 import { fetchTendersChangesFeed, fetchTendersFeed, fetchTender, extractSnapshot, searchTenderByEdrpou } from './prozorro.mjs';
 
 const ALERT_STATUSES = new Set(['active.tendering', 'active.pre-qualification']);
+// Only alert on tenders whose first-item CPV (ДК 021:2015) starts with one of these prefixes.
+// 48 = software packages and information systems; 72 = IT services. Tenders with other CPVs
+// (medical equipment, chemicals, construction, etc.) from watched entities are silently
+// skipped — TerraLab's business is purely software/IT, so other categories are noise.
+const RELEVANT_CPV_PREFIXES = ['48', '72'];
 // Safety cap on forward feed pagination — 500 pages × 100 items = 50000 tenders ≈ 2.5–4 days
 // of publishing. With hourly cron a tick reads ~5 pages on the happy path; the cap is a
 // safety net for GitHub Actions schedule drops (free-tier may skip several consecutive ticks)
@@ -105,12 +110,16 @@ export async function checkWatchedEntities(deps) {
       const raw = await _fetch(cand.tenderID);
       const snap = _extract(raw);
       if (!ALERT_STATUSES.has(snap.status)) continue;
-      alerts.push(buildAlertGroup(snap));
-      seen[edrpou] = [...seenForEntity, cand.tenderID];
+      // Learn the entity name regardless of CPV — even if we'll silently skip the alert
+      // because the tender's CPV is irrelevant, the snapshot's procuringEntity.name is
+      // still authoritative for resolving "(unknown)".
       const watchedRow = watchedByEdrpou.get(edrpou);
       if (watchedRow && (!watchedRow.name || watchedRow.name === '(unknown)') && snap.procuringEntity?.name) {
         discoveredNames[edrpou] = snap.procuringEntity.name;
       }
+      if (!isRelevantCpv(snap.classification?.id)) continue;
+      alerts.push(buildAlertGroup(snap));
+      seen[edrpou] = [...seenForEntity, cand.tenderID];
     } catch (err) {
       errors.push({ tender_id: cand.tenderID, error: err.message });
     }
@@ -132,6 +141,11 @@ export async function checkWatchedEntities(deps) {
   await saveCursor({ offset: lastOffset });
   await saveSeen(seen);
   return { alerts, errors, discoveredNames };
+}
+
+function isRelevantCpv(cpv) {
+  if (!cpv) return false;
+  return RELEVANT_CPV_PREFIXES.some(p => cpv.startsWith(p));
 }
 
 function buildAlertGroup(snap) {
