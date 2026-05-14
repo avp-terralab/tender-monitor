@@ -420,3 +420,29 @@ export async function sendReply({ token, chatId, text, replyToMessageId, replyMa
   }
   throw lastErr;
 }
+
+export async function editMessageReplyMarkup({ token, chatId, messageId, replyMarkup, fetch: fetchImpl = fetch }) {
+  const url = `https://api.telegram.org/bot${token}/editMessageReplyMarkup`;
+  const params = new URLSearchParams({
+    chat_id: String(chatId),
+    message_id: String(messageId),
+    reply_markup: JSON.stringify(replyMarkup),
+  });
+  const res = await fetchImpl(url, { method: 'POST', body: params });
+  if (!res.ok) throw new Error(`Telegram editMessageReplyMarkup ${res.status}: ${await res.text()}`);
+  const json = await res.json();
+  if (!json.ok) throw new Error(`Telegram editMessageReplyMarkup: ${json.description ?? 'unknown'}`);
+  return json;
+}
+
+export async function answerCallbackQuery({ token, callbackQueryId, text, showAlert, fetch: fetchImpl = fetch }) {
+  const url = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
+  const params = new URLSearchParams({ callback_query_id: String(callbackQueryId) });
+  if (text != null) params.set('text', text);
+  if (showAlert) params.set('show_alert', 'true');
+  const res = await fetchImpl(url, { method: 'POST', body: params });
+  if (!res.ok) throw new Error(`Telegram answerCallbackQuery ${res.status}: ${await res.text()}`);
+  const json = await res.json();
+  if (!json.ok) throw new Error(`Telegram answerCallbackQuery: ${json.description ?? 'unknown'}`);
+  return json;
+}

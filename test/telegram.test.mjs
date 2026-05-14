@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, answerCallbackQuery } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -626,4 +626,63 @@ test('sendDigest: addButtonsForTenders entries that do NOT appear in any chunk a
     { addButtonsForTenders: ['UA-2026-05-14-008910-a'] },
   );
   assert.doesNotMatch(calls[0], /reply_markup/);
+});
+
+test('editMessageReplyMarkup: posts to editMessageReplyMarkup endpoint with chat_id, message_id, reply_markup', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, body: opts.body.toString() });
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  const kb = { inline_keyboard: [[{ text: '✅ Додано', callback_data: 'noop' }]] };
+  await editMessageReplyMarkup({
+    token: 'TOK', chatId: '111', messageId: 222, replyMarkup: kb, fetch: fakeFetch,
+  });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/botTOK\/editMessageReplyMarkup$/);
+  const body = decodeURIComponent(calls[0].body.replace(/\+/g, ' '));
+  assert.match(body, /chat_id=111/);
+  assert.match(body, /message_id=222/);
+  assert.match(body, /reply_markup=.*✅ Додано/);
+  assert.match(body, /"callback_data":"noop"/);
+});
+
+test('editMessageReplyMarkup: throws on Telegram error response', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 400, text: async () => 'bad' });
+  await assert.rejects(
+    () => editMessageReplyMarkup({
+      token: 'T', chatId: '1', messageId: 1,
+      replyMarkup: { inline_keyboard: [] }, fetch: fakeFetch,
+    }),
+    /Telegram editMessageReplyMarkup 400/,
+  );
+});
+
+test('answerCallbackQuery: posts callback_query_id, text, show_alert', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, body: opts.body.toString() });
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await answerCallbackQuery({
+    token: 'TOK', callbackQueryId: 'cbq1', text: '✅ Готово', showAlert: true, fetch: fakeFetch,
+  });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/botTOK\/answerCallbackQuery$/);
+  const body = decodeURIComponent(calls[0].body.replace(/\+/g, ' '));
+  assert.match(body, /callback_query_id=cbq1/);
+  assert.match(body, /text=✅ Готово/);
+  assert.match(body, /show_alert=true/);
+});
+
+test('answerCallbackQuery: omits text and show_alert when not provided', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await answerCallbackQuery({ token: 'T', callbackQueryId: 'cbq1', fetch: fakeFetch });
+  assert.equal(calls.length, 1);
+  assert.doesNotMatch(calls[0], /text=/);
+  assert.doesNotMatch(calls[0], /show_alert=/);
 });
