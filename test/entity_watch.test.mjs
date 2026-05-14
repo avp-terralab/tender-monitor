@@ -544,6 +544,34 @@ test('checkWatchedEntities: tender with no classification → no alert, seen NOT
   assert.equal(state.seenStore.value['11111111'], undefined);
 });
 
+test('checkWatchedEntities: seen state capped at 200 per entity — oldest dropped FIFO', async () => {
+  // Pre-load seen with 200 existing IDs; new alert should drop the oldest.
+  const preExisting = Array.from({ length: 200 }, (_, i) => `UA-OLD-${String(i).padStart(3, '0')}`);
+  const { deps, state } = baseDeps({
+    watchedEntities: [{ edrpou: '11111111', enabled: true }],
+    loadSeen: async () => ({ '11111111': [...preExisting] }),
+    fetchChangesFeed: async () => ({
+      items: [{ tenderID: 'UA-NEW', procuringEntity: { identifier: { id: '11111111' } } }],
+      nextOffset: 'cp',
+    }),
+    fetchTender: async () => ({
+      data: {
+        tenderID: 'UA-NEW',
+        title: 't',
+        status: 'active.tendering',
+        procuringEntity: { name: 'X', identifier: { id: '11111111' } },
+        items: [{ classification: { id: '72250000-2', scheme: 'ДК021' } }],
+      },
+    }),
+  });
+  await checkWatchedEntities(deps);
+  const finalSeen = state.seenStore.value['11111111'];
+  assert.equal(finalSeen.length, 200, 'cap holds at 200');
+  assert.equal(finalSeen[finalSeen.length - 1], 'UA-NEW', 'newest at tail');
+  assert.equal(finalSeen.includes('UA-OLD-000'), false, 'oldest dropped');
+  assert.equal(finalSeen[0], 'UA-OLD-001', 'second-oldest now at head');
+});
+
 test('checkWatchedEntities: per-entity cpv_prefixes overrides default — alert on 33xxx', async () => {
   // Entity has cpv_prefixes=["33"] → 33xxx (медтехніка) IS relevant for THIS entity
   // even though it's outside the global 48/72 default.

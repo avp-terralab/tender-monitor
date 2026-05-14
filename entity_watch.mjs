@@ -21,6 +21,11 @@ const FEED_PAGE_CAP = 500;
 // for them. Closes the gap where /watch <edrpou> happens BEFORE the entity publishes
 // (forward feed only catches future publications).
 const BACKFILL_PAGE_CAP = 10;
+// Cap seen-state size per entity to keep _watched_seen.json bounded. Oldest IDs are dropped
+// FIFO once the cap is exceeded. Re-alert risk is essentially zero: forward cursor only
+// moves ahead, and any tender re-surfacing via dateModified will have a non-active status
+// (dropped tenders are ≥SEEN_CAP-tenders-old → long since complete/cancelled).
+const SEEN_CAP_PER_ENTITY = 200;
 
 export async function checkWatchedEntities(deps) {
   const {
@@ -124,7 +129,7 @@ export async function checkWatchedEntities(deps) {
       const prefixes = watchedRow?.cpv_prefixes ?? RELEVANT_CPV_PREFIXES;
       if (!hasRelevantCpv(snap.classification_ids ?? [], prefixes)) continue;
       alerts.push(buildAlertGroup(snap));
-      seen[edrpou] = [...seenForEntity, cand.tenderID];
+      seen[edrpou] = [...seenForEntity, cand.tenderID].slice(-SEEN_CAP_PER_ENTITY);
     } catch (err) {
       errors.push({ tender_id: cand.tenderID, error: err.message });
     }
