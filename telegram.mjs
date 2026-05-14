@@ -111,10 +111,15 @@ const LEGAL_FORM_ABBREVIATIONS = [
 
 export function abbreviateLegalForm(name) {
   if (!name) return name;
+  // Prozorro registry sometimes returns names with leading/trailing whitespace
+  // (e.g. " Комунальне підприємство ..."). All abbreviation regexes are anchored
+  // at ^, so trim before matching — otherwise the regex misses and the long form
+  // leaks through to /watched, /info, digests, etc.
+  const trimmed = name.trim();
   for (const [re, replacement] of LEGAL_FORM_ABBREVIATIONS) {
-    if (re.test(name)) return name.replace(re, replacement).trim();
+    if (re.test(trimmed)) return trimmed.replace(re, replacement).trim();
   }
-  return name;
+  return trimmed;
 }
 
 function fmtDate(iso) {

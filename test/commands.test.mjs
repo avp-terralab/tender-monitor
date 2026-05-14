@@ -278,6 +278,17 @@ test('abbreviateLegalForm: empty/null returns unchanged', () => {
   assert.equal(abbreviateLegalForm(null), null);
 });
 
+test('abbreviateLegalForm: leading/trailing whitespace does not block matching (Prozorro registry quirk)', () => {
+  assert.equal(
+    abbreviateLegalForm(' Комунальне підприємство "Балтська багатопрофільна лікарня" Балтської міської ради'),
+    'КП "Балтська багатопрофільна лікарня" Балтської міської ради',
+  );
+  assert.equal(
+    abbreviateLegalForm('Товариство з обмеженою відповідальністю «ТерраЛаб»  '),
+    'ТОВ «ТерраЛаб»',
+  );
+});
+
 test('applyMutation: append adds new row', () => {
   const wl = [{ tender_id: 'UA-A', enabled: true, notes: 'A' }];
   const result = applyMutation(wl, {
