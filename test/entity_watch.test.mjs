@@ -543,3 +543,29 @@ test('checkWatchedEntities: tender with no classification → no alert, seen NOT
   assert.equal(result.alerts.length, 0);
   assert.equal(state.seenStore.value['11111111'], undefined);
 });
+
+test('checkWatchedEntities: multi-item tender with first item irrelevant + second relevant → alert', async () => {
+  // Real Prozorro case: e.g. tender lists [медичне обладнання 33141, ЛІС-послуга 72250].
+  // First item is 33xxx — would fail single-item check. Filter must scan ALL items.
+  const { deps } = baseDeps({
+    watchedEntities: [{ edrpou: '11111111', enabled: true }],
+    fetchChangesFeed: async () => ({
+      items: [{ tenderID: 'UA-MULTI', procuringEntity: { identifier: { id: '11111111' } } }],
+      nextOffset: 'cp',
+    }),
+    fetchTender: async () => ({
+      data: {
+        tenderID: 'UA-MULTI',
+        title: 't',
+        status: 'active.tendering',
+        procuringEntity: { name: 'X', identifier: { id: '11111111' } },
+        items: [
+          { classification: { id: '33141000-0', scheme: 'ДК021' } }, // irrelevant — медтехніка
+          { classification: { id: '72250000-2', scheme: 'ДК021' } }, // relevant — ЛІС-послуга
+        ],
+      },
+    }),
+  });
+  const result = await checkWatchedEntities(deps);
+  assert.equal(result.alerts.length, 1);
+});

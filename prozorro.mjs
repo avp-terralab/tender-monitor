@@ -72,6 +72,11 @@ export function extractSnapshot(raw) {
           scheme: t.items[0].classification.scheme ?? null,
         }
       : null,
+    // All items' CPV ids — used by entity_watch filter to match ANY relevant code
+    // in multi-line tenders (e.g. медтехніка + ЛІС-послуга у одному оголошенні).
+    classification_ids: (t.items ?? [])
+      .map(it => it?.classification?.id)
+      .filter(Boolean),
     contact: t.procuringEntity?.contactPoint?.name
       ? {
           name: t.procuringEntity.contactPoint.name,

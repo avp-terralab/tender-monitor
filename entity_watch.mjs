@@ -117,7 +117,7 @@ export async function checkWatchedEntities(deps) {
       if (watchedRow && (!watchedRow.name || watchedRow.name === '(unknown)') && snap.procuringEntity?.name) {
         discoveredNames[edrpou] = snap.procuringEntity.name;
       }
-      if (!isRelevantCpv(snap.classification?.id)) continue;
+      if (!hasRelevantCpv(snap.classification_ids ?? [])) continue;
       alerts.push(buildAlertGroup(snap));
       seen[edrpou] = [...seenForEntity, cand.tenderID];
     } catch (err) {
@@ -143,9 +143,8 @@ export async function checkWatchedEntities(deps) {
   return { alerts, errors, discoveredNames };
 }
 
-function isRelevantCpv(cpv) {
-  if (!cpv) return false;
-  return RELEVANT_CPV_PREFIXES.some(p => cpv.startsWith(p));
+function hasRelevantCpv(cpvIds) {
+  return cpvIds.some(cpv => RELEVANT_CPV_PREFIXES.some(p => cpv.startsWith(p)));
 }
 
 function buildAlertGroup(snap) {
