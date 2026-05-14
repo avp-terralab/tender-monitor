@@ -52,7 +52,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const cq = update.callback_query;
   if (cq) {
     return handleCallbackQuery({
-      cq, env, _sendReply, _editMessageReplyMarkup, _answerCallbackQuery,
+      cq, env, _editMessageReplyMarkup, _answerCallbackQuery,
       _loadAllowedUsers, _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
       _fetchTender, _extractSnapshot,
     });
@@ -413,7 +413,7 @@ export async function runHandler({ update, env, deps = {} }) {
 const TENDER_ID_RE = /^UA-\d{4}-\d{2}-\d{2}-\d{6}-[a-zA-Z]$/;
 
 async function handleCallbackQuery({
-  cq, env, _sendReply, _editMessageReplyMarkup, _answerCallbackQuery,
+  cq, env, _editMessageReplyMarkup, _answerCallbackQuery,
   _loadAllowedUsers, _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
   _fetchTender, _extractSnapshot,
 }) {
@@ -451,8 +451,20 @@ async function handleCallbackQuery({
       await ack('❌ Невалідний tender_id');
       return;
     }
-    // Add path implemented in next task — for now stub to avoid compile errors.
-    await ack('TODO');
+    const result = await applyMutationWithRetry({
+      env,
+      loadWatchlist: _loadWatchlist,
+      saveWatchlist: _saveWatchlist,
+      computeMutation: async ({ watchlist }) => {
+        let archive = [];
+        try { ({ archive } = await _loadArchivedTenders(env)); } catch {}
+        return handleAdd({
+          watchlist, archive,
+          fetchTender: _fetchTender, extractSnapshot: _extractSnapshot,
+        }, { tender_id: tenderId, notes: null });
+      },
+    });
+    await onAddResult({ result, tenderId, chatId, messageId, env, _editMessageReplyMarkup, ack });
     return;
   }
 
@@ -573,4 +585,41 @@ async function applyUnarchive({ env, loadWatchlist, saveWatchlist, loadArchivedT
       ? '⚠️ GitHub тимчасово недоступний, спробуй за хвилину'
       : '⚠️ Сталася помилка на стороні бота';
   }
+}
+
+async function onAddResult({ result, tenderId, chatId, messageId, env, _editMessageReplyMarkup, ack }) {
+  const time = formatKyivTime(new Date());
+  if (typeof result === 'string' && /^✅/.test(result)) {
+    await safeEditKeyboard(_editMessageReplyMarkup, env, chatId, messageId, `✅ Додано ${time}`);
+    await ack(`✅ ${tenderId} додано у watchlist`);
+    return;
+  }
+  if (typeof result === 'string' && /Вже моніторю/.test(result)) {
+    await safeEditKeyboard(_editMessageReplyMarkup, env, chatId, messageId, `ℹ️ Вже додано`);
+    await ack('ℹ️ Вже моніторю');
+    return;
+  }
+  if (typeof result === 'string' && /архівована/i.test(result)) {
+    await safeEditKeyboard(_editMessageReplyMarkup, env, chatId, messageId, `📦 В архіві`);
+    await ack('📦 Тендер в архіві');
+    return;
+  }
+  await ack(typeof result === 'string' ? result : '⚠️ Помилка', true);
+}
+
+async function safeEditKeyboard(_edit, env, chatId, messageId, label) {
+  try {
+    await _edit({
+      token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+      replyMarkup: { inline_keyboard: [[{ text: label, callback_data: 'noop' }]] },
+    });
+  } catch (err) {
+    console.error('worker: editMessageReplyMarkup failed:', err.message);
+  }
+}
+
+function formatKyivTime(d) {
+  return new Intl.DateTimeFormat('uk-UA', {
+    timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(d);
 }

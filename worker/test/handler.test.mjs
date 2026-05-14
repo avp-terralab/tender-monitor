@@ -1231,3 +1231,38 @@ test('runHandler: callback_query data="something-unknown" → answers with unkno
   assert.equal(acks.length, 1);
   assert.match(acks[0].text, /Невідома кнопка/);
 });
+
+test('runHandler: callback_query "add:UA-…" success → handleAdd, edit keyboard to ✅, toast', async () => {
+  const acks = [];
+  const edits = [];
+  const saved = [];
+  await runHandler({
+    update: {
+      callback_query: {
+        id: 'cbq1', data: `add:${ID}`,
+        message: { chat: { id: 123 }, message_id: 42 },
+      },
+    },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [], sha: 'sha1' }),
+        saveWatchlist: async (env, wl) => { saved.push(wl); },
+      }).deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageReplyMarkup: async (a) => edits.push(a),
+    },
+  });
+  // Add happened
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0][0].tender_id, ID);
+  // Keyboard swapped
+  assert.equal(edits.length, 1);
+  assert.equal(edits[0].messageId, 42);
+  assert.equal(edits[0].chatId, '123');
+  assert.match(JSON.stringify(edits[0].replyMarkup), /✅ Додано/);
+  assert.match(JSON.stringify(edits[0].replyMarkup), /"callback_data":"noop"/);
+  // Toast
+  assert.equal(acks.length, 1);
+  assert.match(acks[0].text, /додано/i);
+});
