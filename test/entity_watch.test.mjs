@@ -544,6 +544,51 @@ test('checkWatchedEntities: tender with no classification → no alert, seen NOT
   assert.equal(state.seenStore.value['11111111'], undefined);
 });
 
+test('checkWatchedEntities: per-entity cpv_prefixes overrides default — alert on 33xxx', async () => {
+  // Entity has cpv_prefixes=["33"] → 33xxx (медтехніка) IS relevant for THIS entity
+  // even though it's outside the global 48/72 default.
+  const { deps } = baseDeps({
+    watchedEntities: [{ edrpou: '11111111', enabled: true, cpv_prefixes: ['33'] }],
+    fetchChangesFeed: async () => ({
+      items: [{ tenderID: 'UA-MED', procuringEntity: { identifier: { id: '11111111' } } }],
+      nextOffset: 'cp',
+    }),
+    fetchTender: async () => ({
+      data: {
+        tenderID: 'UA-MED',
+        title: 't',
+        status: 'active.tendering',
+        procuringEntity: { name: 'X', identifier: { id: '11111111' } },
+        items: [{ classification: { id: '33141000-0', scheme: 'ДК021' } }],
+      },
+    }),
+  });
+  const result = await checkWatchedEntities(deps);
+  assert.equal(result.alerts.length, 1);
+});
+
+test('checkWatchedEntities: per-entity cpv_prefixes overrides default — global 72 NO LONGER relevant', async () => {
+  // Entity has cpv_prefixes=["33"] only → 72xxx (which is in global default) is now irrelevant.
+  const { deps } = baseDeps({
+    watchedEntities: [{ edrpou: '11111111', enabled: true, cpv_prefixes: ['33'] }],
+    fetchChangesFeed: async () => ({
+      items: [{ tenderID: 'UA-IT', procuringEntity: { identifier: { id: '11111111' } } }],
+      nextOffset: 'cp',
+    }),
+    fetchTender: async () => ({
+      data: {
+        tenderID: 'UA-IT',
+        title: 't',
+        status: 'active.tendering',
+        procuringEntity: { name: 'X', identifier: { id: '11111111' } },
+        items: [{ classification: { id: '72250000-2', scheme: 'ДК021' } }],
+      },
+    }),
+  });
+  const result = await checkWatchedEntities(deps);
+  assert.equal(result.alerts.length, 0);
+});
+
 test('checkWatchedEntities: multi-item tender with first item irrelevant + second relevant → alert', async () => {
   // Real Prozorro case: e.g. tender lists [медичне обладнання 33141, ЛІС-послуга 72250].
   // First item is 33xxx — would fail single-item check. Filter must scan ALL items.

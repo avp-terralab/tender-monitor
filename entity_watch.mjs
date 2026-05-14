@@ -1,10 +1,14 @@
 import { fetchTendersChangesFeed, fetchTendersFeed, fetchTender, extractSnapshot, searchTenderByEdrpou } from './prozorro.mjs';
 
 const ALERT_STATUSES = new Set(['active.tendering', 'active.pre-qualification']);
-// Only alert on tenders whose first-item CPV (ДК 021:2015) starts with one of these prefixes.
-// 48 = software packages and information systems; 72 = IT services. Tenders with other CPVs
-// (medical equipment, chemicals, construction, etc.) from watched entities are silently
-// skipped — TerraLab's business is purely software/IT, so other categories are noise.
+// Default CPV (ДК 021:2015) prefix whitelist for alert generation. 48 = software packages
+// and information systems; 72 = IT services. Tenders whose items contain none of these
+// codes are silently skipped — TerraLab's business is purely software/IT, so other
+// categories are noise.
+//
+// Per-entity override: a row in watched_entities.json may set "cpv_prefixes": ["33", ...]
+// to use a different whitelist for that EDRPOU only. Useful when watching an entity
+// whose relevant tenders fall outside the default 48/72 (e.g. a defense contractor).
 const RELEVANT_CPV_PREFIXES = ['48', '72'];
 // Safety cap on forward feed pagination — 500 pages × 100 items = 50000 tenders ≈ 2.5–4 days
 // of publishing. With hourly cron a tick reads ~5 pages on the happy path; the cap is a
@@ -117,7 +121,8 @@ export async function checkWatchedEntities(deps) {
       if (watchedRow && (!watchedRow.name || watchedRow.name === '(unknown)') && snap.procuringEntity?.name) {
         discoveredNames[edrpou] = snap.procuringEntity.name;
       }
-      if (!hasRelevantCpv(snap.classification_ids ?? [])) continue;
+      const prefixes = watchedRow?.cpv_prefixes ?? RELEVANT_CPV_PREFIXES;
+      if (!hasRelevantCpv(snap.classification_ids ?? [], prefixes)) continue;
       alerts.push(buildAlertGroup(snap));
       seen[edrpou] = [...seenForEntity, cand.tenderID];
     } catch (err) {
@@ -143,8 +148,8 @@ export async function checkWatchedEntities(deps) {
   return { alerts, errors, discoveredNames };
 }
 
-function hasRelevantCpv(cpvIds) {
-  return cpvIds.some(cpv => RELEVANT_CPV_PREFIXES.some(p => cpv.startsWith(p)));
+function hasRelevantCpv(cpvIds, prefixes) {
+  return cpvIds.some(cpv => prefixes.some(p => cpv.startsWith(p)));
 }
 
 function buildAlertGroup(snap) {
