@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -548,4 +548,18 @@ test('formatDigest: renders deadline_approaching event with hour label', () => {
     events: [{ type: 'deadline_approaching', threshold: '3h', deadline: '2026-05-16T14:00:00+03:00' }],
   }]);
   assert.match(text3, /⏰ До дедлайну подачі менше 3 годин/);
+});
+
+test('sendDigest: passes text + chat_id to fetch with parse_mode=HTML', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, body: opts.body.toString() });
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: 1 } }) };
+  };
+  await sendDigest({ token: 'TOK', chatId: '12345', fetch: fakeFetch }, 'hello');
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/botTOK\/sendMessage$/);
+  assert.match(calls[0].body, /chat_id=12345/);
+  assert.match(calls[0].body, /text=hello/);
+  assert.match(calls[0].body, /parse_mode=HTML/);
 });

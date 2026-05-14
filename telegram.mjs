@@ -332,18 +332,20 @@ export function chunkMessage(text, max) {
   return chunks;
 }
 
-async function sendOne({ token, chatId }, text) {
+async function sendOne({ token, chatId, fetch: fetchImpl = fetch }, text, replyMarkup) {
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
-  const body = new URLSearchParams({
+  const params = {
     chat_id: String(chatId),
     text,
     parse_mode: 'HTML',
     disable_web_page_preview: 'true',
-  });
+  };
+  if (replyMarkup != null) params.reply_markup = JSON.stringify(replyMarkup);
+  const body = new URLSearchParams(params);
   let lastErr;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await fetch(url, { method: 'POST', body });
+      const res = await fetchImpl(url, { method: 'POST', body });
       if (res.ok) return await res.json();
       lastErr = new Error(`Telegram ${res.status}: ${await res.text()}`);
     } catch (err) { lastErr = err; }
@@ -351,14 +353,14 @@ async function sendOne({ token, chatId }, text) {
   throw lastErr;
 }
 
-export async function sendDigest({ token, chatId }, text) {
+export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, text) {
   const chunks = chunkMessage(text, 4000);
   let last;
   for (let i = 0; i < chunks.length; i++) {
     const annotated = chunks.length > 1
       ? `${chunks[i]}\n\n— ${i + 1}/${chunks.length} —`
       : chunks[i];
-    last = await sendOne({ token, chatId }, annotated);
+    last = await sendOne({ token, chatId, fetch: fetchImpl }, annotated);
   }
   return last;
 }
