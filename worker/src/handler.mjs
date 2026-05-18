@@ -5,10 +5,10 @@ import {
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
-  formatInfo, buildHelpText, MAIN_KEYBOARD,
+  formatInfo, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
-import { sendReply, editMessageReplyMarkup, answerCallbackQuery } from '../../telegram.mjs';
+import { sendReply, editMessageReplyMarkup, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
 import {
   loadWatchlist, saveWatchlist,
   loadWatchedEntities, saveWatchedEntities,
@@ -48,6 +48,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const _now = deps.now ?? (() => new Date());
   const _editMessageReplyMarkup = deps.editMessageReplyMarkup ?? editMessageReplyMarkup;
   const _answerCallbackQuery = deps.answerCallbackQuery ?? answerCallbackQuery;
+  const _setMyCommands = deps.setMyCommands ?? setMyCommands;
 
   const cq = update.callback_query;
   if (cq) {
@@ -63,26 +64,6 @@ export async function runHandler({ update, env, deps = {} }) {
   const chatId = String(msg.chat?.id ?? '');
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const isAdmin = chatId !== '' && chatId === adminChatId;
-
-  // /start works for everyone — reveals chat_id so non-allowed users can request access.
-  // /start <token> is handled in a later branch.
-  if (typeof msg.text === 'string' && /^\/start(?:@\w+)?\s*$/i.test(msg.text)) {
-    const startReply = isAdmin
-      ? `👋 Привіт!\n\nТвій chat_id: <code>${chatId}</code>\n\n/help — список команд.`
-      : `👋 Привіт!\n\nЦе приватний бот. Твій chat_id: <code>${chatId}</code>\n\nНадішли цей id адміну, щоб отримати доступ.`;
-    try {
-      await _sendReply({
-        token: env.TELEGRAM_BOT_TOKEN,
-        chatId: msg.chat.id,
-        text: startReply,
-        replyToMessageId: msg.message_id,
-        replyMarkup: isAdmin ? MAIN_KEYBOARD : undefined,
-      });
-    } catch (err) {
-      console.error('worker: sendReply /start failed:', err.message);
-    }
-    return;
-  }
 
   // For non-admin chat, check allowlist file. Admin skips this (works during GH outages).
   let userRecord = null;
@@ -100,6 +81,31 @@ export async function runHandler({ update, env, deps = {} }) {
   const isEditor = isAdmin || userRole === 'editor';
   const role = isAdmin ? 'admin' : (isEditor ? 'editor' : 'viewer');
   const isAllowed = isAdmin || isInvited;
+
+  // /start works for everyone — reveals chat_id; for allowed users, also seeds chat-scope command list.
+  // /start <token> is handled in a later branch.
+  if (typeof msg.text === 'string' && /^\/start(?:@\w+)?\s*$/i.test(msg.text)) {
+    const startReply = isAdmin
+      ? `👋 Привіт!\n\nТвій chat_id: <code>${chatId}</code>\n\n/help — список команд.`
+      : `👋 Привіт!\n\nЦе приватний бот. Твій chat_id: <code>${chatId}</code>\n\nНадішли цей id адміну, щоб отримати доступ.`;
+    try {
+      await _sendReply({
+        token: env.TELEGRAM_BOT_TOKEN,
+        chatId: msg.chat.id,
+        text: startReply,
+        replyToMessageId: msg.message_id,
+        replyMarkup: isAllowed ? MAIN_KEYBOARD : undefined,
+      });
+    } catch (err) {
+      console.error('worker: sendReply /start failed:', err.message);
+    }
+    if (isAllowed) {
+      // Fire-and-forget; logs but doesn't block.
+      syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, chatId, role);
+    }
+    return;
+  }
+
   // /start <token> handled below regardless of allowlist (it grants access).
   const isStartWithToken = typeof msg.text === 'string' && /^\/start(?:@\w+)?\s+\S/i.test(msg.text);
   if (!isAllowed && !isStartWithToken) return;
@@ -159,6 +165,10 @@ export async function runHandler({ update, env, deps = {} }) {
             } catch (err) {
               console.error('worker: admin notification failed:', err.message);
             }
+          }
+          // Sync chat-scope commands for the freshly-redeemed user.
+          if (mutationBSucceeded && result.userMutation?.row?.role) {
+            syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, chatId, result.userMutation.row.role);
           }
         }
       } catch (err) {
@@ -386,6 +396,9 @@ export async function runHandler({ update, env, deps = {} }) {
         computeMutation: ({ users }) =>
           handleRole({ allowedUsers: users, adminChatId }, cmd),
       });
+      if (typeof reply === 'string' && /^✅/.test(reply)) {
+        syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, cmd.chat_id, cmd.role);
+      }
     }
   } else if (cmd.cmd === 'archive') {
     try {
@@ -664,4 +677,13 @@ async function safeEditKeyboard(_edit, env, chatId, messageId, label) {
 
 function formatKyivTime(d) {
   return KYIV_TIME_FMT.format(d);
+}
+
+async function syncBotCommands(_setMyCommands, token, chatId, role) {
+  const commands = BOT_COMMANDS_BY_ROLE[role] ?? BOT_COMMANDS_BY_ROLE.viewer;
+  try {
+    await _setMyCommands({ token, commands, chatId });
+  } catch (err) {
+    console.error('worker: setMyCommands failed:', err.message);
+  }
 }

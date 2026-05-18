@@ -32,6 +32,7 @@ const makeDeps = (overrides = {}) => {
       loadAllowedUsers: async () => ({ users: [], sha: null }),
       loadArchivedTenders: async () => ({ archive: [], sha: null }),
       saveArchivedTenders: async () => ({}),
+      setMyCommands: async () => {},
       ...overrides,
     },
   };
@@ -1671,4 +1672,103 @@ test('runHandler: admin /help → response has /role and /invite', async () => {
   });
   assert.match(sent[0].text, /\/role/);
   assert.match(sent[0].text, /\/invite/);
+});
+
+// Task 16: syncBotCommands on /start, redeem, /role
+test('runHandler: /start (no token), viewer → setMyCommands called with viewer set', async () => {
+  const calls = [];
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    setMyCommands: async (args) => { calls.push(args); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/start', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].chatId, '456');
+  const names = calls[0].commands.map(c => c.command);
+  assert.ok(names.includes('info'));
+  assert.ok(!names.includes('add'));
+  assert.ok(!names.includes('invite'));
+});
+
+test('runHandler: /start (no token), editor → setMyCommands with editor set', async () => {
+  const calls = [];
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'E', role: 'editor' }], sha: 's' }),
+    setMyCommands: async (args) => { calls.push(args); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/start', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(calls.length, 1);
+  const names = calls[0].commands.map(c => c.command);
+  assert.ok(names.includes('add'));
+  assert.ok(!names.includes('invite'));
+});
+
+test('runHandler: /start (no token), admin → setMyCommands with admin set', async () => {
+  const calls = [];
+  const { deps } = makeDeps({
+    setMyCommands: async (args) => { calls.push(args); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/start', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(calls.length, 1);
+  const names = calls[0].commands.map(c => c.command);
+  assert.ok(names.includes('invite'));
+  assert.ok(names.includes('role'));
+});
+
+test('runHandler: /start from non-allowed → setMyCommands NOT called', async () => {
+  const calls = [];
+  const { deps } = makeDeps({
+    setMyCommands: async (args) => { calls.push(args); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 999 }, text: '/start', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(calls.length, 0);
+});
+
+test('runHandler: /role editor 456 success → setMyCommands for target chat 456', async () => {
+  const calls = [];
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({
+      users: [{ chat_id: '456', label: 'A', role: 'viewer' }], sha: 's',
+    }),
+    saveAllowedUsers: async () => {},
+    setMyCommands: async (args) => { calls.push(args); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/role editor 456', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  // Expect at least one call with chatId 456 and editor commands
+  const targetCall = calls.find(c => c.chatId === '456');
+  assert.ok(targetCall, 'expected setMyCommands for target chat 456');
+  const names = targetCall.commands.map(c => c.command);
+  assert.ok(names.includes('add'));
+});
+
+test('runHandler: setMyCommands failure does not block reply', async () => {
+  const { deps, sent } = makeDeps({
+    setMyCommands: async () => { throw new Error('boom'); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/start', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1); // reply still went through
 });
