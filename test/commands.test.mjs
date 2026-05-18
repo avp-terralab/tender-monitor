@@ -1076,12 +1076,12 @@ test('handleInvite: creates invite with given label, 7-day expiry, returns deep-
   assert.equal(result.mutation.row.label, 'Olha');
   assert.equal(result.mutation.row.status, 'pending');
   assert.equal(result.mutation.row.created_at, '2026-05-12T10:00:00.000Z');
-  assert.equal(result.mutation.row.expires_at, '2026-05-19T10:00:00.000Z');
+  assert.equal(result.mutation.row.expires_at, '2026-05-13T10:00:00.000Z');
   assert.equal(result.mutation.row.redeemed_by, null);
   assert.equal(result.mutation.row.redeemed_at, null);
   assert.match(result.reply, /t\.me\/terralab_tenders_bot\?start=a{32}/);
   assert.match(result.reply, /Olha/);
-  assert.match(result.reply, /7 днів/);
+  assert.match(result.reply, /24 години/);
 });
 
 test('applyInviteMutation: append_invite adds row', () => {

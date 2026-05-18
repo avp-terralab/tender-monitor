@@ -5,7 +5,7 @@ const TENDER_ID_RE_STR = 'UA-\\d{4}-\\d{2}-\\d{2}-\\d{6}-[a-zA-Z]';
 const EDRPOU_RE = /^\d{8}$/;
 const TOKEN_RE = /^[a-f0-9]{32}$/i;
 const NUMERIC_RE = /^\d+$/;
-const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 const VALID_ROLES = new Set(['editor', 'viewer']);
 
 // Reply-keyboard button labels. Tapping a button sends its text as a normal
@@ -498,7 +498,7 @@ export function handleInvite(deps, { role, label }) {
     redeemed_at: null,
   };
   const link = `https://t.me/${deps.botUsername}?start=${token}`;
-  const reply = `🔗 Invite для <b>${escapeHtml(label)}</b> (${role})\n\n${link}\n\nПерешли цій людині. Дійсне 7 днів.`;
+  const reply = `🔗 Invite для <b>${escapeHtml(label)}</b> (${role})\n\n${link}\n\nПерешли цій людині. Дійсне 24 години.`;
   return {
     reply,
     mutation: { type: 'append_invite', row },
@@ -708,7 +708,7 @@ export function handleRedeem(deps, { token }) {
       inviteMutation: null,
       userMutation: null,
       adminNotice: null,
-      reply: '❌ Посилання застаріло (>7 днів)',
+      reply: '❌ Посилання застаріло (>24 години)',
     };
   }
   // Token NOT consumed when redeemer already has access — preserves a fresh
