@@ -921,12 +921,13 @@ test('runHandler: /invite as admin → appends invite, replies with link', async
     now: () => new Date('2026-05-12T10:00:00Z'),
   });
   await runHandler({
-    update: { message: { chat: { id: 123 }, text: '/invite Olha', message_id: 1 } },
+    update: { message: { chat: { id: 123 }, text: '/invite editor Olha', message_id: 1 } },
     env: ENV,
     deps,
   });
   assert.equal(savedInvites.length, 1);
   assert.equal(savedInvites[0].label, 'Olha');
+  assert.equal(savedInvites[0].role, 'editor');
   assert.equal(savedInvites[0].token, 'c'.repeat(32));
   assert.equal(sent.length, 1);
   assert.match(sent[0].text, /t\.me\/terralab_tenders_bot\?start=c{32}/);
@@ -944,7 +945,7 @@ test('runHandler: /invite as non-admin → silently ignored', async () => {
   assert.equal(sent.length, 0);
 });
 
-test('runHandler: /invite without label → error reply (admin)', async () => {
+test('runHandler: /invite without role → error reply (admin)', async () => {
   const { deps, sent } = makeDeps();
   await runHandler({
     update: { message: { chat: { id: 123 }, text: '/invite', message_id: 1 } },
@@ -952,7 +953,7 @@ test('runHandler: /invite without label → error reply (admin)', async () => {
     deps,
   });
   assert.equal(sent.length, 1);
-  assert.match(sent[0].text, /Вкажи назву/);
+  assert.match(sent[0].text, /Вкажи роль/);
 });
 
 // Task 12: /invites, /users, /revoke admin commands
@@ -1508,4 +1509,128 @@ test('callback add: editor → success (watchlist saved, ack OK)', async () => {
   });
   assert.equal(saved.length, 1);
   assert.match(acks[0].text, /✅/);
+});
+
+// Task 14: /invite role-first + /role command wiring
+test('runHandler: admin /invite editor Andrii → invite saved with role:editor', async () => {
+  const savedInvites = [];
+  const { deps, sent } = makeDeps({
+    loadInvites: async () => ({ invites: [], sha: 'inv' }),
+    saveInvites: async (env, inv) => { savedInvites.push(inv); },
+    generateToken: () => 'a'.repeat(32),
+    now: () => new Date('2026-05-18T10:00:00.000Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/invite editor Andrii', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(savedInvites.length, 1);
+  assert.equal(savedInvites[0][0].role, 'editor');
+  assert.equal(savedInvites[0][0].label, 'Andrii');
+  assert.match(sent[0].text, /Andrii/);
+});
+
+test('runHandler: admin /invite viewer Olha → invite saved with role:viewer', async () => {
+  const savedInvites = [];
+  const { deps } = makeDeps({
+    loadInvites: async () => ({ invites: [], sha: 'inv' }),
+    saveInvites: async (env, inv) => { savedInvites.push(inv); },
+    generateToken: () => 'b'.repeat(32),
+    now: () => new Date('2026-05-18T10:00:00.000Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/invite viewer Olha', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(savedInvites[0][0].role, 'viewer');
+});
+
+test('runHandler: admin /invite Andrii (no role keyword) → error reply, no save', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    saveInvites: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/invite Andrii', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /Невалідна роль|роль/i);
+});
+
+test('runHandler: admin /role editor 456 (user is viewer) → role flipped', async () => {
+  const saved = [];
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({
+      users: [{ chat_id: '456', label: 'Andrii', role: 'viewer' }],
+      sha: 'au',
+    }),
+    saveAllowedUsers: async (env, users) => { saved.push(users); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/role editor 456', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0][0].role, 'editor');
+  assert.match(sent[0].text, /✅/);
+  assert.match(sent[0].text, /Andrii/);
+});
+
+test('runHandler: admin /role viewer 123 (self) → refusal', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [], sha: 'au' }),
+    saveAllowedUsers: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/role viewer 123', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /адмін/i);
+});
+
+test('runHandler: admin /role editor 999 (not found) → error reply', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [], sha: 'au' }),
+    saveAllowedUsers: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/role editor 999', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /не знайдено/);
+});
+
+test('runHandler: viewer /role editor 999 → silent return (admin-only)', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/role editor 999', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 0);
+});
+
+test('runHandler: editor /invite editor X → silent return (admin-only)', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'E', role: 'editor' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/invite editor X', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 0);
 });

@@ -1,7 +1,7 @@
 import {
   parseCommand, handleAdd, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
-  handleInvite, handleRedeem, handleRevoke, handleUsersList, handleInvitesList,
+  handleInvite, handleRedeem, handleRevoke, handleRole, handleUsersList, handleInvitesList,
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
@@ -319,8 +319,12 @@ export async function runHandler({ update, env, deps = {} }) {
     }
   } else if (cmd.cmd === 'invite') {
     if (!isAdmin) return;
-    if (cmd.error === 'missing_label') {
-      reply = '❌ Вкажи назву: /invite Olha';
+    if (cmd.error === 'missing_role') {
+      reply = '❌ Вкажи роль першим: /invite editor [імʼя] або /invite viewer [імʼя]';
+    } else if (cmd.error === 'invalid_role') {
+      reply = '❌ Невалідна роль. Тільки editor або viewer.';
+    } else if (cmd.error === 'missing_label') {
+      reply = '❌ Вкажи імʼя: /invite editor [імʼя]';
     } else {
       reply = await applyInviteMutationWithRetry({
         env,
@@ -361,6 +365,25 @@ export async function runHandler({ update, env, deps = {} }) {
         saveAllowedUsers: _saveAllowedUsers,
         computeMutation: ({ users }) =>
           handleRevoke({ allowedUsers: users, adminChatId }, cmd),
+      });
+    }
+  } else if (cmd.cmd === 'role') {
+    if (!isAdmin) return;
+    if (cmd.error === 'missing_args') {
+      reply = '❌ Формат: /role [editor|viewer] [chat_id]';
+    } else if (cmd.error === 'invalid_role') {
+      reply = '❌ Невалідна роль. Тільки editor або viewer.';
+    } else if (cmd.error === 'missing_chat_id') {
+      reply = '❌ Не вказано chat_id. /role editor 12345';
+    } else if (cmd.error === 'invalid_chat_id') {
+      reply = '❌ chat_id має бути числом';
+    } else {
+      reply = await applyAllowedUsersMutationWithRetry({
+        env,
+        loadAllowedUsers: _loadAllowedUsers,
+        saveAllowedUsers: _saveAllowedUsers,
+        computeMutation: ({ users }) =>
+          handleRole({ allowedUsers: users, adminChatId }, cmd),
       });
     }
   } else if (cmd.cmd === 'archive') {
