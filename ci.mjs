@@ -1,6 +1,6 @@
 import { runOnce } from './monitor.mjs';
 import { fetchTender, extractSnapshot, fetchContract } from './prozorro.mjs';
-import { sendDigest as tgSend } from './telegram.mjs';
+import { broadcastDigest } from './telegram.mjs';
 import { checkWatchedEntities } from './entity_watch.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -32,6 +32,17 @@ if (!existsSync(watchlistPath)) {
 
 const watchlist = JSON.parse(readFileSync(watchlistPath, 'utf-8'));
 
+// Build digest recipient list: admin (TELEGRAM_CHAT_ID) + every chat in
+// _state/allowed_users.json. Per-recipient delivery is wrapped in try/catch by
+// broadcastDigest so one blocked/unstarted chat doesn't stop the rest.
+const allowedUsersPath = join(stateDir, 'allowed_users.json');
+const allowedUsers = existsSync(allowedUsersPath)
+  ? JSON.parse(readFileSync(allowedUsersPath, 'utf-8'))
+  : [];
+const chatIds = [chatId, ...allowedUsers.map(u => String(u.chat_id))]
+  .filter((id, i, arr) => arr.indexOf(id) === i);
+console.log(`Digest recipients: ${chatIds.length} (admin + ${allowedUsers.length} allowed)`);
+
 const watchedEntitiesPath = join(REPO, 'watched_entities.json');
 const watchedEntities = existsSync(watchedEntitiesPath)
   ? JSON.parse(readFileSync(watchedEntitiesPath, 'utf-8'))
@@ -58,7 +69,7 @@ const result = await runOnce({
       snapshot: snap,
     }, null, 2));
   },
-  sendDigest: async (text, opts) => tgSend({ token, chatId }, text, opts),
+  sendDigest: async (text, opts) => broadcastDigest({ token, chatIds }, text, opts),
   updateSheet: async () => { /* no-op in CI */ },
   watchedEntities,
   checkWatchedEntities,

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, answerCallbackQuery, setMyCommands } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, answerCallbackQuery, setMyCommands, broadcastDigest } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -733,4 +733,40 @@ test('setMyCommands: chat_id coerced to number even if passed as string', async 
     fetch: fakeFetch,
   });
   assert.strictEqual(body.scope.chat_id, 456); // number, not '456'
+});
+
+test('broadcastDigest: sends to each recipient in chatIds', async () => {
+  const sent = [];
+  const fakeFetch = async (url, opts) => {
+    const params = new URLSearchParams(opts.body.toString());
+    sent.push(params.get('chat_id'));
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: 1 } }) };
+  };
+  await broadcastDigest({ token: 'TOK', chatIds: ['111', '222', '333'], fetch: fakeFetch }, 'hello');
+  assert.deepEqual(sent, ['111', '222', '333']);
+});
+
+test('broadcastDigest: per-recipient failure does not abort remaining sends', async () => {
+  const sent = [];
+  const fakeFetch = async (url, opts) => {
+    const params = new URLSearchParams(opts.body.toString());
+    const cid = params.get('chat_id');
+    sent.push(cid);
+    if (cid === '222') {
+      return { ok: false, status: 403, text: async () => 'Forbidden: bot was blocked by the user' };
+    }
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: 1 } }) };
+  };
+  await broadcastDigest({ token: 'TOK', chatIds: ['111', '222', '333'], fetch: fakeFetch }, 'hello');
+  // Two attempts to 222 (sendOne retries once on failure), but all three recipients reached
+  assert.ok(sent.includes('111'));
+  assert.ok(sent.includes('222'));
+  assert.ok(sent.includes('333'));
+});
+
+test('broadcastDigest: empty chatIds → no-op, no fetch call', async () => {
+  let called = false;
+  const fakeFetch = async () => { called = true; return { ok: true, json: async () => ({}) }; };
+  await broadcastDigest({ token: 'TOK', chatIds: [], fetch: fakeFetch }, 'hello');
+  assert.equal(called, false);
 });

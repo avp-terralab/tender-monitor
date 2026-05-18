@@ -378,6 +378,19 @@ export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, te
   return last;
 }
 
+// Fan-out a digest to multiple recipients. Per-recipient failures are logged
+// (typically 403 from users who haven't started the bot, or 400 from blocked
+// chats) but do not abort delivery to remaining recipients.
+export async function broadcastDigest({ token, chatIds, fetch: fetchImpl = fetch }, text, opts) {
+  for (const chatId of chatIds) {
+    try {
+      await sendDigest({ token, chatId, fetch: fetchImpl }, text, opts);
+    } catch (err) {
+      console.error(`broadcastDigest to ${chatId} failed:`, err.message);
+    }
+  }
+}
+
 export async function getUpdates({ token, offset, fetch: fetchImpl = fetch }) {
   const url = `https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=0&limit=100`;
   const res = await fetchImpl(url);
