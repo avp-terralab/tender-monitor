@@ -9,135 +9,145 @@
 - **Admin** (`ADMIN_CHAT_ID` env, = `1744078008`) — повний доступ + admin-команди.
 - **Allowed users** (`_state/allowed_users.json`) — той самий доступ що й admin, окрім `/invite`/`/invites`/`/users`/`/revoke`.
 
-Власник хоче, щоб **mutating-операції** (додати/змінити/видалити закупівлю чи замовника) могли виконувати лише **дві конкретні Telegram chat_id**: `1744078008` (поточний admin) та `7321709183`. Решта запрошених учасників мають бачити моніторинг тільки в режимі перегляду.
+Власник хоче, щоб **mutating-операції** (додати/змінити/видалити закупівлю чи замовника) могли виконувати лише виділені користувачі ("editors"). Решта запрошених — у режимі перегляду.
 
-Додаткова вимога: **користувач бачить лише ті команди, які він може використати** — у `/help` та в автокомпліті Telegram «/».
+Додаткові вимоги:
+- **Адмін керує ролями через бот** — присвоює роль при `/invite` та може змінювати її для існуючих юзерів через `/role`.
+- **Користувач бачить лише ті команди, які він може використати** — у `/help` та в автокомпліті Telegram «/».
 
-## Ролі (нова модель)
+## Ролі
 
 | Роль | Хто | Доступ |
 |---|---|---|
-| **Admin** | `chat_id == ADMIN_CHAT_ID` (1744078008) | Editor + `/invite`, `/invites`, `/users`, `/revoke` |
-| **Editor** | `chat_id in EDITOR_CHAT_IDS` АБО admin | Viewer + `/add`, `/remove`, `/watch`, `/unwatch`, `/unarchive`, inline-кнопка `add:` |
-| **Viewer** | `chat_id ∈ allowed_users.json` і не editor | `/start`, `/help`, `/menu`, `/status`, `/info`, `/watched`, `/archive` (список і деталі) |
-| **Не-allowed** | решта | `/start` (greeting із власним chat_id), `/start <token>` (redeem) |
+| **Admin** | `chat_id == ADMIN_CHAT_ID` (1744078008) | Editor + `/invite`, `/invites`, `/users`, `/revoke`, `/role` |
+| **Editor** | Запис в `allowed_users.json` з `role: "editor"` (або admin) | Viewer + `/add`, `/remove`, `/watch`, `/unwatch`, `/unarchive`, inline-кнопка `add:` |
+| **Viewer** | Запис в `allowed_users.json` з `role: "viewer"` (або без `role` — back-compat) | `/start`, `/help`, `/menu`, `/status`, `/info`, `/watched`, `/archive` (список і деталі) |
+| **Guest** | Не у `allowed_users.json` і не admin | `/start` (greeting із chat_id), `/start <token>` (redeem) |
 
-Admin **імпліцитно** editor — не треба окремо додавати у `EDITOR_CHAT_IDS`.
+Admin **імпліцитно** editor — на нього не поширюється allowed_users перевірка. Окремий запис у `allowed_users.json` для admin'а не потрібний.
 
-## Конфігурація
+## Storage schema
 
-Новий env var Worker'а:
+### `_state/allowed_users.json`
 
+Було (bare array):
+```json
+[{ "chat_id": "...", "label": "...", "joined_at": "..." }]
 ```
-EDITOR_CHAT_IDS = "7321709183"
+
+Стає:
+```json
+[{ "chat_id": "...", "label": "...", "role": "viewer", "joined_at": "..." }]
 ```
 
-Формат: comma-separated string, parsed at request time у `handler.mjs`. Пустий/відсутній → лише admin може мутирувати (back-compat-safe default).
+Дозволені значення `role`: `"viewer"`, `"editor"`. Запис без поля `role` → читається як `"viewer"` (back-compat для існуючих записів — мігрування lazy, при першому write новий формат).
 
-Зберігання: Cloudflare Worker secret через `npx wrangler secret put EDITOR_CHAT_IDS`. Не в коді, не в `wrangler.toml` — щоб список можна було оновлювати без redeploy.
+### `_state/invites.json`
 
-## Точки зміни
+Додається поле `role` до кожного запису. Значення приймаються при `/invite` і визначають роль майбутнього юзера після redeem.
 
-### 1. `worker/src/handler.mjs`
+```json
+{ "token": "...", "label": "...", "role": "editor", "status": "pending", "expires_at": "...", "created_at": "..." }
+```
 
-**Парсинг та обчислення ролі (на початку `runHandler`):**
+Default `'viewer'` для записів без поля (legacy invites).
+
+## Команди (нові й змінені)
+
+### Існуючі команди — без змін у поведінці
+
+`/start`, `/help`, `/menu`, `/status`, `/info`, `/watched`, `/archive`, `/users`-список (форматування виходу зміниться — див. нижче), `/invites`-список (форматування зміниться).
+
+### Mutating, тепер editor-only
+
+`/add`, `/remove`, `/watch`, `/unwatch`, `/unarchive`, inline-кнопка `add:` callback. Для viewer'а:
+> 🚫 Це команда для редакторів. У тебе доступ лише для перегляду.
+
+Для inline `add:` — callback ack з alert: `🚫 Лише для редакторів`.
+
+### Admin-only — нові й розширені
+
+**`/invite [editor|viewer] [name]`** — формат **role-first**. `role` обов'язковий перший аргумент, `name` — другий.
+- `/invite editor Andrii` → invite токен з `role: "editor"`
+- `/invite viewer Olha` → invite з `role: "viewer"`
+- `/invite Olha` → error: `❌ Вкажи роль першим: /invite editor [імʼя] або /invite viewer [імʼя]`
+- `/invite admin Test` → error: `❌ Невалідна роль. Тільки editor або viewer.`
+- `/invite editor` → error: `❌ Вкажи імʼя: /invite editor [імʼя]`
+
+**`/role [editor|viewer] [chat_id]`** — змінити роль існуючого юзера.
+- `/role editor 7321709183` → user.role = "editor"; reply: `✅ Andrii (7321709183) → editor`
+- `/role viewer 7321709183` → user.role = "viewer"; reply: `✅ Andrii (7321709183) → viewer`
+- `/role editor <ADMIN_CHAT_ID>` → `❌ Не можна змінити роль адміна`
+- `/role viewer <ADMIN_CHAT_ID>` → той самий refuse
+- `/role editor 99999` → `❌ Користувача не знайдено. /users — список`
+- `/role editor 7321709183` (вже editor) → `ℹ️ Andrii (7321709183) вже editor`
+- `/role admin 12345` → `❌ Невалідна роль. Тільки editor або viewer.`
+- `/role 12345 editor` (старий порядок) → error: `❌ Формат: /role [editor|viewer] [chat_id]`
+- `/role` без аргументів → usage hint
+- viewer/editor виконує `/role` → silent return (admin-only, як `/invite`)
+
+**`/users` — змінене форматування виходу**
+
+Поточний формат (`commands.mjs:704–712`):
+```
+👥 Користувачі бота:
+
+1. 1744078008 — admin
+2. 7321709183 — Andrii (від: запрошення)
+```
+
+Стає (роль перед `invited_via`):
+```
+👥 Користувачі бота:
+
+1. 1744078008 — admin
+2. 7321709183 — Andrii — editor (від: запрошення)
+```
+
+Запис без поля `role` → показується `viewer`.
+
+**`/invites` — змінене форматування виходу**
+
+Кожен pending invite показує plan-role:
+```
+🎟 Активні invite-посилання (1):
+• editor — Andrii — закінчиться 2026-05-25 14:00, токен abc...
+```
+
+## Точки зміни в коді
+
+### 1. `commands.mjs`
+
+**`parseCommand`** — оновити парсери:
+- `/invite` regex/parser: match `^/invite(?:@\w+)?\s+(editor|viewer)\s+(\S.*?)\s*$` → `{ cmd: 'invite', role, label }`. Помилки: `missing_role`, `invalid_role`, `missing_label`.
+- `/role` (новий): match `^/role(?:@\w+)?(?:\s+(\S+)(?:\s+(\S+))?)?\s*$` → `{ cmd: 'role', role, chat_id }`. Валідація: role ∈ {editor, viewer}, chat_id — лише цифри. Помилки: `missing_args`, `missing_chat_id`, `invalid_role`, `invalid_chat_id`.
+
+**`handleInvite`** — приймає `cmd.role`, кладе у новий invite record.
+
+**`handleRedeem`** — читає `invite.role`, кладе `role` у новий запис `allowed_users.json`. Якщо `invite.role` відсутній (legacy) → default `'viewer'`.
+
+**`handleRole`** (новий pure-handler) — приймає `{ allowedUsers, adminChatId }, { role, chat_id }`. Повертає `{ reply, mutation? }`. Mutation — `{ kind: 'set_role', chat_id, role }`.
+
+**`applyAllowedUsersMutation`** — додати case для `set_role`: знайти запис по chat_id, оновити `role`.
+
+**`handleUsersList`** — додати `(role)` у вивід для кожного non-admin. Admin рендериться як `(admin)`.
+
+**`handleInvitesList`** — додати рядок role у вивід.
+
+**`HELP_TEXT` → `buildHelpText(role)`** — як у попередній версії спеку. Структура:
+
 ```js
-const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
-const editorIds = String(env.EDITOR_CHAT_IDS ?? '')
-  .split(',').map(s => s.trim()).filter(Boolean);
-const isAdmin = chatId !== '' && chatId === adminChatId;
-// (далі — існуюча isInvited check через _loadAllowedUsers)
-const isEditor = isAdmin || editorIds.includes(chatId);
-// ВАЖЛИВО: isAllowed має включати editor, інакше editor НЕ у allowed_users.json буде заблокований
-const isAllowed = isAdmin || isEditor || isInvited;
-const role = isAdmin ? 'admin' : (isEditor ? 'editor' : (isInvited ? 'viewer' : 'guest'));
-```
-
-**Deps injection** — додати у destructuring на початку `runHandler`:
-```js
-const _setMyCommands = deps.setMyCommands ?? setMyCommands; // imported from telegram.mjs
-```
-
-Те саме для `handleCallbackQuery` — приймати editor list через env та обчислювати `isEditor` тим самим способом.
-
-**Guard на mutating commands.** Перед існуючими гілками `cmd.cmd === 'add'`, `'remove'`, `'watch'`, `'unwatch'`, `'unarchive'`:
-```js
-if (MUTATING_COMMANDS.has(cmd.cmd) && !isEditor) {
-  reply = '🚫 Це команда для редакторів. У тебе доступ лише для перегляду.';
-  // (sendReply через існуючий шлях у кінці runHandler)
-}
-```
-де `MUTATING_COMMANDS = new Set(['add', 'remove', 'watch', 'unwatch', 'unarchive'])`.
-
-**Inline-кнопка `add:` callback** (`handleCallbackQuery`): додати editor check одразу після `isAllowed`:
-```js
-if (!isEditor) {
-  await ack('🚫 Лише для редакторів', true);
-  return;
-}
-```
-
-**`/help` per-role:**
-```js
-} else if (cmd.cmd === 'help') {
-  reply = buildHelpText(role);
-}
-```
-
-**`/start` без аргументу — оновити Telegram chat-scope command menu:**
-В блоці що обробляє `/start` без token (рядки 69–85), після `sendReply`, якщо `isAdmin || isInvited`:
-```js
-await syncBotCommands({ token, chatId, role });
-```
-де `syncBotCommands` — fire-and-forget (errors лише логуються, не блокують відповідь).
-
-**При successful redeem** (`/start <token>` із створенням viewer-а) — теж викликати `syncBotCommands({ token, chatId, role: 'viewer' })` одразу після notify admin.
-
-### 2. `commands.mjs`
-
-**Видалити константу `HELP_TEXT`** (рядки 773–799), замінити функцією:
-
-```js
-const HELP_GENERAL = [
-  'Загальні команди:',
-  '/help — список команд',
-  '/menu — показати швидкі кнопки',
-  '/status — здоровʼя бота',
-];
-
-const HELP_VIEW_TENDERS = [
-  'Моніторинг закупівель за ID:',
-  '/info [UA-...] — список усіх або деталі одного тендера',
-];
-
-const HELP_VIEW_ENTITIES = [
-  'Моніторинг замовників за EDRPOU:',
-  '/watched — список замовників',
-];
-
-const HELP_VIEW_ARCHIVE = [
-  'Архів завершених закупівель:',
-  '/archive — список архіву (з посиланнями на договори)',
-  '/archive [UA-...] — деталі + договір',
-];
-
-const HELP_EDIT_TENDERS = [
-  '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
-  '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
-];
-
-const HELP_EDIT_ENTITIES = [
-  '/watch EDRPOU — стежити за замовником',
-  '/unwatch EDRPOU — припинити стежити',
-];
-
-const HELP_EDIT_ARCHIVE = [
-  '/unarchive [UA-...] — повернути в моніторинг',
-];
-
+const HELP_GENERAL = [/* /help, /menu, /status */];
+const HELP_VIEW_TENDERS = ['Моніторинг закупівель за ID:', '/info [UA-...] — список або деталі'];
+const HELP_VIEW_ENTITIES = ['Моніторинг замовників за EDRPOU:', '/watched — список замовників'];
+const HELP_VIEW_ARCHIVE = ['Архів завершених закупівель:', '/archive — список архіву', '/archive [UA-...] — деталі + договір'];
+const HELP_EDIT_TENDERS = ['/add UA-... — додати тендер', '/remove UA-... — видалити'];
+const HELP_EDIT_ENTITIES = ['/watch EDRPOU — стежити', '/unwatch EDRPOU — припинити'];
+const HELP_EDIT_ARCHIVE = ['/unarchive [UA-...] — повернути в моніторинг'];
 const HELP_ADMIN = [
   'Адмін-команди:',
-  '/invite [імʼя] — створити invite-посилання',
+  '/invite [editor|viewer] [імʼя] — створити invite-посилання',
+  '/role [editor|viewer] [chat_id] — змінити роль користувача',
   '/invites — активні invite-посилання',
   '/users — список користувачів',
   '/revoke [chat_id] — видалити користувача',
@@ -145,41 +155,23 @@ const HELP_ADMIN = [
 
 export function buildHelpText(role) {
   const parts = [HELP_GENERAL.join('\n')];
-
-  // Tenders block (view + optional edit lines)
-  const tendersBlock = [...HELP_VIEW_TENDERS];
-  if (role === 'editor' || role === 'admin') {
-    // Insert edit lines BEFORE the view line for natural order (add, remove, info)
-    tendersBlock.splice(1, 0, ...HELP_EDIT_TENDERS);
-  }
-  parts.push(tendersBlock.join('\n'));
-
-  // Entities block
-  const entitiesBlock = [...HELP_VIEW_ENTITIES];
-  if (role === 'editor' || role === 'admin') {
-    entitiesBlock.splice(1, 0, ...HELP_EDIT_ENTITIES);
-  }
-  parts.push(entitiesBlock.join('\n'));
-
-  // Archive block
-  const archiveBlock = [...HELP_VIEW_ARCHIVE];
-  if (role === 'editor' || role === 'admin') {
-    archiveBlock.push(...HELP_EDIT_ARCHIVE);
-  }
-  parts.push(archiveBlock.join('\n'));
-
-  if (role === 'admin') {
-    parts.push(HELP_ADMIN.join('\n'));
-  }
-
+  const tenders = [...HELP_VIEW_TENDERS];
+  if (role === 'editor' || role === 'admin') tenders.splice(1, 0, ...HELP_EDIT_TENDERS);
+  parts.push(tenders.join('\n'));
+  const entities = [...HELP_VIEW_ENTITIES];
+  if (role === 'editor' || role === 'admin') entities.splice(1, 0, ...HELP_EDIT_ENTITIES);
+  parts.push(entities.join('\n'));
+  const archive = [...HELP_VIEW_ARCHIVE];
+  if (role === 'editor' || role === 'admin') archive.push(...HELP_EDIT_ARCHIVE);
+  parts.push(archive.join('\n'));
+  if (role === 'admin') parts.push(HELP_ADMIN.join('\n'));
   return parts.join('\n\n');
 }
 
-// Backward-compat: existing tests import HELP_TEXT and assert full content.
-export const HELP_TEXT = buildHelpText('admin');
+export const HELP_TEXT = buildHelpText('admin'); // back-compat for existing tests
 ```
 
-**Новий експорт `BOT_COMMANDS_BY_ROLE`** для Telegram `setMyCommands`:
+**`BOT_COMMANDS_BY_ROLE`** (новий експорт) — для Telegram `setMyCommands`:
 
 ```js
 const VIEW_COMMANDS = [
@@ -190,7 +182,6 @@ const VIEW_COMMANDS = [
   { command: 'watched', description: 'Список замовників' },
   { command: 'archive', description: 'Архів завершених закупівель' },
 ];
-
 const EDIT_COMMANDS = [
   { command: 'add',       description: 'Додати тендер у моніторинг' },
   { command: 'remove',    description: 'Видалити тендер' },
@@ -198,9 +189,9 @@ const EDIT_COMMANDS = [
   { command: 'unwatch',   description: 'Припинити стежити за замовником' },
   { command: 'unarchive', description: 'Повернути тендер з архіву' },
 ];
-
 const ADMIN_COMMANDS = [
   { command: 'invite',  description: 'Створити invite-посилання' },
+  { command: 'role',    description: 'Змінити роль користувача' },
   { command: 'invites', description: 'Активні invite-посилання' },
   { command: 'users',   description: 'Список користувачів' },
   { command: 'revoke',  description: 'Видалити користувача' },
@@ -213,10 +204,100 @@ export const BOT_COMMANDS_BY_ROLE = {
 };
 ```
 
+### 2. `worker/src/handler.mjs`
+
+**Парсинг ролі юзера (на початку `runHandler`, після завантаження allowed users):**
+```js
+const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
+const isAdmin = chatId !== '' && chatId === adminChatId;
+
+let userRecord = null;
+try {
+  const { users } = await _loadAllowedUsers(env);
+  userRecord = users.find(u => u.chat_id === chatId) ?? null;
+} catch (err) {
+  console.error('worker: loadAllowedUsers failed:', err.message);
+  // Fail closed — non-admin sees nothing if we can't verify.
+}
+const isInvited = userRecord !== null;
+const isAllowed = isAdmin || isInvited;
+const userRole = userRecord?.role ?? 'viewer'; // legacy entries without role → viewer
+const isEditor = isAdmin || userRole === 'editor';
+const role = isAdmin ? 'admin' : (isEditor ? 'editor' : (isInvited ? 'viewer' : 'guest'));
+```
+
+**Guard для mutating-команд** — перед існуючими гілками `cmd.cmd === 'add' | 'remove' | 'watch' | 'unwatch' | 'unarchive'`:
+```js
+const MUTATING = new Set(['add', 'remove', 'watch', 'unwatch', 'unarchive']);
+if (MUTATING.has(cmd.cmd) && !isEditor) {
+  reply = '🚫 Це команда для редакторів. У тебе доступ лише для перегляду.';
+  // falls through to existing sendReply at end
+} else if (cmd.cmd === 'add') { /* ... existing ... */ }
+```
+
+(Реалізаційно — додати один if-блок перед існуючими if/else if; код повертає `reply` й продовжує до sendReply.)
+
+**Inline `add:` callback (`handleCallbackQuery`)** — після `isAllowed` гейту:
+```js
+if (!isEditor) {
+  await ack('🚫 Лише для редакторів', true);
+  return;
+}
+```
+(Перевикористовує той самий загруз `allowed_users.json` що `runHandler` робить для авторизації.)
+
+**`/help`** — `reply = buildHelpText(role);` замість константи.
+
+**`/invite`** — передати `cmd.role` у handler:
+```js
+} else if (cmd.cmd === 'invite') {
+  if (!isAdmin) return;
+  if (cmd.error === 'missing_role') {
+    reply = '❌ Вкажи роль першим: /invite editor [імʼя] або /invite viewer [імʼя]';
+  } else if (cmd.error === 'invalid_role') {
+    reply = '❌ Невалідна роль. Тільки editor або viewer.';
+  } else if (cmd.error === 'missing_label') {
+    reply = '❌ Вкажи імʼя: /invite editor [імʼя]';
+  } else {
+    // pass cmd.role through computeMutation
+  }
+}
+```
+
+**`/role`** — нова гілка:
+```js
+} else if (cmd.cmd === 'role') {
+  if (!isAdmin) return;
+  if (cmd.error === 'missing_args' || cmd.error === 'missing_chat_id') {
+    reply = '❌ Формат: /role [editor|viewer] [chat_id]';
+  } else if (cmd.error === 'invalid_role') {
+    reply = '❌ Невалідна роль. Тільки editor або viewer.';
+  } else if (cmd.error === 'invalid_chat_id') {
+    reply = '❌ chat_id має бути числом';
+  } else {
+    reply = await applyAllowedUsersMutationWithRetry({
+      env, loadAllowedUsers: _loadAllowedUsers, saveAllowedUsers: _saveAllowedUsers,
+      computeMutation: ({ users }) => handleRole({ allowedUsers: users, adminChatId }, cmd),
+    });
+  }
+}
+```
+
+**`/start` (no token), при `isAllowed`** — після `sendReply` викликати fire-and-forget оновлення Telegram chat-scope command list:
+```js
+if (isAllowed) {
+  syncBotCommands({ token: env.TELEGRAM_BOT_TOKEN, chatId, role })
+    .catch(err => console.error('syncBotCommands failed:', err.message));
+}
+```
+
+**Redeem success** (`handleRedeem` після успіху both mutations) — теж `syncBotCommands` для нового viewer'а.
+
+**`/role` success** — після успішного `applyAllowedUsersMutation`, якщо роль змінилась, викликати `syncBotCommands` для target chat_id (щоб у нього одразу оновився autocomplete без потреби `/start`). Краще — повернути target chat_id у result.mutation і викликати після save. Fire-and-forget.
+
 ### 3. `telegram.mjs`
 
-Додати тонку обгортку над Bot API `setMyCommands`:
-
+Нова функція:
 ```js
 export async function setMyCommands({ token, commands, chatId }) {
   const url = `https://api.telegram.org/bot${token}/setMyCommands`;
@@ -230,17 +311,12 @@ export async function setMyCommands({ token, commands, chatId }) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`setMyCommands ${res.status}: ${text}`);
-  }
+  if (!res.ok) throw new Error(`setMyCommands ${res.status}`);
 }
 ```
 
-І `syncBotCommands` обгортка у `worker/src/handler.mjs` (або у `commands.mjs` як pure-helper, що дістає список):
-
+Helper у `handler.mjs`:
 ```js
-// In handler.mjs:
 async function syncBotCommands({ token, chatId, role }) {
   const commands = BOT_COMMANDS_BY_ROLE[role] ?? BOT_COMMANDS_BY_ROLE.viewer;
   try {
@@ -251,62 +327,112 @@ async function syncBotCommands({ token, chatId, role }) {
 }
 ```
 
+**Deps injection** у `runHandler` (для testability):
+```js
+const _setMyCommands = deps.setMyCommands ?? setMyCommands; // import from telegram.mjs
+```
+
 ### 4. Тести
 
-**`worker/test/handler.test.mjs`** — нові test cases (mock-based, на стилі поточних handler-тестів):
+**`test/commands.test.mjs`:**
 
-- `viewer chat: /info → success, /add → "🚫 Це команда для редакторів"`
-- `viewer chat: /remove → refusal; watchlist не змінюється (saveWatchlist not called)`
-- `viewer chat: /watch → refusal; entities не змінюється`
-- `viewer chat: /unarchive UA-... → refusal; archive не змінюється`
-- `editor chat (not admin, in EDITOR_CHAT_IDS): /add → success`
-- `editor chat: /invite → silent return (admin-only)` — поведінка існуюча, але перевірити що залишилась
-- `admin chat: /invite → success` — sanity
-- `inline button add: callback → viewer ack with "🚫 Лише для редакторів"; editor → success`
-- `/start (no token), viewer → setMyCommands called with VIEW_COMMANDS`
-- `/start (no token), editor → setMyCommands called with VIEW + EDIT commands`
-- `/start (no token), admin → setMyCommands called with all commands`
-- `/start <token> redeem success → setMyCommands called with VIEW_COMMANDS for new viewer`
-- `/start non-allowed → setMyCommands NOT called`
-- `EDITOR_CHAT_IDS empty/unset → admin still has full access; allowed users are viewers`
-- `EDITOR_CHAT_IDS with spaces "7321709183, 999" → both parsed`
+- `parseCommand('/invite editor Andrii')` → `{ cmd:'invite', role:'editor', label:'Andrii' }`
+- `parseCommand('/invite viewer Olha')` → `{ cmd:'invite', role:'viewer', label:'Olha' }`
+- `parseCommand('/invite Andrii')` → `{ cmd:'invite', error:'missing_role' }`
+- `parseCommand('/invite admin X')` → `{ cmd:'invite', error:'invalid_role' }`
+- `parseCommand('/invite editor')` → `{ cmd:'invite', error:'missing_label' }`
+- `parseCommand('/invite')` → `{ cmd:'invite', error:'missing_role' }` (single error code; UX буде "вкажи роль першим")
+- `parseCommand('/role editor 12345')` → `{ cmd:'role', role:'editor', chat_id:'12345' }`
+- `parseCommand('/role viewer 12345')` → `{ cmd:'role', role:'viewer', chat_id:'12345' }`
+- `parseCommand('/role')` → `{ cmd:'role', error:'missing_args' }`
+- `parseCommand('/role editor')` → `{ cmd:'role', error:'missing_chat_id' }`
+- `parseCommand('/role admin 12345')` → `{ error:'invalid_role' }`
+- `parseCommand('/role editor abc')` → `{ error:'invalid_chat_id' }`
+- `parseCommand('/role 12345 editor')` → `{ error:'invalid_role' }` (старий порядок, лівий "12345" не валід. роль)
+- `handleInvite({ ..., cmd:{ role:'editor', label:'A' }})` — створений invite має `role:'editor'`
+- `handleRedeem(...)` — новий user має той `role` що був у invite
+- `handleRedeem(...)` — legacy invite без role → user.role === 'viewer'
+- `handleRole({...}, { role:'editor', chat_id:'12345' })` — mutation `{ kind:'set_role', chat_id:'12345', role:'editor' }`
+- `handleRole({...adminChatId:'AA'}, { role:'editor', chat_id:'AA' })` → reply contains "адмін"
+- `handleRole({users:[X with role:editor]}, { role:'editor', chat_id:X.chat_id })` → reply "вже editor", no mutation
+- `handleRole({users:[]}, { role:'editor', chat_id:'99999' })` → reply "не знайдено", no mutation
+- `applyAllowedUsersMutation([{X, role:'viewer'}], {kind:'set_role', chat_id:X.chat_id, role:'editor'})` → user updated
+- `handleUsersList({...})` — вивід містить `(editor)` / `(viewer)` / `(admin)`
+- `handleUsersList` — legacy user без role показується як `(viewer)`
+- `handleInvitesList` — вивід містить роль per-token
+- `buildHelpText('viewer')` — не містить `/add`, `/remove`, `/watch`, `/unwatch`, `/unarchive`, `/invite`, `/role`
+- `buildHelpText('viewer')` — містить `/info`, `/watched`, `/archive`
+- `buildHelpText('editor')` — містить mutating + view; не містить `/invite`, `/role`, `/users`, `/revoke`
+- `buildHelpText('admin')` — містить усе, включно з `/role`
+- `buildHelpText('admin') === HELP_TEXT` (back-compat)
+- Існуючі асерти `HELP_TEXT mentions admin commands` (`/invite`, `/users`, `/revoke`) лишаються; додати `/role` в той же блок
+- `BOT_COMMANDS_BY_ROLE.viewer` не містить `add`, `invite`, `role`
+- `BOT_COMMANDS_BY_ROLE.editor` містить `add` але не `invite`/`role`
+- `BOT_COMMANDS_BY_ROLE.admin` містить `role`
+- Всі command names ≤32 символи (Telegram limit)
 
-**`test/commands.test.mjs`** — нові test cases:
+**`worker/test/handler.test.mjs`:**
 
-- `buildHelpText('viewer') не містить /add, /remove, /watch, /unwatch, /unarchive, /invite`
-- `buildHelpText('viewer') містить /info, /watched, /archive`
-- `buildHelpText('editor') містить mutating + view; не містить /invite, /users, /revoke`
-- `buildHelpText('admin') == HELP_TEXT (existing constant)`
-- Існуючі асерти `HELP_TEXT mentions admin commands` — лишаються незмінні (HELP_TEXT тепер = `buildHelpText('admin')`)
-- `BOT_COMMANDS_BY_ROLE.viewer | editor | admin` — перевірити масиви: viewer не містить `add`, editor містить `add` але не `invite`, admin містить усе. Перевірити що всі command names ASCII-only й коротші за 32 символи (Telegram limit).
+- viewer chat: `/info` → success
+- viewer chat: `/add UA-...` → refusal `🚫 Це команда для редакторів`; `saveWatchlist` не викликається
+- viewer chat: `/remove UA-...` → refusal; `saveWatchlist` не викликається
+- viewer chat: `/watch 12345678` → refusal; `saveWatchedEntities` не викликається
+- viewer chat: `/unwatch 12345678` → refusal
+- viewer chat: `/unarchive UA-...` → refusal
+- viewer chat: `/role editor 99999` → silent return (admin-only)
+- viewer chat: `/invite editor X` → silent return
+- editor chat: `/add UA-...` → success (`saveWatchlist` called)
+- editor chat: `/role editor 99999` → silent return
+- editor chat: `/invite editor X` → silent return
+- admin chat: `/invite editor Andrii` → invite created with role='editor'
+- admin chat: `/invite viewer Olha` → invite created with role='viewer'
+- admin chat: `/invite Andrii` → reply `❌ Вкажи роль першим`
+- admin chat: `/role editor 7321709183` (user exists, was viewer) → role flipped; reply `✅`
+- admin chat: `/role viewer 1744078008` (self) → refusal "не можна змінити роль адміна"
+- admin chat: `/role editor 99999` → "не знайдено"
+- admin chat: `/role editor 7321709183` (already editor) → "вже editor", no save
+- inline `add:` callback, viewer → `ack('🚫 Лише для редакторів', true)`; no watchlist write
+- inline `add:` callback, editor → success
+- `/start` (no token), viewer → `setMyCommands` called with VIEW_COMMANDS
+- `/start` (no token), editor → `setMyCommands` called with VIEW+EDIT
+- `/start` (no token), admin → `setMyCommands` called with all
+- `/start <token>` successful redeem → `setMyCommands` called with VIEW (or EDIT, depends on invite.role)
+- `/role` success → `setMyCommands` called for target chat_id with new role's command set
+- legacy `allowed_users.json` (entry without `role`) → user treated as viewer (refusal on /add)
+- legacy `invites.json` (record without `role`) → redeem → user.role === 'viewer'
 
 ## Deployment
 
-1. Merge у `main` → CI задеплоїть Worker (`worker-deploy.yml`).
-2. Виставити secret: `cd worker && npx wrangler secret put EDITOR_CHAT_IDS` → ввести `7321709183`.
-3. Для існуючих чатів editor'ів: `setMyCommands` оновиться при наступному `/start`. Якщо хочеш одразу — попроси їх натиснути `/start`. Альтернатива: разовий маніал-виклик Bot API (не обов'язково для MVP).
-4. У BotFather залишити глобальний `/setcommands` як viewer-set (мінімум) — fallback для нових чатів до першого `/start`.
-
-## Що не змінюємо
-
-- **Reply keyboard (`MAIN_KEYBOARD`)** — 4 кнопки усі view, доступні всім allowed. Без змін.
-- **`/start` greeting** — той самий текст для admin/editor/viewer/guest, бо мета — показати chat_id.
-- **`/status`** — без обмежень (просто пингує health).
-- **Notification до admin при redeem** — без змін.
-- **`/help` для не-allowed** — не показуємо (як зараз: handler does `return` для не-allowed до `cmd === 'help'`).
+1. Merge у `main` → CI задеплоїть Worker.
+2. **Onboard 7321709183 як editor:**
+   - Адмін у боті: `/invite editor Andrii`
+   - Бот віддасть посилання `t.me/terralab_tenders_bot?start=<token>`
+   - Адмін пересилає лінку 7321709183 → юзер тапає → редеплой/secret не потрібний → у allowed_users.json з'являється `{chat_id:"7321709183", label:"Andrii", role:"editor", joined_at:"..."}`
+3. **Глобальний BotFather command list** — лишити viewer-set (мінімум). За потреби — оновити (через @BotFather → `/setcommands`):
+   ```
+   help - Список команд
+   menu - Швидкі кнопки
+   status - Здоровʼя бота
+   info - Список або деталі тендерів
+   watched - Список замовників
+   archive - Архів завершених закупівель
+   ```
+4. Для існуючих editor/admin чатів autocomplete оновиться при наступному `/start`. Або разово запустити setMyCommands вручну (поза скоупом MVP).
 
 ## Edge cases
 
-- **Editor що теж є у `allowed_users.json`:** OK, він editor (`isEditor` має priority).
-- **Editor НЕ у `allowed_users.json`:** також OK — `isAdmin || editorIds.includes(chatId)` проходить before allowlist check. Уточнення: у handler логіці `isAllowed = isAdmin || isInvited`. Треба змінити на `isAllowed = isAdmin || isEditor || isInvited` — інакше editor якого видалили з `allowed_users.json` буде заблокований.
-- **`EDITOR_CHAT_IDS` має admin id:** harmless duplication — `isEditor = isAdmin || editorIds.includes(chatId)` — спрацьовує однаково.
-- **`EDITOR_CHAT_IDS` має id неіснуючого юзера:** harmless — він просто не зможе нічого зробити, бо не пише боту. При першому повідомленні від нього — отримає editor-доступ.
-- **`setMyCommands` failure:** залогувати й продовжити; не блокує відповідь. Telegram має кеш — наступний `/start` спробує знову.
-- **Admin зробив `/revoke` для editor'а:** editor залишиться editor'ом, бо `EDITOR_CHAT_IDS` — env, не `allowed_users.json`. Це фіча: editor'ів керує адмін через CF dashboard / wrangler, не через бот-команду. (Майбутній enhancement — `/promote <chat_id>` / `/demote <chat_id>` — поза скоупом цього спеку.)
+- **Existing `allowed_users.json` без поля `role`:** читається як viewer; коли admin зробить `/role editor X`, запис оновиться і отримає поле.
+- **Existing `invites.json` без поля `role`:** redeem → новий user отримує `role: 'viewer'`. Інші pending invites — без зміни поки не використані.
+- **Race: admin зробив `/role editor X`, X одночасно натиснув `/add`:** залежить від порядку завантаження. Якщо X завантажив `allowed_users.json` до save — побачить старий `role`. У наступному повідомленні буде вже OK. Acceptable; no extra coordination needed.
+- **`setMyCommands` failure:** залогувати, не блокувати відповідь. Telegram кешує — наступний `/start` спробує знову.
+- **`/role` для admin chat_id:** refuse explicitly, бо admin не має запису в `allowed_users.json`, і навіть якщо мав би — змінювати власну роль через бот небажано.
+- **`/revoke` для editor'а:** просто видаляє запис із `allowed_users.json` — наступний `isInvited` = false, юзер стає guest. Без додаткової логіки.
+- **`/role` після `/revoke`:** "не знайдено" — як очікуємо.
 
 ## Out of scope
 
-- Команди `/promote`, `/demote` для керування editor'ами через бот (потребувало б додаткового storage; зараз обходимось env var).
-- Per-user role у `allowed_users.json` (`role: viewer|editor`). Зберігаємо схему bare-array як зараз, editor list — окремо в env.
-- Reply keyboard з editor-кнопками для швидких mutating дій (вони все одно потребують аргументів — tender_id, EDRPOU).
-- Локалізація refusal-повідомлень (зараз тільки UA).
+- Локалізація refusal-повідомлень (UA only).
+- Per-user invite TTL override.
+- Audit log змін ролі.
+- Реплі-клавіатура для адмін-команд.
+- Передача `role` редаговано-кому через окремий env (як `EDITOR_CHAT_IDS`) — розглядалось, відкинуто на користь storage-based підходу.
