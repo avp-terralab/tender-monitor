@@ -1,0 +1,78 @@
+{
+  "tender_id": "UA-2026-05-15-006953-a",
+  "saved_at": "2026-05-15T21:39:24.187Z",
+  "snapshot": {
+    "tender_id": "UA-2026-05-15-006953-a",
+    "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії\n",
+    "status": "active.tendering",
+    "dateModified": "2026-05-15T13:17:27.908863+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-05-25T00:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "Комунальне некомерційне підприємство \"Білгород-Дністровська центральна районна лікарня\" Білгород-Дністровської міської ради",
+      "edrpou": "01998696"
+    },
+    "value": {
+      "amount": 226300,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": true
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "48810000-9",
+      "description": "Інформаційні системи",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "48810000-9",
+      "48810000-9",
+      "48810000-9",
+      "48810000-9",
+      "48810000-9"
+    ],
+    "contact": {
+      "name": "Ольга Мартиненко",
+      "email": "akkerman.crbfin@gmail.com",
+      "telephone": "+380673384622, +380673384622"
+    },
+    "documents": [
+      {
+        "id": "95393655b7d4470fac58cf7baaf42a9c",
+        "title": "Проєкт_Договору.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-05-15T13:02:46.286354+03:00"
+      },
+      {
+        "id": "318782ee809f4080ba3abbc772d6f8a9",
+        "title": "ТД  (3).docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-05-15T13:02:46.286354+03:00"
+      },
+      {
+        "id": "37d06a1f939a4b38ae1586a198d961ba",
+        "title": "Перелік_документів, які подаються_переможцем.docx",
+        "documentType": "evaluationCriteria",
+        "datePublished": "2026-05-15T13:12:29.465148+03:00"
+      },
+      {
+        "id": "e53122bffb2b4c02b8a2ef06a0354989",
+        "title": "технічні х-ки , документи  учасника закупівлі (2).docx",
+        "documentType": "technicalSpecifications",
+        "datePublished": "2026-05-15T13:12:29.465148+03:00"
+      },
+      {
+        "id": "1bba7ec0153a4f50aebded741264ad4e",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-05-15T13:17:27.301466+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
