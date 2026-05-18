@@ -1,0 +1,87 @@
+{
+  "tender_id": "UA-2026-05-18-010369-a",
+  "saved_at": "2026-05-18T19:14:53.448Z",
+  "snapshot": {
+    "tender_id": "UA-2026-05-18-010369-a",
+    "title": "код ДК 021:2015 72250000-2 «Послуги, пов’язані із системами та підтримкою»\n(Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії) \n",
+    "status": "active.tendering",
+    "dateModified": "2026-05-18T15:34:03.435958+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-05-26T00:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО МЕРЕФ'ЯНСЬКОЇ МІСЬКОЇ РАДИ \"МЕРЕФ'ЯНСЬКА ЦЕНТРАЛЬНА РАЙОННА ЛІКАРНЯ\"",
+      "edrpou": "02002227"
+    },
+    "value": {
+      "amount": 893033.33,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": true
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72250000-2",
+      "description": "Послуги, пов’язані із системами та підтримкою",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72250000-2",
+      "72250000-2",
+      "72250000-2",
+      "72250000-2",
+      "72250000-2",
+      "72250000-2",
+      "72250000-2",
+      "72250000-2"
+    ],
+    "contact": {
+      "name": "Ірина Закривидорога",
+      "email": "knp-mcrl.zakupki@ukr.net",
+      "telephone": "+380639702815"
+    },
+    "documents": [
+      {
+        "id": "fe23b18967824301bd5c0b8c8571d7e9",
+        "title": "Додаток 1 до ТД.docx",
+        "documentType": null,
+        "datePublished": "2026-05-18T15:32:33.271743+03:00"
+      },
+      {
+        "id": "0b70fa6b34b9431db6f254fb11e149f3",
+        "title": "Додаток 2 до ТД.docx",
+        "documentType": null,
+        "datePublished": "2026-05-18T15:32:33.271743+03:00"
+      },
+      {
+        "id": "345ef8b61a6e44dda4051fd50df5f521",
+        "title": "Додаток 3 (Проєкт договору).docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-05-18T15:32:33.271743+03:00"
+      },
+      {
+        "id": "007d5463b52843949e57e994f9dd3997",
+        "title": "Додаток 4 до ТД.docx",
+        "documentType": null,
+        "datePublished": "2026-05-18T15:32:33.271743+03:00"
+      },
+      {
+        "id": "9c58da4197ff473c84a26e3d8f8c9d5c",
+        "title": "ТД 7225.docx",
+        "documentType": null,
+        "datePublished": "2026-05-18T15:32:33.271743+03:00"
+      },
+      {
+        "id": "360b2ca9804b4b769c8452b0d61d6cf4",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-05-18T15:34:02.986079+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}

@@ -237,5 +237,143 @@
       ],
       "cancellations": []
     }
+  },
+  {
+    "tender_id": "UA-2026-04-22-013036-a",
+    "notes": "Комунальне некомерційне підприємство \"Хмельницький  обласний заклад з надання психіатричної  допомоги\" Хмельницької обласної ради — Послуги з постачання та налаштування програмного забезпечення лабор…",
+    "archived_at": "2026-05-18T19:14:52.850Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-04-22-013036-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+      "status": "complete",
+      "dateModified": "2026-05-18T15:52:52.405164+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-04-30T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне некомерційне підприємство \"Хмельницький  обласний заклад з надання психіатричної  допомоги\" Хмельницької обласної ради",
+        "edrpou": "02004580"
+      },
+      "value": {
+        "amount": 287100,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72318000-7",
+        "description": "Послуги з передачі даних",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72318000-7"
+      ],
+      "contact": {
+        "name": "Климчук Віталій Леонідович",
+        "email": "buleshna@ukr.net",
+        "telephone": "+380933496123"
+      },
+      "documents": [
+        {
+          "id": "1ee2fa001a47448eb08164760ca40e1e",
+          "title": "4. ТД послуги.doc",
+          "documentType": null,
+          "datePublished": "2026-04-22T15:55:26.098062+03:00"
+        },
+        {
+          "id": "296b30aca5e4496ebf3c3d2f71f17fd6",
+          "title": "4.1. Додаток 1 послуги.doc",
+          "documentType": null,
+          "datePublished": "2026-04-22T15:55:26.098062+03:00"
+        },
+        {
+          "id": "b919f94005fa444bb9d40e6305fd15f4",
+          "title": "4.2. Додаток 2 ТЗ послуги.docx",
+          "documentType": null,
+          "datePublished": "2026-04-22T15:55:26.098062+03:00"
+        },
+        {
+          "id": "4363f72350fc47fa8dd47663e769fe21",
+          "title": "4.3. Додаток_3-Проект_договору.doc",
+          "documentType": "contractProforma",
+          "datePublished": "2026-04-22T15:55:26.098062+03:00"
+        },
+        {
+          "id": "d3493eef318f4637a047d9d201033626",
+          "title": "4.4. Додаток 4 Перелiк.docx",
+          "documentType": null,
+          "datePublished": "2026-04-22T15:55:26.098062+03:00"
+        },
+        {
+          "id": "2a7e5a6711314cc3ae2b76b1e5bd9faf",
+          "title": "4.5. Додаток 5 вимоги до переможця.docx",
+          "documentType": null,
+          "datePublished": "2026-04-22T15:55:26.098062+03:00"
+        },
+        {
+          "id": "0d962e6822df46c192069e08556fdbae",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-04-22T16:01:31.278433+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "3bee032951a542b8a9d81c0600b7f993",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "84a193736b354fa8977fbdc9e0fbc67c",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "title_en": "Договір 12.pdf",
+              "title_ru": "Договір 12.pdf",
+              "description": "SHA1: 2ee1d545f2e631113f55c21d5ca831b5c215534e",
+              "id": "b01f4ad2ce7f417796169241392dd84b",
+              "hash": "md5:7d8b760d2ca42f2a021ac99c7e9d72e0",
+              "title": "Договір 12.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/84a193736b354fa8977fbdc9e0fbc67c/documents/b01f4ad2ce7f417796169241392dd84b?download=09ede85224b64a2cb2015b817b07b759",
+              "documentOf": "contract",
+              "datePublished": "2026-05-18T15:50:38.023551+03:00",
+              "dateModified": "2026-05-18T15:50:38.023551+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "documentType": "notice",
+              "title_en": "sign.p7s",
+              "title_ru": "sign.p7s",
+              "description": "SHA1: d3ca5674739e13bcba09e3cc4a8b88cff2b9f87e",
+              "id": "bb798187eaff4a55bcf6ae0122b88d2b",
+              "hash": "md5:f7edd5f345adbfc7207ebd3b354e3070",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/84a193736b354fa8977fbdc9e0fbc67c/documents/bb798187eaff4a55bcf6ae0122b88d2b?download=37fbe5d1b90f49b1804bc9f5a6be2c78",
+              "documentOf": "contract",
+              "datePublished": "2026-05-18T15:52:34.890617+03:00",
+              "dateModified": "2026-05-18T15:52:34.890617+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": []
+    }
   }
 ]
