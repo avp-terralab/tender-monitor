@@ -771,7 +771,7 @@ export function handleInvitesList({ invites, now }) {
     const suffix = inv.token.slice(-6);
     const exp = inv.expires_at.slice(0, 10);
     const role = inv.role ?? 'viewer';
-    lines.push(`${i + 1}. <b>${escapeHtml(inv.label)}</b> — ${role} — …${suffix} (до ${exp})`);
+    lines.push(`${i + 1}. ${roleIcon(role)} <b>${escapeHtml(inv.label)}</b> — ${role} — …${suffix} (до ${exp})`);
   });
   lines.push('', `Всього: ${active.length}`);
   return lines.join('\n');
