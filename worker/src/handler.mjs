@@ -1,7 +1,7 @@
 import {
   parseCommand, handleAdd, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
-  handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, buildRoleChangeNotice, handleUsersList, handleInvitesList,
+  handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, buildRoleChangeNotice, handleWhoami, handleUsersList, handleInvitesList,
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
@@ -470,6 +470,14 @@ export async function runHandler({ update, env, deps = {} }) {
     }
   } else if (cmd.cmd === 'help') {
     reply = buildHelpText(role);
+  } else if (cmd.cmd === 'whoami') {
+    try {
+      const { users } = await _loadAllowedUsers(env);
+      reply = handleWhoami({ allowedUsers: users, adminChatId, chatId });
+    } catch (err) {
+      console.error('worker: /whoami failed:', err.message);
+      reply = '⚠️ GitHub тимчасово недоступний';
+    }
   } else if (cmd.cmd === 'notify') {
     if (cmd.error === 'invalid_arg') {
       reply = '❌ Формат: /notify on або /notify off';

@@ -4,3 +4,7 @@ node_modules/
 *.log
 .env
 .DS_Store
+# Screenshot dumps from chat sessions
+/*.png
+# Local sub-agent worktrees (created by AI assistant skills)
+/.claude/

@@ -5,7 +5,7 @@ import {
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
-  handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, handleUsersList, handleInvitesList, HELP_TEXT,
+  handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, handleWhoami, handleUsersList, handleInvitesList, HELP_TEXT,
   buildHelpText, buildWelcomeText, buildRoleChangeNotice,
   applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
@@ -2360,4 +2360,45 @@ test('buildRoleChangeNotice: viewer only sees view commands', () => {
   assert.match(text, /viewer/);
   assert.match(text, /\/info/);
   assert.doesNotMatch(text, /\/add\b/);
+});
+
+test('parseCommand: /whoami → cmd whoami', () => {
+  assert.deepEqual(parseCommand('/whoami'), { cmd: 'whoami' });
+});
+
+test('handleWhoami: admin → shows admin row with always-on notifications', () => {
+  const text = handleWhoami({ allowedUsers: [], adminChatId: '111', chatId: '111' });
+  assert.match(text, /Admin/);
+  assert.match(text, /111/);
+  assert.match(text, /admin/);
+  assert.match(text, /завжди увімкнено/i);
+});
+
+test('handleWhoami: editor with notifications on → ✏️ role + ✅ notify', () => {
+  const text = handleWhoami({
+    allowedUsers: [{ chat_id: '222', label: 'Andrii', role: 'editor', notifications: true }],
+    adminChatId: '111',
+    chatId: '222',
+  });
+  assert.match(text, /Andrii/);
+  assert.match(text, /✏️.*editor/);
+  assert.match(text, /✅.*УВІМКНЕНО/);
+});
+
+test('handleWhoami: viewer default (no role, no notifications) → 📄 + ❌', () => {
+  const text = handleWhoami({
+    allowedUsers: [{ chat_id: '222', label: 'Legacy' }],
+    adminChatId: '111',
+    chatId: '222',
+  });
+  assert.match(text, /Legacy/);
+  assert.match(text, /📄.*viewer/);
+  assert.match(text, /❌.*ВИМКНЕНО/);
+});
+
+test('handleWhoami: guest (not in allowlist, not admin) → shows guest message', () => {
+  const text = handleWhoami({ allowedUsers: [], adminChatId: '111', chatId: '999' });
+  assert.match(text, /Гість/);
+  assert.match(text, /999/);
+  assert.match(text, /Звернись до адміна/);
 });

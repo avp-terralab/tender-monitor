@@ -153,7 +153,14 @@ export async function runOnce(deps) {
         deadline: r.curr.tenderPeriod?.endDate ?? null,
       }))
     );
-    await sendDigest(heartbeat);
+    // Heartbeat is operational ops info (admin-facing). Use sendHeartbeat if
+    // provided to route it to admin-only; fall back to sendDigest broadcast
+    // for backward-compat in tests.
+    if (deps.sendHeartbeat) {
+      await deps.sendHeartbeat(heartbeat);
+    } else {
+      await sendDigest(heartbeat);
+    }
     // Update sheet last_check, but DO NOT save state (no events to acknowledge)
     await Promise.all(results.map(r =>
       updateSheet(r.row.tender_id, {

@@ -44,6 +44,7 @@ export function parseCommand(text) {
   if (/^\/help(?:@\w+)?$/i.test(trimmed)) return { cmd: 'help' };
   if (/^\/status(?:@\w+)?$/i.test(trimmed)) return { cmd: 'status' };
   if (/^\/watched(?:@\w+)?$/i.test(trimmed)) return { cmd: 'watched' };
+  if (/^\/whoami(?:@\w+)?$/i.test(trimmed)) return { cmd: 'whoami' };
 
   const notifyMatch = trimmed.match(/^\/notify(?:@\w+)?(?:\s+(\S+))?\s*$/i);
   if (notifyMatch) {
@@ -880,6 +881,36 @@ export function handleNotify({ allowedUsers, adminChatId, chatId }, { action }) 
   };
 }
 
+// Self-service "who am I" reply. Shows chat_id, label (if known), role,
+// and current notifications preference. Useful before asking admin for
+// changes or troubleshooting access.
+export function handleWhoami({ allowedUsers, adminChatId, chatId }) {
+  if (chatId === adminChatId) {
+    return [
+      `👤 <b>Admin</b>`,
+      `🆔 chat_id: <code>${chatId}</code>`,
+      `👑 Роль: admin`,
+      `🔔 Сповіщення: завжди увімкнено`,
+    ].join('\n');
+  }
+  const user = allowedUsers.find(u => u.chat_id === chatId);
+  if (!user) {
+    return [
+      `👤 <b>Гість</b>`,
+      `🆔 chat_id: <code>${chatId}</code>`,
+      `❓ Немає доступу. Звернись до адміна.`,
+    ].join('\n');
+  }
+  const role = user.role ?? 'viewer';
+  const notifyOn = user.notifications === true;
+  return [
+    `👤 <b>${escapeHtml(user.label)}</b>`,
+    `🆔 chat_id: <code>${chatId}</code>`,
+    `${roleIcon(role)} Роль: ${role}`,
+    `${notifyOn ? '✅' : '❌'} Сповіщення: ${notifyOn ? 'УВІМКНЕНО' : 'ВИМКНЕНО'}`,
+  ].join('\n');
+}
+
 export function handleUnarchive({ archive }, { tender_id }) {
   const entry = archive.find(a => a.tender_id === tender_id);
   if (!entry) {
@@ -898,6 +929,7 @@ const HELP_GENERAL = [
   'Загальні команди:',
   '/help — список команд',
   '/status — здоровʼя бота',
+  '/whoami — твоя роль і стан сповіщень',
   '/notify — увімкнути/вимкнути сповіщення про зміни у тендерах',
 ].join('\n');
 
@@ -1007,6 +1039,7 @@ export function buildWelcomeText(label, role) {
 const VIEW_COMMANDS = [
   { command: 'help',    description: 'Список команд' },
   { command: 'status',  description: 'Здоровʼя бота' },
+  { command: 'whoami',  description: 'Твоя роль і стан сповіщень' },
   { command: 'notify',  description: 'Увімкнути/вимкнути сповіщення' },
   { command: 'info',    description: 'Список або деталі тендерів' },
   { command: 'watched', description: 'Список замовників' },
