@@ -5,7 +5,7 @@ import {
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
-  formatInfo, HELP_TEXT, MAIN_KEYBOARD,
+  formatInfo, buildHelpText, MAIN_KEYBOARD,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, answerCallbackQuery } from '../../telegram.mjs';
@@ -98,6 +98,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const isInvited = userRecord !== null;
   const userRole = userRecord?.role ?? 'viewer';
   const isEditor = isAdmin || userRole === 'editor';
+  const role = isAdmin ? 'admin' : (isEditor ? 'editor' : 'viewer');
   const isAllowed = isAdmin || isInvited;
   // /start <token> handled below regardless of allowlist (it grants access).
   const isStartWithToken = typeof msg.text === 'string' && /^\/start(?:@\w+)?\s+\S/i.test(msg.text);
@@ -417,7 +418,7 @@ export async function runHandler({ update, env, deps = {} }) {
       });
     }
   } else if (cmd.cmd === 'help') {
-    reply = HELP_TEXT;
+    reply = buildHelpText(role);
   } else if (cmd.cmd === 'menu') {
     reply = '⚡ Швидкі дії — внизу. Команди з аргументами (/add, /watch …) пиши текстом.';
   } else if (cmd.cmd === 'unknown') {

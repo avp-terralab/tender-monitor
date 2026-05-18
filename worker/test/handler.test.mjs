@@ -1634,3 +1634,41 @@ test('runHandler: editor /invite editor X → silent return (admin-only)', async
   });
   assert.equal(sent.length, 0);
 });
+
+test('runHandler: viewer /help → response missing /add and /invite', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/help', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.doesNotMatch(sent[0].text, /\/add\b/);
+  assert.doesNotMatch(sent[0].text, /\/invite\b/);
+  assert.match(sent[0].text, /\/info/);
+});
+
+test('runHandler: editor /help → response has /add but no /invite', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'E', role: 'editor' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/help', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /\/add/);
+  assert.doesNotMatch(sent[0].text, /\/invite\b/);
+});
+
+test('runHandler: admin /help → response has /role and /invite', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/help', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /\/role/);
+  assert.match(sent[0].text, /\/invite/);
+});
