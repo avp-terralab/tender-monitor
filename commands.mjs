@@ -742,7 +742,7 @@ export function handleRedeem(deps, { token }) {
         added_at: nowIso,
       },
     },
-    reply: `✅ Доступ надано: <b>${escapeHtml(invite.label)}</b>.\n\n/help — список команд.`,
+    reply: buildWelcomeText(invite.label, invite.role ?? 'viewer'),
     adminNotice: `🆕 <b>${escapeHtml(invite.label)}</b> приєднався (chat_id: <code>${chatId}</code>)`,
   };
 }
@@ -953,6 +953,28 @@ export function buildHelpText(role) {
 }
 
 export const HELP_TEXT = buildHelpText('admin');
+
+// Composed greeting shown to a user immediately after they redeem an invite via
+// /start <token>. Includes bot purpose, the user's resolved role, an /notify
+// reminder (default OFF), and the role-filtered help text.
+export function buildWelcomeText(label, role) {
+  const roleLabel = role === 'editor' ? 'editor (редактор)'
+    : role === 'admin' ? 'admin'
+    : 'viewer (перегляд)';
+  return [
+    `✅ Доступ надано: <b>${escapeHtml(label)}</b> (роль: ${roleLabel})`,
+    '',
+    '👋 Вітаю у боті моніторингу тендерів TerraLab!',
+    '',
+    'ℹ️ Я стежу за вказаними закупівлями на Prozorro і повідомляю про важливі зміни: дедлайн подачі, нові питання та відповіді, призначення аукціону, переможців, підписання договорів. Також відстежую нові тендери від конкретних замовників за EDRPOU.',
+    '',
+    '🔔 <b>Сповіщення</b> наразі вимкнені (за замовчуванням). Щоб отримувати дайджест — надішли /notify і натисни кнопку увімкнення.',
+    '',
+    '📋 <b>Твої команди:</b>',
+    '',
+    buildHelpText(role),
+  ].join('\n');
+}
 
 const VIEW_COMMANDS = [
   { command: 'help',    description: 'Список команд' },

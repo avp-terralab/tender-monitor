@@ -6,7 +6,7 @@ import {
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleRole, handleNotify, handleUsersList, handleInvitesList, HELP_TEXT,
-  buildHelpText,
+  buildHelpText, buildWelcomeText,
   applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
   BOT_COMMANDS_BY_ROLE,
@@ -2283,4 +2283,49 @@ test('buildHelpText all roles mention /notify', () => {
   for (const role of ['viewer', 'editor', 'admin']) {
     assert.match(buildHelpText(role), /\/notify/, `role ${role} missing /notify`);
   }
+});
+
+test('buildWelcomeText: includes label, role, purpose, notify hint, and command list', () => {
+  const text = buildWelcomeText('Андрій', 'viewer');
+  assert.match(text, /Доступ надано:.*Андрій/);
+  assert.match(text, /viewer/);
+  assert.match(text, /Prozorro/);
+  assert.match(text, /\/notify/);
+  assert.match(text, /Сповіщення.*вимкнен/i);
+  // Help text included → /info, /watched, /archive present for viewer
+  assert.match(text, /\/info/);
+  assert.match(text, /\/watched/);
+  assert.match(text, /\/archive/);
+  // Editor commands absent for viewer
+  assert.doesNotMatch(text, /\/add\b/);
+  assert.doesNotMatch(text, /\/invite\b/);
+});
+
+test('buildWelcomeText: editor role includes mutating commands but not admin', () => {
+  const text = buildWelcomeText('Олена', 'editor');
+  assert.match(text, /редактор/i);
+  assert.match(text, /\/add/);
+  assert.match(text, /\/remove/);
+  assert.doesNotMatch(text, /\/invite\b/);
+  assert.doesNotMatch(text, /\/role\b/);
+});
+
+test('buildWelcomeText: HTML-escapes label', () => {
+  const text = buildWelcomeText('<script>', 'viewer');
+  assert.doesNotMatch(text, /<script>/);
+  assert.match(text, /&lt;script&gt;/);
+});
+
+test('handleRedeem: reply is the full welcome text (not just one-line confirmation)', () => {
+  const invite = {
+    token: 'a'.repeat(32), label: 'X', role: 'viewer',
+    status: 'pending', expires_at: '2099-01-01T00:00:00.000Z',
+  };
+  const r = handleRedeem(
+    { invites: [invite], allowedUsers: [], adminChatId: '111', chatId: '222', now: () => new Date('2026-05-19T10:00:00Z') },
+    { token: 'a'.repeat(32) },
+  );
+  assert.match(r.reply, /Вітаю/);
+  assert.match(r.reply, /\/notify/);
+  assert.match(r.reply, /\/info/);
 });
