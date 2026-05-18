@@ -32,6 +32,7 @@ const makeDeps = (overrides = {}) => {
       loadAllowedUsers: async () => ({ users: [], sha: null }),
       loadArchivedTenders: async () => ({ archive: [], sha: null }),
       saveArchivedTenders: async () => ({}),
+      setMyCommands: async () => {},
       ...overrides,
     },
   };
@@ -884,6 +885,67 @@ test('runHandler: /start <token> valid → mutates both files, replies, notifies
   assert.match(toAdmin.text, /приєднався/);
 });
 
+test('runHandler: /start <token> redeem with role:editor → setMyCommands for new editor', async () => {
+  const invite = {
+    token: 'b'.repeat(32),
+    label: 'Andrii',
+    role: 'editor',
+    status: 'pending',
+    expires_at: '2099-01-01T00:00:00Z',
+    redeemed_by: null,
+    redeemed_at: null,
+  };
+  const calls = [];
+  const { deps } = makeDeps({
+    loadInvites: async () => ({ invites: [invite], sha: 'inv-sha' }),
+    saveInvites: async () => ({}),
+    loadAllowedUsers: async () => ({ users: [], sha: 'usr-sha' }),
+    saveAllowedUsers: async () => ({}),
+    setMyCommands: async (args) => { calls.push(args); },
+    now: () => new Date('2026-05-18T10:00:00Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 777 }, text: `/start ${'b'.repeat(32)}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  const targetCall = calls.find(c => c.chatId === '777');
+  assert.ok(targetCall, 'expected setMyCommands for new redeemer 777');
+  const names = targetCall.commands.map(c => c.command);
+  assert.ok(names.includes('add'), 'editor commands should include /add');
+});
+
+test('runHandler: /start <token> redeem with role:viewer → setMyCommands for new viewer', async () => {
+  const invite = {
+    token: 'c'.repeat(32),
+    label: 'Olha',
+    role: 'viewer',
+    status: 'pending',
+    expires_at: '2099-01-01T00:00:00Z',
+    redeemed_by: null,
+    redeemed_at: null,
+  };
+  const calls = [];
+  const { deps } = makeDeps({
+    loadInvites: async () => ({ invites: [invite], sha: 'inv-sha' }),
+    saveInvites: async () => ({}),
+    loadAllowedUsers: async () => ({ users: [], sha: 'usr-sha' }),
+    saveAllowedUsers: async () => ({}),
+    setMyCommands: async (args) => { calls.push(args); },
+    now: () => new Date('2026-05-18T10:00:00Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 888 }, text: `/start ${'c'.repeat(32)}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  const targetCall = calls.find(c => c.chatId === '888');
+  assert.ok(targetCall, 'expected setMyCommands for new redeemer 888');
+  const names = targetCall.commands.map(c => c.command);
+  assert.ok(!names.includes('add'), 'viewer commands should NOT include /add');
+  assert.ok(names.includes('info'), 'viewer commands should include /info');
+});
+
 test('runHandler: /start <token> invalid → reply, no mutations', async () => {
   let saveCalled = false;
   const { deps, sent } = makeDeps({
@@ -921,12 +983,13 @@ test('runHandler: /invite as admin → appends invite, replies with link', async
     now: () => new Date('2026-05-12T10:00:00Z'),
   });
   await runHandler({
-    update: { message: { chat: { id: 123 }, text: '/invite Olha', message_id: 1 } },
+    update: { message: { chat: { id: 123 }, text: '/invite editor Olha', message_id: 1 } },
     env: ENV,
     deps,
   });
   assert.equal(savedInvites.length, 1);
   assert.equal(savedInvites[0].label, 'Olha');
+  assert.equal(savedInvites[0].role, 'editor');
   assert.equal(savedInvites[0].token, 'c'.repeat(32));
   assert.equal(sent.length, 1);
   assert.match(sent[0].text, /t\.me\/terralab_tenders_bot\?start=c{32}/);
@@ -944,7 +1007,7 @@ test('runHandler: /invite as non-admin → silently ignored', async () => {
   assert.equal(sent.length, 0);
 });
 
-test('runHandler: /invite without label → error reply (admin)', async () => {
+test('runHandler: /invite without role → error reply (admin)', async () => {
   const { deps, sent } = makeDeps();
   await runHandler({
     update: { message: { chat: { id: 123 }, text: '/invite', message_id: 1 } },
@@ -952,7 +1015,7 @@ test('runHandler: /invite without label → error reply (admin)', async () => {
     deps,
   });
   assert.equal(sent.length, 1);
-  assert.match(sent[0].text, /Вкажи назву/);
+  assert.match(sent[0].text, /Вкажи роль/);
 });
 
 // Task 12: /invites, /users, /revoke admin commands
@@ -1343,4 +1406,430 @@ test('runHandler: callback_query "add:UA-…" success → handleAdd, edit keyboa
   // Toast
   assert.equal(acks.length, 1);
   assert.match(acks[0].text, /додано/i);
+});
+
+test('runHandler: viewer (no role field, legacy) → /add refused, no save', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V' }], sha: 's' }),
+    saveWatchlist: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /редакторів/);
+});
+
+test('runHandler: viewer (role:viewer) → /remove refused', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    saveWatchlist: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: `/remove ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /редакторів/);
+});
+
+test('runHandler: viewer → /watch refused', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    saveWatchedEntities: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/watch 12345678', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /редакторів/);
+});
+
+test('runHandler: viewer → /unwatch refused', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    saveWatchedEntities: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/unwatch 12345678', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /редакторів/);
+});
+
+test('runHandler: viewer → /unarchive refused', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: `/unarchive ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /редакторів/);
+});
+
+test('runHandler: editor (role:editor) → /add succeeds (saveWatchlist called)', async () => {
+  const saved = [];
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'E', role: 'editor' }], sha: 's' }),
+    loadWatchlist: async () => ({ watchlist: [], sha: 'wl' }),
+    saveWatchlist: async (env, wl) => { saved.push(wl); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saved.length, 1);
+  assert.match(sent[0].text, /✅/);
+});
+
+test('runHandler: admin (chat_id == ADMIN_CHAT_ID) → /add succeeds', async () => {
+  const saved = [];
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 'wl' }),
+    saveWatchlist: async (env, wl) => { saved.push(wl); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saved.length, 1);
+});
+
+test('runHandler: viewer → /info still works (view command)', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    loadWatchlist: async () => ({ watchlist: [], sha: 'wl' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/info', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /Немає активних тендерів/);
+});
+
+test('callback add: viewer → ack with refusal, no watchlist save', async () => {
+  const acks = [];
+  let saveCalled = false;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    saveWatchlist: async () => { saveCalled = true; },
+    answerCallbackQuery: async (args) => { acks.push(args); },
+  });
+  await runHandler({
+    update: {
+      callback_query: {
+        id: 'cb1',
+        data: `add:${ID}`,
+        message: { chat: { id: 456 }, message_id: 99 },
+      },
+    },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.equal(acks.length, 1);
+  assert.match(acks[0].text, /редакторів/);
+  assert.equal(acks[0].showAlert, true);
+});
+
+test('callback add: editor → success (watchlist saved, ack OK)', async () => {
+  const saved = [];
+  const acks = [];
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'E', role: 'editor' }], sha: 's' }),
+    loadWatchlist: async () => ({ watchlist: [], sha: 'wl' }),
+    saveWatchlist: async (env, wl) => { saved.push(wl); },
+    answerCallbackQuery: async (args) => { acks.push(args); },
+    editMessageReplyMarkup: async () => {},
+  });
+  await runHandler({
+    update: {
+      callback_query: {
+        id: 'cb2',
+        data: `add:${ID}`,
+        message: { chat: { id: 456 }, message_id: 99 },
+      },
+    },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saved.length, 1);
+  assert.match(acks[0].text, /✅/);
+});
+
+// Task 14: /invite role-first + /role command wiring
+test('runHandler: admin /invite editor Andrii → invite saved with role:editor', async () => {
+  const savedInvites = [];
+  const { deps, sent } = makeDeps({
+    loadInvites: async () => ({ invites: [], sha: 'inv' }),
+    saveInvites: async (env, inv) => { savedInvites.push(inv); },
+    generateToken: () => 'a'.repeat(32),
+    now: () => new Date('2026-05-18T10:00:00.000Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/invite editor Andrii', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(savedInvites.length, 1);
+  assert.equal(savedInvites[0][0].role, 'editor');
+  assert.equal(savedInvites[0][0].label, 'Andrii');
+  assert.match(sent[0].text, /Andrii/);
+});
+
+test('runHandler: admin /invite viewer Olha → invite saved with role:viewer', async () => {
+  const savedInvites = [];
+  const { deps } = makeDeps({
+    loadInvites: async () => ({ invites: [], sha: 'inv' }),
+    saveInvites: async (env, inv) => { savedInvites.push(inv); },
+    generateToken: () => 'b'.repeat(32),
+    now: () => new Date('2026-05-18T10:00:00.000Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/invite viewer Olha', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(savedInvites[0][0].role, 'viewer');
+});
+
+test('runHandler: admin /invite Andrii (no role keyword) → error reply, no save', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    saveInvites: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/invite Andrii', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /Невалідна роль|роль/i);
+});
+
+test('runHandler: admin /role editor 456 (user is viewer) → role flipped', async () => {
+  const saved = [];
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({
+      users: [{ chat_id: '456', label: 'Andrii', role: 'viewer' }],
+      sha: 'au',
+    }),
+    saveAllowedUsers: async (env, users) => { saved.push(users); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/role editor 456', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0][0].role, 'editor');
+  assert.match(sent[0].text, /✅/);
+  assert.match(sent[0].text, /Andrii/);
+});
+
+test('runHandler: admin /role viewer 123 (self) → refusal', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [], sha: 'au' }),
+    saveAllowedUsers: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/role viewer 123', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /адмін/i);
+});
+
+test('runHandler: admin /role editor 999 (not found) → error reply', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [], sha: 'au' }),
+    saveAllowedUsers: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/role editor 999', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /не знайдено/);
+});
+
+test('runHandler: viewer /role editor 999 → silent return (admin-only)', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/role editor 999', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 0);
+});
+
+test('runHandler: editor /invite editor X → silent return (admin-only)', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'E', role: 'editor' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/invite editor X', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 0);
+});
+
+test('runHandler: viewer /help → response missing /add and /invite', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/help', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.doesNotMatch(sent[0].text, /\/add\b/);
+  assert.doesNotMatch(sent[0].text, /\/invite\b/);
+  assert.match(sent[0].text, /\/info/);
+});
+
+test('runHandler: editor /help → response has /add but no /invite', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'E', role: 'editor' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/help', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /\/add/);
+  assert.doesNotMatch(sent[0].text, /\/invite\b/);
+});
+
+test('runHandler: admin /help → response has /role and /invite', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/help', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /\/role/);
+  assert.match(sent[0].text, /\/invite/);
+});
+
+// Task 16: syncBotCommands on /start, redeem, /role
+test('runHandler: /start (no token), viewer → setMyCommands called with viewer set', async () => {
+  const calls = [];
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    setMyCommands: async (args) => { calls.push(args); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/start', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].chatId, '456');
+  const names = calls[0].commands.map(c => c.command);
+  assert.ok(names.includes('info'));
+  assert.ok(!names.includes('add'));
+  assert.ok(!names.includes('invite'));
+});
+
+test('runHandler: /start (no token), editor → setMyCommands with editor set', async () => {
+  const calls = [];
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'E', role: 'editor' }], sha: 's' }),
+    setMyCommands: async (args) => { calls.push(args); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/start', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(calls.length, 1);
+  const names = calls[0].commands.map(c => c.command);
+  assert.ok(names.includes('add'));
+  assert.ok(!names.includes('invite'));
+});
+
+test('runHandler: /start (no token), admin → setMyCommands with admin set', async () => {
+  const calls = [];
+  const { deps } = makeDeps({
+    setMyCommands: async (args) => { calls.push(args); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/start', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(calls.length, 1);
+  const names = calls[0].commands.map(c => c.command);
+  assert.ok(names.includes('invite'));
+  assert.ok(names.includes('role'));
+});
+
+test('runHandler: /start from non-allowed → setMyCommands NOT called', async () => {
+  const calls = [];
+  const { deps } = makeDeps({
+    setMyCommands: async (args) => { calls.push(args); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 999 }, text: '/start', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(calls.length, 0);
+});
+
+test('runHandler: /role editor 456 success → setMyCommands for target chat 456', async () => {
+  const calls = [];
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({
+      users: [{ chat_id: '456', label: 'A', role: 'viewer' }], sha: 's',
+    }),
+    saveAllowedUsers: async () => {},
+    setMyCommands: async (args) => { calls.push(args); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/role editor 456', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  // Expect at least one call with chatId 456 and editor commands
+  const targetCall = calls.find(c => c.chatId === '456');
+  assert.ok(targetCall, 'expected setMyCommands for target chat 456');
+  const names = targetCall.commands.map(c => c.command);
+  assert.ok(names.includes('add'));
+});
+
+test('runHandler: setMyCommands failure does not block reply', async () => {
+  const { deps, sent } = makeDeps({
+    setMyCommands: async () => { throw new Error('boom'); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/start', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1); // reply still went through
 });

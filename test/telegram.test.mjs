@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, answerCallbackQuery } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, answerCallbackQuery, setMyCommands } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -685,4 +685,52 @@ test('answerCallbackQuery: omits text and show_alert when not provided', async (
   assert.equal(calls.length, 1);
   assert.doesNotMatch(calls[0], /text=/);
   assert.doesNotMatch(calls[0], /show_alert=/);
+});
+
+test('setMyCommands: POSTs to Telegram API with chat scope', async () => {
+  let captured = null;
+  const fakeFetch = async (url, opts) => {
+    captured = { url, opts };
+    return new Response('{"ok":true}', { status: 200 });
+  };
+  await setMyCommands({
+    token: 'TOK',
+    chatId: '123',
+    commands: [{ command: 'help', description: 'h' }],
+    fetch: fakeFetch,
+  });
+  assert.equal(captured.url, 'https://api.telegram.org/botTOK/setMyCommands');
+  assert.equal(captured.opts.method, 'POST');
+  assert.equal(captured.opts.headers['content-type'], 'application/json');
+  const body = JSON.parse(captured.opts.body);
+  assert.deepEqual(body.commands, [{ command: 'help', description: 'h' }]);
+  assert.deepEqual(body.scope, { type: 'chat', chat_id: 123 });
+});
+
+test('setMyCommands: throws on non-OK response', async () => {
+  const fakeFetch = async () => new Response('bad', { status: 400 });
+  await assert.rejects(
+    setMyCommands({
+      token: 'TOK',
+      chatId: '123',
+      commands: [],
+      fetch: fakeFetch,
+    }),
+    /setMyCommands 400/,
+  );
+});
+
+test('setMyCommands: chat_id coerced to number even if passed as string', async () => {
+  let body = null;
+  const fakeFetch = async (url, opts) => {
+    body = JSON.parse(opts.body);
+    return new Response('{"ok":true}', { status: 200 });
+  };
+  await setMyCommands({
+    token: 'TOK',
+    chatId: '456',
+    commands: [],
+    fetch: fakeFetch,
+  });
+  assert.strictEqual(body.scope.chat_id, 456); // number, not '456'
 });

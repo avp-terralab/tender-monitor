@@ -6,6 +6,7 @@ const EDRPOU_RE = /^\d{8}$/;
 const TOKEN_RE = /^[a-f0-9]{32}$/i;
 const NUMERIC_RE = /^\d+$/;
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const VALID_ROLES = new Set(['editor', 'viewer']);
 
 // Reply-keyboard button labels. Tapping a button sends its text as a normal
 // message; parseCommand maps the exact label to the matching slash command.
@@ -125,9 +126,31 @@ export function parseCommand(text) {
 
   const inviteMatch = trimmed.match(/^\/invite(?:@\w+)?(?:\s+(.+))?$/i);
   if (inviteMatch) {
-    const label = (inviteMatch[1] || '').trim();
+    const args = (inviteMatch[1] || '').trim();
+    if (!args) return { cmd: 'invite', error: 'missing_role' };
+    const parts = args.split(/\s+/);
+    const role = parts[0].toLowerCase();
+    if (!VALID_ROLES.has(role)) {
+      return { cmd: 'invite', error: 'invalid_role' };
+    }
+    const label = parts.slice(1).join(' ').trim();
     if (!label) return { cmd: 'invite', error: 'missing_label' };
-    return { cmd: 'invite', label };
+    return { cmd: 'invite', role, label };
+  }
+
+  const roleMatch = trimmed.match(/^\/role(?:@\w+)?(?:\s+(.+))?$/i);
+  if (roleMatch) {
+    const args = (roleMatch[1] || '').trim();
+    if (!args) return { cmd: 'role', error: 'missing_args' };
+    const parts = args.split(/\s+/);
+    const role = parts[0].toLowerCase();
+    if (!VALID_ROLES.has(role)) {
+      return { cmd: 'role', error: 'invalid_role' };
+    }
+    const chat_id = parts[1];
+    if (!chat_id) return { cmd: 'role', error: 'missing_chat_id' };
+    if (!NUMERIC_RE.test(chat_id)) return { cmd: 'role', error: 'invalid_chat_id' };
+    return { cmd: 'role', role, chat_id };
   }
 
   if (/^\/invites(?:@\w+)?$/i.test(trimmed)) return { cmd: 'invites' };
@@ -451,7 +474,7 @@ export async function handleWatch(deps, { edrpou }) {
   };
 }
 
-export function handleInvite(deps, { label }) {
+export function handleInvite(deps, { role, label }) {
   const token = deps.generateToken();
   const now = deps.now();
   const createdAt = now.toISOString();
@@ -459,6 +482,7 @@ export function handleInvite(deps, { label }) {
   const row = {
     token,
     label,
+    role,
     created_at: createdAt,
     expires_at: expiresAt,
     status: 'pending',
@@ -466,7 +490,7 @@ export function handleInvite(deps, { label }) {
     redeemed_at: null,
   };
   const link = `https://t.me/${deps.botUsername}?start=${token}`;
-  const reply = `🔗 Invite для <b>${escapeHtml(label)}</b>\n\n${link}\n\nПерешли цій людині. Дійсне 7 днів.`;
+  const reply = `🔗 Invite для <b>${escapeHtml(label)}</b> (${role})\n\n${link}\n\nПерешли цій людині. Дійсне 7 днів.`;
   return {
     reply,
     mutation: { type: 'append_invite', row },
@@ -491,6 +515,11 @@ export function applyAllowedUsersMutation(users, mutation) {
   }
   if (mutation.type === 'remove_user') {
     return users.filter(u => u.chat_id !== mutation.chat_id);
+  }
+  if (mutation.type === 'set_role') {
+    return users.map(u =>
+      u.chat_id === mutation.chat_id ? { ...u, role: mutation.role } : u
+    );
   }
   return users;
 }
@@ -693,6 +722,7 @@ export function handleRedeem(deps, { token }) {
         chat_id: chatId,
         label: invite.label,
         invited_via: invite.label,
+        role: invite.role ?? 'viewer',
         added_at: nowIso,
       },
     },
@@ -705,8 +735,9 @@ export function handleUsersList({ allowedUsers, adminChatId }) {
   const lines = [`👥 Користувачі бота:`, ''];
   lines.push(`1. <code>${adminChatId}</code> — admin`);
   allowedUsers.forEach((u, i) => {
+    const role = u.role ?? 'viewer';
     const via = u.invited_via ? ` (від: ${escapeHtml(u.invited_via)})` : '';
-    lines.push(`${i + 2}. <code>${u.chat_id}</code> — ${escapeHtml(u.label)}${via}`);
+    lines.push(`${i + 2}. <code>${u.chat_id}</code> — ${escapeHtml(u.label)} — ${role}${via}`);
   });
   lines.push('', `Всього: ${allowedUsers.length + 1}`);
   return lines.join('\n');
@@ -724,7 +755,8 @@ export function handleInvitesList({ invites, now }) {
   active.forEach((inv, i) => {
     const suffix = inv.token.slice(-6);
     const exp = inv.expires_at.slice(0, 10);
-    lines.push(`${i + 1}. <b>${escapeHtml(inv.label)}</b> — …${suffix} (до ${exp})`);
+    const role = inv.role ?? 'viewer';
+    lines.push(`${i + 1}. <b>${escapeHtml(inv.label)}</b> — ${role} — …${suffix} (до ${exp})`);
   });
   lines.push('', `Всього: ${active.length}`);
   return lines.join('\n');
@@ -741,6 +773,30 @@ export function handleRevoke({ allowedUsers, adminChatId }, { chat_id }) {
   return {
     reply: `✅ <b>${escapeHtml(user.label)}</b> видалено (chat_id: <code>${chat_id}</code>)`,
     mutation: { type: 'remove_user', chat_id },
+  };
+}
+
+export function handleRole({ allowedUsers, adminChatId }, { role, chat_id }) {
+  if (chat_id === adminChatId) {
+    return { reply: '❌ Не можна змінити роль адміна', mutation: null };
+  }
+  const user = allowedUsers.find(u => u.chat_id === chat_id);
+  if (!user) {
+    return {
+      reply: `❓ Користувача <code>${chat_id}</code> не знайдено. /users — список`,
+      mutation: null,
+    };
+  }
+  const currentRole = user.role ?? 'viewer';
+  if (currentRole === role) {
+    return {
+      reply: `ℹ️ <b>${escapeHtml(user.label)}</b> вже ${role}`,
+      mutation: null,
+    };
+  }
+  return {
+    reply: `✅ <b>${escapeHtml(user.label)}</b> (<code>${chat_id}</code>) → ${role}`,
+    mutation: { type: 'set_role', chat_id, role },
   };
 }
 
@@ -770,30 +826,106 @@ export function handleUnarchive({ archive, watchlist }, { tender_id }) {
   };
 }
 
-export const HELP_TEXT = [
+const HELP_GENERAL = [
   'Загальні команди:',
   '/help — список команд',
   '/menu — показати швидкі кнопки',
   '/status — здоровʼя бота',
-  '',
+].join('\n');
+
+const HELP_VIEW_TENDERS = [
   'Моніторинг закупівель за ID:',
-  '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
-  '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
   '/info [UA-...] — список усіх або деталі одного тендера',
-  '',
+];
+
+const HELP_VIEW_ENTITIES = [
   'Моніторинг замовників за EDRPOU:',
-  '/watch EDRPOU — стежити за замовником',
-  '/unwatch EDRPOU — припинити стежити',
   '/watched — список замовників',
-  '',
+];
+
+const HELP_VIEW_ARCHIVE = [
   'Архів завершених закупівель:',
   '/archive — список архіву (з посиланнями на договори)',
   '/archive [UA-...] — деталі + договір',
+];
+
+const HELP_EDIT_TENDERS = [
+  '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
+  '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
+];
+
+const HELP_EDIT_ENTITIES = [
+  '/watch EDRPOU — стежити за замовником',
+  '/unwatch EDRPOU — припинити стежити',
+];
+
+const HELP_EDIT_ARCHIVE = [
   '/unarchive [UA-...] — повернути в моніторинг',
-  '',
+];
+
+const HELP_ADMIN = [
   'Адмін-команди:',
-  '/invite [імʼя] — створити invite-посилання',
+  '/invite [editor|viewer] [імʼя] — створити invite-посилання',
+  '/role [editor|viewer] [chat_id] — змінити роль користувача',
   '/invites — активні invite-посилання',
   '/users — список користувачів',
   '/revoke [chat_id] — видалити користувача',
 ].join('\n');
+
+export function buildHelpText(role) {
+  const parts = [HELP_GENERAL];
+
+  const tenders = [...HELP_VIEW_TENDERS];
+  if (role === 'editor' || role === 'admin') {
+    // Insert edit lines before the view line so order reads: add, remove, info
+    tenders.splice(1, 0, ...HELP_EDIT_TENDERS);
+  }
+  parts.push(tenders.join('\n'));
+
+  const entities = [...HELP_VIEW_ENTITIES];
+  if (role === 'editor' || role === 'admin') {
+    entities.splice(1, 0, ...HELP_EDIT_ENTITIES);
+  }
+  parts.push(entities.join('\n'));
+
+  const archive = [...HELP_VIEW_ARCHIVE];
+  if (role === 'editor' || role === 'admin') {
+    archive.push(...HELP_EDIT_ARCHIVE);
+  }
+  parts.push(archive.join('\n'));
+
+  if (role === 'admin') parts.push(HELP_ADMIN);
+
+  return parts.join('\n\n');
+}
+
+export const HELP_TEXT = buildHelpText('admin');
+
+const VIEW_COMMANDS = [
+  { command: 'help',    description: 'Список команд' },
+  { command: 'menu',    description: 'Швидкі кнопки' },
+  { command: 'status',  description: 'Здоровʼя бота' },
+  { command: 'info',    description: 'Список або деталі тендерів' },
+  { command: 'watched', description: 'Список замовників' },
+  { command: 'archive', description: 'Архів завершених закупівель' },
+];
+const EDIT_COMMANDS = [
+  { command: 'add',       description: 'Додати тендер у моніторинг' },
+  { command: 'remove',    description: 'Видалити тендер' },
+  { command: 'watch',     description: 'Стежити за замовником (EDRPOU)' },
+  { command: 'unwatch',   description: 'Припинити стежити за замовником' },
+  { command: 'unarchive', description: 'Повернути тендер з архіву' },
+];
+const ADMIN_COMMANDS = [
+  { command: 'invite',  description: 'Створити invite-посилання' },
+  { command: 'role',    description: 'Змінити роль користувача' },
+  { command: 'invites', description: 'Активні invite-посилання' },
+  { command: 'users',   description: 'Список користувачів' },
+  { command: 'revoke',  description: 'Видалити користувача' },
+];
+
+export const BOT_COMMANDS_BY_ROLE = {
+  viewer: VIEW_COMMANDS,
+  editor: [...VIEW_COMMANDS, ...EDIT_COMMANDS],
+  admin:  [...VIEW_COMMANDS, ...EDIT_COMMANDS, ...ADMIN_COMMANDS],
+};

@@ -1,14 +1,14 @@
 import {
   parseCommand, handleAdd, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
-  handleInvite, handleRedeem, handleRevoke, handleUsersList, handleInvitesList,
+  handleInvite, handleRedeem, handleRevoke, handleRole, handleUsersList, handleInvitesList,
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
-  formatInfo, HELP_TEXT, MAIN_KEYBOARD,
+  formatInfo, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
-import { sendReply, editMessageReplyMarkup, answerCallbackQuery } from '../../telegram.mjs';
+import { sendReply, editMessageReplyMarkup, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
 import {
   loadWatchlist, saveWatchlist,
   loadWatchedEntities, saveWatchedEntities,
@@ -48,6 +48,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const _now = deps.now ?? (() => new Date());
   const _editMessageReplyMarkup = deps.editMessageReplyMarkup ?? editMessageReplyMarkup;
   const _answerCallbackQuery = deps.answerCallbackQuery ?? answerCallbackQuery;
+  const _setMyCommands = deps.setMyCommands ?? setMyCommands;
 
   const cq = update.callback_query;
   if (cq) {
@@ -64,7 +65,24 @@ export async function runHandler({ update, env, deps = {} }) {
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const isAdmin = chatId !== '' && chatId === adminChatId;
 
-  // /start works for everyone — reveals chat_id so non-allowed users can request access.
+  // For non-admin chat, check allowlist file. Admin skips this (works during GH outages).
+  let userRecord = null;
+  if (!isAdmin) {
+    try {
+      const { users } = await _loadAllowedUsers(env);
+      userRecord = users.find(u => u.chat_id === chatId) ?? null;
+    } catch (err) {
+      console.error('worker: loadAllowedUsers failed:', err.message);
+      // Fail closed — non-admin sees nothing if we can't verify.
+    }
+  }
+  const isInvited = userRecord !== null;
+  const userRole = userRecord?.role ?? 'viewer';
+  const isEditor = isAdmin || userRole === 'editor';
+  const role = isAdmin ? 'admin' : (isEditor ? 'editor' : 'viewer');
+  const isAllowed = isAdmin || isInvited;
+
+  // /start works for everyone — reveals chat_id; for allowed users, also seeds chat-scope command list.
   // /start <token> is handled in a later branch.
   if (typeof msg.text === 'string' && /^\/start(?:@\w+)?\s*$/i.test(msg.text)) {
     const startReply = isAdmin
@@ -76,26 +94,18 @@ export async function runHandler({ update, env, deps = {} }) {
         chatId: msg.chat.id,
         text: startReply,
         replyToMessageId: msg.message_id,
-        replyMarkup: isAdmin ? MAIN_KEYBOARD : undefined,
+        replyMarkup: isAllowed ? MAIN_KEYBOARD : undefined,
       });
     } catch (err) {
       console.error('worker: sendReply /start failed:', err.message);
     }
+    if (isAllowed) {
+      // Fire-and-forget; logs but doesn't block.
+      syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, chatId, role);
+    }
     return;
   }
 
-  // For non-admin chat, check allowlist file. Admin skips this (works during GH outages).
-  let isInvited = false;
-  if (!isAdmin) {
-    try {
-      const { users } = await _loadAllowedUsers(env);
-      isInvited = users.some(u => u.chat_id === chatId);
-    } catch (err) {
-      console.error('worker: loadAllowedUsers failed:', err.message);
-      // Fail closed — non-admin sees nothing if we can't verify.
-    }
-  }
-  const isAllowed = isAdmin || isInvited;
   // /start <token> handled below regardless of allowlist (it grants access).
   const isStartWithToken = typeof msg.text === 'string' && /^\/start(?:@\w+)?\s+\S/i.test(msg.text);
   if (!isAllowed && !isStartWithToken) return;
@@ -104,7 +114,10 @@ export async function runHandler({ update, env, deps = {} }) {
   const cmd = parseCommand(msg.text);
   let reply;
 
-  if (cmd.cmd === 'start') {
+  const MUTATING = new Set(['add', 'remove', 'watch', 'unwatch', 'unarchive']);
+  if (MUTATING.has(cmd.cmd) && !isEditor) {
+    reply = '🚫 Це команда для редакторів. У тебе доступ лише для перегляду.';
+  } else if (cmd.cmd === 'start') {
     // /start without payload was handled earlier; here we only see /start <token>.
     if (cmd.error === 'invalid_token') {
       reply = '❌ Невалідне посилання';
@@ -152,6 +165,10 @@ export async function runHandler({ update, env, deps = {} }) {
             } catch (err) {
               console.error('worker: admin notification failed:', err.message);
             }
+          }
+          // Sync chat-scope commands for the freshly-redeemed user.
+          if (mutationBSucceeded && result.userMutation?.row?.role) {
+            syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, chatId, result.userMutation.row.role);
           }
         }
       } catch (err) {
@@ -313,8 +330,12 @@ export async function runHandler({ update, env, deps = {} }) {
     }
   } else if (cmd.cmd === 'invite') {
     if (!isAdmin) return;
-    if (cmd.error === 'missing_label') {
-      reply = '❌ Вкажи назву: /invite Olha';
+    if (cmd.error === 'missing_role') {
+      reply = '❌ Вкажи роль першим: /invite editor [імʼя] або /invite viewer [імʼя]';
+    } else if (cmd.error === 'invalid_role') {
+      reply = '❌ Невалідна роль. Тільки editor або viewer.';
+    } else if (cmd.error === 'missing_label') {
+      reply = '❌ Вкажи імʼя: /invite editor [імʼя]';
     } else {
       reply = await applyInviteMutationWithRetry({
         env,
@@ -357,6 +378,28 @@ export async function runHandler({ update, env, deps = {} }) {
           handleRevoke({ allowedUsers: users, adminChatId }, cmd),
       });
     }
+  } else if (cmd.cmd === 'role') {
+    if (!isAdmin) return;
+    if (cmd.error === 'missing_args') {
+      reply = '❌ Формат: /role [editor|viewer] [chat_id]';
+    } else if (cmd.error === 'invalid_role') {
+      reply = '❌ Невалідна роль. Тільки editor або viewer.';
+    } else if (cmd.error === 'missing_chat_id') {
+      reply = '❌ Не вказано chat_id. /role editor 12345';
+    } else if (cmd.error === 'invalid_chat_id') {
+      reply = '❌ chat_id має бути числом';
+    } else {
+      reply = await applyAllowedUsersMutationWithRetry({
+        env,
+        loadAllowedUsers: _loadAllowedUsers,
+        saveAllowedUsers: _saveAllowedUsers,
+        computeMutation: ({ users }) =>
+          handleRole({ allowedUsers: users, adminChatId }, cmd),
+      });
+      if (typeof reply === 'string' && /^✅/.test(reply)) {
+        syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, cmd.chat_id, cmd.role);
+      }
+    }
   } else if (cmd.cmd === 'archive') {
     try {
       const { archive } = await _loadArchivedTenders(env);
@@ -388,7 +431,7 @@ export async function runHandler({ update, env, deps = {} }) {
       });
     }
   } else if (cmd.cmd === 'help') {
-    reply = HELP_TEXT;
+    reply = buildHelpText(role);
   } else if (cmd.cmd === 'menu') {
     reply = '⚡ Швидкі дії — внизу. Команди з аргументами (/add, /watch …) пиши текстом.';
   } else if (cmd.cmd === 'unknown') {
@@ -426,16 +469,18 @@ async function handleCallbackQuery({
   const messageId = cq.message?.message_id;
   const isAdmin = chatId !== '' && chatId === adminChatId;
 
-  let isInvited = false;
+  let userRecord = null;
   if (!isAdmin) {
     try {
       const { users } = await _loadAllowedUsers(env);
-      isInvited = users.some(u => u.chat_id === chatId);
+      userRecord = users.find(u => u.chat_id === chatId) ?? null;
     } catch (err) {
       console.error('worker: callback loadAllowedUsers failed:', err.message);
     }
   }
+  const isInvited = userRecord !== null;
   const isAllowed = isAdmin || isInvited;
+  const isEditor = isAdmin || (userRecord?.role === 'editor');
 
   const ack = (text, showAlert = false) => _answerCallbackQuery({
     token: env.TELEGRAM_BOT_TOKEN, callbackQueryId: cq.id, text, showAlert,
@@ -450,6 +495,10 @@ async function handleCallbackQuery({
   if (data === 'noop') { await ack(); return; }
 
   if (data.startsWith('add:')) {
+    if (!isEditor) {
+      await ack('🚫 Це команда для редакторів', true);
+      return;
+    }
     const tenderId = data.slice(4);
     if (!TENDER_ID_RE.test(tenderId)) {
       await ack('❌ Невалідний tender_id');
@@ -628,4 +677,13 @@ async function safeEditKeyboard(_edit, env, chatId, messageId, label) {
 
 function formatKyivTime(d) {
   return KYIV_TIME_FMT.format(d);
+}
+
+async function syncBotCommands(_setMyCommands, token, chatId, role) {
+  const commands = BOT_COMMANDS_BY_ROLE[role] ?? BOT_COMMANDS_BY_ROLE.viewer;
+  try {
+    await _setMyCommands({ token, commands, chatId });
+  } catch (err) {
+    console.error('worker: setMyCommands failed:', err.message);
+  }
 }

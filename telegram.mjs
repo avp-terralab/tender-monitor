@@ -451,3 +451,20 @@ export async function answerCallbackQuery({ token, callbackQueryId, text, showAl
   if (!json.ok) throw new Error(`Telegram answerCallbackQuery: ${json.description ?? 'unknown'}`);
   return json;
 }
+
+export async function setMyCommands({ token, commands, chatId, fetch: fetchImpl = fetch }) {
+  const url = `https://api.telegram.org/bot${token}/setMyCommands`;
+  const body = {
+    commands,
+    scope: { type: 'chat', chat_id: Number(chatId) },
+    language_code: '',
+  };
+  const res = await fetchImpl(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`setMyCommands ${res.status}`);
+  }
+}

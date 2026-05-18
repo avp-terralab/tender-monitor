@@ -5,9 +5,11 @@ import {
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
-  handleRedeem, handleRevoke, handleUsersList, handleInvitesList, HELP_TEXT,
+  handleRedeem, handleRevoke, handleRole, handleUsersList, handleInvitesList, HELP_TEXT,
+  buildHelpText,
   applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
+  BOT_COMMANDS_BY_ROLE,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -978,28 +980,28 @@ test('handleWatch: fetchTender failure during bootstrap is silently skipped', as
   assert.deepEqual(result.mutation.bootstrap.ids, []);
 });
 
-test('parseCommand: /invite with label', () => {
-  assert.deepEqual(parseCommand('/invite Olha'), { cmd: 'invite', label: 'Olha' });
+test('parseCommand: /invite without role keyword → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite Olha'), { cmd: 'invite', error: 'invalid_role' });
 });
 
-test('parseCommand: /invite with multi-word label', () => {
-  assert.deepEqual(parseCommand('/invite Olha Petrenko'), { cmd: 'invite', label: 'Olha Petrenko' });
+test('parseCommand: /invite multi-word without role keyword → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite Olha Petrenko'), { cmd: 'invite', error: 'invalid_role' });
 });
 
-test('parseCommand: /invite with Cyrillic label', () => {
-  assert.deepEqual(parseCommand('/invite Ольга'), { cmd: 'invite', label: 'Ольга' });
+test('parseCommand: /invite Cyrillic without role keyword → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite Ольга'), { cmd: 'invite', error: 'invalid_role' });
 });
 
-test('parseCommand: /invite without label → error', () => {
-  assert.deepEqual(parseCommand('/invite'), { cmd: 'invite', error: 'missing_label' });
+test('parseCommand: /invite without args → missing_role', () => {
+  assert.deepEqual(parseCommand('/invite'), { cmd: 'invite', error: 'missing_role' });
 });
 
-test('parseCommand: /invite with bot suffix', () => {
-  assert.deepEqual(parseCommand('/invite@my_bot Olha'), { cmd: 'invite', label: 'Olha' });
+test('parseCommand: /invite with bot suffix but no role keyword → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite@my_bot Olha'), { cmd: 'invite', error: 'invalid_role' });
 });
 
-test('parseCommand: /invite trims label whitespace', () => {
-  assert.deepEqual(parseCommand('/invite   Olha   '), { cmd: 'invite', label: 'Olha' });
+test('parseCommand: /invite trims whitespace, no role keyword → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite   Olha   '), { cmd: 'invite', error: 'invalid_role' });
 });
 
 test('parseCommand: /invites', () => {
@@ -1058,7 +1060,7 @@ test('handleInvite: escapes HTML in label', () => {
     generateToken: () => 'a'.repeat(32),
     now: () => new Date('2026-05-12T10:00:00Z'),
     botUsername: 'terralab_tenders_bot',
-  }, { label: '<script>&"' });
+  }, { role: 'viewer', label: '<script>&"' });
   assert.match(result.reply, /&lt;script&gt;&amp;/);
   assert.doesNotMatch(result.reply, /<script>/);
   assert.equal(result.mutation.row.label, '<script>&"'); // raw label stored, only display escaped
@@ -1070,7 +1072,7 @@ test('handleInvite: creates invite with given label, 7-day expiry, returns deep-
     generateToken: () => 'a'.repeat(32),
     now: () => new Date('2026-05-12T10:00:00Z'),
     botUsername: 'terralab_tenders_bot',
-  }, { label: 'Olha' });
+  }, { role: 'viewer', label: 'Olha' });
   assert.equal(result.mutation.type, 'append_invite');
   assert.equal(result.mutation.row.token, 'a'.repeat(32));
   assert.equal(result.mutation.row.label, 'Olha');
@@ -1364,6 +1366,7 @@ test('HELP_TEXT mentions admin commands', () => {
   assert.match(HELP_TEXT, /\/invite/);
   assert.match(HELP_TEXT, /\/users/);
   assert.match(HELP_TEXT, /\/revoke/);
+  assert.match(HELP_TEXT, /\/role/);
 });
 
 test('parseCommand: /archive (no arg)', () => {
@@ -1736,4 +1739,451 @@ test('HELP_TEXT: mentions /archive, /unarchive (no /contract — removed)', () =
 test('HELP_TEXT: uses square brackets for placeholders (no <...>)', () => {
   // <...> breaks Telegram HTML parse_mode — re-check post-edit.
   assert.doesNotMatch(HELP_TEXT, /<UA-/);
+});
+
+test('parseCommand: /invite editor Andrii → role+label', () => {
+  assert.deepEqual(parseCommand('/invite editor Andrii'), {
+    cmd: 'invite', role: 'editor', label: 'Andrii',
+  });
+});
+
+test('parseCommand: /invite viewer Olha → role+label', () => {
+  assert.deepEqual(parseCommand('/invite viewer Olha'), {
+    cmd: 'invite', role: 'viewer', label: 'Olha',
+  });
+});
+
+test('parseCommand: /invite viewer Olha Test → label with spaces', () => {
+  assert.deepEqual(parseCommand('/invite viewer Olha Test'), {
+    cmd: 'invite', role: 'viewer', label: 'Olha Test',
+  });
+});
+
+test('parseCommand: /invite (no args) → missing_role', () => {
+  assert.deepEqual(parseCommand('/invite'), { cmd: 'invite', error: 'missing_role' });
+});
+
+test('parseCommand: /invite Andrii (no role keyword) → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite Andrii'), { cmd: 'invite', error: 'invalid_role' });
+});
+
+test('parseCommand: /invite admin Test → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite admin Test'), { cmd: 'invite', error: 'invalid_role' });
+});
+
+test('parseCommand: /invite editor (no label) → missing_label', () => {
+  assert.deepEqual(parseCommand('/invite editor'), { cmd: 'invite', error: 'missing_label' });
+});
+
+test('parseCommand: /invite viewer (no label) → missing_label', () => {
+  assert.deepEqual(parseCommand('/invite viewer'), { cmd: 'invite', error: 'missing_label' });
+});
+
+test('parseCommand: /invite@botname editor Andrii → still parses', () => {
+  assert.deepEqual(parseCommand('/invite@terralab_tenders_bot editor Andrii'), {
+    cmd: 'invite', role: 'editor', label: 'Andrii',
+  });
+});
+
+test('parseCommand: /role editor 12345 → role+chat_id', () => {
+  assert.deepEqual(parseCommand('/role editor 12345'), {
+    cmd: 'role', role: 'editor', chat_id: '12345',
+  });
+});
+
+test('parseCommand: /role viewer 7321709183 → role+chat_id', () => {
+  assert.deepEqual(parseCommand('/role viewer 7321709183'), {
+    cmd: 'role', role: 'viewer', chat_id: '7321709183',
+  });
+});
+
+test('parseCommand: /role (no args) → missing_args', () => {
+  assert.deepEqual(parseCommand('/role'), { cmd: 'role', error: 'missing_args' });
+});
+
+test('parseCommand: /role editor (no chat_id) → missing_chat_id', () => {
+  assert.deepEqual(parseCommand('/role editor'), { cmd: 'role', error: 'missing_chat_id' });
+});
+
+test('parseCommand: /role admin 12345 → invalid_role', () => {
+  assert.deepEqual(parseCommand('/role admin 12345'), { cmd: 'role', error: 'invalid_role' });
+});
+
+test('parseCommand: /role 12345 editor (old order) → invalid_role', () => {
+  assert.deepEqual(parseCommand('/role 12345 editor'), { cmd: 'role', error: 'invalid_role' });
+});
+
+test('parseCommand: /role editor abc → invalid_chat_id', () => {
+  assert.deepEqual(parseCommand('/role editor abc'), { cmd: 'role', error: 'invalid_chat_id' });
+});
+
+test('parseCommand: /role@botname editor 12345 → still parses', () => {
+  assert.deepEqual(parseCommand('/role@terralab_tenders_bot editor 12345'), {
+    cmd: 'role', role: 'editor', chat_id: '12345',
+  });
+});
+
+test('handleInvite: writes role:editor into invite record', () => {
+  const result = handleInvite(
+    {
+      invites: [],
+      generateToken: () => 'a'.repeat(32),
+      now: () => new Date('2026-05-18T10:00:00.000Z'),
+      botUsername: 'bot',
+    },
+    { role: 'editor', label: 'Andrii' },
+  );
+  assert.equal(result.mutation.type, 'append_invite');
+  assert.equal(result.mutation.row.role, 'editor');
+  assert.equal(result.mutation.row.label, 'Andrii');
+  assert.match(result.reply, /Andrii/);
+});
+
+test('handleInvite: writes role:viewer into invite record', () => {
+  const result = handleInvite(
+    {
+      invites: [],
+      generateToken: () => 'b'.repeat(32),
+      now: () => new Date('2026-05-18T10:00:00.000Z'),
+      botUsername: 'bot',
+    },
+    { role: 'viewer', label: 'Olha' },
+  );
+  assert.equal(result.mutation.row.role, 'viewer');
+  assert.equal(result.mutation.row.label, 'Olha');
+});
+
+test('handleInvite: reply mentions the role', () => {
+  const result = handleInvite(
+    {
+      invites: [],
+      generateToken: () => 'c'.repeat(32),
+      now: () => new Date('2026-05-18T10:00:00.000Z'),
+      botUsername: 'bot',
+    },
+    { role: 'editor', label: 'Andrii' },
+  );
+  assert.match(result.reply, /editor/);
+});
+
+test('handleRedeem: user inherits role:editor from invite', () => {
+  const result = handleRedeem(
+    {
+      invites: [{
+        token: 't'.repeat(32),
+        label: 'A',
+        role: 'editor',
+        status: 'pending',
+        expires_at: '2099-01-01T00:00:00.000Z',
+      }],
+      allowedUsers: [],
+      adminChatId: '111',
+      chatId: '222',
+      now: () => new Date('2026-05-18T10:00:00.000Z'),
+    },
+    { token: 't'.repeat(32) },
+  );
+  assert.equal(result.userMutation.row.role, 'editor');
+  assert.equal(result.userMutation.row.chat_id, '222');
+});
+
+test('handleRedeem: user inherits role:viewer from invite', () => {
+  const result = handleRedeem(
+    {
+      invites: [{
+        token: 't'.repeat(32),
+        label: 'A',
+        role: 'viewer',
+        status: 'pending',
+        expires_at: '2099-01-01T00:00:00.000Z',
+      }],
+      allowedUsers: [],
+      adminChatId: '111',
+      chatId: '222',
+      now: () => new Date('2026-05-18T10:00:00.000Z'),
+    },
+    { token: 't'.repeat(32) },
+  );
+  assert.equal(result.userMutation.row.role, 'viewer');
+});
+
+test('applyAllowedUsersMutation: set_role updates role in-place', () => {
+  const users = [
+    { chat_id: '111', label: 'A', role: 'viewer' },
+    { chat_id: '222', label: 'B', role: 'viewer' },
+  ];
+  const result = applyAllowedUsersMutation(users, {
+    type: 'set_role', chat_id: '222', role: 'editor',
+  });
+  assert.equal(result[0].role, 'viewer');
+  assert.equal(result[1].role, 'editor');
+  assert.equal(result[1].chat_id, '222');
+  assert.equal(result[1].label, 'B');
+});
+
+test('applyAllowedUsersMutation: set_role on legacy entry (no role field) adds role', () => {
+  const users = [{ chat_id: '111', label: 'A' }];
+  const result = applyAllowedUsersMutation(users, {
+    type: 'set_role', chat_id: '111', role: 'editor',
+  });
+  assert.equal(result[0].role, 'editor');
+});
+
+test('applyAllowedUsersMutation: set_role on non-existing chat_id is a no-op', () => {
+  const users = [{ chat_id: '111', label: 'A', role: 'viewer' }];
+  const result = applyAllowedUsersMutation(users, {
+    type: 'set_role', chat_id: '999', role: 'editor',
+  });
+  assert.deepEqual(result, users);
+});
+
+test('handleRedeem: legacy invite without role → user.role defaults to viewer', () => {
+  const result = handleRedeem(
+    {
+      invites: [{
+        token: 't'.repeat(32),
+        label: 'A',
+        // no role field
+        status: 'pending',
+        expires_at: '2099-01-01T00:00:00.000Z',
+      }],
+      allowedUsers: [],
+      adminChatId: '111',
+      chatId: '222',
+      now: () => new Date('2026-05-18T10:00:00.000Z'),
+    },
+    { token: 't'.repeat(32) },
+  );
+  assert.equal(result.userMutation.row.role, 'viewer');
+});
+
+test('handleRole: viewer → editor for existing user returns mutation', () => {
+  const result = handleRole(
+    {
+      allowedUsers: [{ chat_id: '222', label: 'Andrii', role: 'viewer' }],
+      adminChatId: '111',
+    },
+    { role: 'editor', chat_id: '222' },
+  );
+  assert.deepEqual(result.mutation, { type: 'set_role', chat_id: '222', role: 'editor' });
+  assert.match(result.reply, /Andrii/);
+  assert.match(result.reply, /editor/);
+});
+
+test('handleRole: editor → viewer', () => {
+  const result = handleRole(
+    {
+      allowedUsers: [{ chat_id: '222', label: 'X', role: 'editor' }],
+      adminChatId: '111',
+    },
+    { role: 'viewer', chat_id: '222' },
+  );
+  assert.equal(result.mutation.role, 'viewer');
+  assert.match(result.reply, /viewer/);
+});
+
+test('handleRole: target == admin → refuse with reply, no mutation', () => {
+  const result = handleRole(
+    {
+      allowedUsers: [],
+      adminChatId: '111',
+    },
+    { role: 'viewer', chat_id: '111' },
+  );
+  assert.equal(result.mutation, null);
+  assert.match(result.reply, /адмін/i);
+});
+
+test('handleRole: target not found → reply, no mutation', () => {
+  const result = handleRole(
+    {
+      allowedUsers: [{ chat_id: '222', label: 'X', role: 'viewer' }],
+      adminChatId: '111',
+    },
+    { role: 'editor', chat_id: '999' },
+  );
+  assert.equal(result.mutation, null);
+  assert.match(result.reply, /не знайдено/i);
+});
+
+test('handleRole: target already has this role → no mutation, info reply', () => {
+  const result = handleRole(
+    {
+      allowedUsers: [{ chat_id: '222', label: 'X', role: 'editor' }],
+      adminChatId: '111',
+    },
+    { role: 'editor', chat_id: '222' },
+  );
+  assert.equal(result.mutation, null);
+  assert.match(result.reply, /вже editor/i);
+});
+
+test('handleRole: legacy user without role field; setting editor → mutation issued', () => {
+  // legacy = no role field = viewer
+  const result = handleRole(
+    {
+      allowedUsers: [{ chat_id: '222', label: 'X' }],
+      adminChatId: '111',
+    },
+    { role: 'editor', chat_id: '222' },
+  );
+  assert.equal(result.mutation.role, 'editor');
+});
+
+test('handleRole: legacy user without role; setting viewer → no mutation (effectively same)', () => {
+  const result = handleRole(
+    {
+      allowedUsers: [{ chat_id: '222', label: 'X' }],
+      adminChatId: '111',
+    },
+    { role: 'viewer', chat_id: '222' },
+  );
+  assert.equal(result.mutation, null);
+  assert.match(result.reply, /вже viewer/i);
+});
+
+test('handleUsersList: shows role for each non-admin user', () => {
+  const result = handleUsersList({
+    allowedUsers: [
+      { chat_id: '222', label: 'Andrii', role: 'editor' },
+      { chat_id: '333', label: 'Olha', role: 'viewer' },
+    ],
+    adminChatId: '111',
+  });
+  assert.match(result, /1\. <code>111<\/code> — admin/);
+  assert.match(result, /Andrii.*editor/);
+  assert.match(result, /Olha.*viewer/);
+});
+
+test('handleUsersList: legacy user without role → shown as viewer', () => {
+  const result = handleUsersList({
+    allowedUsers: [{ chat_id: '222', label: 'Legacy' }],
+    adminChatId: '111',
+  });
+  assert.match(result, /Legacy.*viewer/);
+});
+
+test('handleInvitesList: shows planned role per active invite', () => {
+  const result = handleInvitesList({
+    invites: [
+      {
+        token: 'a'.repeat(32),
+        label: 'Andrii',
+        role: 'editor',
+        status: 'pending',
+        expires_at: '2099-01-01T00:00:00.000Z',
+      },
+      {
+        token: 'b'.repeat(32),
+        label: 'Olha',
+        role: 'viewer',
+        status: 'pending',
+        expires_at: '2099-01-01T00:00:00.000Z',
+      },
+    ],
+    now: () => new Date('2026-05-18T00:00:00.000Z'),
+  });
+  assert.match(result, /Andrii.*editor/);
+  assert.match(result, /Olha.*viewer/);
+});
+
+test('handleInvitesList: legacy invite without role → shown as viewer', () => {
+  const result = handleInvitesList({
+    invites: [
+      {
+        token: 'a'.repeat(32),
+        label: 'Legacy',
+        status: 'pending',
+        expires_at: '2099-01-01T00:00:00.000Z',
+      },
+    ],
+    now: () => new Date('2026-05-18T00:00:00.000Z'),
+  });
+  assert.match(result, /Legacy.*viewer/);
+});
+
+test('buildHelpText("viewer") does NOT contain mutating or admin commands', () => {
+  const t = buildHelpText('viewer');
+  assert.doesNotMatch(t, /\/add\b/);
+  assert.doesNotMatch(t, /\/remove\b/);
+  assert.doesNotMatch(t, /\/watch\b/);
+  assert.doesNotMatch(t, /\/unwatch\b/);
+  assert.doesNotMatch(t, /\/unarchive\b/);
+  assert.doesNotMatch(t, /\/invite\b/);
+  assert.doesNotMatch(t, /\/role\b/);
+  assert.doesNotMatch(t, /\/users\b/);
+  assert.doesNotMatch(t, /\/revoke\b/);
+});
+
+test('buildHelpText("viewer") contains view commands', () => {
+  const t = buildHelpText('viewer');
+  assert.match(t, /\/info/);
+  assert.match(t, /\/watched/);
+  assert.match(t, /\/archive/);
+  assert.match(t, /\/help/);
+  assert.match(t, /\/status/);
+});
+
+test('buildHelpText("editor") contains mutating, not admin', () => {
+  const t = buildHelpText('editor');
+  assert.match(t, /\/add/);
+  assert.match(t, /\/remove/);
+  assert.match(t, /\/watch/);
+  assert.match(t, /\/unwatch/);
+  assert.match(t, /\/unarchive/);
+  assert.doesNotMatch(t, /\/invite\b/);
+  assert.doesNotMatch(t, /\/role\b/);
+  assert.doesNotMatch(t, /\/users\b/);
+  assert.doesNotMatch(t, /\/revoke\b/);
+});
+
+test('buildHelpText("admin") contains everything including /role', () => {
+  const t = buildHelpText('admin');
+  assert.match(t, /\/add/);
+  assert.match(t, /\/invite/);
+  assert.match(t, /\/role/);
+  assert.match(t, /\/users/);
+  assert.match(t, /\/revoke/);
+});
+
+test('HELP_TEXT (export) === buildHelpText("admin") — back-compat', () => {
+  assert.equal(HELP_TEXT, buildHelpText('admin'));
+});
+
+test('BOT_COMMANDS_BY_ROLE.viewer does not contain editor/admin commands', () => {
+  const names = BOT_COMMANDS_BY_ROLE.viewer.map(c => c.command);
+  assert.ok(names.includes('info'));
+  assert.ok(names.includes('archive'));
+  assert.ok(!names.includes('add'));
+  assert.ok(!names.includes('invite'));
+  assert.ok(!names.includes('role'));
+});
+
+test('BOT_COMMANDS_BY_ROLE.editor contains mutating but not admin', () => {
+  const names = BOT_COMMANDS_BY_ROLE.editor.map(c => c.command);
+  assert.ok(names.includes('add'));
+  assert.ok(names.includes('remove'));
+  assert.ok(names.includes('watch'));
+  assert.ok(names.includes('unwatch'));
+  assert.ok(names.includes('unarchive'));
+  assert.ok(!names.includes('invite'));
+  assert.ok(!names.includes('role'));
+});
+
+test('BOT_COMMANDS_BY_ROLE.admin contains /role and admin commands', () => {
+  const names = BOT_COMMANDS_BY_ROLE.admin.map(c => c.command);
+  assert.ok(names.includes('role'));
+  assert.ok(names.includes('invite'));
+  assert.ok(names.includes('users'));
+  assert.ok(names.includes('revoke'));
+});
+
+test('BOT_COMMANDS_BY_ROLE: all command names lowercase a-z0-9_, ≤32 chars, descriptions ≤256', () => {
+  for (const role of ['viewer', 'editor', 'admin']) {
+    for (const c of BOT_COMMANDS_BY_ROLE[role]) {
+      assert.ok(c.command.length <= 32, `command ${c.command} too long`);
+      assert.ok(c.description.length <= 256, `description ${c.description} too long`);
+      assert.match(c.command, /^[a-z][a-z0-9_]*$/, `invalid command name ${c.command}`);
+    }
+  }
 });
