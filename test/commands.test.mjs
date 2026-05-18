@@ -5,7 +5,7 @@ import {
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
-  handleRedeem, handleRevoke, handleRole, handleUsersList, handleInvitesList, HELP_TEXT,
+  handleRedeem, handleRevoke, handleRole, handleNotify, handleUsersList, handleInvitesList, HELP_TEXT,
   buildHelpText,
   applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
@@ -2171,5 +2171,116 @@ test('BOT_COMMANDS_BY_ROLE: all command names lowercase a-z0-9_, ≤32 chars, de
       assert.ok(c.description.length <= 256, `description ${c.description} too long`);
       assert.match(c.command, /^[a-z][a-z0-9_]*$/, `invalid command name ${c.command}`);
     }
+  }
+});
+
+test('parseCommand: /notify (no args) → { cmd: notify }', () => {
+  assert.deepEqual(parseCommand('/notify'), { cmd: 'notify' });
+});
+
+test('parseCommand: /notify on → action on', () => {
+  assert.deepEqual(parseCommand('/notify on'), { cmd: 'notify', action: 'on' });
+});
+
+test('parseCommand: /notify off → action off', () => {
+  assert.deepEqual(parseCommand('/notify off'), { cmd: 'notify', action: 'off' });
+});
+
+test('parseCommand: /notify garbage → invalid_arg', () => {
+  assert.deepEqual(parseCommand('/notify garbage'), { cmd: 'notify', error: 'invalid_arg' });
+});
+
+test('parseCommand: /notify@botname on → still parses', () => {
+  assert.deepEqual(parseCommand('/notify@terralab_tenders_bot on'), { cmd: 'notify', action: 'on' });
+});
+
+test('handleNotify: admin → always-on reply, no mutation, no button', () => {
+  const r = handleNotify({ allowedUsers: [], adminChatId: '111', chatId: '111' }, {});
+  assert.match(r.reply, /адмін/i);
+  assert.match(r.reply, /увімкнено/i);
+  assert.equal(r.mutation, null);
+  assert.equal(r.replyMarkup, null);
+});
+
+test('handleNotify: viewer show-state (default off) → reply + inline toggle button', () => {
+  const r = handleNotify(
+    { allowedUsers: [{ chat_id: '222', label: 'V', role: 'viewer' }], adminChatId: '111', chatId: '222' },
+    {},
+  );
+  assert.match(r.reply, /вимкнено/i);
+  assert.equal(r.mutation, null);
+  assert.equal(r.replyMarkup.inline_keyboard[0][0].callback_data, 'notify:on');
+});
+
+test('handleNotify: viewer show-state when ON → button toggles to OFF', () => {
+  const r = handleNotify(
+    { allowedUsers: [{ chat_id: '222', label: 'V', role: 'viewer', notifications: true }], adminChatId: '111', chatId: '222' },
+    {},
+  );
+  assert.match(r.reply, /увімкнено/i);
+  assert.equal(r.replyMarkup.inline_keyboard[0][0].callback_data, 'notify:off');
+});
+
+test('handleNotify: viewer /notify on → mutation set_notifications true', () => {
+  const r = handleNotify(
+    { allowedUsers: [{ chat_id: '222', label: 'V', role: 'viewer' }], adminChatId: '111', chatId: '222' },
+    { action: 'on' },
+  );
+  assert.deepEqual(r.mutation, { type: 'set_notifications', chat_id: '222', value: true });
+  assert.match(r.reply, /увімкнено/);
+});
+
+test('handleNotify: viewer /notify off → mutation set_notifications false', () => {
+  const r = handleNotify(
+    { allowedUsers: [{ chat_id: '222', label: 'V', role: 'viewer', notifications: true }], adminChatId: '111', chatId: '222' },
+    { action: 'off' },
+  );
+  assert.deepEqual(r.mutation, { type: 'set_notifications', chat_id: '222', value: false });
+  assert.match(r.reply, /вимкнено/);
+});
+
+test('handleNotify: viewer /notify on when already on → no mutation, info reply', () => {
+  const r = handleNotify(
+    { allowedUsers: [{ chat_id: '222', label: 'V', role: 'viewer', notifications: true }], adminChatId: '111', chatId: '222' },
+    { action: 'on' },
+  );
+  assert.equal(r.mutation, null);
+  assert.match(r.reply, /вже увімкнено/);
+});
+
+test('applyAllowedUsersMutation: set_notifications updates the boolean', () => {
+  const users = [
+    { chat_id: '111', label: 'A', role: 'viewer', notifications: false },
+    { chat_id: '222', label: 'B', role: 'editor', notifications: false },
+  ];
+  const result = applyAllowedUsersMutation(users, {
+    type: 'set_notifications', chat_id: '222', value: true,
+  });
+  assert.equal(result[0].notifications, false);
+  assert.equal(result[1].notifications, true);
+});
+
+test('handleRedeem: new user gets notifications: false by default', () => {
+  const r = handleRedeem(
+    {
+      invites: [{ token: 't'.repeat(32), label: 'X', role: 'viewer', status: 'pending', expires_at: '2099-01-01T00:00:00.000Z' }],
+      allowedUsers: [],
+      adminChatId: '111',
+      chatId: '222',
+      now: () => new Date('2026-05-19T10:00:00Z'),
+    },
+    { token: 't'.repeat(32) },
+  );
+  assert.equal(r.userMutation.row.notifications, false);
+});
+
+test('BOT_COMMANDS_BY_ROLE.viewer includes /notify', () => {
+  const names = BOT_COMMANDS_BY_ROLE.viewer.map(c => c.command);
+  assert.ok(names.includes('notify'));
+});
+
+test('buildHelpText all roles mention /notify', () => {
+  for (const role of ['viewer', 'editor', 'admin']) {
+    assert.match(buildHelpText(role), /\/notify/, `role ${role} missing /notify`);
   }
 });

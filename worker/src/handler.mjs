@@ -1,7 +1,7 @@
 import {
   parseCommand, handleAdd, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
-  handleInvite, handleRedeem, handleRevoke, handleRole, handleUsersList, handleInvitesList,
+  handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, handleUsersList, handleInvitesList,
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
@@ -55,7 +55,8 @@ export async function runHandler({ update, env, deps = {} }) {
   if (cq) {
     return handleCallbackQuery({
       cq, env, _editMessageReplyMarkup, _answerCallbackQuery,
-      _loadAllowedUsers, _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
+      _loadAllowedUsers, _saveAllowedUsers,
+      _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
       _fetchTender, _extractSnapshot,
     });
   }
@@ -114,6 +115,7 @@ export async function runHandler({ update, env, deps = {} }) {
 
   const cmd = parseCommand(msg.text);
   let reply;
+  let notifyReplyMarkup = null;
 
   const MUTATING = new Set(['add', 'remove', 'watch', 'unwatch', 'unarchive']);
   if (MUTATING.has(cmd.cmd) && !isEditor) {
@@ -453,6 +455,34 @@ export async function runHandler({ update, env, deps = {} }) {
     }
   } else if (cmd.cmd === 'help') {
     reply = buildHelpText(role);
+  } else if (cmd.cmd === 'notify') {
+    if (cmd.error === 'invalid_arg') {
+      reply = '❌ Формат: /notify on або /notify off';
+    } else {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const { users, sha } = await _loadAllowedUsers(env);
+          const result = handleNotify({ allowedUsers: users, adminChatId, chatId }, cmd);
+          notifyReplyMarkup = result.replyMarkup;
+          reply = result.reply;
+          if (!result.mutation) break;
+          const newUsers = applyAllowedUsersMutation(users, result.mutation);
+          await _saveAllowedUsers(env, newUsers, sha);
+          break;
+        } catch (err) {
+          if (err instanceof ConflictError && attempt === 0) continue;
+          if (err instanceof ConflictError) {
+            reply = '⚠️ Конфлікт версій, спробуй ще раз';
+            break;
+          }
+          console.error('worker: /notify failed:', err.message);
+          reply = err.message.includes('GitHub')
+            ? '⚠️ GitHub тимчасово недоступний, спробуй за хвилину'
+            : '⚠️ Сталася помилка на стороні бота';
+          break;
+        }
+      }
+    }
   } else if (cmd.cmd === 'unknown') {
     reply = '❓ Не розумію. /help';
   } else {
@@ -465,7 +495,7 @@ export async function runHandler({ update, env, deps = {} }) {
       chatId: msg.chat.id,
       text: reply,
       replyToMessageId: msg.message_id,
-      replyMarkup: isAllowed ? MAIN_KEYBOARD : undefined,
+      replyMarkup: notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined),
     });
   } catch (err) {
     console.error('worker: sendReply failed:', err.message);
@@ -480,7 +510,8 @@ const KYIV_TIME_FMT = new Intl.DateTimeFormat('uk-UA', {
 
 async function handleCallbackQuery({
   cq, env, _editMessageReplyMarkup, _answerCallbackQuery,
-  _loadAllowedUsers, _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
+  _loadAllowedUsers, _saveAllowedUsers,
+  _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
   _fetchTender, _extractSnapshot,
 }) {
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
@@ -512,6 +543,41 @@ async function handleCallbackQuery({
 
   const data = String(cq.data ?? '');
   if (data === 'noop') { await ack(); return; }
+
+  if (data === 'notify:on' || data === 'notify:off') {
+    if (isAdmin) { await ack('🔔 Адмін завжди отримує'); return; }
+    const desired = data === 'notify:on';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { users, sha } = await _loadAllowedUsers(env);
+        const mutation = { type: 'set_notifications', chat_id: chatId, value: desired };
+        const newUsers = applyAllowedUsersMutation(users, mutation);
+        await _saveAllowedUsers(env, newUsers, sha);
+        try {
+          await _editMessageReplyMarkup({
+            token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+            replyMarkup: {
+              inline_keyboard: [[{
+                text: desired ? '🔕 Вимкнути сповіщення' : '🔔 Увімкнути сповіщення',
+                callback_data: desired ? 'notify:off' : 'notify:on',
+              }]],
+            },
+          });
+        } catch (err) {
+          console.error('worker: notify edit keyboard failed:', err.message);
+        }
+        await ack(desired ? '✅ Сповіщення увімкнено' : '✅ Сповіщення вимкнено');
+        return;
+      } catch (err) {
+        if (err instanceof ConflictError && attempt === 0) continue;
+        console.error('worker: notify callback failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+    }
+    await ack('⚠️ Не зміг зберегти');
+    return;
+  }
 
   if (data.startsWith('add:')) {
     if (!isEditor) {

@@ -45,6 +45,15 @@ export function parseCommand(text) {
   if (/^\/status(?:@\w+)?$/i.test(trimmed)) return { cmd: 'status' };
   if (/^\/watched(?:@\w+)?$/i.test(trimmed)) return { cmd: 'watched' };
 
+  const notifyMatch = trimmed.match(/^\/notify(?:@\w+)?(?:\s+(\S+))?\s*$/i);
+  if (notifyMatch) {
+    const arg = (notifyMatch[1] || '').toLowerCase();
+    if (!arg) return { cmd: 'notify' };
+    if (arg === 'on') return { cmd: 'notify', action: 'on' };
+    if (arg === 'off') return { cmd: 'notify', action: 'off' };
+    return { cmd: 'notify', error: 'invalid_arg' };
+  }
+
   const infoMatch = trimmed.match(/^\/info(?:@\w+)?(?:\s+(.+))?$/i);
   if (infoMatch) {
     const args = (infoMatch[1] || '').trim();
@@ -520,6 +529,11 @@ export function applyAllowedUsersMutation(users, mutation) {
       u.chat_id === mutation.chat_id ? { ...u, role: mutation.role } : u
     );
   }
+  if (mutation.type === 'set_notifications') {
+    return users.map(u =>
+      u.chat_id === mutation.chat_id ? { ...u, notifications: mutation.value } : u
+    );
+  }
   return users;
 }
 
@@ -724,6 +738,7 @@ export function handleRedeem(deps, { token }) {
         label: invite.label,
         invited_via: invite.label,
         role: invite.role ?? 'viewer',
+        notifications: false,
         added_at: nowIso,
       },
     },
@@ -800,6 +815,55 @@ export function handleRole({ allowedUsers, adminChatId }, { role, chat_id }) {
   };
 }
 
+// Per-user opt-in for monitor digest broadcasts. Admin (env-based) is always on.
+// `action` is 'on' | 'off' | undefined (show current state with inline toggle button).
+export function handleNotify({ allowedUsers, adminChatId, chatId }, { action }) {
+  // Admin always receives — toggle is a no-op for them.
+  if (chatId === adminChatId) {
+    return {
+      reply: '🔔 Сповіщення: <b>увімкнено</b> (адмін, завжди отримує)',
+      mutation: null,
+      replyMarkup: null,
+    };
+  }
+  const user = allowedUsers.find(u => u.chat_id === chatId);
+  if (!user) {
+    // Should never reach here — gated by isAllowed at the worker level.
+    return { reply: '❓ Не знайдено в allowlist', mutation: null, replyMarkup: null };
+  }
+  const current = user.notifications === true;
+
+  if (action === undefined) {
+    // Show state + inline button for opposite action.
+    const stateLabel = current ? 'увімкнено' : '<b>вимкнено</b>';
+    const buttonLabel = current ? '🔕 Вимкнути сповіщення' : '🔔 Увімкнути сповіщення';
+    const buttonData = current ? 'notify:off' : 'notify:on';
+    return {
+      reply: `🔔 Сповіщення про зміни у тендерах: ${stateLabel}`,
+      mutation: null,
+      replyMarkup: {
+        inline_keyboard: [[{ text: buttonLabel, callback_data: buttonData }]],
+      },
+    };
+  }
+
+  const desired = action === 'on';
+  if (current === desired) {
+    return {
+      reply: `ℹ️ Сповіщення вже ${desired ? 'увімкнено' : 'вимкнено'}`,
+      mutation: null,
+      replyMarkup: null,
+    };
+  }
+  return {
+    reply: desired
+      ? '✅ Сповіщення увімкнено. Наступний дайджест отримаєш.'
+      : '✅ Сповіщення вимкнено. Дайджести більше не приходитимуть.',
+    mutation: { type: 'set_notifications', chat_id: chatId, value: desired },
+    replyMarkup: null,
+  };
+}
+
 export function handleUnarchive({ archive }, { tender_id }) {
   const entry = archive.find(a => a.tender_id === tender_id);
   if (!entry) {
@@ -818,6 +882,7 @@ const HELP_GENERAL = [
   'Загальні команди:',
   '/help — список команд',
   '/status — здоровʼя бота',
+  '/notify — увімкнути/вимкнути сповіщення про зміни у тендерах',
 ].join('\n');
 
 const HELP_VIEW_TENDERS = [
@@ -890,6 +955,7 @@ export const HELP_TEXT = buildHelpText('admin');
 const VIEW_COMMANDS = [
   { command: 'help',    description: 'Список команд' },
   { command: 'status',  description: 'Здоровʼя бота' },
+  { command: 'notify',  description: 'Увімкнути/вимкнути сповіщення' },
   { command: 'info',    description: 'Список або деталі тендерів' },
   { command: 'watched', description: 'Список замовників' },
   { command: 'archive', description: 'Архів завершених закупівель' },

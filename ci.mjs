@@ -32,16 +32,19 @@ if (!existsSync(watchlistPath)) {
 
 const watchlist = JSON.parse(readFileSync(watchlistPath, 'utf-8'));
 
-// Build digest recipient list: admin (TELEGRAM_CHAT_ID) + every chat in
-// _state/allowed_users.json. Per-recipient delivery is wrapped in try/catch by
+// Build digest recipient list: admin (TELEGRAM_CHAT_ID) is always included +
+// every allowed user with explicit `notifications: true` opt-in. Default is
+// off so newly invited users don't get a flood of alerts until they enable
+// via /notify. Per-recipient delivery is wrapped in try/catch by
 // broadcastDigest so one blocked/unstarted chat doesn't stop the rest.
 const allowedUsersPath = join(stateDir, 'allowed_users.json');
 const allowedUsers = existsSync(allowedUsersPath)
   ? JSON.parse(readFileSync(allowedUsersPath, 'utf-8'))
   : [];
-const chatIds = [chatId, ...allowedUsers.map(u => String(u.chat_id))]
+const optedIn = allowedUsers.filter(u => u.notifications === true);
+const chatIds = [chatId, ...optedIn.map(u => String(u.chat_id))]
   .filter((id, i, arr) => arr.indexOf(id) === i);
-console.log(`Digest recipients: ${chatIds.length} (admin + ${allowedUsers.length} allowed)`);
+console.log(`Digest recipients: ${chatIds.length} (admin + ${optedIn.length} opted-in of ${allowedUsers.length} allowed)`);
 
 const watchedEntitiesPath = join(REPO, 'watched_entities.json');
 const watchedEntities = existsSync(watchedEntitiesPath)
