@@ -928,7 +928,6 @@ export function handleUnarchive({ archive }, { tender_id }) {
 const HELP_GENERAL = [
   'Загальні команди:',
   '/help — список команд',
-  '/status — здоровʼя бота',
   '/whoami — твоя роль і стан сповіщень',
   '/notify — увімкнути/вимкнути сповіщення про зміни у тендерах',
 ].join('\n');
@@ -964,6 +963,7 @@ const HELP_EDIT_ARCHIVE = [
 
 const HELP_ADMIN = [
   'Адмін-команди:',
+  '/status — здоровʼя бота',
   '/invite [editor|viewer] [імʼя] — створити invite-посилання',
   '/role [editor|viewer] [chat_id] — змінити роль користувача',
   '/invites — активні invite-посилання',
@@ -1038,7 +1038,6 @@ export function buildWelcomeText(label, role) {
 
 const VIEW_COMMANDS = [
   { command: 'help',    description: 'Список команд' },
-  { command: 'status',  description: 'Здоровʼя бота' },
   { command: 'whoami',  description: 'Твоя роль і стан сповіщень' },
   { command: 'notify',  description: 'Увімкнути/вимкнути сповіщення' },
   { command: 'info',    description: 'Список або деталі тендерів' },
@@ -1053,6 +1052,7 @@ const EDIT_COMMANDS = [
   { command: 'unarchive', description: 'Видалити тендер з архіву' },
 ];
 const ADMIN_COMMANDS = [
+  { command: 'status',  description: 'Здоровʼя бота' },
   { command: 'invite',  description: 'Створити invite-посилання' },
   { command: 'role',    description: 'Змінити роль користувача' },
   { command: 'invites', description: 'Активні invite-посилання' },

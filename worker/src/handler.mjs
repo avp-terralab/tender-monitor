@@ -217,6 +217,7 @@ export async function runHandler({ update, env, deps = {} }) {
       });
     }
   } else if (cmd.cmd === 'status') {
+    if (!isAdmin) return;
     try {
       const { watchlist, sha } = await _loadWatchlist(env);
       reply = handleStatus({ watchlist, sha });

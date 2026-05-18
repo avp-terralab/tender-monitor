@@ -2099,6 +2099,7 @@ test('buildHelpText("viewer") does NOT contain mutating or admin commands', () =
   assert.doesNotMatch(t, /\/role\b/);
   assert.doesNotMatch(t, /\/users\b/);
   assert.doesNotMatch(t, /\/revoke\b/);
+  assert.doesNotMatch(t, /\/status\b/);
 });
 
 test('buildHelpText("viewer") contains view commands', () => {
@@ -2107,6 +2108,10 @@ test('buildHelpText("viewer") contains view commands', () => {
   assert.match(t, /\/watched/);
   assert.match(t, /\/archive/);
   assert.match(t, /\/help/);
+});
+
+test('buildHelpText("admin") includes /status (admin-only ops command)', () => {
+  const t = buildHelpText('admin');
   assert.match(t, /\/status/);
 });
 
