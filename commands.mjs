@@ -755,7 +755,8 @@ export function handleInvitesList({ invites, now }) {
   active.forEach((inv, i) => {
     const suffix = inv.token.slice(-6);
     const exp = inv.expires_at.slice(0, 10);
-    lines.push(`${i + 1}. <b>${escapeHtml(inv.label)}</b> — …${suffix} (до ${exp})`);
+    const role = inv.role ?? 'viewer';
+    lines.push(`${i + 1}. <b>${escapeHtml(inv.label)}</b> — ${role} — …${suffix} (до ${exp})`);
   });
   lines.push('', `Всього: ${active.length}`);
   return lines.join('\n');

@@ -2059,3 +2059,42 @@ test('handleUsersList: legacy user without role → shown as viewer', () => {
   });
   assert.match(result, /Legacy.*viewer/);
 });
+
+test('handleInvitesList: shows planned role per active invite', () => {
+  const result = handleInvitesList({
+    invites: [
+      {
+        token: 'a'.repeat(32),
+        label: 'Andrii',
+        role: 'editor',
+        status: 'pending',
+        expires_at: '2099-01-01T00:00:00.000Z',
+      },
+      {
+        token: 'b'.repeat(32),
+        label: 'Olha',
+        role: 'viewer',
+        status: 'pending',
+        expires_at: '2099-01-01T00:00:00.000Z',
+      },
+    ],
+    now: () => new Date('2026-05-18T00:00:00.000Z'),
+  });
+  assert.match(result, /Andrii.*editor/);
+  assert.match(result, /Olha.*viewer/);
+});
+
+test('handleInvitesList: legacy invite without role → shown as viewer', () => {
+  const result = handleInvitesList({
+    invites: [
+      {
+        token: 'a'.repeat(32),
+        label: 'Legacy',
+        status: 'pending',
+        expires_at: '2099-01-01T00:00:00.000Z',
+      },
+    ],
+    now: () => new Date('2026-05-18T00:00:00.000Z'),
+  });
+  assert.match(result, /Legacy.*viewer/);
+});
