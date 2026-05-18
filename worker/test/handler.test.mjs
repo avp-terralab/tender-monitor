@@ -1344,3 +1344,118 @@ test('runHandler: callback_query "add:UA-…" success → handleAdd, edit keyboa
   assert.equal(acks.length, 1);
   assert.match(acks[0].text, /додано/i);
 });
+
+test('runHandler: viewer (no role field, legacy) → /add refused, no save', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V' }], sha: 's' }),
+    saveWatchlist: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /редакторів/);
+});
+
+test('runHandler: viewer (role:viewer) → /remove refused', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    saveWatchlist: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: `/remove ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /редакторів/);
+});
+
+test('runHandler: viewer → /watch refused', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    saveWatchedEntities: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/watch 12345678', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /редакторів/);
+});
+
+test('runHandler: viewer → /unwatch refused', async () => {
+  let saveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    saveWatchedEntities: async () => { saveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/unwatch 12345678', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.match(sent[0].text, /редакторів/);
+});
+
+test('runHandler: viewer → /unarchive refused', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: `/unarchive ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /редакторів/);
+});
+
+test('runHandler: editor (role:editor) → /add succeeds (saveWatchlist called)', async () => {
+  const saved = [];
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'E', role: 'editor' }], sha: 's' }),
+    loadWatchlist: async () => ({ watchlist: [], sha: 'wl' }),
+    saveWatchlist: async (env, wl) => { saved.push(wl); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saved.length, 1);
+  assert.match(sent[0].text, /✅/);
+});
+
+test('runHandler: admin (chat_id == ADMIN_CHAT_ID) → /add succeeds', async () => {
+  const saved = [];
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 'wl' }),
+    saveWatchlist: async (env, wl) => { saved.push(wl); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saved.length, 1);
+});
+
+test('runHandler: viewer → /info still works (view command)', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    loadWatchlist: async () => ({ watchlist: [], sha: 'wl' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/info', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /Немає активних тендерів/);
+});

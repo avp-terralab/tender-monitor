@@ -85,16 +85,19 @@ export async function runHandler({ update, env, deps = {} }) {
   }
 
   // For non-admin chat, check allowlist file. Admin skips this (works during GH outages).
-  let isInvited = false;
+  let userRecord = null;
   if (!isAdmin) {
     try {
       const { users } = await _loadAllowedUsers(env);
-      isInvited = users.some(u => u.chat_id === chatId);
+      userRecord = users.find(u => u.chat_id === chatId) ?? null;
     } catch (err) {
       console.error('worker: loadAllowedUsers failed:', err.message);
       // Fail closed — non-admin sees nothing if we can't verify.
     }
   }
+  const isInvited = userRecord !== null;
+  const userRole = userRecord?.role ?? 'viewer';
+  const isEditor = isAdmin || userRole === 'editor';
   const isAllowed = isAdmin || isInvited;
   // /start <token> handled below regardless of allowlist (it grants access).
   const isStartWithToken = typeof msg.text === 'string' && /^\/start(?:@\w+)?\s+\S/i.test(msg.text);
@@ -104,7 +107,10 @@ export async function runHandler({ update, env, deps = {} }) {
   const cmd = parseCommand(msg.text);
   let reply;
 
-  if (cmd.cmd === 'start') {
+  const MUTATING = new Set(['add', 'remove', 'watch', 'unwatch', 'unarchive']);
+  if (MUTATING.has(cmd.cmd) && !isEditor) {
+    reply = '🚫 Це команда для редакторів. У тебе доступ лише для перегляду.';
+  } else if (cmd.cmd === 'start') {
     // /start without payload was handled earlier; here we only see /start <token>.
     if (cmd.error === 'invalid_token') {
       reply = '❌ Невалідне посилання';
