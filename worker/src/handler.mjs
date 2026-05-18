@@ -524,6 +524,13 @@ export async function runHandler({ update, env, deps = {} }) {
   } catch (err) {
     console.error('worker: sendReply failed:', err.message);
   }
+
+  // Keep this chat's "/" autocomplete in sync with the current role's command
+  // list on every reply (fire-and-forget). Self-heals when BOT_COMMANDS_BY_ROLE
+  // changes without requiring the user to send /start.
+  if (isAllowed) {
+    syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, chatId, role);
+  }
 }
 
 const TENDER_ID_RE = /^UA-\d{4}-\d{2}-\d{2}-\d{6}-[a-zA-Z]$/;
