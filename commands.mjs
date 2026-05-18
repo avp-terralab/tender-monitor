@@ -272,13 +272,28 @@ export function formatInfo({ runIso, groups, errors = [] }) {
   return lines.join('\n');
 }
 
-export function handleStatus({ watchlist, sha }) {
+export function handleStatus({ watchlist, sha, users, invites, lastCommit, now }) {
   const active = watchlist.filter(r => r.enabled).length;
-  const lines = [
-    '🟢 Worker live',
-    `📋 Watchlist: ${watchlist.length} tenders (${active} active)`,
-    `✅ GitHub auth: OK (sha ${sha.slice(0, 7)})`,
-  ];
+  const lines = ['🟢 Worker live'];
+  lines.push(`📋 Watchlist: ${watchlist.length} тендерів (${active} активних)`);
+  if (users) {
+    const optedIn = users.filter(u => u.notifications === true).length;
+    lines.push(`👥 Користувачі: ${users.length + 1} (admin + ${users.length}; opted-in на сповіщення: ${optedIn})`);
+  }
+  if (invites) {
+    const nowDate = (now ?? (() => new Date()))();
+    const activeInvites = invites.filter(i => i.status === 'pending' && new Date(i.expires_at) > nowDate).length;
+    lines.push(`🎟 Активних invite-посилань: ${activeInvites}`);
+  }
+  if (lastCommit && lastCommit.date) {
+    // Last monitor tick = last commit on main (state commits from github-actions[bot])
+    const ageMin = Math.round((Date.now() - new Date(lastCommit.date).getTime()) / 60000);
+    const ageStr = ageMin < 60 ? `${ageMin} хв тому`
+      : ageMin < 1440 ? `${Math.round(ageMin / 60)} год тому`
+      : `${Math.round(ageMin / 1440)} дн тому`;
+    lines.push(`⏱ Останній tick: ${ageStr} (${lastCommit.sha})`);
+  }
+  lines.push(`✅ GitHub auth: OK (sha ${sha.slice(0, 7)})`);
   return lines.join('\n');
 }
 

@@ -457,13 +457,35 @@ test('handleStatus: formats live status', () => {
     sha: 'abc1234567890def',
   });
   assert.match(reply, /🟢 Worker live/);
-  assert.match(reply, /Watchlist: 3 tenders \(2 active\)/);
+  assert.match(reply, /Watchlist: 3 тендерів \(2 активних\)/);
   assert.match(reply, /sha abc1234/);
 });
 
 test('handleStatus: empty watchlist', () => {
   const reply = handleStatus({ watchlist: [], sha: '0000000' });
-  assert.match(reply, /Watchlist: 0 tenders \(0 active\)/);
+  assert.match(reply, /Watchlist: 0 тендерів \(0 активних\)/);
+});
+
+test('handleStatus: extended — users + invites + lastCommit', () => {
+  const reply = handleStatus({
+    watchlist: [{ tender_id: 'UA-A', enabled: true }],
+    sha: 'sha12345',
+    users: [
+      { chat_id: '1', notifications: true },
+      { chat_id: '2', notifications: false },
+      { chat_id: '3', notifications: true },
+    ],
+    invites: [
+      { status: 'pending', expires_at: '2099-01-01T00:00:00Z' },
+      { status: 'pending', expires_at: '2020-01-01T00:00:00Z' }, // expired
+      { status: 'redeemed', expires_at: '2099-01-01T00:00:00Z' },
+    ],
+    lastCommit: { sha: 'abc1234', date: new Date(Date.now() - 5 * 60 * 1000).toISOString() },
+    now: () => new Date(),
+  });
+  assert.match(reply, /Користувачі: 4 \(admin \+ 3; opted-in на сповіщення: 2\)/);
+  assert.match(reply, /Активних invite-посилань: 1/);
+  assert.match(reply, /Останній tick: 5 хв тому \(abc1234\)/);
 });
 
 test('parseCommand: /remove with valid id', () => {

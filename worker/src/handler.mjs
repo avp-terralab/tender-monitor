@@ -13,7 +13,7 @@ import { sendReply, editMessageReplyMarkup, answerCallbackQuery, setMyCommands }
 import {
   loadWatchlist, saveWatchlist,
   loadWatchedEntities, saveWatchedEntities,
-  loadWatchedSeen, saveWatchedSeen,
+  loadWatchedSeen, saveWatchedSeen, fetchLastCommit,
   loadAllowedUsers, saveAllowedUsers,
   loadInvites, saveInvites,
   loadArchivedTenders, saveArchivedTenders,
@@ -50,6 +50,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const _editMessageReplyMarkup = deps.editMessageReplyMarkup ?? editMessageReplyMarkup;
   const _answerCallbackQuery = deps.answerCallbackQuery ?? answerCallbackQuery;
   const _setMyCommands = deps.setMyCommands ?? setMyCommands;
+  const _fetchLastCommit = deps.fetchLastCommit ?? fetchLastCommit;
 
   const cq = update.callback_query;
   if (cq) {
@@ -219,8 +220,20 @@ export async function runHandler({ update, env, deps = {} }) {
   } else if (cmd.cmd === 'status') {
     if (!isAdmin) return;
     try {
-      const { watchlist, sha } = await _loadWatchlist(env);
-      reply = handleStatus({ watchlist, sha });
+      // Parallel load to keep latency low. Individual side-fetches are best-effort
+      // — if one fails the others still surface in the reply.
+      const [wlRes, usersRes, invitesRes, lastCommitRes] = await Promise.allSettled([
+        _loadWatchlist(env),
+        _loadAllowedUsers(env),
+        _loadInvites(env),
+        _fetchLastCommit(env),
+      ]);
+      if (wlRes.status !== 'fulfilled') throw wlRes.reason;
+      const { watchlist, sha } = wlRes.value;
+      const users = usersRes.status === 'fulfilled' ? usersRes.value.users : undefined;
+      const invites = invitesRes.status === 'fulfilled' ? invitesRes.value.invites : undefined;
+      const lastCommit = lastCommitRes.status === 'fulfilled' ? lastCommitRes.value : null;
+      reply = handleStatus({ watchlist, sha, users, invites, lastCommit, now: _now });
     } catch (err) {
       console.error('worker: status loadWatchlist failed:', err.message);
       reply = `⚠️ Worker live, але GitHub недоступний: ${err.message}`;

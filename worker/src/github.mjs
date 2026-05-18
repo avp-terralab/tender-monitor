@@ -11,6 +11,30 @@ export class ConflictError extends Error {
   }
 }
 
+// Newest commit on the default branch. Used by /status to show when the monitor
+// last persisted state — a proxy for "is the cron/pinger still alive".
+export async function fetchLastCommit(env, { fetch: fetchImpl = fetch } = {}) {
+  const res = await fetchImpl(
+    `${API_BASE}/repos/${REPO}/commits?per_page=1`,
+    {
+      headers: {
+        Authorization: `Bearer ${env.GITHUB_PAT}`,
+        'User-Agent': 'tender-monitor-worker',
+        Accept: 'application/vnd.github+json',
+      },
+    }
+  );
+  if (!res.ok) throw new Error(`GitHub GET ${res.status}: ${await res.text()}`);
+  const arr = await res.json();
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+  const c = arr[0];
+  return {
+    sha: (c.sha ?? '').slice(0, 7),
+    date: c.commit?.committer?.date ?? null,
+    message: (c.commit?.message ?? '').split('\n')[0],
+  };
+}
+
 export async function loadWatchlist(env, { fetch: fetchImpl = fetch } = {}) {
   const res = await fetchImpl(
     `${API_BASE}/repos/${REPO}/contents/${WATCHLIST_FILE}?ref=main`,

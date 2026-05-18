@@ -34,6 +34,7 @@ const makeDeps = (overrides = {}) => {
       saveArchivedTenders: async () => ({}),
       fetchContract: async () => ({ documents: [] }),
       setMyCommands: async () => {},
+      fetchLastCommit: async () => null,
       ...overrides,
     },
   };
@@ -402,7 +403,7 @@ test('runHandler: /status with watchlist → reply with counts and sha', async (
   });
   assert.equal(sent.length, 1);
   assert.match(sent[0].text, /🟢 Worker live/);
-  assert.match(sent[0].text, /Watchlist: 2 tenders \(1 active\)/);
+  assert.match(sent[0].text, /Watchlist: 2 тендерів \(1 активних\)/);
   assert.match(sent[0].text, /sha fedcba9/);
 });
 
