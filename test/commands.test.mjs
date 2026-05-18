@@ -2038,3 +2038,24 @@ test('handleRole: legacy user without role; setting viewer → no mutation (effe
   assert.equal(result.mutation, null);
   assert.match(result.reply, /вже viewer/i);
 });
+
+test('handleUsersList: shows role for each non-admin user', () => {
+  const result = handleUsersList({
+    allowedUsers: [
+      { chat_id: '222', label: 'Andrii', role: 'editor' },
+      { chat_id: '333', label: 'Olha', role: 'viewer' },
+    ],
+    adminChatId: '111',
+  });
+  assert.match(result, /1\. <code>111<\/code> — admin/);
+  assert.match(result, /Andrii.*editor/);
+  assert.match(result, /Olha.*viewer/);
+});
+
+test('handleUsersList: legacy user without role → shown as viewer', () => {
+  const result = handleUsersList({
+    allowedUsers: [{ chat_id: '222', label: 'Legacy' }],
+    adminChatId: '111',
+  });
+  assert.match(result, /Legacy.*viewer/);
+});
