@@ -1862,3 +1862,64 @@ test('handleInvite: reply mentions the role', () => {
   );
   assert.match(result.reply, /editor/);
 });
+
+test('handleRedeem: user inherits role:editor from invite', () => {
+  const result = handleRedeem(
+    {
+      invites: [{
+        token: 't'.repeat(32),
+        label: 'A',
+        role: 'editor',
+        status: 'pending',
+        expires_at: '2099-01-01T00:00:00.000Z',
+      }],
+      allowedUsers: [],
+      adminChatId: '111',
+      chatId: '222',
+      now: () => new Date('2026-05-18T10:00:00.000Z'),
+    },
+    { token: 't'.repeat(32) },
+  );
+  assert.equal(result.userMutation.row.role, 'editor');
+  assert.equal(result.userMutation.row.chat_id, '222');
+});
+
+test('handleRedeem: user inherits role:viewer from invite', () => {
+  const result = handleRedeem(
+    {
+      invites: [{
+        token: 't'.repeat(32),
+        label: 'A',
+        role: 'viewer',
+        status: 'pending',
+        expires_at: '2099-01-01T00:00:00.000Z',
+      }],
+      allowedUsers: [],
+      adminChatId: '111',
+      chatId: '222',
+      now: () => new Date('2026-05-18T10:00:00.000Z'),
+    },
+    { token: 't'.repeat(32) },
+  );
+  assert.equal(result.userMutation.row.role, 'viewer');
+});
+
+test('handleRedeem: legacy invite without role → user.role defaults to viewer', () => {
+  const result = handleRedeem(
+    {
+      invites: [{
+        token: 't'.repeat(32),
+        label: 'A',
+        // no role field
+        status: 'pending',
+        expires_at: '2099-01-01T00:00:00.000Z',
+      }],
+      allowedUsers: [],
+      adminChatId: '111',
+      chatId: '222',
+      now: () => new Date('2026-05-18T10:00:00.000Z'),
+    },
+    { token: 't'.repeat(32) },
+  );
+  assert.equal(result.userMutation.row.role, 'viewer');
+});

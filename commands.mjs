@@ -717,6 +717,7 @@ export function handleRedeem(deps, { token }) {
         chat_id: chatId,
         label: invite.label,
         invited_via: invite.label,
+        role: invite.role ?? 'viewer',
         added_at: nowIso,
       },
     },
