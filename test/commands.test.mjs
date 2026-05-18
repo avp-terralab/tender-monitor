@@ -1781,3 +1781,41 @@ test('parseCommand: /invite@botname editor Andrii → still parses', () => {
     cmd: 'invite', role: 'editor', label: 'Andrii',
   });
 });
+
+test('parseCommand: /role editor 12345 → role+chat_id', () => {
+  assert.deepEqual(parseCommand('/role editor 12345'), {
+    cmd: 'role', role: 'editor', chat_id: '12345',
+  });
+});
+
+test('parseCommand: /role viewer 7321709183 → role+chat_id', () => {
+  assert.deepEqual(parseCommand('/role viewer 7321709183'), {
+    cmd: 'role', role: 'viewer', chat_id: '7321709183',
+  });
+});
+
+test('parseCommand: /role (no args) → missing_args', () => {
+  assert.deepEqual(parseCommand('/role'), { cmd: 'role', error: 'missing_args' });
+});
+
+test('parseCommand: /role editor (no chat_id) → missing_chat_id', () => {
+  assert.deepEqual(parseCommand('/role editor'), { cmd: 'role', error: 'missing_chat_id' });
+});
+
+test('parseCommand: /role admin 12345 → invalid_role', () => {
+  assert.deepEqual(parseCommand('/role admin 12345'), { cmd: 'role', error: 'invalid_role' });
+});
+
+test('parseCommand: /role 12345 editor (old order) → invalid_role', () => {
+  assert.deepEqual(parseCommand('/role 12345 editor'), { cmd: 'role', error: 'invalid_role' });
+});
+
+test('parseCommand: /role editor abc → invalid_chat_id', () => {
+  assert.deepEqual(parseCommand('/role editor abc'), { cmd: 'role', error: 'invalid_chat_id' });
+});
+
+test('parseCommand: /role@botname editor 12345 → still parses', () => {
+  assert.deepEqual(parseCommand('/role@terralab_tenders_bot editor 12345'), {
+    cmd: 'role', role: 'editor', chat_id: '12345',
+  });
+});

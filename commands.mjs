@@ -6,6 +6,7 @@ const EDRPOU_RE = /^\d{8}$/;
 const TOKEN_RE = /^[a-f0-9]{32}$/i;
 const NUMERIC_RE = /^\d+$/;
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const VALID_ROLES = new Set(['editor', 'viewer']);
 
 // Reply-keyboard button labels. Tapping a button sends its text as a normal
 // message; parseCommand maps the exact label to the matching slash command.
@@ -129,12 +130,27 @@ export function parseCommand(text) {
     if (!args) return { cmd: 'invite', error: 'missing_role' };
     const parts = args.split(/\s+/);
     const role = parts[0].toLowerCase();
-    if (role !== 'editor' && role !== 'viewer') {
+    if (!VALID_ROLES.has(role)) {
       return { cmd: 'invite', error: 'invalid_role' };
     }
     const label = parts.slice(1).join(' ').trim();
     if (!label) return { cmd: 'invite', error: 'missing_label' };
     return { cmd: 'invite', role, label };
+  }
+
+  const roleMatch = trimmed.match(/^\/role(?:@\w+)?(?:\s+(.+))?$/i);
+  if (roleMatch) {
+    const args = (roleMatch[1] || '').trim();
+    if (!args) return { cmd: 'role', error: 'missing_args' };
+    const parts = args.split(/\s+/);
+    const role = parts[0].toLowerCase();
+    if (!VALID_ROLES.has(role)) {
+      return { cmd: 'role', error: 'invalid_role' };
+    }
+    const chat_id = parts[1];
+    if (!chat_id) return { cmd: 'role', error: 'missing_chat_id' };
+    if (!NUMERIC_RE.test(chat_id)) return { cmd: 'role', error: 'invalid_chat_id' };
+    return { cmd: 'role', role, chat_id };
   }
 
   if (/^\/invites(?:@\w+)?$/i.test(trimmed)) return { cmd: 'invites' };
