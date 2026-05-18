@@ -432,16 +432,18 @@ async function handleCallbackQuery({
   const messageId = cq.message?.message_id;
   const isAdmin = chatId !== '' && chatId === adminChatId;
 
-  let isInvited = false;
+  let userRecord = null;
   if (!isAdmin) {
     try {
       const { users } = await _loadAllowedUsers(env);
-      isInvited = users.some(u => u.chat_id === chatId);
+      userRecord = users.find(u => u.chat_id === chatId) ?? null;
     } catch (err) {
       console.error('worker: callback loadAllowedUsers failed:', err.message);
     }
   }
+  const isInvited = userRecord !== null;
   const isAllowed = isAdmin || isInvited;
+  const isEditor = isAdmin || (userRecord?.role === 'editor');
 
   const ack = (text, showAlert = false) => _answerCallbackQuery({
     token: env.TELEGRAM_BOT_TOKEN, callbackQueryId: cq.id, text, showAlert,
@@ -456,6 +458,10 @@ async function handleCallbackQuery({
   if (data === 'noop') { await ack(); return; }
 
   if (data.startsWith('add:')) {
+    if (!isEditor) {
+      await ack('🚫 Це команда для редакторів', true);
+      return;
+    }
     const tenderId = data.slice(4);
     if (!TENDER_ID_RE.test(tenderId)) {
       await ack('❌ Невалідний tender_id');

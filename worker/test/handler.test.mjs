@@ -1459,3 +1459,53 @@ test('runHandler: viewer → /info still works (view command)', async () => {
   });
   assert.match(sent[0].text, /Немає активних тендерів/);
 });
+
+test('callback add: viewer → ack with refusal, no watchlist save', async () => {
+  const acks = [];
+  let saveCalled = false;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    saveWatchlist: async () => { saveCalled = true; },
+    answerCallbackQuery: async (args) => { acks.push(args); },
+  });
+  await runHandler({
+    update: {
+      callback_query: {
+        id: 'cb1',
+        data: `add:${ID}`,
+        message: { chat: { id: 456 }, message_id: 99 },
+      },
+    },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saveCalled, false);
+  assert.equal(acks.length, 1);
+  assert.match(acks[0].text, /редакторів/);
+  assert.equal(acks[0].showAlert, true);
+});
+
+test('callback add: editor → success (watchlist saved, ack OK)', async () => {
+  const saved = [];
+  const acks = [];
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'E', role: 'editor' }], sha: 's' }),
+    loadWatchlist: async () => ({ watchlist: [], sha: 'wl' }),
+    saveWatchlist: async (env, wl) => { saved.push(wl); },
+    answerCallbackQuery: async (args) => { acks.push(args); },
+    editMessageReplyMarkup: async () => {},
+  });
+  await runHandler({
+    update: {
+      callback_query: {
+        id: 'cb2',
+        data: `add:${ID}`,
+        message: { chat: { id: 456 }, message_id: 99 },
+      },
+    },
+    env: ENV,
+    deps,
+  });
+  assert.equal(saved.length, 1);
+  assert.match(acks[0].text, /✅/);
+});
