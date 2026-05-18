@@ -2036,9 +2036,9 @@ test('handleUsersList: shows role for each non-admin user', () => {
     ],
     adminChatId: '111',
   });
-  assert.match(result, /1\. <code>111<\/code> — admin/);
-  assert.match(result, /Andrii.*editor/);
-  assert.match(result, /Olha.*viewer/);
+  assert.match(result, /1\. 👑 <code>111<\/code> — admin/);
+  assert.match(result, /✏️.*Andrii.*editor/);
+  assert.match(result, /📄.*Olha.*viewer/);
 });
 
 test('handleUsersList: legacy user without role → shown as viewer', () => {

@@ -749,10 +749,10 @@ export function handleRedeem(deps, { token }) {
 
 export function handleUsersList({ allowedUsers, adminChatId }) {
   const lines = [`👥 Користувачі бота:`, ''];
-  lines.push(`1. <code>${adminChatId}</code> — admin`);
+  lines.push(`1. 👑 <code>${adminChatId}</code> — admin`);
   allowedUsers.forEach((u, i) => {
     const role = u.role ?? 'viewer';
-    lines.push(`${i + 2}. <code>${u.chat_id}</code> — ${escapeHtml(u.label)} — ${role}`);
+    lines.push(`${i + 2}. ${roleIcon(role)} <code>${u.chat_id}</code> — ${escapeHtml(u.label)} — ${role}`);
   });
   lines.push('', `Всього: ${allowedUsers.length + 1}`);
   return lines.join('\n');
