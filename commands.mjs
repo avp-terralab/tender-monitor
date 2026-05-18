@@ -42,7 +42,6 @@ export function parseCommand(text) {
   }
 
   if (/^\/help(?:@\w+)?$/i.test(trimmed)) return { cmd: 'help' };
-  if (/^\/menu(?:@\w+)?$/i.test(trimmed)) return { cmd: 'menu' };
   if (/^\/status(?:@\w+)?$/i.test(trimmed)) return { cmd: 'status' };
   if (/^\/watched(?:@\w+)?$/i.test(trimmed)) return { cmd: 'watched' };
 
@@ -356,7 +355,7 @@ export async function handleAdd(deps, { tender_id, notes }) {
   const archived = archive.find(a => a.tender_id === tender_id);
   if (archived) {
     return {
-      reply: `⚠️ ${tender_id} архівована (${archived.final_status}). Поверну? /unarchive ${tender_id}`,
+      reply: `⚠️ ${tender_id} в архіві (${archived.final_status}). Спочатку /unarchive ${tender_id} щоб видалити з архіву, потім /add знову.`,
       mutation: null,
     };
   }
@@ -800,36 +799,23 @@ export function handleRole({ allowedUsers, adminChatId }, { role, chat_id }) {
   };
 }
 
-export function handleUnarchive({ archive, watchlist }, { tender_id }) {
+export function handleUnarchive({ archive }, { tender_id }) {
   const entry = archive.find(a => a.tender_id === tender_id);
   if (!entry) {
     return {
       reply: `❓ ${tender_id} не в архіві`,
       archiveMutation: null,
-      watchlistMutation: null,
-    };
-  }
-  if (watchlist.some(r => r.tender_id === tender_id)) {
-    return {
-      reply: `⚠️ ${tender_id} вже у watchlist`,
-      archiveMutation: null,
-      watchlistMutation: null,
     };
   }
   return {
-    reply: `✅ ${tender_id} повернуто в моніторинг.`,
+    reply: `✅ ${tender_id} видалено з архіву`,
     archiveMutation: { type: 'remove_archive', tender_id },
-    watchlistMutation: {
-      type: 'append',
-      row: { tender_id, enabled: true, notes: entry.notes ?? '' },
-    },
   };
 }
 
 const HELP_GENERAL = [
   'Загальні команди:',
   '/help — список команд',
-  '/menu — показати швидкі кнопки',
   '/status — здоровʼя бота',
 ].join('\n');
 
@@ -845,8 +831,7 @@ const HELP_VIEW_ENTITIES = [
 
 const HELP_VIEW_ARCHIVE = [
   'Архів завершених закупівель:',
-  '/archive — список архіву (з посиланнями на договори)',
-  '/archive [UA-...] — деталі + договір',
+  '/archive [UA-...] — список архіву або деталі одного тендера',
 ];
 
 const HELP_EDIT_TENDERS = [
@@ -860,7 +845,7 @@ const HELP_EDIT_ENTITIES = [
 ];
 
 const HELP_EDIT_ARCHIVE = [
-  '/unarchive [UA-...] — повернути в моніторинг',
+  '/unarchive [UA-...] — видалити з архіву',
 ];
 
 const HELP_ADMIN = [
@@ -903,7 +888,6 @@ export const HELP_TEXT = buildHelpText('admin');
 
 const VIEW_COMMANDS = [
   { command: 'help',    description: 'Список команд' },
-  { command: 'menu',    description: 'Швидкі кнопки' },
   { command: 'status',  description: 'Здоровʼя бота' },
   { command: 'info',    description: 'Список або деталі тендерів' },
   { command: 'watched', description: 'Список замовників' },
@@ -914,7 +898,7 @@ const EDIT_COMMANDS = [
   { command: 'remove',    description: 'Видалити тендер' },
   { command: 'watch',     description: 'Стежити за замовником (EDRPOU)' },
   { command: 'unwatch',   description: 'Припинити стежити за замовником' },
-  { command: 'unarchive', description: 'Повернути тендер з архіву' },
+  { command: 'unarchive', description: 'Видалити тендер з архіву' },
 ];
 const ADMIN_COMMANDS = [
   { command: 'invite',  description: 'Створити invite-посилання' },

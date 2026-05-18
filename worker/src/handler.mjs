@@ -423,8 +423,6 @@ export async function runHandler({ update, env, deps = {} }) {
     } else {
       reply = await applyUnarchive({
         env,
-        loadWatchlist: _loadWatchlist,
-        saveWatchlist: _saveWatchlist,
         loadArchivedTenders: _loadArchivedTenders,
         saveArchivedTenders: _saveArchivedTenders,
         tender_id: cmd.tender_id,
@@ -432,8 +430,6 @@ export async function runHandler({ update, env, deps = {} }) {
     }
   } else if (cmd.cmd === 'help') {
     reply = buildHelpText(role);
-  } else if (cmd.cmd === 'menu') {
-    reply = '⚡ Швидкі дії — внизу. Команди з аргументами (/add, /watch …) пиши текстом.';
   } else if (cmd.cmd === 'unknown') {
     reply = '❓ Не розумію. /help';
   } else {
@@ -615,23 +611,13 @@ async function applyEntityMutationWithRetry({ env, loadWatchedEntities, saveWatc
   return '⚠️ Не зміг зберегти, спробуй за хвилину';
 }
 
-async function applyUnarchive({ env, loadWatchlist, saveWatchlist, loadArchivedTenders, saveArchivedTenders, tender_id }) {
+async function applyUnarchive({ env, loadArchivedTenders, saveArchivedTenders, tender_id }) {
   try {
-    const { archive, sha: archSha } = await loadArchivedTenders(env);
-    const { watchlist, sha: wlSha } = await loadWatchlist(env);
-    const result = handleUnarchive({ archive, watchlist }, { tender_id });
-    if (!result.watchlistMutation) return result.reply;
-    // Append to watchlist first
-    const newWatchlist = applyMutation(watchlist, result.watchlistMutation);
-    await saveWatchlist(env, newWatchlist, wlSha);
-    // Remove from archive
+    const { archive, sha } = await loadArchivedTenders(env);
+    const result = handleUnarchive({ archive }, { tender_id });
+    if (!result.archiveMutation) return result.reply;
     const newArchive = applyArchiveMutation(archive, result.archiveMutation);
-    try {
-      await saveArchivedTenders(env, newArchive, archSha);
-    } catch (err) {
-      console.error('worker: unarchive saveArchive failed:', err.message);
-      return `⚠️ ${tender_id} додано до watchlist, але не видалено з архіву. Наступний monitor-тік може його повторно архівувати — спробуй /unarchive ще раз.`;
-    }
+    await saveArchivedTenders(env, newArchive, sha);
     return result.reply;
   } catch (err) {
     if (err instanceof ConflictError) {
@@ -656,7 +642,7 @@ async function onAddResult({ result, tenderId, chatId, messageId, env, _editMess
     await ack('ℹ️ Вже моніторю');
     return;
   }
-  if (typeof result === 'string' && /архівована/i.test(result)) {
+  if (typeof result === 'string' && /в архіві/i.test(result)) {
     await safeEditKeyboard(_editMessageReplyMarkup, env, chatId, messageId, `📦 В архіві`);
     await ack('📦 Тендер в архіві');
     return;

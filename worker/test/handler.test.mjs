@@ -116,7 +116,7 @@ test('runHandler: button label "📋 Моніторинг закупівель" 
   assert.ok(sent[0].replyMarkup);
 });
 
-test('runHandler: /menu replies with short hint + the keyboard', async () => {
+test('runHandler: /menu → unknown command (removed)', async () => {
   const { deps, sent } = makeDeps();
   await runHandler({
     update: { message: { chat: { id: 123 }, text: '/menu', message_id: 3 } },
@@ -124,10 +124,7 @@ test('runHandler: /menu replies with short hint + the keyboard', async () => {
     deps,
   });
   assert.equal(sent.length, 1);
-  assert.ok(sent[0].replyMarkup);
-  // The /menu reply should be a deliberate menu hint, not the unknown-command fallback
-  assert.doesNotMatch(sent[0].text, /Не розумію/);
-  assert.ok(sent[0].text.length < 200, 'menu reply should be a short hint');
+  assert.match(sent[0].text, /Не розумію/);
 });
 
 test('runHandler: /start for allowed user also carries the keyboard', async () => {
@@ -1130,30 +1127,27 @@ test('runHandler: /archive UA-... uses fresh fetchTender for contracts', async (
   assert.match(sent[0].text, /📄 Договір/);
 });
 
-test('runHandler: /unarchive moves UA → watchlist', async () => {
+test('runHandler: /unarchive deletes from archive (no watchlist re-add)', async () => {
   const archive = [{
     tender_id: 'UA-2026-04-30-010542-a',
     notes: 'КНП — Реактиви',
     final_status: 'complete',
     final_snapshot: {},
   }];
-  const savedWatchlists = [];
+  let watchlistSaveCalled = false;
   const savedArchives = [];
   const { deps, sent } = makeDeps({
-    loadWatchlist: async () => ({ watchlist: [], sha: 'wl-sha' }),
-    saveWatchlist: async (env, wl) => { savedWatchlists.push(wl); return {}; },
     loadArchivedTenders: async () => ({ archive, sha: 'arch-sha' }),
     saveArchivedTenders: async (env, arr) => { savedArchives.push(arr); return {}; },
+    saveWatchlist: async () => { watchlistSaveCalled = true; },
   });
   await runHandler({
     update: { message: { chat: { id: 123 }, text: '/unarchive UA-2026-04-30-010542-a', message_id: 1 } },
     env: ENV,
     deps,
   });
-  assert.match(sent[0].text, /✅ UA-2026-04-30-010542-a повернуто/);
-  assert.equal(savedWatchlists.length, 1);
-  assert.equal(savedWatchlists[0][0].tender_id, 'UA-2026-04-30-010542-a');
-  assert.equal(savedWatchlists[0][0].enabled, true);
+  assert.match(sent[0].text, /✅ UA-2026-04-30-010542-a видалено з архіву/);
+  assert.equal(watchlistSaveCalled, false);
   assert.equal(savedArchives.length, 1);
   assert.equal(savedArchives[0].length, 0);
 });
@@ -1176,8 +1170,9 @@ test('runHandler: /add for archived UA → warning, no Prozorro fetch', async ()
     deps,
   });
   assert.equal(fetched, false);
-  assert.match(sent[0].text, /архівована \(complete\)/);
+  assert.match(sent[0].text, /в архіві \(complete\)/);
   assert.match(sent[0].text, /\/unarchive UA-2026-04-30-010542-a/);
+  assert.match(sent[0].text, /потім \/add знову/);
 });
 
 test('runHandler: /info UA-... for archived → redirect', async () => {

@@ -102,10 +102,8 @@ test('parseCommand: free text that just contains an emoji stays null', () => {
   assert.deepEqual(parseCommand('Моніторинг'), { cmd: null });
 });
 
-test('parseCommand: /menu → cmd: menu', () => {
-  assert.deepEqual(parseCommand('/menu'), { cmd: 'menu' });
-  assert.deepEqual(parseCommand('/menu@my_bot'), { cmd: 'menu' });
-  assert.deepEqual(parseCommand('  /menu  '), { cmd: 'menu' });
+test('parseCommand: /menu → cmd: unknown (command removed)', () => {
+  assert.deepEqual(parseCommand('/menu'), { cmd: 'unknown' });
 });
 
 const SAMPLE_SNAP = {
@@ -1655,39 +1653,26 @@ test('handleArchiveDetail: hydrates contract docs via fetchContract', async () =
 test('handleUnarchive: unknown id', () => {
   const result = handleUnarchive({
     archive: [],
-    watchlist: [],
   }, { tender_id: 'UA-2026-04-30-010542-a' });
   assert.match(result.reply, /❓ UA-2026-04-30-010542-a не в архіві/);
   assert.equal(result.archiveMutation, null);
-  assert.equal(result.watchlistMutation, null);
 });
 
-test('handleUnarchive: already in watchlist', () => {
-  const archive = [{ tender_id: 'UA-2026-04-30-010542-a', notes: 'X', final_snapshot: {} }];
-  const watchlist = [{ tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'X' }];
-  const result = handleUnarchive({ archive, watchlist }, { tender_id: 'UA-2026-04-30-010542-a' });
-  assert.match(result.reply, /⚠️ UA-2026-04-30-010542-a вже у watchlist/);
-  assert.equal(result.archiveMutation, null);
-  assert.equal(result.watchlistMutation, null);
-});
-
-test('handleUnarchive: success', () => {
+test('handleUnarchive: success — deletes from archive only', () => {
   const archive = [{
     tender_id: 'UA-2026-04-30-010542-a',
     notes: 'КНП — Реактиви',
     final_status: 'complete',
     final_snapshot: {},
   }];
-  const result = handleUnarchive({ archive, watchlist: [] }, { tender_id: 'UA-2026-04-30-010542-a' });
-  assert.match(result.reply, /✅ UA-2026-04-30-010542-a повернуто/);
+  const result = handleUnarchive({ archive }, { tender_id: 'UA-2026-04-30-010542-a' });
+  assert.match(result.reply, /✅ UA-2026-04-30-010542-a видалено з архіву/);
   assert.deepEqual(result.archiveMutation, {
     type: 'remove_archive',
     tender_id: 'UA-2026-04-30-010542-a',
   });
-  assert.deepEqual(result.watchlistMutation, {
-    type: 'append',
-    row: { tender_id: 'UA-2026-04-30-010542-a', enabled: true, notes: 'КНП — Реактиви' },
-  });
+  // No watchlistMutation field — handleUnarchive no longer re-adds to monitoring
+  assert.equal(result.watchlistMutation, undefined);
 });
 
 test('handleAdd: tender already in archive → warning, no fetch', async () => {
@@ -1704,8 +1689,9 @@ test('handleAdd: tender already in archive → warning, no fetch', async () => {
     extractSnapshot: () => ({}),
     nowIso: '2026-05-12T10:00:00Z',
   }, { tender_id: 'UA-2026-04-30-010542-a', notes: null });
-  assert.match(result.reply, /⚠️ UA-2026-04-30-010542-a архівована \(complete\)/);
+  assert.match(result.reply, /⚠️ UA-2026-04-30-010542-a в архіві \(complete\)/);
   assert.match(result.reply, /\/unarchive UA-2026-04-30-010542-a/);
+  assert.match(result.reply, /потім \/add знову/);
   assert.equal(result.mutation, null);
   assert.equal(fetchCalls, 0);
 });
