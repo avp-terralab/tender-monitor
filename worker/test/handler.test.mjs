@@ -32,6 +32,7 @@ const makeDeps = (overrides = {}) => {
       loadAllowedUsers: async () => ({ users: [], sha: null }),
       loadArchivedTenders: async () => ({ archive: [], sha: null }),
       saveArchivedTenders: async () => ({}),
+      fetchContract: async () => ({ documents: [] }),
       setMyCommands: async () => {},
       ...overrides,
     },
@@ -1115,8 +1116,10 @@ test('runHandler: /archive UA-... uses fresh fetchTender for contracts', async (
     loadArchivedTenders: async () => ({ archive, sha: 'sha-arch' }),
     fetchTender: async () => {
       fetched = true;
-      return { data: { contracts: [{ id: 'C1', documents: [{ title: 'D1', url: 'https://x' }] }] } };
+      return { data: { contracts: [{ id: 'C1' }] } };
     },
+    // /archive UA-... hydrates contract docs via fetchContract (/contracts/{id})
+    fetchContract: async () => ({ documents: [{ title: 'D1', url: 'https://x' }] }),
   });
   await runHandler({
     update: { message: { chat: { id: 123 }, text: '/archive UA-2026-04-30-010542-a', message_id: 1 } },
@@ -1173,6 +1176,136 @@ test('runHandler: /add for archived UA → warning, no Prozorro fetch', async ()
   assert.match(sent[0].text, /в архіві \(complete\)/);
   assert.match(sent[0].text, /\/unarchive UA-2026-04-30-010542-a/);
   assert.match(sent[0].text, /потім \/add знову/);
+});
+
+test('runHandler: /info UA-... with terminal status in watchlist → auto-archive + notice', async () => {
+  const TID = 'UA-2026-04-30-010542-a';
+  const RAW_TERMINAL = {
+    data: {
+      tenderID: TID, title: 'Реактиви', status: 'complete',
+      tenderPeriod: { endDate: '2026-05-15T14:00:00+03:00' },
+      procuringEntity: { name: 'КНП', identifier: { id: '11111111' } },
+      contracts: [{ id: 'C1', status: 'active' }],
+      items: [],
+    },
+  };
+  const savedArchives = [];
+  const savedWatchlists = [];
+  const contractsFetched = [];
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [{ tender_id: TID, enabled: true, notes: 'КНП — Реактиви' }],
+      sha: 'wl-sha',
+    }),
+    saveWatchlist: async (env, wl, sha) => { savedWatchlists.push({ wl, sha }); },
+    loadArchivedTenders: async () => ({ archive: [], sha: 'arch-sha' }),
+    saveArchivedTenders: async (env, arr, sha) => { savedArchives.push({ arr, sha }); },
+    fetchTender: async () => RAW_TERMINAL,
+    fetchContract: async (id) => {
+      contractsFetched.push(id);
+      return { documents: [{ id: 'doc1', title: 'Договір.pdf', url: 'http://x', documentType: 'contract' }] };
+    },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/info ${TID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  // Reply: regular /info detail + archive notice
+  assert.match(sent[0].text, new RegExp(TID));
+  assert.match(sent[0].text, /📦 Архівовано/);
+  assert.match(sent[0].text, new RegExp(`/archive ${TID}`));
+  // Archive written, with hydrated contract documents
+  assert.equal(savedArchives.length, 1);
+  assert.equal(savedArchives[0].arr[0].tender_id, TID);
+  assert.equal(savedArchives[0].arr[0].final_status, 'complete');
+  assert.equal(savedArchives[0].arr[0].notes, 'КНП — Реактиви');
+  assert.equal(savedArchives[0].arr[0].final_snapshot.contracts[0].documents.length, 1);
+  // Contract fetch happened (hydration)
+  assert.deepEqual(contractsFetched, ['C1']);
+  // Watchlist deletion happened
+  assert.equal(savedWatchlists.length, 1);
+  assert.equal(savedWatchlists[0].wl.length, 0);
+});
+
+test('runHandler: /info UA-... terminal status NOT in watchlist → no archive write', async () => {
+  const TID = 'UA-2026-04-30-010542-a';
+  let archiveSaveCalled = false;
+  let watchlistSaveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 'wl-sha' }),
+    loadArchivedTenders: async () => ({ archive: [], sha: 'arch-sha' }),
+    saveArchivedTenders: async () => { archiveSaveCalled = true; },
+    saveWatchlist: async () => { watchlistSaveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/info ${TID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  // Tender not in watchlist → falls through to "❓ не у watchlist" or archive-redirect.
+  // Either way no archive write should happen for this fresh fetch path.
+  assert.equal(archiveSaveCalled, false);
+  assert.equal(watchlistSaveCalled, false);
+});
+
+test('runHandler: /info UA-... active.tendering (non-terminal) → no archive', async () => {
+  const TID = 'UA-2026-04-30-010542-a';
+  let archiveSaveCalled = false;
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [{ tender_id: TID, enabled: true, notes: 'X' }],
+      sha: 'wl-sha',
+    }),
+    loadArchivedTenders: async () => ({ archive: [], sha: 'arch-sha' }),
+    saveArchivedTenders: async () => { archiveSaveCalled = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/info ${TID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.match(sent[0].text, /UA-2026-04-30-010542-a/);
+  assert.doesNotMatch(sent[0].text, /📦 Архівовано/);
+  assert.equal(archiveSaveCalled, false);
+});
+
+test('runHandler: /info UA-... terminal, already in archive → notice still shown, no duplicate write', async () => {
+  const TID = 'UA-2026-04-30-010542-a';
+  const RAW_TERMINAL = {
+    data: {
+      tenderID: TID, title: 'X', status: 'complete',
+      procuringEntity: { name: 'T', identifier: { id: '1' } },
+      contracts: [],
+      items: [],
+    },
+  };
+  const savedArchives = [];
+  const savedWatchlists = [];
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [{ tender_id: TID, enabled: true, notes: 'X' }],
+      sha: 'wl-sha',
+    }),
+    saveWatchlist: async (env, wl) => { savedWatchlists.push(wl); },
+    loadArchivedTenders: async () => ({
+      archive: [{ tender_id: TID, final_status: 'complete', final_snapshot: {}, notes: 'X', archived_at: '2026-05-18T10:00:00Z' }],
+      sha: 'arch-sha',
+    }),
+    saveArchivedTenders: async (env, arr) => { savedArchives.push(arr); },
+    fetchTender: async () => RAW_TERMINAL,
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/info ${TID}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  // Archive write skipped (already present), but watchlist still gets cleaned up
+  assert.equal(savedArchives.length, 0);
+  assert.equal(savedWatchlists.length, 1);
+  assert.equal(savedWatchlists[0].length, 0);
+  // Notice still shown (treats already-archived as success)
+  assert.match(sent[0].text, /📦 Архівовано/);
 });
 
 test('runHandler: /info UA-... for archived → redirect', async () => {

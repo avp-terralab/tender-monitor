@@ -6,6 +6,7 @@ import {
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
   formatInfo, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD,
+  TERMINAL_STATUSES, hydrateContractDocs,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
@@ -264,6 +265,8 @@ export async function runHandler({ update, env, deps = {} }) {
               value: snap.value,
               classification: snap.classification,
               contact: snap.contact,
+              _snapshot: snap,
+              _row: r,
             };
           } catch (err) {
             return { tender_id: r.tender_id, error: err.message };
@@ -272,6 +275,26 @@ export async function runHandler({ update, env, deps = {} }) {
         const groups = results.filter(r => !r.error);
         const errors = results.filter(r => r.error);
         reply = formatInfo({ runIso: new Date().toISOString(), groups, errors });
+
+        // Live archive: when /info UA-... shows a terminal status for a watchlist
+        // tender, archive it inline. Reduces archive lag from monitor-cron cadence
+        // to per-/info-call. Only triggered for single-tender queries.
+        if (cmd.tender_id && groups.length === 1 && TERMINAL_STATUSES.has(groups[0].status)) {
+          const archived = await applyLiveArchive({
+            env,
+            loadArchivedTenders: _loadArchivedTenders,
+            saveArchivedTenders: _saveArchivedTenders,
+            loadWatchlist: _loadWatchlist,
+            saveWatchlist: _saveWatchlist,
+            fetchContract: _fetchContract,
+            tender_id: cmd.tender_id,
+            snapshot: groups[0]._snapshot,
+            notes: groups[0]._row.notes ?? '',
+          });
+          if (archived) {
+            reply = reply + `\n\n📦 Архівовано — переміщено в /archive ${cmd.tender_id}`;
+          }
+        }
       }
     } catch (err) {
       console.error('worker: info loadWatchlist failed:', err.message);
@@ -609,6 +632,60 @@ async function applyEntityMutationWithRetry({ env, loadWatchedEntities, saveWatc
     }
   }
   return '⚠️ Не зміг зберегти, спробуй за хвилину';
+}
+
+// Triggered inline from /info UA-... when fresh fetch shows a terminal status.
+// Two writes: append to archived_tenders.json + remove from watchlist.json.
+// Best-effort — failures are logged, not surfaced (caller decides whether to
+// add the "📦 Архівовано" notice based on return value).
+async function applyLiveArchive({
+  env, loadArchivedTenders, saveArchivedTenders,
+  loadWatchlist, saveWatchlist,
+  fetchContract, tender_id, snapshot, notes,
+}) {
+  try {
+    await hydrateContractDocs(snapshot.contracts, fetchContract);
+  } catch (err) {
+    // hydrate is best-effort; archive proceeds even if some contracts fail
+    console.error('worker: live archive hydrateContractDocs failed:', err.message);
+  }
+
+  // 1. Append to archive (idempotent — skip if already present)
+  let archiveWritten = false;
+  try {
+    const { archive, sha } = await loadArchivedTenders(env);
+    if (archive.some(a => a.tender_id === tender_id)) {
+      archiveWritten = true; // already archived, treat as success
+    } else {
+      const row = {
+        tender_id,
+        notes: notes ?? '',
+        archived_at: new Date().toISOString(),
+        final_status: snapshot.status,
+        final_snapshot: snapshot,
+      };
+      const newArchive = applyArchiveMutation(archive, { type: 'append_archive', row });
+      await saveArchivedTenders(env, newArchive, sha);
+      archiveWritten = true;
+    }
+  } catch (err) {
+    console.error('worker: live archive saveArchive failed:', err.message);
+    return false;
+  }
+
+  // 2. Remove from watchlist (best-effort — if it fails, next monitor cycle catches it)
+  try {
+    const { watchlist, sha } = await loadWatchlist(env);
+    if (watchlist.some(r => r.tender_id === tender_id)) {
+      const newWatchlist = applyMutation(watchlist, { type: 'delete', tender_id });
+      await saveWatchlist(env, newWatchlist, sha);
+    }
+  } catch (err) {
+    console.error('worker: live archive removeWatchlist failed:', err.message);
+    // Archive succeeded; watchlist removal will be retried by next monitor cycle.
+  }
+
+  return archiveWritten;
 }
 
 async function applyUnarchive({ env, loadArchivedTenders, saveArchivedTenders, tender_id }) {

@@ -603,12 +603,14 @@ function formatContractsBlock(contracts) {
   return lines.join('\n');
 }
 
+export const TERMINAL_STATUSES = new Set(['complete', 'cancelled', 'unsuccessful']);
+
 // Prozorro tender response returns contract SUMMARY only — documents (signed PDF,
 // КЕП) live at /contracts/{id}. Fetch each contract and replace its empty
 // `documents` array with the real one. fetchContract failures are tolerated:
 // the contract keeps its original (likely empty) documents and downstream
 // formatContractsBlock returns null.
-async function hydrateContractDocs(contracts, fetchContract) {
+export async function hydrateContractDocs(contracts, fetchContract) {
   if (!fetchContract || !contracts) return;
   for (const c of contracts) {
     if (!c.id) continue;
