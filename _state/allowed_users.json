@@ -23,7 +23,7 @@
     "label": "Андрій Парасина",
     "invited_via": "Андрій Парасина",
     "role": "viewer",
-    "notifications": false,
+    "notifications": true,
     "added_at": "2026-05-18T21:55:43.462Z"
   }
 ]
