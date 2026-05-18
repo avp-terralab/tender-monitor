@@ -821,7 +821,7 @@ export function handleRole({ allowedUsers, adminChatId }, { role, chat_id }) {
 export function buildNotifyButton(isOn) {
   return {
     inline_keyboard: [[{
-      text: isOn ? '🔔 Сповіщення: УВІМКНЕНО' : '🔕 Сповіщення: ВИМКНЕНО',
+      text: isOn ? '✅ Сповіщення: УВІМКНЕНО' : '❌ Сповіщення: ВИМКНЕНО',
       callback_data: isOn ? 'notify:off' : 'notify:on',
     }]],
   };
