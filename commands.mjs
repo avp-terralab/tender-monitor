@@ -474,7 +474,7 @@ export async function handleWatch(deps, { edrpou }) {
   };
 }
 
-export function handleInvite(deps, { label }) {
+export function handleInvite(deps, { role, label }) {
   const token = deps.generateToken();
   const now = deps.now();
   const createdAt = now.toISOString();
@@ -482,6 +482,7 @@ export function handleInvite(deps, { label }) {
   const row = {
     token,
     label,
+    role,
     created_at: createdAt,
     expires_at: expiresAt,
     status: 'pending',
@@ -489,7 +490,7 @@ export function handleInvite(deps, { label }) {
     redeemed_at: null,
   };
   const link = `https://t.me/${deps.botUsername}?start=${token}`;
-  const reply = `🔗 Invite для <b>${escapeHtml(label)}</b>\n\n${link}\n\nПерешли цій людині. Дійсне 7 днів.`;
+  const reply = `🔗 Invite для <b>${escapeHtml(label)}</b> (${role})\n\n${link}\n\nПерешли цій людині. Дійсне 7 днів.`;
   return {
     reply,
     mutation: { type: 'append_invite', row },

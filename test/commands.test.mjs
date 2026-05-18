@@ -1058,7 +1058,7 @@ test('handleInvite: escapes HTML in label', () => {
     generateToken: () => 'a'.repeat(32),
     now: () => new Date('2026-05-12T10:00:00Z'),
     botUsername: 'terralab_tenders_bot',
-  }, { label: '<script>&"' });
+  }, { role: 'viewer', label: '<script>&"' });
   assert.match(result.reply, /&lt;script&gt;&amp;/);
   assert.doesNotMatch(result.reply, /<script>/);
   assert.equal(result.mutation.row.label, '<script>&"'); // raw label stored, only display escaped
@@ -1070,7 +1070,7 @@ test('handleInvite: creates invite with given label, 7-day expiry, returns deep-
     generateToken: () => 'a'.repeat(32),
     now: () => new Date('2026-05-12T10:00:00Z'),
     botUsername: 'terralab_tenders_bot',
-  }, { label: 'Olha' });
+  }, { role: 'viewer', label: 'Olha' });
   assert.equal(result.mutation.type, 'append_invite');
   assert.equal(result.mutation.row.token, 'a'.repeat(32));
   assert.equal(result.mutation.row.label, 'Olha');
@@ -1818,4 +1818,47 @@ test('parseCommand: /role@botname editor 12345 → still parses', () => {
   assert.deepEqual(parseCommand('/role@terralab_tenders_bot editor 12345'), {
     cmd: 'role', role: 'editor', chat_id: '12345',
   });
+});
+
+test('handleInvite: writes role:editor into invite record', () => {
+  const result = handleInvite(
+    {
+      invites: [],
+      generateToken: () => 'a'.repeat(32),
+      now: () => new Date('2026-05-18T10:00:00.000Z'),
+      botUsername: 'bot',
+    },
+    { role: 'editor', label: 'Andrii' },
+  );
+  assert.equal(result.mutation.type, 'append_invite');
+  assert.equal(result.mutation.row.role, 'editor');
+  assert.equal(result.mutation.row.label, 'Andrii');
+  assert.match(result.reply, /Andrii/);
+});
+
+test('handleInvite: writes role:viewer into invite record', () => {
+  const result = handleInvite(
+    {
+      invites: [],
+      generateToken: () => 'b'.repeat(32),
+      now: () => new Date('2026-05-18T10:00:00.000Z'),
+      botUsername: 'bot',
+    },
+    { role: 'viewer', label: 'Olha' },
+  );
+  assert.equal(result.mutation.row.role, 'viewer');
+  assert.equal(result.mutation.row.label, 'Olha');
+});
+
+test('handleInvite: reply mentions the role', () => {
+  const result = handleInvite(
+    {
+      invites: [],
+      generateToken: () => 'c'.repeat(32),
+      now: () => new Date('2026-05-18T10:00:00.000Z'),
+      botUsername: 'bot',
+    },
+    { role: 'editor', label: 'Andrii' },
+  );
+  assert.match(result.reply, /editor/);
 });
