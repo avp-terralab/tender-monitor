@@ -835,11 +835,12 @@ export function handleNotify({ allowedUsers, adminChatId, chatId }, { action }) 
 
   if (action === undefined) {
     // Show state + inline button for opposite action.
+    const statePrefix = current ? '🔔' : '❌';
     const stateLabel = current ? 'увімкнено' : '<b>вимкнено</b>';
     const buttonLabel = current ? '🔕 Вимкнути сповіщення' : '🔔 Увімкнути сповіщення';
     const buttonData = current ? 'notify:off' : 'notify:on';
     return {
-      reply: `🔔 Сповіщення про зміни у тендерах: ${stateLabel}`,
+      reply: `${statePrefix} Сповіщення про зміни у тендерах: ${stateLabel}`,
       mutation: null,
       replyMarkup: {
         inline_keyboard: [[{ text: buttonLabel, callback_data: buttonData }]],
@@ -849,8 +850,9 @@ export function handleNotify({ allowedUsers, adminChatId, chatId }, { action }) 
 
   const desired = action === 'on';
   if (current === desired) {
+    const prefix = desired ? '🔔' : '❌';
     return {
-      reply: `ℹ️ Сповіщення вже ${desired ? 'увімкнено' : 'вимкнено'}`,
+      reply: `${prefix} Сповіщення вже ${desired ? 'увімкнено' : 'вимкнено'}`,
       mutation: null,
       replyMarkup: null,
     };
