@@ -737,8 +737,7 @@ export function handleUsersList({ allowedUsers, adminChatId }) {
   lines.push(`1. <code>${adminChatId}</code> — admin`);
   allowedUsers.forEach((u, i) => {
     const role = u.role ?? 'viewer';
-    const via = u.invited_via ? ` (від: ${escapeHtml(u.invited_via)})` : '';
-    lines.push(`${i + 2}. <code>${u.chat_id}</code> — ${escapeHtml(u.label)} — ${role}${via}`);
+    lines.push(`${i + 2}. <code>${u.chat_id}</code> — ${escapeHtml(u.label)} — ${role}`);
   });
   lines.push('', `Всього: ${allowedUsers.length + 1}`);
   return lines.join('\n');
