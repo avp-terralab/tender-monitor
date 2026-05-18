@@ -66,24 +66,8 @@ export async function runHandler({ update, env, deps = {} }) {
   if (!msg) return;
   const chatId = String(msg.chat?.id ?? '');
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
-  const isAdmin = chatId !== '' && chatId === adminChatId;
-
-  // For non-admin chat, check allowlist file. Admin skips this (works during GH outages).
-  let userRecord = null;
-  if (!isAdmin) {
-    try {
-      const { users } = await _loadAllowedUsers(env);
-      userRecord = users.find(u => u.chat_id === chatId) ?? null;
-    } catch (err) {
-      console.error('worker: loadAllowedUsers failed:', err.message);
-      // Fail closed — non-admin sees nothing if we can't verify.
-    }
-  }
-  const isInvited = userRecord !== null;
-  const userRole = userRecord?.role ?? 'viewer';
-  const isEditor = isAdmin || userRole === 'editor';
-  const role = isAdmin ? 'admin' : (isEditor ? 'editor' : 'viewer');
-  const isAllowed = isAdmin || isInvited;
+  const { isAdmin, isInvited, isAllowed, isEditor, role, userRecord } =
+    await resolveUserContext({ chatId, adminChatId, env, _loadAllowedUsers, where: 'msg' });
 
   // /start works for everyone — reveals chat_id; for allowed users, also seeds chat-scope command list.
   // /start <token> is handled in a later branch.
@@ -561,20 +545,8 @@ async function handleCallbackQuery({
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const chatId = String(cq.message?.chat?.id ?? '');
   const messageId = cq.message?.message_id;
-  const isAdmin = chatId !== '' && chatId === adminChatId;
-
-  let userRecord = null;
-  if (!isAdmin) {
-    try {
-      const { users } = await _loadAllowedUsers(env);
-      userRecord = users.find(u => u.chat_id === chatId) ?? null;
-    } catch (err) {
-      console.error('worker: callback loadAllowedUsers failed:', err.message);
-    }
-  }
-  const isInvited = userRecord !== null;
-  const isAllowed = isAdmin || isInvited;
-  const isEditor = isAdmin || (userRecord?.role === 'editor');
+  const { isAdmin, isAllowed, isEditor } =
+    await resolveUserContext({ chatId, adminChatId, env, _loadAllowedUsers, where: 'callback' });
 
   const ack = (text, showAlert = false) => _answerCallbackQuery({
     token: env.TELEGRAM_BOT_TOKEN, callbackQueryId: cq.id, text, showAlert,
@@ -854,4 +826,27 @@ async function syncBotCommands(_setMyCommands, token, chatId, role) {
   } catch (err) {
     console.error('worker: setMyCommands failed:', err.message);
   }
+}
+
+// Resolves auth/role context for a chat. Used by both runHandler and
+// handleCallbackQuery so they share a single source of truth. `where` tags
+// the log line so we can tell message vs callback failures apart.
+async function resolveUserContext({ chatId, adminChatId, env, _loadAllowedUsers, where }) {
+  const isAdmin = chatId !== '' && chatId === adminChatId;
+  let userRecord = null;
+  if (!isAdmin) {
+    try {
+      const { users } = await _loadAllowedUsers(env);
+      userRecord = users.find(u => u.chat_id === chatId) ?? null;
+    } catch (err) {
+      console.error(`worker: ${where} loadAllowedUsers failed:`, err.message);
+      // Fail closed — non-admin sees nothing if we can't verify.
+    }
+  }
+  const isInvited = userRecord !== null;
+  const userRole = userRecord?.role ?? 'viewer';
+  const isEditor = isAdmin || userRole === 'editor';
+  const isAllowed = isAdmin || isInvited;
+  const role = isAdmin ? 'admin' : (isEditor ? 'editor' : 'viewer');
+  return { isAdmin, isInvited, isAllowed, isEditor, role, userRole, userRecord };
 }
