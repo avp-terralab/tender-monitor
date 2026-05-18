@@ -516,6 +516,11 @@ export function applyAllowedUsersMutation(users, mutation) {
   if (mutation.type === 'remove_user') {
     return users.filter(u => u.chat_id !== mutation.chat_id);
   }
+  if (mutation.type === 'set_role') {
+    return users.map(u =>
+      u.chat_id === mutation.chat_id ? { ...u, role: mutation.role } : u
+    );
+  }
   return users;
 }
 

@@ -1904,6 +1904,36 @@ test('handleRedeem: user inherits role:viewer from invite', () => {
   assert.equal(result.userMutation.row.role, 'viewer');
 });
 
+test('applyAllowedUsersMutation: set_role updates role in-place', () => {
+  const users = [
+    { chat_id: '111', label: 'A', role: 'viewer' },
+    { chat_id: '222', label: 'B', role: 'viewer' },
+  ];
+  const result = applyAllowedUsersMutation(users, {
+    type: 'set_role', chat_id: '222', role: 'editor',
+  });
+  assert.equal(result[0].role, 'viewer');
+  assert.equal(result[1].role, 'editor');
+  assert.equal(result[1].chat_id, '222');
+  assert.equal(result[1].label, 'B');
+});
+
+test('applyAllowedUsersMutation: set_role on legacy entry (no role field) adds role', () => {
+  const users = [{ chat_id: '111', label: 'A' }];
+  const result = applyAllowedUsersMutation(users, {
+    type: 'set_role', chat_id: '111', role: 'editor',
+  });
+  assert.equal(result[0].role, 'editor');
+});
+
+test('applyAllowedUsersMutation: set_role on non-existing chat_id is a no-op', () => {
+  const users = [{ chat_id: '111', label: 'A', role: 'viewer' }];
+  const result = applyAllowedUsersMutation(users, {
+    type: 'set_role', chat_id: '999', role: 'editor',
+  });
+  assert.deepEqual(result, users);
+});
+
 test('handleRedeem: legacy invite without role → user.role defaults to viewer', () => {
   const result = handleRedeem(
     {
