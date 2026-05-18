@@ -1,7 +1,7 @@
 import {
   parseCommand, handleAdd, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
-  handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, handleUsersList, handleInvitesList,
+  handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, handleUsersList, handleInvitesList,
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
@@ -556,12 +556,7 @@ async function handleCallbackQuery({
         try {
           await _editMessageReplyMarkup({
             token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
-            replyMarkup: {
-              inline_keyboard: [[{
-                text: desired ? '🔕 Вимкнути сповіщення' : '🔔 Увімкнути сповіщення',
-                callback_data: desired ? 'notify:off' : 'notify:on',
-              }]],
-            },
+            replyMarkup: buildNotifyButton(desired),
           });
         } catch (err) {
           console.error('worker: notify edit keyboard failed:', err.message);

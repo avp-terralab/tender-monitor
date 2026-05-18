@@ -5,7 +5,7 @@ import {
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
-  handleRedeem, handleRevoke, handleRole, handleNotify, handleUsersList, handleInvitesList, HELP_TEXT,
+  handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, handleUsersList, handleInvitesList, HELP_TEXT,
   buildHelpText, buildWelcomeText,
   applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
@@ -2202,23 +2202,39 @@ test('handleNotify: admin → always-on reply, no mutation, no button', () => {
   assert.equal(r.replyMarkup, null);
 });
 
-test('handleNotify: viewer show-state (default off) → reply + inline toggle button', () => {
+test('handleNotify: viewer show-state (default off) → state-button shows OFF', () => {
   const r = handleNotify(
     { allowedUsers: [{ chat_id: '222', label: 'V', role: 'viewer' }], adminChatId: '111', chatId: '222' },
     {},
   );
-  assert.match(r.reply, /вимкнено/i);
   assert.equal(r.mutation, null);
-  assert.equal(r.replyMarkup.inline_keyboard[0][0].callback_data, 'notify:on');
+  const btn = r.replyMarkup.inline_keyboard[0][0];
+  assert.equal(btn.callback_data, 'notify:on');
+  assert.match(btn.text, /ВИМКНЕНО/);
+  // Body text is minimal — state lives in the button label
+  assert.match(r.reply, /Сповіщення про зміни/);
 });
 
-test('handleNotify: viewer show-state when ON → button toggles to OFF', () => {
+test('handleNotify: viewer show-state when ON → state-button shows ON', () => {
   const r = handleNotify(
     { allowedUsers: [{ chat_id: '222', label: 'V', role: 'viewer', notifications: true }], adminChatId: '111', chatId: '222' },
     {},
   );
-  assert.match(r.reply, /увімкнено/i);
-  assert.equal(r.replyMarkup.inline_keyboard[0][0].callback_data, 'notify:off');
+  const btn = r.replyMarkup.inline_keyboard[0][0];
+  assert.equal(btn.callback_data, 'notify:off');
+  assert.match(btn.text, /УВІМКНЕНО/);
+});
+
+test('buildNotifyButton: ON state → "УВІМКНЕНО" + callback notify:off (tap turns off)', () => {
+  const btn = buildNotifyButton(true).inline_keyboard[0][0];
+  assert.match(btn.text, /УВІМКНЕНО/);
+  assert.equal(btn.callback_data, 'notify:off');
+});
+
+test('buildNotifyButton: OFF state → "ВИМКНЕНО" + callback notify:on (tap turns on)', () => {
+  const btn = buildNotifyButton(false).inline_keyboard[0][0];
+  assert.match(btn.text, /ВИМКНЕНО/);
+  assert.equal(btn.callback_data, 'notify:on');
 });
 
 test('handleNotify: viewer /notify on → mutation set_notifications true', () => {

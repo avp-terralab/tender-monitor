@@ -815,8 +815,20 @@ export function handleRole({ allowedUsers, adminChatId }, { role, chat_id }) {
   };
 }
 
+// Single state-button representation. The button label IS the state; tapping
+// it toggles. Used by both /notify show-state and the inline callback after
+// the toggle write succeeds, so the rendered keyboard stays consistent.
+export function buildNotifyButton(isOn) {
+  return {
+    inline_keyboard: [[{
+      text: isOn ? '🔔 Сповіщення: УВІМКНЕНО' : '🔕 Сповіщення: ВИМКНЕНО',
+      callback_data: isOn ? 'notify:off' : 'notify:on',
+    }]],
+  };
+}
+
 // Per-user opt-in for monitor digest broadcasts. Admin (env-based) is always on.
-// `action` is 'on' | 'off' | undefined (show current state with inline toggle button).
+// `action` is 'on' | 'off' | undefined (show state-button UX).
 export function handleNotify({ allowedUsers, adminChatId, chatId }, { action }) {
   // Admin always receives — toggle is a no-op for them.
   if (chatId === adminChatId) {
@@ -834,17 +846,12 @@ export function handleNotify({ allowedUsers, adminChatId, chatId }, { action }) 
   const current = user.notifications === true;
 
   if (action === undefined) {
-    // Show state + inline button for opposite action.
-    const statePrefix = current ? '🔔' : '❌';
-    const stateLabel = current ? 'увімкнено' : '<b>вимкнено</b>';
-    const buttonLabel = current ? '🔕 Вимкнути сповіщення' : '🔔 Увімкнути сповіщення';
-    const buttonData = current ? 'notify:off' : 'notify:on';
+    // Show current state as a self-explanatory toggle button. Minimal body
+    // text — the button's label conveys both state and tappable affordance.
     return {
-      reply: `${statePrefix} Сповіщення про зміни у тендерах: ${stateLabel}`,
+      reply: '🛎 <b>Сповіщення про зміни в тендерах</b>',
       mutation: null,
-      replyMarkup: {
-        inline_keyboard: [[{ text: buttonLabel, callback_data: buttonData }]],
-      },
+      replyMarkup: buildNotifyButton(current),
     };
   }
 
