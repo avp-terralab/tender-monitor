@@ -826,30 +826,77 @@ export function handleUnarchive({ archive, watchlist }, { tender_id }) {
   };
 }
 
-export const HELP_TEXT = [
+const HELP_GENERAL = [
   'Загальні команди:',
   '/help — список команд',
   '/menu — показати швидкі кнопки',
   '/status — здоровʼя бота',
-  '',
+].join('\n');
+
+const HELP_VIEW_TENDERS = [
   'Моніторинг закупівель за ID:',
-  '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
-  '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
   '/info [UA-...] — список усіх або деталі одного тендера',
-  '',
+];
+
+const HELP_VIEW_ENTITIES = [
   'Моніторинг замовників за EDRPOU:',
-  '/watch EDRPOU — стежити за замовником',
-  '/unwatch EDRPOU — припинити стежити',
   '/watched — список замовників',
-  '',
+];
+
+const HELP_VIEW_ARCHIVE = [
   'Архів завершених закупівель:',
   '/archive — список архіву (з посиланнями на договори)',
   '/archive [UA-...] — деталі + договір',
+];
+
+const HELP_EDIT_TENDERS = [
+  '/add UA-YYYY-MM-DD-NNNNNN-x — додати тендер',
+  '/remove UA-YYYY-MM-DD-NNNNNN-x — видалити тендер',
+];
+
+const HELP_EDIT_ENTITIES = [
+  '/watch EDRPOU — стежити за замовником',
+  '/unwatch EDRPOU — припинити стежити',
+];
+
+const HELP_EDIT_ARCHIVE = [
   '/unarchive [UA-...] — повернути в моніторинг',
-  '',
+];
+
+const HELP_ADMIN = [
   'Адмін-команди:',
-  '/invite [імʼя] — створити invite-посилання',
+  '/invite [editor|viewer] [імʼя] — створити invite-посилання',
+  '/role [editor|viewer] [chat_id] — змінити роль користувача',
   '/invites — активні invite-посилання',
   '/users — список користувачів',
   '/revoke [chat_id] — видалити користувача',
 ].join('\n');
+
+export function buildHelpText(role) {
+  const parts = [HELP_GENERAL];
+
+  const tenders = [...HELP_VIEW_TENDERS];
+  if (role === 'editor' || role === 'admin') {
+    // Insert edit lines before the view line so order reads: add, remove, info
+    tenders.splice(1, 0, ...HELP_EDIT_TENDERS);
+  }
+  parts.push(tenders.join('\n'));
+
+  const entities = [...HELP_VIEW_ENTITIES];
+  if (role === 'editor' || role === 'admin') {
+    entities.splice(1, 0, ...HELP_EDIT_ENTITIES);
+  }
+  parts.push(entities.join('\n'));
+
+  const archive = [...HELP_VIEW_ARCHIVE];
+  if (role === 'editor' || role === 'admin') {
+    archive.push(...HELP_EDIT_ARCHIVE);
+  }
+  parts.push(archive.join('\n'));
+
+  if (role === 'admin') parts.push(HELP_ADMIN);
+
+  return parts.join('\n\n');
+}
+
+export const HELP_TEXT = buildHelpText('admin');

@@ -6,6 +6,7 @@ import {
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleRole, handleUsersList, handleInvitesList, HELP_TEXT,
+  buildHelpText,
   applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
 } from '../commands.mjs';
@@ -1364,6 +1365,7 @@ test('HELP_TEXT mentions admin commands', () => {
   assert.match(HELP_TEXT, /\/invite/);
   assert.match(HELP_TEXT, /\/users/);
   assert.match(HELP_TEXT, /\/revoke/);
+  assert.match(HELP_TEXT, /\/role/);
 });
 
 test('parseCommand: /archive (no arg)', () => {
@@ -2097,4 +2099,52 @@ test('handleInvitesList: legacy invite without role → shown as viewer', () => 
     now: () => new Date('2026-05-18T00:00:00.000Z'),
   });
   assert.match(result, /Legacy.*viewer/);
+});
+
+test('buildHelpText("viewer") does NOT contain mutating or admin commands', () => {
+  const t = buildHelpText('viewer');
+  assert.doesNotMatch(t, /\/add\b/);
+  assert.doesNotMatch(t, /\/remove\b/);
+  assert.doesNotMatch(t, /\/watch\b/);
+  assert.doesNotMatch(t, /\/unwatch\b/);
+  assert.doesNotMatch(t, /\/unarchive\b/);
+  assert.doesNotMatch(t, /\/invite\b/);
+  assert.doesNotMatch(t, /\/role\b/);
+  assert.doesNotMatch(t, /\/users\b/);
+  assert.doesNotMatch(t, /\/revoke\b/);
+});
+
+test('buildHelpText("viewer") contains view commands', () => {
+  const t = buildHelpText('viewer');
+  assert.match(t, /\/info/);
+  assert.match(t, /\/watched/);
+  assert.match(t, /\/archive/);
+  assert.match(t, /\/help/);
+  assert.match(t, /\/status/);
+});
+
+test('buildHelpText("editor") contains mutating, not admin', () => {
+  const t = buildHelpText('editor');
+  assert.match(t, /\/add/);
+  assert.match(t, /\/remove/);
+  assert.match(t, /\/watch/);
+  assert.match(t, /\/unwatch/);
+  assert.match(t, /\/unarchive/);
+  assert.doesNotMatch(t, /\/invite\b/);
+  assert.doesNotMatch(t, /\/role\b/);
+  assert.doesNotMatch(t, /\/users\b/);
+  assert.doesNotMatch(t, /\/revoke\b/);
+});
+
+test('buildHelpText("admin") contains everything including /role', () => {
+  const t = buildHelpText('admin');
+  assert.match(t, /\/add/);
+  assert.match(t, /\/invite/);
+  assert.match(t, /\/role/);
+  assert.match(t, /\/users/);
+  assert.match(t, /\/revoke/);
+});
+
+test('HELP_TEXT (export) === buildHelpText("admin") — back-compat', () => {
+  assert.equal(HELP_TEXT, buildHelpText('admin'));
 });
