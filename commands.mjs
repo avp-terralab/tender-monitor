@@ -315,7 +315,7 @@ export function handleRemove({ watchlist }, { tender_id }) {
 
 export function handleWatched({ watchedEntities }) {
   if (!watchedEntities || watchedEntities.length === 0) {
-    return '📭 Не стежу за жодним замовником. Додай: /watch [EDRPOU]';
+    return '📭 Не стежу за жодним замовником. Додай: /watch [ЄДРПОУ]';
   }
   const rows = watchedEntities.map((e, i) => {
     const icon = e.enabled ? '🟢' : '🔴';
@@ -450,12 +450,12 @@ export async function handleWatch(deps, { edrpou }) {
     }
   } catch (err) {
     return {
-      reply: `⚠️ Не зміг перевірити EDRPOU: ${err.message}. Спробуй ще раз.`,
+      reply: `⚠️ Не зміг перевірити ЄДРПОУ: ${err.message}. Спробуй ще раз.`,
       mutation: null,
     };
   }
 
-  // Name fallback: when the descending feed walk found no tender for this EDRPOU
+  // Name fallback: when the descending feed walk found no tender for this ЄДРПОУ
   // (rare publisher, or no publication in the last ~1000 fresh tenders), try the
   // BFF text-search endpoint — it can pull the legalName from historical tenders
   // anywhere in Prozorro. Soft enrichment: failure leaves name as "(unknown)".
@@ -475,7 +475,7 @@ export async function handleWatch(deps, { edrpou }) {
     added_at: new Date().toISOString(),
   };
   const reply = entityName === '(unknown)'
-    ? `✅ ${edrpou} збережено. Серед ~1000 останніх публікацій Prozorro тендерів від цього замовника не виявлено — нормально, якщо замовник публікує рідко. Назва замовника зʼявиться у /watched коли bot знайде його перший новий тендер. Якщо EDRPOU помилковий — /unwatch ${edrpou}.`
+    ? `✅ ${edrpou} збережено. Серед ~1000 останніх публікацій Prozorro тендерів від цього замовника не виявлено — нормально, якщо замовник публікує рідко. Назва замовника зʼявиться у /watched коли bot знайде його перший новий тендер. Якщо ЄДРПОУ помилковий — /unwatch ${edrpou}.`
     : `✅ Стежу за ${edrpou} — ${escapeHtml(abbreviateLegalForm(entityName))}\nПомічено як уже-побачені: ${bootstrapIds.length} активних тендерів. Алерт буде на нові.`;
   return {
     reply,
@@ -938,7 +938,7 @@ const HELP_VIEW_TENDERS = [
 ];
 
 const HELP_VIEW_ENTITIES = [
-  'Моніторинг замовників за EDRPOU:',
+  'Моніторинг замовників за ЄДРПОУ:',
   '/watched — список замовників',
 ];
 
@@ -953,8 +953,8 @@ const HELP_EDIT_TENDERS = [
 ];
 
 const HELP_EDIT_ENTITIES = [
-  '/watch EDRPOU — стежити за замовником',
-  '/unwatch EDRPOU — припинити стежити',
+  '/watch ЄДРПОУ — стежити за замовником',
+  '/unwatch ЄДРПОУ — припинити стежити',
 ];
 
 const HELP_EDIT_ARCHIVE = [
@@ -1026,7 +1026,7 @@ export function buildWelcomeText(label, role) {
     '',
     '👋 Вітаю у боті моніторингу тендерів TerraLab!',
     '',
-    'ℹ️ Я стежу за вказаними закупівлями на Prozorro і повідомляю про важливі зміни: дедлайн подачі, нові питання та відповіді, призначення аукціону, переможців, підписання договорів. Також відстежую нові тендери від конкретних замовників за EDRPOU.',
+    'ℹ️ Я стежу за вказаними закупівлями на Prozorro і повідомляю про важливі зміни: дедлайн подачі, нові питання та відповіді, призначення аукціону, переможців, підписання договорів. Також відстежую нові тендери від конкретних замовників за ЄДРПОУ.',
     '',
     '🔔 <b>Сповіщення</b> наразі вимкнені (за замовчуванням). Щоб отримувати дайджест — надішли /notify і натисни кнопку увімкнення.',
     '',
@@ -1047,7 +1047,7 @@ const VIEW_COMMANDS = [
 const EDIT_COMMANDS = [
   { command: 'add',       description: 'Додати тендер у моніторинг' },
   { command: 'remove',    description: 'Видалити тендер' },
-  { command: 'watch',     description: 'Стежити за замовником (EDRPOU)' },
+  { command: 'watch',     description: 'Стежити за замовником (ЄДРПОУ)' },
   { command: 'unwatch',   description: 'Припинити стежити за замовником' },
   { command: 'unarchive', description: 'Видалити тендер з архіву' },
 ];

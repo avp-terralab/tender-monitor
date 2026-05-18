@@ -700,7 +700,7 @@ test('runHandler: /unwatch invalid edrpou → ❌ reply, no save', async () => {
     env: ENV,
     deps,
   });
-  assert.match(sent[0].text, /EDRPOU має бути 8 цифр/);
+  assert.match(sent[0].text, /ЄДРПОУ має бути 8 цифр/);
   assert.equal(saveCalled, false);
 });
 
@@ -758,7 +758,7 @@ test('runHandler: /watch invalid → ❌ reply, no calls', async () => {
     env: ENV,
     deps,
   });
-  assert.match(sent[0].text, /EDRPOU має бути 8 цифр/);
+  assert.match(sent[0].text, /ЄДРПОУ має бути 8 цифр/);
   assert.equal(loadCalled, false);
 });
 

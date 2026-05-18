@@ -305,9 +305,9 @@ export async function runHandler({ update, env, deps = {} }) {
     }
   } else if (cmd.cmd === 'watch') {
     if (cmd.error === 'invalid_edrpou') {
-      reply = '❌ EDRPOU має бути 8 цифр';
+      reply = '❌ ЄДРПОУ має бути 8 цифр';
     } else if (cmd.error === 'missing_edrpou') {
-      reply = '❌ Не вказано EDRPOU. /watch 12345678';
+      reply = '❌ Не вказано ЄДРПОУ. /watch 12345678';
     } else {
       reply = await applyEntityMutationWithRetry({
         env,
@@ -335,9 +335,9 @@ export async function runHandler({ update, env, deps = {} }) {
     }
   } else if (cmd.cmd === 'unwatch') {
     if (cmd.error === 'invalid_edrpou') {
-      reply = '❌ EDRPOU має бути 8 цифр';
+      reply = '❌ ЄДРПОУ має бути 8 цифр';
     } else if (cmd.error === 'missing_edrpou') {
-      reply = '❌ Не вказано EDRPOU. /unwatch 12345678';
+      reply = '❌ Не вказано ЄДРПОУ. /unwatch 12345678';
     } else {
       reply = await applyEntityMutationWithRetry({
         env,

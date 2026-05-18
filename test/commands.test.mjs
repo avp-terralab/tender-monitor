@@ -885,7 +885,7 @@ test('handleWatch: feed throws → ⚠️ + null mutation', async () => {
     },
     { edrpou: '11111111' }
   );
-  assert.match(result.reply, /⚠️ Не зміг перевірити EDRPOU/);
+  assert.match(result.reply, /⚠️ Не зміг перевірити ЄДРПОУ/);
   assert.equal(result.mutation, null);
 });
 
