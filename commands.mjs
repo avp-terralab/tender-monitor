@@ -900,3 +900,32 @@ export function buildHelpText(role) {
 }
 
 export const HELP_TEXT = buildHelpText('admin');
+
+const VIEW_COMMANDS = [
+  { command: 'help',    description: 'Список команд' },
+  { command: 'menu',    description: 'Швидкі кнопки' },
+  { command: 'status',  description: 'Здоровʼя бота' },
+  { command: 'info',    description: 'Список або деталі тендерів' },
+  { command: 'watched', description: 'Список замовників' },
+  { command: 'archive', description: 'Архів завершених закупівель' },
+];
+const EDIT_COMMANDS = [
+  { command: 'add',       description: 'Додати тендер у моніторинг' },
+  { command: 'remove',    description: 'Видалити тендер' },
+  { command: 'watch',     description: 'Стежити за замовником (EDRPOU)' },
+  { command: 'unwatch',   description: 'Припинити стежити за замовником' },
+  { command: 'unarchive', description: 'Повернути тендер з архіву' },
+];
+const ADMIN_COMMANDS = [
+  { command: 'invite',  description: 'Створити invite-посилання' },
+  { command: 'role',    description: 'Змінити роль користувача' },
+  { command: 'invites', description: 'Активні invite-посилання' },
+  { command: 'users',   description: 'Список користувачів' },
+  { command: 'revoke',  description: 'Видалити користувача' },
+];
+
+export const BOT_COMMANDS_BY_ROLE = {
+  viewer: VIEW_COMMANDS,
+  editor: [...VIEW_COMMANDS, ...EDIT_COMMANDS],
+  admin:  [...VIEW_COMMANDS, ...EDIT_COMMANDS, ...ADMIN_COMMANDS],
+};

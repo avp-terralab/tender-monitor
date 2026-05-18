@@ -9,6 +9,7 @@ import {
   buildHelpText,
   applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
+  BOT_COMMANDS_BY_ROLE,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -2147,4 +2148,42 @@ test('buildHelpText("admin") contains everything including /role', () => {
 
 test('HELP_TEXT (export) === buildHelpText("admin") — back-compat', () => {
   assert.equal(HELP_TEXT, buildHelpText('admin'));
+});
+
+test('BOT_COMMANDS_BY_ROLE.viewer does not contain editor/admin commands', () => {
+  const names = BOT_COMMANDS_BY_ROLE.viewer.map(c => c.command);
+  assert.ok(names.includes('info'));
+  assert.ok(names.includes('archive'));
+  assert.ok(!names.includes('add'));
+  assert.ok(!names.includes('invite'));
+  assert.ok(!names.includes('role'));
+});
+
+test('BOT_COMMANDS_BY_ROLE.editor contains mutating but not admin', () => {
+  const names = BOT_COMMANDS_BY_ROLE.editor.map(c => c.command);
+  assert.ok(names.includes('add'));
+  assert.ok(names.includes('remove'));
+  assert.ok(names.includes('watch'));
+  assert.ok(names.includes('unwatch'));
+  assert.ok(names.includes('unarchive'));
+  assert.ok(!names.includes('invite'));
+  assert.ok(!names.includes('role'));
+});
+
+test('BOT_COMMANDS_BY_ROLE.admin contains /role and admin commands', () => {
+  const names = BOT_COMMANDS_BY_ROLE.admin.map(c => c.command);
+  assert.ok(names.includes('role'));
+  assert.ok(names.includes('invite'));
+  assert.ok(names.includes('users'));
+  assert.ok(names.includes('revoke'));
+});
+
+test('BOT_COMMANDS_BY_ROLE: all command names lowercase a-z0-9_, ≤32 chars, descriptions ≤256', () => {
+  for (const role of ['viewer', 'editor', 'admin']) {
+    for (const c of BOT_COMMANDS_BY_ROLE[role]) {
+      assert.ok(c.command.length <= 32, `command ${c.command} too long`);
+      assert.ok(c.description.length <= 256, `description ${c.description} too long`);
+      assert.match(c.command, /^[a-z][a-z0-9_]*$/, `invalid command name ${c.command}`);
+    }
+  }
 });
