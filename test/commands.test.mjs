@@ -6,7 +6,7 @@ import {
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, handleUsersList, handleInvitesList, HELP_TEXT,
-  buildHelpText, buildWelcomeText,
+  buildHelpText, buildWelcomeText, buildRoleChangeNotice,
   applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
   BOT_COMMANDS_BY_ROLE,
@@ -2344,4 +2344,20 @@ test('handleRedeem: reply is the full welcome text (not just one-line confirmati
   assert.match(r.reply, /Вітаю/);
   assert.match(r.reply, /\/notify/);
   assert.match(r.reply, /\/info/);
+});
+
+test('buildRoleChangeNotice: editor includes mutating commands, not admin', () => {
+  const text = buildRoleChangeNotice('editor');
+  assert.match(text, /Адмін змінив твою роль/);
+  assert.match(text, /editor/);
+  assert.match(text, /\/add/);
+  assert.match(text, /\/remove/);
+  assert.doesNotMatch(text, /\/invite\b/);
+});
+
+test('buildRoleChangeNotice: viewer only sees view commands', () => {
+  const text = buildRoleChangeNotice('viewer');
+  assert.match(text, /viewer/);
+  assert.match(text, /\/info/);
+  assert.doesNotMatch(text, /\/add\b/);
 });

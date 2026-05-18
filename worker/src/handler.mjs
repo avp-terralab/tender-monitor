@@ -1,7 +1,7 @@
 import {
   parseCommand, handleAdd, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
-  handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, handleUsersList, handleInvitesList,
+  handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, buildRoleChangeNotice, handleUsersList, handleInvitesList,
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
@@ -423,6 +423,16 @@ export async function runHandler({ update, env, deps = {} }) {
       });
       if (typeof reply === 'string' && /^✅/.test(reply)) {
         syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, cmd.chat_id, cmd.role);
+        // Notify the target user about their new role + role-filtered command list.
+        try {
+          await _sendReply({
+            token: env.TELEGRAM_BOT_TOKEN,
+            chatId: Number(cmd.chat_id),
+            text: buildRoleChangeNotice(cmd.role),
+          });
+        } catch (err) {
+          console.error('worker: /role target notify failed:', err.message);
+        }
       }
     }
   } else if (cmd.cmd === 'archive') {

@@ -1767,8 +1767,11 @@ test('runHandler: admin /role editor 456 (user is viewer) → role flipped', asy
   });
   assert.equal(saved.length, 1);
   assert.equal(saved[0][0].role, 'editor');
-  assert.match(sent[0].text, /✅/);
-  assert.match(sent[0].text, /Andrii/);
+  // Admin gets the ✅ confirmation (find by their chat_id 123)
+  const adminMsg = sent.find(s => Number(s.chatId) === 123);
+  assert.ok(adminMsg, 'expected admin confirmation message');
+  assert.match(adminMsg.text, /✅/);
+  assert.match(adminMsg.text, /Andrii/);
 });
 
 test('runHandler: admin /role viewer 123 (self) → refusal', async () => {
@@ -1948,6 +1951,45 @@ test('runHandler: /role editor 456 success → setMyCommands for target chat 456
   assert.ok(targetCall, 'expected setMyCommands for target chat 456');
   const names = targetCall.commands.map(c => c.command);
   assert.ok(names.includes('add'));
+});
+
+test('runHandler: /role editor 456 success → target user receives role-change notice', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({
+      users: [{ chat_id: '456', label: 'A', role: 'viewer' }], sha: 's',
+    }),
+    saveAllowedUsers: async () => {},
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/role editor 456', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  // sent[0] = admin's ✅ confirmation; sent[1] = target's role-change notice
+  const targetMsg = sent.find(s => String(s.chatId) === '456');
+  assert.ok(targetMsg, 'expected message to target chat 456');
+  assert.match(targetMsg.text, /Адмін змінив твою роль/);
+  assert.match(targetMsg.text, /editor/);
+  // role-filtered command list included
+  assert.match(targetMsg.text, /\/add/);
+  assert.doesNotMatch(targetMsg.text, /\/invite\b/);
+});
+
+test('runHandler: /role viewer 456 (no-op, already viewer) → target NOT notified', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({
+      users: [{ chat_id: '456', label: 'A', role: 'viewer' }], sha: 's',
+    }),
+    saveAllowedUsers: async () => {},
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/role viewer 456', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  // Admin sees "ℹ️ вже viewer"; target should NOT get a notification
+  const targetMsg = sent.find(s => String(s.chatId) === '456');
+  assert.equal(targetMsg, undefined);
 });
 
 test('runHandler: setMyCommands failure does not block reply', async () => {

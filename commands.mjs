@@ -961,6 +961,20 @@ export function buildHelpText(role) {
 
 export const HELP_TEXT = buildHelpText('admin');
 
+// Notice sent to a user when admin changes their role via /role.
+// Tells them the new role and lists their role-appropriate commands.
+export function buildRoleChangeNotice(role) {
+  const roleLabel = role === 'editor' ? 'editor (редактор — можеш додавати/змінювати/видаляти)'
+    : 'viewer (тільки перегляд)';
+  return [
+    `ℹ️ Адмін змінив твою роль: <b>${roleLabel}</b>`,
+    '',
+    '📋 <b>Доступні тобі команди:</b>',
+    '',
+    buildHelpText(role),
+  ].join('\n');
+}
+
 // Composed greeting shown to a user immediately after they redeem an invite via
 // /start <token>. Includes bot purpose, the user's resolved role, an /notify
 // reminder (default OFF), and the role-filtered help text.
