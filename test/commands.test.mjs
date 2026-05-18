@@ -5,7 +5,7 @@ import {
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
-  handleRedeem, handleRevoke, handleUsersList, handleInvitesList, HELP_TEXT,
+  handleRedeem, handleRevoke, handleRole, handleUsersList, handleInvitesList, HELP_TEXT,
   applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
 } from '../commands.mjs';
@@ -1952,4 +1952,89 @@ test('handleRedeem: legacy invite without role → user.role defaults to viewer'
     { token: 't'.repeat(32) },
   );
   assert.equal(result.userMutation.row.role, 'viewer');
+});
+
+test('handleRole: viewer → editor for existing user returns mutation', () => {
+  const result = handleRole(
+    {
+      allowedUsers: [{ chat_id: '222', label: 'Andrii', role: 'viewer' }],
+      adminChatId: '111',
+    },
+    { role: 'editor', chat_id: '222' },
+  );
+  assert.deepEqual(result.mutation, { type: 'set_role', chat_id: '222', role: 'editor' });
+  assert.match(result.reply, /Andrii/);
+  assert.match(result.reply, /editor/);
+});
+
+test('handleRole: editor → viewer', () => {
+  const result = handleRole(
+    {
+      allowedUsers: [{ chat_id: '222', label: 'X', role: 'editor' }],
+      adminChatId: '111',
+    },
+    { role: 'viewer', chat_id: '222' },
+  );
+  assert.equal(result.mutation.role, 'viewer');
+  assert.match(result.reply, /viewer/);
+});
+
+test('handleRole: target == admin → refuse with reply, no mutation', () => {
+  const result = handleRole(
+    {
+      allowedUsers: [],
+      adminChatId: '111',
+    },
+    { role: 'viewer', chat_id: '111' },
+  );
+  assert.equal(result.mutation, null);
+  assert.match(result.reply, /адмін/i);
+});
+
+test('handleRole: target not found → reply, no mutation', () => {
+  const result = handleRole(
+    {
+      allowedUsers: [{ chat_id: '222', label: 'X', role: 'viewer' }],
+      adminChatId: '111',
+    },
+    { role: 'editor', chat_id: '999' },
+  );
+  assert.equal(result.mutation, null);
+  assert.match(result.reply, /не знайдено/i);
+});
+
+test('handleRole: target already has this role → no mutation, info reply', () => {
+  const result = handleRole(
+    {
+      allowedUsers: [{ chat_id: '222', label: 'X', role: 'editor' }],
+      adminChatId: '111',
+    },
+    { role: 'editor', chat_id: '222' },
+  );
+  assert.equal(result.mutation, null);
+  assert.match(result.reply, /вже editor/i);
+});
+
+test('handleRole: legacy user without role field; setting editor → mutation issued', () => {
+  // legacy = no role field = viewer
+  const result = handleRole(
+    {
+      allowedUsers: [{ chat_id: '222', label: 'X' }],
+      adminChatId: '111',
+    },
+    { role: 'editor', chat_id: '222' },
+  );
+  assert.equal(result.mutation.role, 'editor');
+});
+
+test('handleRole: legacy user without role; setting viewer → no mutation (effectively same)', () => {
+  const result = handleRole(
+    {
+      allowedUsers: [{ chat_id: '222', label: 'X' }],
+      adminChatId: '111',
+    },
+    { role: 'viewer', chat_id: '222' },
+  );
+  assert.equal(result.mutation, null);
+  assert.match(result.reply, /вже viewer/i);
 });

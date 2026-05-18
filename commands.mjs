@@ -774,6 +774,30 @@ export function handleRevoke({ allowedUsers, adminChatId }, { chat_id }) {
   };
 }
 
+export function handleRole({ allowedUsers, adminChatId }, { role, chat_id }) {
+  if (chat_id === adminChatId) {
+    return { reply: '❌ Не можна змінити роль адміна', mutation: null };
+  }
+  const user = allowedUsers.find(u => u.chat_id === chat_id);
+  if (!user) {
+    return {
+      reply: `❓ Користувача <code>${chat_id}</code> не знайдено. /users — список`,
+      mutation: null,
+    };
+  }
+  const currentRole = user.role ?? 'viewer';
+  if (currentRole === role) {
+    return {
+      reply: `ℹ️ <b>${escapeHtml(user.label)}</b> вже ${role}`,
+      mutation: null,
+    };
+  }
+  return {
+    reply: `✅ <b>${escapeHtml(user.label)}</b> (<code>${chat_id}</code>) → ${role}`,
+    mutation: { type: 'set_role', chat_id, role },
+  };
+}
+
 export function handleUnarchive({ archive, watchlist }, { tender_id }) {
   const entry = archive.find(a => a.tender_id === tender_id);
   if (!entry) {
