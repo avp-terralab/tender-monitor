@@ -885,6 +885,67 @@ test('runHandler: /start <token> valid → mutates both files, replies, notifies
   assert.match(toAdmin.text, /приєднався/);
 });
 
+test('runHandler: /start <token> redeem with role:editor → setMyCommands for new editor', async () => {
+  const invite = {
+    token: 'b'.repeat(32),
+    label: 'Andrii',
+    role: 'editor',
+    status: 'pending',
+    expires_at: '2099-01-01T00:00:00Z',
+    redeemed_by: null,
+    redeemed_at: null,
+  };
+  const calls = [];
+  const { deps } = makeDeps({
+    loadInvites: async () => ({ invites: [invite], sha: 'inv-sha' }),
+    saveInvites: async () => ({}),
+    loadAllowedUsers: async () => ({ users: [], sha: 'usr-sha' }),
+    saveAllowedUsers: async () => ({}),
+    setMyCommands: async (args) => { calls.push(args); },
+    now: () => new Date('2026-05-18T10:00:00Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 777 }, text: `/start ${'b'.repeat(32)}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  const targetCall = calls.find(c => c.chatId === '777');
+  assert.ok(targetCall, 'expected setMyCommands for new redeemer 777');
+  const names = targetCall.commands.map(c => c.command);
+  assert.ok(names.includes('add'), 'editor commands should include /add');
+});
+
+test('runHandler: /start <token> redeem with role:viewer → setMyCommands for new viewer', async () => {
+  const invite = {
+    token: 'c'.repeat(32),
+    label: 'Olha',
+    role: 'viewer',
+    status: 'pending',
+    expires_at: '2099-01-01T00:00:00Z',
+    redeemed_by: null,
+    redeemed_at: null,
+  };
+  const calls = [];
+  const { deps } = makeDeps({
+    loadInvites: async () => ({ invites: [invite], sha: 'inv-sha' }),
+    saveInvites: async () => ({}),
+    loadAllowedUsers: async () => ({ users: [], sha: 'usr-sha' }),
+    saveAllowedUsers: async () => ({}),
+    setMyCommands: async (args) => { calls.push(args); },
+    now: () => new Date('2026-05-18T10:00:00Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 888 }, text: `/start ${'c'.repeat(32)}`, message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  const targetCall = calls.find(c => c.chatId === '888');
+  assert.ok(targetCall, 'expected setMyCommands for new redeemer 888');
+  const names = targetCall.commands.map(c => c.command);
+  assert.ok(!names.includes('add'), 'viewer commands should NOT include /add');
+  assert.ok(names.includes('info'), 'viewer commands should include /info');
+});
+
 test('runHandler: /start <token> invalid → reply, no mutations', async () => {
   let saveCalled = false;
   const { deps, sent } = makeDeps({
