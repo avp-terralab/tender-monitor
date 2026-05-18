@@ -403,12 +403,14 @@ const _setMyCommands = deps.setMyCommands ?? setMyCommands; // import from teleg
 
 ## Deployment
 
-1. Merge у `main` → CI задеплоїть Worker.
-2. **Onboard 7321709183 як editor:**
-   - Адмін у боті: `/invite editor Andrii`
-   - Бот віддасть посилання `t.me/terralab_tenders_bot?start=<token>`
-   - Адмін пересилає лінку 7321709183 → юзер тапає → редеплой/secret не потрібний → у allowed_users.json з'являється `{chat_id:"7321709183", label:"Andrii", role:"editor", joined_at:"..."}`
-3. **Глобальний BotFather command list** — лишити viewer-set (мінімум). За потреби — оновити (через @BotFather → `/setcommands`):
+1. **Pre-seed Оксани як editor у `_state/allowed_users.json`** — окремий commit ПЕРЕД merge:
+   ```json
+   { "chat_id": "7321709183", "label": "Оксана Каніцька", "invited_via": "Оксана Каніцька",
+     "added_at": "2026-05-14T07:14:45.140Z", "role": "editor" }
+   ```
+   Інші 4 записи (Ліля, Андрій Підкова, Тетяна, Андрій Парасина) лишаються без поля `role` → читатимуться як viewer. Це усуває view-only вікно для Оксани після деплою.
+2. Merge у `main` → CI задеплоїть Worker.
+3. **Глобальний BotFather command list** — лишити viewer-set (мінімум), оновити (через @BotFather → `/setcommands`):
    ```
    help - Список команд
    menu - Швидкі кнопки
@@ -417,7 +419,21 @@ const _setMyCommands = deps.setMyCommands ?? setMyCommands; // import from teleg
    watched - Список замовників
    archive - Архів завершених закупівель
    ```
-4. Для існуючих editor/admin чатів autocomplete оновиться при наступному `/start`. Або разово запустити setMyCommands вручну (поза скоупом MVP).
+4. **Існуючі editor/admin чати** — autocomplete оновиться при наступному `/start` (Worker викличе `setMyCommands` з повним списком). Це стосується admin (1744078008) і Оксани (7321709183).
+5. **Майбутні invite'и через бот:**
+   - Адмін: `/invite editor [імʼя]` або `/invite viewer [імʼя]` → лінка → redeem → юзер отримує відповідну роль.
+   - Для зміни ролі вже доданих: `/role editor [chat_id]` / `/role viewer [chat_id]`.
+
+### Pre-deploy migration summary
+
+| chat_id | Юзер | Поточне поле `role` | Стан після кроку 1 |
+|---|---|---|---|
+| 1744078008 | Admin (ти) | — (не в allowed_users) | admin (з env) |
+| 7321709183 | Оксана Каніцька | відсутнє | `role: "editor"` (seed) |
+| 1725058653 | Ліля Цісар | відсутнє | відсутнє → читається як viewer |
+| 1197609556 | Андрій Підкова | відсутнє | відсутнє → viewer |
+| 1402480451 | Тетяна Косинська | відсутнє | відсутнє → viewer |
+| 786078813 | Андрій Парасина 1511 | відсутнє | відсутнє → viewer |
 
 ## Edge cases
 
