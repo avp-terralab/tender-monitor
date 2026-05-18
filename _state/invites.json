@@ -71,5 +71,15 @@
     "status": "redeemed",
     "redeemed_by": "786078813",
     "redeemed_at": "2026-05-18T20:58:22.298Z"
+  },
+  {
+    "token": "5b88814eb6b176ef0c939718bf807deb",
+    "label": "Андрій Парасина",
+    "role": "editor",
+    "created_at": "2026-05-18T21:44:20.919Z",
+    "expires_at": "2026-05-25T21:44:20.919Z",
+    "status": "pending",
+    "redeemed_by": null,
+    "redeemed_at": null
   }
 ]
