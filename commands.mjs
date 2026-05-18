@@ -791,9 +791,16 @@ export function handleRevoke({ allowedUsers, adminChatId }, { chat_id }) {
   };
 }
 
+// Role-state indicator: editor (extra rights) → ✅, viewer (read-only) → ❌.
+// Mirrors the /notify on/off semantics so the bot's visual vocabulary is
+// consistent: ✅ = has-access / enabled, ❌ = restricted / disabled.
+export function roleIcon(role) {
+  return role === 'editor' ? '✅' : '❌';
+}
+
 export function handleRole({ allowedUsers, adminChatId }, { role, chat_id }) {
   if (chat_id === adminChatId) {
-    return { reply: '❌ Не можна змінити роль адміна', mutation: null };
+    return { reply: '🚫 Не можна змінити роль адміна', mutation: null };
   }
   const user = allowedUsers.find(u => u.chat_id === chat_id);
   if (!user) {
@@ -805,12 +812,12 @@ export function handleRole({ allowedUsers, adminChatId }, { role, chat_id }) {
   const currentRole = user.role ?? 'viewer';
   if (currentRole === role) {
     return {
-      reply: `ℹ️ <b>${escapeHtml(user.label)}</b> вже ${role}`,
+      reply: `ℹ️ <b>${escapeHtml(user.label)}</b> вже ${roleIcon(role)} ${role}`,
       mutation: null,
     };
   }
   return {
-    reply: `✅ <b>${escapeHtml(user.label)}</b> (<code>${chat_id}</code>) → ${role}`,
+    reply: `${roleIcon(role)} <b>${escapeHtml(user.label)}</b> (<code>${chat_id}</code>) → ${role}`,
     mutation: { type: 'set_role', chat_id, role },
   };
 }
@@ -967,7 +974,7 @@ export function buildRoleChangeNotice(role) {
   const roleLabel = role === 'editor' ? 'editor (редактор — можеш додавати/змінювати/видаляти)'
     : 'viewer (тільки перегляд)';
   return [
-    `ℹ️ Адмін змінив твою роль: <b>${roleLabel}</b>`,
+    `${roleIcon(role)} Адмін змінив твою роль: <b>${roleLabel}</b>`,
     '',
     '📋 <b>Доступні тобі команди:</b>',
     '',

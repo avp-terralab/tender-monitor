@@ -2001,7 +2001,7 @@ test('handleRole: target already has this role → no mutation, info reply', () 
     { role: 'editor', chat_id: '222' },
   );
   assert.equal(result.mutation, null);
-  assert.match(result.reply, /вже editor/i);
+  assert.match(result.reply, /вже.*editor/i);
 });
 
 test('handleRole: legacy user without role field; setting editor → mutation issued', () => {
@@ -2025,7 +2025,7 @@ test('handleRole: legacy user without role; setting viewer → no mutation (effe
     { role: 'viewer', chat_id: '222' },
   );
   assert.equal(result.mutation, null);
-  assert.match(result.reply, /вже viewer/i);
+  assert.match(result.reply, /вже.*viewer/i);
 });
 
 test('handleUsersList: shows role for each non-admin user', () => {
