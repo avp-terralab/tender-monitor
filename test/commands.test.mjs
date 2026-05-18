@@ -978,28 +978,28 @@ test('handleWatch: fetchTender failure during bootstrap is silently skipped', as
   assert.deepEqual(result.mutation.bootstrap.ids, []);
 });
 
-test('parseCommand: /invite with label', () => {
-  assert.deepEqual(parseCommand('/invite Olha'), { cmd: 'invite', label: 'Olha' });
+test('parseCommand: /invite without role keyword → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite Olha'), { cmd: 'invite', error: 'invalid_role' });
 });
 
-test('parseCommand: /invite with multi-word label', () => {
-  assert.deepEqual(parseCommand('/invite Olha Petrenko'), { cmd: 'invite', label: 'Olha Petrenko' });
+test('parseCommand: /invite multi-word without role keyword → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite Olha Petrenko'), { cmd: 'invite', error: 'invalid_role' });
 });
 
-test('parseCommand: /invite with Cyrillic label', () => {
-  assert.deepEqual(parseCommand('/invite Ольга'), { cmd: 'invite', label: 'Ольга' });
+test('parseCommand: /invite Cyrillic without role keyword → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite Ольга'), { cmd: 'invite', error: 'invalid_role' });
 });
 
-test('parseCommand: /invite without label → error', () => {
-  assert.deepEqual(parseCommand('/invite'), { cmd: 'invite', error: 'missing_label' });
+test('parseCommand: /invite without args → missing_role', () => {
+  assert.deepEqual(parseCommand('/invite'), { cmd: 'invite', error: 'missing_role' });
 });
 
-test('parseCommand: /invite with bot suffix', () => {
-  assert.deepEqual(parseCommand('/invite@my_bot Olha'), { cmd: 'invite', label: 'Olha' });
+test('parseCommand: /invite with bot suffix but no role keyword → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite@my_bot Olha'), { cmd: 'invite', error: 'invalid_role' });
 });
 
-test('parseCommand: /invite trims label whitespace', () => {
-  assert.deepEqual(parseCommand('/invite   Olha   '), { cmd: 'invite', label: 'Olha' });
+test('parseCommand: /invite trims whitespace, no role keyword → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite   Olha   '), { cmd: 'invite', error: 'invalid_role' });
 });
 
 test('parseCommand: /invites', () => {
@@ -1736,4 +1736,48 @@ test('HELP_TEXT: mentions /archive, /unarchive (no /contract — removed)', () =
 test('HELP_TEXT: uses square brackets for placeholders (no <...>)', () => {
   // <...> breaks Telegram HTML parse_mode — re-check post-edit.
   assert.doesNotMatch(HELP_TEXT, /<UA-/);
+});
+
+test('parseCommand: /invite editor Andrii → role+label', () => {
+  assert.deepEqual(parseCommand('/invite editor Andrii'), {
+    cmd: 'invite', role: 'editor', label: 'Andrii',
+  });
+});
+
+test('parseCommand: /invite viewer Olha → role+label', () => {
+  assert.deepEqual(parseCommand('/invite viewer Olha'), {
+    cmd: 'invite', role: 'viewer', label: 'Olha',
+  });
+});
+
+test('parseCommand: /invite viewer Olha Test → label with spaces', () => {
+  assert.deepEqual(parseCommand('/invite viewer Olha Test'), {
+    cmd: 'invite', role: 'viewer', label: 'Olha Test',
+  });
+});
+
+test('parseCommand: /invite (no args) → missing_role', () => {
+  assert.deepEqual(parseCommand('/invite'), { cmd: 'invite', error: 'missing_role' });
+});
+
+test('parseCommand: /invite Andrii (no role keyword) → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite Andrii'), { cmd: 'invite', error: 'invalid_role' });
+});
+
+test('parseCommand: /invite admin Test → invalid_role', () => {
+  assert.deepEqual(parseCommand('/invite admin Test'), { cmd: 'invite', error: 'invalid_role' });
+});
+
+test('parseCommand: /invite editor (no label) → missing_label', () => {
+  assert.deepEqual(parseCommand('/invite editor'), { cmd: 'invite', error: 'missing_label' });
+});
+
+test('parseCommand: /invite viewer (no label) → missing_label', () => {
+  assert.deepEqual(parseCommand('/invite viewer'), { cmd: 'invite', error: 'missing_label' });
+});
+
+test('parseCommand: /invite@botname editor Andrii → still parses', () => {
+  assert.deepEqual(parseCommand('/invite@terralab_tenders_bot editor Andrii'), {
+    cmd: 'invite', role: 'editor', label: 'Andrii',
+  });
 });

@@ -125,9 +125,16 @@ export function parseCommand(text) {
 
   const inviteMatch = trimmed.match(/^\/invite(?:@\w+)?(?:\s+(.+))?$/i);
   if (inviteMatch) {
-    const label = (inviteMatch[1] || '').trim();
+    const args = (inviteMatch[1] || '').trim();
+    if (!args) return { cmd: 'invite', error: 'missing_role' };
+    const parts = args.split(/\s+/);
+    const role = parts[0].toLowerCase();
+    if (role !== 'editor' && role !== 'viewer') {
+      return { cmd: 'invite', error: 'invalid_role' };
+    }
+    const label = parts.slice(1).join(' ').trim();
     if (!label) return { cmd: 'invite', error: 'missing_label' };
-    return { cmd: 'invite', label };
+    return { cmd: 'invite', role, label };
   }
 
   if (/^\/invites(?:@\w+)?$/i.test(trimmed)) return { cmd: 'invites' };
