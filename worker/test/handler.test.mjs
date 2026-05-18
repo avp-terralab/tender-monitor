@@ -1767,11 +1767,11 @@ test('runHandler: admin /role editor 456 (user is viewer) → role flipped', asy
   });
   assert.equal(saved.length, 1);
   assert.equal(saved[0][0].role, 'editor');
-  // Admin gets the ✅ confirmation (find by their chat_id 123)
+  // Admin gets the role-flip confirmation (find by their chat_id 123)
   const adminMsg = sent.find(s => Number(s.chatId) === 123);
   assert.ok(adminMsg, 'expected admin confirmation message');
-  assert.match(adminMsg.text, /✅/);
   assert.match(adminMsg.text, /Andrii/);
+  assert.match(adminMsg.text, /→ editor/);
 });
 
 test('runHandler: admin /role viewer 123 (self) → refusal', async () => {

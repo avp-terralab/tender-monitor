@@ -791,11 +791,11 @@ export function handleRevoke({ allowedUsers, adminChatId }, { chat_id }) {
   };
 }
 
-// Role-state indicator: editor (extra rights) → ✅, viewer (read-only) → ❌.
-// Mirrors the /notify on/off semantics so the bot's visual vocabulary is
-// consistent: ✅ = has-access / enabled, ❌ = restricted / disabled.
+// Role-state indicator: editor (can write) → ✏️, viewer (read-only) → 📄.
+// The icons reflect the role's capability metaphorically (pencil = editing,
+// document = reading).
 export function roleIcon(role) {
-  return role === 'editor' ? '✅' : '❌';
+  return role === 'editor' ? '✏️' : '📄';
 }
 
 export function handleRole({ allowedUsers, adminChatId }, { role, chat_id }) {

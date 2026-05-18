@@ -421,7 +421,12 @@ export async function runHandler({ update, env, deps = {} }) {
         computeMutation: ({ users }) =>
           handleRole({ allowedUsers: users, adminChatId }, cmd),
       });
-      if (typeof reply === 'string' && /^✅/.test(reply)) {
+      // Success replies lead with the role icon (✏️ editor / 📄 viewer); error
+      // and no-op replies use other prefixes (❓ 🚫 ℹ️). Detect success by the
+      // role-icon prefix so we only fan out side-effects on real changes.
+      const roleSuccess = typeof reply === 'string'
+        && (reply.startsWith('✏️') || reply.startsWith('📄'));
+      if (roleSuccess) {
         syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, cmd.chat_id, cmd.role);
         // Notify the target user about their new role + role-filtered command list.
         try {
