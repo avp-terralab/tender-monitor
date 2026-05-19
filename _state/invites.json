@@ -148,9 +148,9 @@
     "role": "editor",
     "created_at": "2026-05-19T05:41:42.560Z",
     "expires_at": "2026-05-20T05:41:42.560Z",
-    "status": "pending",
-    "redeemed_by": null,
-    "redeemed_at": null
+    "status": "redeemed",
+    "redeemed_by": "786078813",
+    "redeemed_at": "2026-05-19T05:43:21.477Z"
   },
   {
     "token": "7df296413b72e5be9de55542e6f4e37a",
