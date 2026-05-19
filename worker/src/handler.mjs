@@ -265,6 +265,7 @@ export async function runHandler({ update, env, deps = {} }) {
               value: snap.value,
               classification: snap.classification,
               contact: snap.contact,
+              awards: snap.awards,
               _snapshot: snap,
               _row: r,
             };

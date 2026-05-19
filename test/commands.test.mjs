@@ -962,6 +962,88 @@ test('formatInfo: deadline line for active.tendering', () => {
   assert.match(reply, /⏰ Подача пропозиції до: 15\.05\.2026 до 14:30/);
 });
 
+test('formatInfo: shows bidder under review for active.qualification', () => {
+  const reply = formatInfo({
+    runIso: '2026-05-19T22:22:00+03:00',
+    groups: [{
+      tender_id: 'UA-2026-04-30-010542-a',
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-2026-04-30-010542-a',
+      status: 'active.qualification',
+      awards: [
+        { id: 'a1', status: 'pending', suppliers: [{ name: 'ТОВ «ТерраЛаб»', identifier: { id: '40123456' } }] },
+      ],
+    }],
+  });
+  assert.match(reply, /ℹ️ Статус: Розгляд пропозицій/);
+  assert.match(reply, /👤 Учасник: ТОВ «ТерраЛаб» \(ЄДРПОУ 40123456\)/);
+});
+
+test('formatInfo: lists multiple bidders under review when multiple awards are pending', () => {
+  const reply = formatInfo({
+    runIso: '2026-05-19T22:22:00+03:00',
+    groups: [{
+      tender_id: 'UA-X',
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+      status: 'active.qualification',
+      awards: [
+        { id: 'a1', status: 'pending', suppliers: [{ name: 'ТОВ «ТерраЛаб»', identifier: { id: '40123456' } }] },
+        { id: 'a2', status: 'pending', suppliers: [{ name: 'ТОВ «Інший»', identifier: { id: '40999999' } }] },
+      ],
+    }],
+  });
+  assert.match(reply, /👤 Учасники:/);
+  assert.match(reply, /• ТОВ «ТерраЛаб» \(ЄДРПОУ 40123456\)/);
+  assert.match(reply, /• ТОВ «Інший» \(ЄДРПОУ 40999999\)/);
+});
+
+test('formatInfo: skips disqualified/cancelled awards, shows only pending', () => {
+  const reply = formatInfo({
+    runIso: '2026-05-19T22:22:00+03:00',
+    groups: [{
+      tender_id: 'UA-X',
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+      status: 'active.qualification',
+      awards: [
+        { id: 'a1', status: 'unsuccessful', suppliers: [{ name: 'Старий ФОП', identifier: { id: '11111111' } }] },
+        { id: 'a2', status: 'pending', suppliers: [{ name: 'ТОВ «Поточний»', identifier: { id: '22222222' } }] },
+      ],
+    }],
+  });
+  assert.match(reply, /👤 Учасник: ТОВ «Поточний» \(ЄДРПОУ 22222222\)/);
+  assert.doesNotMatch(reply, /Старий ФОП/);
+});
+
+test('formatInfo: no bidder line for active.tendering even if awards present', () => {
+  const reply = formatInfo({
+    runIso: '2026-05-19T22:22:00+03:00',
+    groups: [{
+      tender_id: 'UA-X',
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+      status: 'active.tendering',
+      awards: [
+        { id: 'a1', status: 'pending', suppliers: [{ name: 'ТОВ X', identifier: { id: '11111111' } }] },
+      ],
+    }],
+  });
+  assert.doesNotMatch(reply, /👤 Учасник/);
+});
+
+test('formatInfo: abbreviates supplier legal form in 👤 line', () => {
+  const reply = formatInfo({
+    runIso: '2026-05-19T22:22:00+03:00',
+    groups: [{
+      tender_id: 'UA-X',
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+      status: 'active.qualification',
+      awards: [
+        { id: 'a1', status: 'pending', suppliers: [{ name: 'Товариство з обмеженою відповідальністю «ТерраЛаб»', identifier: { id: '40123456' } }] },
+      ],
+    }],
+  });
+  assert.match(reply, /👤 Учасник: ТОВ «ТерраЛаб» \(ЄДРПОУ 40123456\)/);
+  assert.doesNotMatch(reply, /Товариство з обмеженою/);
+});
+
 test('formatInfo: no deadline/countdown when status != active.tendering', () => {
   // tenderPeriod.endDate is only meaningful while submissions are open.
   // For active.awarded / active.qualification / complete / cancelled — the

@@ -240,6 +240,26 @@ function formatInfoEntry(g, runIso) {
     if (g.status === 'active.tendering' && g.deadline) {
       sections.push(`⏰ Подача пропозиції до: ${fmtDeadline(g.deadline)}`);
     }
+    if (g.status === 'active.qualification' && Array.isArray(g.awards)) {
+      const pending = g.awards.filter(a => a.status === 'pending');
+      const suppliers = pending
+        .map(a => a.suppliers?.[0])
+        .filter(s => s?.name);
+      if (suppliers.length === 1) {
+        const s = suppliers[0];
+        const name = abbreviateLegalForm(s.name);
+        const edrpou = s.identifier?.id ? ` (ЄДРПОУ ${s.identifier.id})` : '';
+        sections.push(`👤 Учасник: ${escapeHtml(name)}${edrpou}`);
+      } else if (suppliers.length > 1) {
+        const lines = ['👤 Учасники:'];
+        for (const s of suppliers) {
+          const name = abbreviateLegalForm(s.name);
+          const edrpou = s.identifier?.id ? ` (ЄДРПОУ ${s.identifier.id})` : '';
+          lines.push(`  • ${escapeHtml(name)}${edrpou}`);
+        }
+        sections.push(lines.join('\n'));
+      }
+    }
   }
   return sections.join('\n');
 }
