@@ -310,10 +310,17 @@ export function formatHeartbeat(runIso, snapshots) {
     lines.push('');
     lines.push('Поточні дедлайни:');
     for (const s of snapshots) {
-      const left = fmtTimeLeft(s.deadline, runIso);
-      const leftPart = left ? `, ⏰ ${left}` : '';
       const idLink = `<a href="https://prozorro.gov.ua/tender/${escapeHtml(s.tender_id)}">${escapeHtml(s.tender_id)}</a>`;
-      lines.push(`— ${idLink} — ${fmtStatus(s.status)} (до ${fmtDeadline(s.deadline)}${leftPart})`);
+      const deadlinePassed = s.deadline && new Date(s.deadline) - new Date(runIso) < 0;
+      if (deadlinePassed) {
+        // Deadline already passed (e.g. status moved to active.qualification) —
+        // showing "минув на N днів тому" is noise. Reframe as a historical fact.
+        lines.push(`— ${idLink} — ${fmtStatus(s.status)} (подача пропозицій була до ${fmtDeadline(s.deadline)})`);
+      } else {
+        const left = fmtTimeLeft(s.deadline, runIso);
+        const leftPart = left ? `, ⏰ ${left}` : '';
+        lines.push(`— ${idLink} — ${fmtStatus(s.status)} (до ${fmtDeadline(s.deadline)}${leftPart})`);
+      }
     }
   }
   return lines.join('\n');

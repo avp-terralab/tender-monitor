@@ -351,6 +351,23 @@ test('formatHeartbeat: includes heading, count, and tenders with deadlines', () 
   assert.match(text, /Розгляд пропозицій/);
 });
 
+test('formatHeartbeat: passed deadline rendered as "подача пропозицій була до …" without time-left', () => {
+  // 2026-05-19 09:00 Kyiv; deadline 2026-05-15 08:00 Kyiv already passed
+  const text = formatHeartbeat('2026-05-19T06:00:00.000Z', [
+    { tender_id: 'UA-Z', title: 'Z', status: 'active.qualification', deadline: '2026-05-15T08:00:00+03:00' },
+  ]);
+  assert.match(text, /UA-Z<\/a> — Розгляд пропозицій \(подача пропозицій була до 15\.05\.2026 до 08:00\)/);
+  assert.doesNotMatch(text, /минув на/);
+  assert.doesNotMatch(text, /год тому/);
+});
+
+test('formatHeartbeat: future deadline still rendered with time-left', () => {
+  const text = formatHeartbeat('2026-05-08T06:00:00.000Z', [
+    { tender_id: 'UA-A', title: 'A', status: 'active.tendering', deadline: '2026-05-15T14:00:00+03:00' },
+  ]);
+  assert.match(text, /UA-A<\/a> — Приймання пропозицій \(до 15\.05\.2026 до 14:00, ⏰ /);
+});
+
 test('formatHeartbeat: empty snapshots produces still-alive line without deadlines section', () => {
   const text = formatHeartbeat('2026-05-08T06:00:00.000Z', []);
   assert.match(text, /🟢 Heartbeat/);
