@@ -151,5 +151,15 @@
     "status": "pending",
     "redeemed_by": null,
     "redeemed_at": null
+  },
+  {
+    "token": "7df296413b72e5be9de55542e6f4e37a",
+    "label": "Оксана Каніцька",
+    "role": "editor",
+    "created_at": "2026-05-19T05:42:01.522Z",
+    "expires_at": "2026-05-20T05:42:01.522Z",
+    "status": "pending",
+    "redeemed_by": null,
+    "redeemed_at": null
   }
 ]
