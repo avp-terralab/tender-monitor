@@ -6,5 +6,13 @@
     "role": "editor",
     "notifications": true,
     "added_at": "2026-05-19T05:43:21.477Z"
+  },
+  {
+    "chat_id": "7321709183",
+    "label": "Оксана Каніцька",
+    "invited_via": "Оксана Каніцька",
+    "role": "editor",
+    "notifications": false,
+    "added_at": "2026-05-19T06:09:43.876Z"
   }
 ]
