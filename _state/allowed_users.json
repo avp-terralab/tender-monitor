@@ -28,7 +28,7 @@
     "label": "Ліля Цісар",
     "invited_via": "Ліля Цісар",
     "role": "viewer",
-    "notifications": false,
+    "notifications": true,
     "added_at": "2026-05-19T12:56:11.928Z"
   }
 ]
