@@ -20,6 +20,15 @@ function isHeartbeatHour(runIso) {
   return hour === '09';
 }
 
+function kyivDate(runIso) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Kyiv',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(runIso));
+  const get = (t) => parts.find(p => p.type === t).value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
 export async function runOnce(deps) {
   const {
     runIso, watchlist, fetchTender, extractSnapshot,
@@ -144,22 +153,29 @@ export async function runOnce(deps) {
   }
 
   if (!hasContent && archivedNow.length === 0 && isHeartbeatHour(runIso)) {
-    const heartbeat = formatHeartbeat(runIso, results
-      .filter(r => !r.error && r.curr)
-      .map(r => ({
-        tender_id: r.row.tender_id,
-        title: r.curr.title,
-        status: r.curr.status,
-        deadline: r.curr.tenderPeriod?.endDate ?? null,
-      }))
-    );
-    // Heartbeat is operational ops info (admin-facing). Use sendHeartbeat if
-    // provided to route it to admin-only; fall back to sendDigest broadcast
-    // for backward-compat in tests.
-    if (deps.sendHeartbeat) {
-      await deps.sendHeartbeat(heartbeat);
-    } else {
-      await sendDigest(heartbeat);
+    // Debounce: multiple cron triggers can land in the same Kyiv-09 hour
+    // (GHA scheduled + external pinger). Skip if heartbeat already sent today.
+    const today = kyivDate(runIso);
+    const lastHeartbeatDate = deps.loadHeartbeatDate ? await deps.loadHeartbeatDate() : null;
+    if (lastHeartbeatDate !== today) {
+      const heartbeat = formatHeartbeat(runIso, results
+        .filter(r => !r.error && r.curr)
+        .map(r => ({
+          tender_id: r.row.tender_id,
+          title: r.curr.title,
+          status: r.curr.status,
+          deadline: r.curr.tenderPeriod?.endDate ?? null,
+        }))
+      );
+      // Heartbeat is operational ops info (admin-facing). Use sendHeartbeat if
+      // provided to route it to admin-only; fall back to sendDigest broadcast
+      // for backward-compat in tests.
+      if (deps.sendHeartbeat) {
+        await deps.sendHeartbeat(heartbeat);
+      } else {
+        await sendDigest(heartbeat);
+      }
+      if (deps.saveHeartbeatDate) await deps.saveHeartbeatDate(today);
     }
     // Update sheet last_check, but DO NOT save state (no events to acknowledge)
     await Promise.all(results.map(r =>
@@ -169,7 +185,12 @@ export async function runOnce(deps) {
         last_dateModified: r.curr?.dateModified,
       }).catch(() => {})
     ));
-    return { sent: true, groups: 0, errors: 0, heartbeat: true };
+    return {
+      sent: lastHeartbeatDate !== today,
+      groups: 0,
+      errors: 0,
+      heartbeat: lastHeartbeatDate !== today,
+    };
   }
 
   const isSilent = !hasContent;

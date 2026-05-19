@@ -53,6 +53,7 @@ const watchedEntities = existsSync(watchedEntitiesPath)
 
 const cursorPath = join(stateDir, '_watched_feed_cursor.json');
 const seenPath = join(stateDir, '_watched_seen.json');
+const heartbeatStatePath = join(stateDir, '_heartbeat.json');
 
 const result = await runOnce({
   runIso: new Date().toISOString(),
@@ -75,6 +76,19 @@ const result = await runOnce({
   sendDigest: async (text, opts) => broadcastDigest({ token, chatIds }, text, opts),
   // Heartbeats go only to admin — opted-in viewers don't need ops noise.
   sendHeartbeat: async (text) => broadcastDigest({ token, chatIds: [chatId] }, text),
+  // Debounce duplicate heartbeats within the same Kyiv day (multiple cron
+  // triggers per hour: GHA scheduled at :00 UTC + external pinger at :30 UTC).
+  loadHeartbeatDate: async () => {
+    if (!existsSync(heartbeatStatePath)) return null;
+    try {
+      return JSON.parse(readFileSync(heartbeatStatePath, 'utf-8')).last_kyiv_date ?? null;
+    } catch {
+      return null;
+    }
+  },
+  saveHeartbeatDate: async (d) => {
+    writeFileSync(heartbeatStatePath, JSON.stringify({ last_kyiv_date: d }, null, 2));
+  },
   updateSheet: async () => { /* no-op in CI */ },
   watchedEntities,
   checkWatchedEntities,

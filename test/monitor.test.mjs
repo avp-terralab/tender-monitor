@@ -228,6 +228,47 @@ test('runOnce: heartbeat hour with no events sends heartbeat message', async () 
   assert.match(sent[0], /Моніторю 1 тендер/);
 });
 
+test('runOnce: heartbeat debounced within the same Kyiv day', async () => {
+  // Two triggers in the same Kyiv-09 window (GHA cron at :00 UTC + external pinger at :30 UTC)
+  // must NOT both fire the heartbeat. Persist last-sent Kyiv date in state.
+  let savedDate = null;
+  const sent = [];
+  const baseDeps = {
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: baseSnap() }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => baseSnap(),
+    saveState: async () => {},
+    sendDigest: async (text) => { sent.push(text); },
+    updateSheet: async () => {},
+    loadHeartbeatDate: async () => savedDate,
+    saveHeartbeatDate: async (d) => { savedDate = d; },
+  };
+  await runOnce({ ...baseDeps, runIso: '2026-05-19T06:00:00.000Z' }); // 09:00 Kyiv
+  await runOnce({ ...baseDeps, runIso: '2026-05-19T06:30:00.000Z' }); // 09:30 Kyiv, same day
+  assert.equal(sent.length, 1, 'heartbeat must fire at most once per Kyiv day');
+  assert.equal(savedDate, '2026-05-19');
+});
+
+test('runOnce: heartbeat fires on a new Kyiv day after prior send', async () => {
+  let savedDate = '2026-05-18'; // sent yesterday
+  const sent = [];
+  await runOnce({
+    runIso: '2026-05-19T06:00:00.000Z', // 09:00 Kyiv on 2026-05-19
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: baseSnap() }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => baseSnap(),
+    saveState: async () => {},
+    sendDigest: async (text) => { sent.push(text); },
+    updateSheet: async () => {},
+    loadHeartbeatDate: async () => savedDate,
+    saveHeartbeatDate: async (d) => { savedDate = d; },
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(savedDate, '2026-05-19');
+});
+
 test('runOnce: non-heartbeat hour with no events stays silent', async () => {
   const sent = [];
   await runOnce({
