@@ -4,7 +4,7 @@
     "label": "Андрій Парасина",
     "invited_via": "Андрій Парасина",
     "role": "editor",
-    "notifications": false,
+    "notifications": true,
     "added_at": "2026-05-19T05:43:21.477Z"
   }
 ]
