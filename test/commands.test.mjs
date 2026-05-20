@@ -1646,6 +1646,33 @@ test('handleArchive: no link line when only notice docs present', () => {
   assert.doesNotMatch(reply, /Завантажити договір/);
 });
 
+test('handleArchive: appends EDRPOU after procuring entity name', () => {
+  const reply = handleArchive({ archive: [{
+    tender_id: 'UA-2026-04-30-010542-a',
+    archived_at: '2026-05-12T08:30:00Z',
+    final_status: 'complete',
+    final_snapshot: {
+      procuringEntity: { name: 'КНП "Лікарня"', edrpou: '02000010' },
+      value: { amount: 350000, currency: 'UAH' },
+    },
+  }]});
+  assert.match(reply, /КНП "Лікарня" \(ЄДРПОУ 02000010\) — 350 000 UAH/);
+});
+
+test('handleArchive: omits EDRPOU when missing on entity', () => {
+  const reply = handleArchive({ archive: [{
+    tender_id: 'UA-X',
+    archived_at: '2026-05-12T08:30:00Z',
+    final_status: 'complete',
+    final_snapshot: {
+      procuringEntity: { name: 'КНП Лікарня' },
+      value: { amount: 350000, currency: 'UAH' },
+    },
+  }]});
+  assert.match(reply, /КНП Лікарня — 350 000 UAH/);
+  assert.doesNotMatch(reply, /ЄДРПОУ/);
+});
+
 test('handleArchive: groups by service provider with local numbering', () => {
   // Two suppliers; provider A signed 2 contracts (newer), provider B signed 1.
   // Group order: by max(archived_at) desc. Numbering restarts within each group.

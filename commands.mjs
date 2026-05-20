@@ -621,7 +621,11 @@ function findServiceProvider(entry) {
 function renderArchiveItem(a, localIndex) {
   const icon = ARCHIVE_ICONS[a.final_status] ?? '📦';
   const customerRaw = a.final_snapshot?.procuringEntity?.name ?? '';
-  const customer = customerRaw ? ` — ${escapeHtml(truncate(abbreviateLegalForm(customerRaw), 100))}` : '';
+  const customerEdrpou = a.final_snapshot?.procuringEntity?.edrpou ?? null;
+  const edrpouSuffix = customerEdrpou ? ` (ЄДРПОУ ${customerEdrpou})` : '';
+  const customer = customerRaw
+    ? ` — ${escapeHtml(truncate(abbreviateLegalForm(customerRaw), 100))}${edrpouSuffix}`
+    : '';
   let value = '';
   if (a.final_snapshot?.value?.amount != null) {
     const amt = formatMoney(a.final_snapshot.value.amount);
