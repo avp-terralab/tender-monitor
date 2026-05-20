@@ -205,6 +205,23 @@ test('formatAddReply: HTML-escapes user-controlled fields', () => {
   assert.match(reply, /A&amp;B&gt;/);
 });
 
+test('abbreviateLegalForm: matches when name follows form without a space (quote-attached)', () => {
+  // Real Prozorro entry: EDRPOU 42409961 — no space between "ПІДПРИЄМСТВО" and the opening quote.
+  assert.equal(
+    abbreviateLegalForm('КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО"ЛЮБОТИНСЬКА МІСЬКА ЛІКАРНЯ" ЛЮБОТИНСЬКОЇ МІСЬКОЇ РАДИ ХАРКІВСЬКОЇ ОБЛАСТІ'),
+    'КНП "ЛЮБОТИНСЬКА МІСЬКА ЛІКАРНЯ" ЛЮБОТИНСЬКОЇ МІСЬКОЇ РАДИ ХАРКІВСЬКОЇ ОБЛАСТІ'
+  );
+  // Same issue, other forms — also covered.
+  assert.equal(
+    abbreviateLegalForm('КОМУНАЛЬНЕ ПІДПРИЄМСТВО"X"'),
+    'КП "X"'
+  );
+  assert.equal(
+    abbreviateLegalForm('Товариство з обмеженою відповідальністю«Y»'),
+    'ТОВ «Y»'
+  );
+});
+
 test('abbreviateLegalForm: КНП — accepts "некомерцийне" typo from Prozorro registry', () => {
   // Real example: EDRPOU 01985423 — Prozorro stores "некомерцийне" (и instead of і)
   assert.equal(

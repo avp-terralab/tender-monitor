@@ -94,19 +94,23 @@ export function stripDkCode(title) {
 }
 
 // Note: JS regex \b is ASCII-only — use \s+ to require whitespace separator.
+// Trailing separator after the form word: at least one whitespace OR a lookahead
+// at an opening quote (Prozorro entries sometimes drop the space, e.g.
+// "...ПІДПРИЄМСТВО\"ЛЮБОТИНСЬКА...\"" without a separator).
+const _SEP = '(?:\\s+|(?=["«]))';
 const LEGAL_FORM_ABBREVIATIONS = [
   // [іи] tolerates the "некомерцийне" typo seen in some Prozorro registry entries.
   // (підприємство|товариство): standard form is "підприємство", but registry has
   // entries like "Комунальне некомерцийне товариство" that are semantically КНП too.
-  [/^Комунальне\s+некомерц[іи]йне\s+(?:підприємство|товариство)\s+/i, 'КНП '],
-  [/^Комунальне\s+підприємство\s+/i, 'КП '],
-  [/^Товариство\s+з\s+обмеженою\s+відповідальністю\s+/i, 'ТОВ '],
-  [/^Приватне\s+акціонерне\s+товариство\s+/i, 'ПрАТ '],
-  [/^Публічне\s+акціонерне\s+товариство\s+/i, 'ПАТ '],
-  [/^Акціонерне\s+товариство\s+/i, 'АТ '],
-  [/^Державне\s+підприємство\s+/i, 'ДП '],
-  [/^Приватне\s+підприємство\s+/i, 'ПП '],
-  [/^Фізична\s+особа[-\s]+підприємець\s+/i, 'ФОП '],
+  [new RegExp(`^Комунальне\\s+некомерц[іи]йне\\s+(?:підприємство|товариство)${_SEP}`, 'i'), 'КНП '],
+  [new RegExp(`^Комунальне\\s+підприємство${_SEP}`, 'i'), 'КП '],
+  [new RegExp(`^Товариство\\s+з\\s+обмеженою\\s+відповідальністю${_SEP}`, 'i'), 'ТОВ '],
+  [new RegExp(`^Приватне\\s+акціонерне\\s+товариство${_SEP}`, 'i'), 'ПрАТ '],
+  [new RegExp(`^Публічне\\s+акціонерне\\s+товариство${_SEP}`, 'i'), 'ПАТ '],
+  [new RegExp(`^Акціонерне\\s+товариство${_SEP}`, 'i'), 'АТ '],
+  [new RegExp(`^Державне\\s+підприємство${_SEP}`, 'i'), 'ДП '],
+  [new RegExp(`^Приватне\\s+підприємство${_SEP}`, 'i'), 'ПП '],
+  [new RegExp(`^Фізична\\s+особа[-\\s]+підприємець${_SEP}`, 'i'), 'ФОП '],
 ];
 
 export function abbreviateLegalForm(name) {
