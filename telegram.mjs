@@ -388,10 +388,21 @@ export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, te
 // Fan-out a digest to multiple recipients. Per-recipient failures are logged
 // (typically 403 from users who haven't started the bot, or 400 from blocked
 // chats) but do not abort delivery to remaining recipients.
+//
+// chatIds items can be either a string (legacy: same opts for everyone) or
+// an object { chatId, role }. Viewers don't receive inline action buttons —
+// the callback handler rejects their clicks anyway, so showing the button
+// would just mislead them.
 export async function broadcastDigest({ token, chatIds, fetch: fetchImpl = fetch }, text, opts) {
-  for (const chatId of chatIds) {
+  for (const recipient of chatIds) {
+    const isObj = typeof recipient === 'object' && recipient !== null;
+    const chatId = isObj ? recipient.chatId : recipient;
+    const role = isObj ? recipient.role : null;
+    const effectiveOpts = role === 'viewer' && opts
+      ? { ...opts, addButtonsForTenders: [] }
+      : opts;
     try {
-      await sendDigest({ token, chatId, fetch: fetchImpl }, text, opts);
+      await sendDigest({ token, chatId, fetch: fetchImpl }, text, effectiveOpts);
     } catch (err) {
       console.error(`broadcastDigest to ${chatId} failed:`, err.message);
     }

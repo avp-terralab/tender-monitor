@@ -42,8 +42,12 @@ const allowedUsers = existsSync(allowedUsersPath)
   ? JSON.parse(readFileSync(allowedUsersPath, 'utf-8'))
   : [];
 const optedIn = allowedUsers.filter(u => u.notifications === true);
-const chatIds = [chatId, ...optedIn.map(u => String(u.chat_id))]
-  .filter((id, i, arr) => arr.indexOf(id) === i);
+// Recipient objects carry role so broadcastDigest can suppress inline action
+// buttons for viewers (the callback handler would reject their clicks anyway).
+const chatIds = [
+  { chatId, role: 'admin' },
+  ...optedIn.map(u => ({ chatId: String(u.chat_id), role: u.role ?? 'viewer' })),
+].filter((r, i, arr) => arr.findIndex(x => x.chatId === r.chatId) === i);
 console.log(`Digest recipients: ${chatIds.length} (admin + ${optedIn.length} opted-in of ${allowedUsers.length} allowed)`);
 
 const watchedEntitiesPath = join(REPO, 'watched_entities.json');

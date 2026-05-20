@@ -781,6 +781,55 @@ test('broadcastDigest: per-recipient failure does not abort remaining sends', as
   assert.ok(sent.includes('333'));
 });
 
+test('broadcastDigest: object recipients — viewers do NOT receive inline buttons', async () => {
+  // Mention a tender id whose button would otherwise be added.
+  const text = '🔔 UA-2026-05-19-002203-a — new';
+  const captured = [];
+  const fakeFetch = async (url, opts) => {
+    const params = new URLSearchParams(opts.body.toString());
+    captured.push({
+      chat_id: params.get('chat_id'),
+      reply_markup: params.get('reply_markup'),
+    });
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: 1 } }) };
+  };
+  await broadcastDigest(
+    { token: 'TOK', chatIds: [
+      { chatId: '111', role: 'editor' },
+      { chatId: '222', role: 'viewer' },
+      { chatId: '333', role: 'admin' },
+    ], fetch: fakeFetch },
+    text,
+    { addButtonsForTenders: ['UA-2026-05-19-002203-a'] },
+  );
+  const byChat = Object.fromEntries(captured.map(c => [c.chat_id, c.reply_markup]));
+  assert.match(byChat['111'], /Додати в моніторинг/);
+  assert.match(byChat['333'], /Додати в моніторинг/);
+  assert.ok(!byChat['222'] || !/Додати в моніторинг/.test(byChat['222']),
+    'viewer must not receive inline button');
+});
+
+test('broadcastDigest: string recipients still get buttons (backward compat)', async () => {
+  const text = '🔔 UA-2026-05-19-002203-a — new';
+  const captured = [];
+  const fakeFetch = async (url, opts) => {
+    const params = new URLSearchParams(opts.body.toString());
+    captured.push({
+      chat_id: params.get('chat_id'),
+      reply_markup: params.get('reply_markup'),
+    });
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: 1 } }) };
+  };
+  await broadcastDigest(
+    { token: 'TOK', chatIds: ['111', '222'], fetch: fakeFetch },
+    text,
+    { addButtonsForTenders: ['UA-2026-05-19-002203-a'] },
+  );
+  for (const c of captured) {
+    assert.match(c.reply_markup, /Додати в моніторинг/);
+  }
+});
+
 test('broadcastDigest: empty chatIds → no-op, no fetch call', async () => {
   let called = false;
   const fakeFetch = async () => { called = true; return { ok: true, json: async () => ({}) }; };
