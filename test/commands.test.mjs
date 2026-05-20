@@ -1646,6 +1646,122 @@ test('handleArchive: no link line when only notice docs present', () => {
   assert.doesNotMatch(reply, /Завантажити договір/);
 });
 
+test('handleArchive: groups by service provider with local numbering', () => {
+  // Two suppliers; provider A signed 2 contracts (newer), provider B signed 1.
+  // Group order: by max(archived_at) desc. Numbering restarts within each group.
+  const reply = handleArchive({ archive: [
+    {
+      tender_id: 'UA-A1',
+      archived_at: '2026-05-18T00:00:00Z',
+      final_status: 'complete',
+      final_snapshot: {
+        procuringEntity: { name: 'Замовник X' },
+        awards: [{ id: 'aw1', status: 'active', suppliers: [{ name: 'ТОВ «ТерраЛаб»', identifier: { id: '40123456' } }] }],
+      },
+    },
+    {
+      tender_id: 'UA-A2',
+      archived_at: '2026-05-17T00:00:00Z',
+      final_status: 'complete',
+      final_snapshot: {
+        procuringEntity: { name: 'Замовник Y' },
+        awards: [{ id: 'aw2', status: 'active', suppliers: [{ name: 'ТОВ «ТерраЛаб»', identifier: { id: '40123456' } }] }],
+      },
+    },
+    {
+      tender_id: 'UA-B1',
+      archived_at: '2026-05-15T00:00:00Z',
+      final_status: 'complete',
+      final_snapshot: {
+        procuringEntity: { name: 'Замовник Z' },
+        awards: [{ id: 'aw3', status: 'active', suppliers: [{ name: 'ФОП Іванов', identifier: { id: '1234567890' } }] }],
+      },
+    },
+  ]});
+  // Group A header with count (2 contracts)
+  assert.match(reply, /👤 ТОВ «ТерраЛаб» \(ЄДРПОУ 40123456\) — 2 контракти/);
+  // Group B header with count (1 contract)
+  assert.match(reply, /👤 ФОП Іванов \(ЄДРПОУ 1234567890\) — 1 контракт/);
+  // A group appears before B group (newer max archived_at)
+  const idxA = reply.indexOf('ТерраЛаб');
+  const idxB = reply.indexOf('ФОП Іванов');
+  assert.ok(idxA < idxB, 'group with newer max archived_at comes first');
+  // Within group A: UA-A1 (newer) before UA-A2
+  const idxA1 = reply.indexOf('UA-A1');
+  const idxA2 = reply.indexOf('UA-A2');
+  assert.ok(idxA1 < idxA2, 'within group, newer item first');
+  // Local numbering restarts: B group's only item is "1.", not "3."
+  const bGroupSection = reply.slice(idxB);
+  assert.match(bGroupSection, /1\. .*UA-B1/);
+  // Total stays at the bottom
+  assert.match(reply, /Всього в архіві: 3$/);
+});
+
+test('handleArchive: single service provider still gets group header', () => {
+  const reply = handleArchive({ archive: [
+    {
+      tender_id: 'UA-X1',
+      archived_at: '2026-05-18T00:00:00Z',
+      final_status: 'complete',
+      final_snapshot: {
+        procuringEntity: { name: 'Замовник' },
+        awards: [{ id: 'aw1', status: 'active', suppliers: [{ name: 'ТОВ «ТерраЛаб»', identifier: { id: '40123456' } }] }],
+      },
+    },
+  ]});
+  assert.match(reply, /👤 ТОВ «ТерраЛаб» \(ЄДРПОУ 40123456\) — 1 контракт/);
+});
+
+test('handleArchive: archive entry without active award falls into "Без договору" group', () => {
+  const reply = handleArchive({ archive: [
+    {
+      tender_id: 'UA-CANCEL',
+      archived_at: '2026-05-18T00:00:00Z',
+      final_status: 'cancelled',
+      final_snapshot: { procuringEntity: { name: 'X' }, awards: [] },
+    },
+  ]});
+  assert.match(reply, /📦 Без укладеного договору — 1 контракт/);
+});
+
+test('handleArchive: pluralizes контракт/контракти/контрактів correctly', () => {
+  const mk = (i, edrpou) => ({
+    tender_id: `UA-${i}`,
+    archived_at: `2026-05-${10 + i}T00:00:00Z`,
+    final_status: 'complete',
+    final_snapshot: {
+      procuringEntity: { name: 'X' },
+      awards: [{ id: `aw${i}`, status: 'active', suppliers: [{ name: 'S', identifier: { id: edrpou } }] }],
+    },
+  });
+  // 5 contracts → "5 контрактів"
+  const reply5 = handleArchive({ archive: [mk(1,'X'), mk(2,'X'), mk(3,'X'), mk(4,'X'), mk(5,'X')] });
+  assert.match(reply5, /— 5 контрактів/);
+  // 3 contracts → "3 контракти"
+  const reply3 = handleArchive({ archive: [mk(1,'Y'), mk(2,'Y'), mk(3,'Y')] });
+  assert.match(reply3, /— 3 контракти/);
+});
+
+test('handleArchive: ignores non-active awards when picking service provider', () => {
+  // Disqualified bidder must not be picked as the contracting party.
+  const reply = handleArchive({ archive: [
+    {
+      tender_id: 'UA-W',
+      archived_at: '2026-05-18T00:00:00Z',
+      final_status: 'complete',
+      final_snapshot: {
+        procuringEntity: { name: 'X' },
+        awards: [
+          { id: 'aw1', status: 'unsuccessful', suppliers: [{ name: 'Дискваліфікований', identifier: { id: '99999999' } }] },
+          { id: 'aw2', status: 'active', suppliers: [{ name: 'Переможець', identifier: { id: '40123456' } }] },
+        ],
+      },
+    },
+  ]});
+  assert.match(reply, /👤 Переможець \(ЄДРПОУ 40123456\)/);
+  assert.doesNotMatch(reply, /Дискваліфікований/);
+});
+
 test('handleArchive: sorts by archived_at desc', () => {
   const reply = handleArchive({ archive: [
     { tender_id: 'UA-2026-05-01-000001-a', archived_at: '2026-05-10T00:00:00Z', final_status: 'complete', final_snapshot: {} },

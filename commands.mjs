@@ -1,4 +1,4 @@
-import { stripDkCode, truncate, fmtStatus, fmtDeadline, escapeHtml, formatMoney, formatPhone, abbreviateLegalForm } from './telegram.mjs';
+import { stripDkCode, truncate, fmtStatus, fmtDeadline, escapeHtml, formatMoney, formatPhone, abbreviateLegalForm, plural } from './telegram.mjs';
 export { abbreviateLegalForm };
 
 const TENDER_ID_RE_STR = 'UA-\\d{4}-\\d{2}-\\d{2}-\\d{6}-[a-zA-Z]';
@@ -609,31 +609,79 @@ function findContractDocUrl(entry) {
   return null;
 }
 
+// Service provider = supplier on the winning award (status === 'active').
+// Disqualified ('unsuccessful') and 'cancelled' awards are ignored.
+function findServiceProvider(entry) {
+  const active = (entry.final_snapshot?.awards ?? []).find(a => a.status === 'active');
+  const s = active?.suppliers?.[0];
+  if (!s?.name) return null;
+  return { name: s.name, edrpou: s.identifier?.id ?? null };
+}
+
+function renderArchiveItem(a, localIndex) {
+  const icon = ARCHIVE_ICONS[a.final_status] ?? '📦';
+  const customerRaw = a.final_snapshot?.procuringEntity?.name ?? '';
+  const customer = customerRaw ? ` — ${escapeHtml(truncate(abbreviateLegalForm(customerRaw), 100))}` : '';
+  let value = '';
+  if (a.final_snapshot?.value?.amount != null) {
+    const amt = formatMoney(a.final_snapshot.value.amount);
+    value = ` — ${amt} ${a.final_snapshot.value.currency}`;
+  }
+  const dateSuffix = a.archived_at ? ` (${fmtArchivedDate(a.archived_at)})` : '';
+  const tenderUrl = `https://prozorro.gov.ua/tender/${a.tender_id}`;
+  const idLink = `<a href="${escapeHtml(tenderUrl)}">${escapeHtml(a.tender_id)}</a>`;
+  const mainLine = `${localIndex + 1}. ${icon} ${idLink}${customer}${value}${dateSuffix}`;
+  const docUrl = findContractDocUrl(a);
+  if (!docUrl) return mainLine;
+  return `${mainLine}\n📄 <a href="${escapeHtml(docUrl)}">Завантажити договір</a>`;
+}
+
 export function handleArchive({ archive }) {
   if (!archive || archive.length === 0) {
     return '📭 Архів порожній.';
   }
-  const sorted = [...archive].sort((a, b) =>
-    (b.archived_at ?? '').localeCompare(a.archived_at ?? '')
-  );
-  const rows = sorted.map((a, i) => {
-    const icon = ARCHIVE_ICONS[a.final_status] ?? '📦';
-    const customerRaw = a.final_snapshot?.procuringEntity?.name ?? '';
-    const customer = customerRaw ? ` — ${escapeHtml(truncate(abbreviateLegalForm(customerRaw), 100))}` : '';
-    let value = '';
-    if (a.final_snapshot?.value?.amount != null) {
-      const amt = formatMoney(a.final_snapshot.value.amount);
-      value = ` — ${amt} ${a.final_snapshot.value.currency}`;
+  // Group by service provider EDRPOU; entries without an active award land
+  // in a synthetic "Без укладеного договору" group rendered last.
+  const NO_PROVIDER = '__no_provider__';
+  const groups = new Map();
+  for (const a of archive) {
+    const sp = findServiceProvider(a);
+    const key = sp?.edrpou ?? (sp?.name ? `name:${sp.name}` : NO_PROVIDER);
+    if (!groups.has(key)) {
+      groups.set(key, { provider: sp, entries: [] });
     }
-    const dateSuffix = a.archived_at ? ` (${fmtArchivedDate(a.archived_at)})` : '';
-    const tenderUrl = `https://prozorro.gov.ua/tender/${a.tender_id}`;
-    const idLink = `<a href="${escapeHtml(tenderUrl)}">${escapeHtml(a.tender_id)}</a>`;
-    const mainLine = `${i + 1}. ${icon} ${idLink}${customer}${value}${dateSuffix}`;
-    const docUrl = findContractDocUrl(a);
-    if (!docUrl) return mainLine;
-    return `${mainLine}\n📄 <a href="${escapeHtml(docUrl)}">Завантажити договір</a>`;
+    groups.get(key).entries.push(a);
+  }
+  // Sort entries within each group by archived_at desc, then sort groups by
+  // their max archived_at desc (newest contract first). The synthetic
+  // "no provider" group always renders last.
+  const groupList = [...groups.values()].map(g => {
+    g.entries.sort((x, y) => (y.archived_at ?? '').localeCompare(x.archived_at ?? ''));
+    g.maxArchivedAt = g.entries[0]?.archived_at ?? '';
+    return g;
   });
-  return rows.join('\n\n') + `\n\nВсього в архіві: ${archive.length}`;
+  groupList.sort((a, b) => {
+    if (!a.provider && b.provider) return 1;
+    if (a.provider && !b.provider) return -1;
+    return (b.maxArchivedAt ?? '').localeCompare(a.maxArchivedAt ?? '');
+  });
+
+  const sections = [];
+  for (const g of groupList) {
+    const count = g.entries.length;
+    const noun = plural(count, ['контракт', 'контракти', 'контрактів']);
+    let header;
+    if (g.provider) {
+      const name = escapeHtml(abbreviateLegalForm(g.provider.name));
+      const edrpou = g.provider.edrpou ? ` (ЄДРПОУ ${g.provider.edrpou})` : '';
+      header = `👤 ${name}${edrpou} — ${count} ${noun}`;
+    } else {
+      header = `📦 Без укладеного договору — ${count} ${noun}`;
+    }
+    const body = g.entries.map((a, i) => renderArchiveItem(a, i)).join('\n\n');
+    sections.push(`${header}\n\n${body}`);
+  }
+  return sections.join('\n\n') + `\n\nВсього в архіві: ${archive.length}`;
 }
 
 function formatContractsBlock(contracts) {
