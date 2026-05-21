@@ -365,6 +365,35 @@ test('runOnce: deadline_approaching does not re-fire when 24h already in prior _
   assert.equal(sent.length, 0);
 });
 
+test('runOnce: stale threshold keys in prior _notifiedDeadlines are stripped on save', async () => {
+  // prev carries legacy ['24h','12h','3h'] but only '24h' is currently configured.
+  // 2h before deadline → no NEW events (24h already in prev), but if any save did happen
+  // the merged array must NOT carry the stale keys back.
+  // We force a save by emitting a non-deadline event (new_question).
+  const deadline = '2026-05-16T14:00:00Z';
+  const prev = {
+    ...baseSnap({ tenderPeriod: { endDate: deadline } }),
+    _notifiedDeadlines: ['24h', '12h', '3h'],
+  };
+  const curr = {
+    ...baseSnap({ tenderPeriod: { endDate: deadline } }),
+    questions: [{ id: 'q1', title: 'Q?' }],
+  };
+  const saved = [];
+  await runOnce({
+    runIso: '2026-05-16T12:00:00Z',
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: curr }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => prev,
+    saveState: async (id, s) => saved.push(s),
+    sendDigest: async () => {},
+    updateSheet: async () => {},
+  });
+  assert.equal(saved.length, 1);
+  assert.deepEqual(saved[0]._notifiedDeadlines.sort(), ['24h']);
+});
+
 test('runOnce: entity-watch errors propagate to digest', async () => {
   const sent = [];
   await runOnce({

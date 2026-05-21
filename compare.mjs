@@ -2,6 +2,8 @@ const DEADLINE_THRESHOLDS = [
   { key: '24h', hours: 24 },
 ];
 
+export const DEADLINE_THRESHOLD_KEYS = DEADLINE_THRESHOLDS.map(t => t.key);
+
 function computeDeadlineApproaching(prev, curr, runIso) {
   const deadline = curr.tenderPeriod?.endDate;
   if (!deadline || !runIso) return [];

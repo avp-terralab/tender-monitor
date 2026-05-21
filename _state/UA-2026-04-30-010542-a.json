@@ -128,8 +128,7 @@
     "contracts": [],
     "cancellations": [],
     "_notifiedDeadlines": [
-      "24h",
-      "12h"
+      "24h"
     ]
   }
 }

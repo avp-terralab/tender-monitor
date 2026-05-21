@@ -1,4 +1,4 @@
-import { diff } from './compare.mjs';
+import { diff, DEADLINE_THRESHOLD_KEYS } from './compare.mjs';
 import { formatDigest, formatHeartbeat } from './telegram.mjs';
 
 const TENDER_ID_RE = /^UA-\d{4}-\d{2}-\d{2}-\d{6}-[a-z]$/;
@@ -53,7 +53,9 @@ export async function runOnce(deps) {
       const prevDeadline = prev?.tenderPeriod?.endDate ?? null;
       const currDeadline = curr.tenderPeriod?.endDate ?? null;
       const deadlineChanged = prevDeadline && prevDeadline !== currDeadline;
-      const baseNotified = deadlineChanged ? [] : (prev?._notifiedDeadlines ?? []);
+      const baseNotified = deadlineChanged
+        ? []
+        : (prev?._notifiedDeadlines ?? []).filter(k => DEADLINE_THRESHOLD_KEYS.includes(k));
       const merged = [...new Set([...baseNotified, ...newThresholds])];
       if (merged.length > 0) curr._notifiedDeadlines = merged;
       return { row, curr, events, error: null };
