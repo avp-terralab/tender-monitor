@@ -553,18 +553,12 @@ test('fmtTimeLeft: exported and renders future delta', () => {
   assert.match(out, /3 год/);
 });
 
-test('formatDigest: renders deadline_approaching event with hour label', () => {
+test('formatDigest: renders deadline_approaching event with 24h label', () => {
   const text24 = formatDigest('2026-05-16T12:00:00+03:00', [{
     tender_id: 'UA-X', title: 'X', prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
     events: [{ type: 'deadline_approaching', threshold: '24h', deadline: '2026-05-17T10:00:00+03:00' }],
   }]);
   assert.match(text24, /⏰ До дедлайну подачі менше 24 годин/);
-
-  const text3 = formatDigest('2026-05-16T12:00:00+03:00', [{
-    tender_id: 'UA-X', title: 'X', prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
-    events: [{ type: 'deadline_approaching', threshold: '3h', deadline: '2026-05-16T14:00:00+03:00' }],
-  }]);
-  assert.match(text3, /⏰ До дедлайну подачі менше 3 годин/);
 });
 
 test('sendDigest: passes text + chat_id to fetch with parse_mode=HTML', async () => {

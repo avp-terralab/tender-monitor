@@ -210,12 +210,8 @@ function fmtEvent(e) {
       return `${icon} Виправлення/новий документ ТД: «${escapeHtml(e.title)}»`;
     case 'new_tender_announced':
       return `${icon} Нове оголошення замовника`;
-    case 'deadline_approaching': {
-      const label = e.threshold === '24h' ? 'менше 24 годин'
-        : e.threshold === '12h' ? 'менше 12 годин'
-        : 'менше 3 годин';
-      return `${icon} До дедлайну подачі ${label}`;
-    }
+    case 'deadline_approaching':
+      return `${icon} До дедлайну подачі менше 24 годин`;
     case 'new_complaint':
       return `${icon} Подано скаргу (статус: ${e.status})`;
     case 'complaint_status_changed':

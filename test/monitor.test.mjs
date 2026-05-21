@@ -326,7 +326,7 @@ test('runOnce: works when checkWatchedEntities not provided (backward compat)', 
 });
 
 test('runOnce: deadline_approaching → snapshot saved with merged _notifiedDeadlines', async () => {
-  // 2h before deadline → first run emits 24h+12h+3h, all merged into _notifiedDeadlines
+  // 2h before deadline → first run emits 24h, merged into _notifiedDeadlines
   const deadline = '2026-05-16T14:00:00Z';
   const snap = baseSnap({ tenderPeriod: { endDate: deadline } });
   const saved = [];
@@ -341,15 +341,16 @@ test('runOnce: deadline_approaching → snapshot saved with merged _notifiedDead
     updateSheet: async () => {},
   });
   assert.equal(saved.length, 1);
-  assert.deepEqual(saved[0]._notifiedDeadlines.sort(), ['12h', '24h', '3h']);
+  assert.deepEqual(saved[0]._notifiedDeadlines.sort(), ['24h']);
 });
 
-test('runOnce: deadline_approaching merges with prior _notifiedDeadlines (no dupes)', async () => {
-  // prev already has 24h notified; now 2h left, only 12h+3h should newly fire
+test('runOnce: deadline_approaching does not re-fire when 24h already in prior _notifiedDeadlines', async () => {
+  // prev already has 24h notified; new run within 24h must NOT re-emit → no events → no save
   const deadline = '2026-05-16T14:00:00Z';
   const prev = { ...baseSnap({ tenderPeriod: { endDate: deadline } }), _notifiedDeadlines: ['24h'] };
   const curr = { ...baseSnap({ tenderPeriod: { endDate: deadline } }) };
   const saved = [];
+  const sent = [];
   await runOnce({
     runIso: '2026-05-16T12:00:00Z',
     watchlist: [{ tender_id: T_X, enabled: true }],
@@ -357,11 +358,11 @@ test('runOnce: deadline_approaching merges with prior _notifiedDeadlines (no dup
     extractSnapshot: (r) => r.data,
     loadState: async () => prev,
     saveState: async (id, s) => saved.push(s),
-    sendDigest: async () => {},
+    sendDigest: async (text) => { sent.push(text); },
     updateSheet: async () => {},
   });
-  assert.equal(saved.length, 1);
-  assert.deepEqual(saved[0]._notifiedDeadlines.sort(), ['12h', '24h', '3h']);
+  assert.equal(saved.length, 0);
+  assert.equal(sent.length, 0);
 });
 
 test('runOnce: entity-watch errors propagate to digest', async () => {

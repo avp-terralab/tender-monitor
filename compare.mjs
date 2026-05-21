@@ -1,7 +1,5 @@
 const DEADLINE_THRESHOLDS = [
   { key: '24h', hours: 24 },
-  { key: '12h', hours: 12 },
-  { key: '3h', hours: 3 },
 ];
 
 function computeDeadlineApproaching(prev, curr, runIso) {

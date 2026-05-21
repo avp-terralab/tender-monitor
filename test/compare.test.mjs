@@ -315,24 +315,24 @@ test('diff: deadline_approaching emits 24h when 23h left and not previously noti
   assert.equal(e.deadline, deadline);
 });
 
-test('diff: deadline_approaching emits 24h+12h+3h when only 2h left and never notified', () => {
+test('diff: deadline_approaching emits 24h when 2h left and never notified', () => {
   const now = '2026-05-16T12:00:00Z';
   const deadline = '2026-05-16T14:00:00Z'; // 2h ahead
   const prev = baseSnap(deadline);
   const curr = clone(prev); curr.dateModified = '2026-05-16T12:00:00Z';
   const events = diff(prev, curr, now);
   const thresholds = events.filter(x => x.type === 'deadline_approaching').map(x => x.threshold);
-  assert.deepEqual(thresholds, ['24h', '12h', '3h']);
+  assert.deepEqual(thresholds, ['24h']);
 });
 
-test('diff: deadline_approaching does NOT re-emit thresholds already in _notifiedDeadlines', () => {
+test('diff: deadline_approaching does NOT re-emit threshold already in _notifiedDeadlines', () => {
   const now = '2026-05-16T12:00:00Z';
   const deadline = '2026-05-16T14:00:00Z'; // 2h ahead
-  const prev = { ...baseSnap(deadline), _notifiedDeadlines: ['24h', '12h'] };
+  const prev = { ...baseSnap(deadline), _notifiedDeadlines: ['24h'] };
   const curr = clone(prev); curr.dateModified = '2026-05-16T12:00:00Z';
   const events = diff(prev, curr, now);
   const thresholds = events.filter(x => x.type === 'deadline_approaching').map(x => x.threshold);
-  assert.deepEqual(thresholds, ['3h']);
+  assert.deepEqual(thresholds, []);
 });
 
 test('diff: deadline_approaching not emitted after deadline (negative hoursLeft)', () => {
@@ -348,14 +348,14 @@ test('diff: deadline_approaching re-fires after deadline_changed (notified reset
   const now = '2026-05-16T12:00:00Z';
   const oldDeadline = '2026-05-16T13:00:00Z'; // already in past for the prev side
   const newDeadline = '2026-05-16T14:00:00Z'; // 2h ahead in current
-  const prev = { ...baseSnap(oldDeadline), _notifiedDeadlines: ['24h', '12h', '3h'] };
+  const prev = { ...baseSnap(oldDeadline), _notifiedDeadlines: ['24h'] };
   const curr = baseSnap(newDeadline);
   curr.dateModified = '2026-05-16T12:00:00Z';
   const events = diff(prev, curr, now);
-  // deadline_changed fires + deadline_approaching for all three thresholds again
+  // deadline_changed fires + deadline_approaching for 24h again
   assert.ok(events.some(e => e.type === 'deadline_changed'));
   const thresholds = events.filter(x => x.type === 'deadline_approaching').map(x => x.threshold);
-  assert.deepEqual(thresholds, ['24h', '12h', '3h']);
+  assert.deepEqual(thresholds, ['24h']);
 });
 
 test('diff: monitoring_started + deadline_approaching when freshly added near deadline', () => {
@@ -365,7 +365,7 @@ test('diff: monitoring_started + deadline_approaching when freshly added near de
   const events = diff(null, curr, now);
   assert.equal(events[0].type, 'monitoring_started');
   const thresholds = events.filter(x => x.type === 'deadline_approaching').map(x => x.threshold);
-  assert.deepEqual(thresholds, ['24h', '12h', '3h']);
+  assert.deepEqual(thresholds, ['24h']);
 });
 
 test('diff: deadline_approaching ignored when no deadline on snapshot', () => {
