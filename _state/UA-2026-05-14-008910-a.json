@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-05-14-008910-a",
-  "saved_at": "2026-05-21T18:25:24.846Z",
+  "saved_at": "2026-05-21T21:25:33.376Z",
   "snapshot": {
     "tender_id": "UA-2026-05-14-008910-a",
     "title": "Послуги з консультаційної підтримки програмного забезпечення - лабораторної інформаційної системи LIS TerraLab та Analyzer Manager для автоматизації лабораторних процесів у клініко-діагностичній лабораторії,  код ДК  021:2015:72250000-2 – Послуги, пов’язані із системами та підтримкою",
-    "status": "active.tendering",
-    "dateModified": "2026-05-14T14:32:24.497842+03:00",
+    "status": "active.qualification",
+    "dateModified": "2026-05-22T00:02:14.297113+03:00",
     "tenderPeriod": {
       "endDate": "2026-05-22T00:00:00+03:00"
     },
@@ -94,7 +94,21 @@
     ],
     "questions": [],
     "complaints": [],
-    "awards": [],
+    "awards": [
+      {
+        "id": "f5cb6f1e6fe84cc2ba74839101720583",
+        "status": "pending",
+        "suppliers": [
+          {
+            "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+            "identifier": {
+              "id": "39376596"
+            }
+          }
+        ],
+        "complaints": []
+      }
+    ],
     "contracts": [],
     "cancellations": [],
     "_notifiedDeadlines": [
