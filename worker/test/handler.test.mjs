@@ -35,6 +35,9 @@ const makeDeps = (overrides = {}) => {
       fetchContract: async () => ({ documents: [] }),
       setMyCommands: async () => {},
       fetchLastCommit: async () => null,
+      loadPendingDigest: async () => null,
+      loadTenderState: async () => null,
+      fetchLatestDeployCommit: async () => null,
       ...overrides,
     },
   };
@@ -395,6 +398,7 @@ test('runHandler: /status with watchlist → reply with counts and sha', async (
       ],
       sha: 'fedcba9876543210',
     }),
+    statusCache: new Map(), // isolate from other /status tests
   });
   await runHandler({
     update: { message: { chat: { id: 123 }, text: '/status', message_id: 1 } },
@@ -410,6 +414,7 @@ test('runHandler: /status with watchlist → reply with counts and sha', async (
 test('runHandler: /status when loadWatchlist throws → reply with GitHub error note', async () => {
   const { deps, sent } = await makeDeps({
     loadWatchlist: async () => { throw new Error('GitHub GET 503: timeout'); },
+    statusCache: new Map(), // isolate: skip any previously cached response
   });
   await runHandler({
     update: { message: { chat: { id: 123 }, text: '/status', message_id: 1 } },
@@ -2003,4 +2008,94 @@ test('runHandler: setMyCommands failure does not block reply', async () => {
     deps,
   });
   assert.equal(sent.length, 1); // reply still went through
+});
+
+// ── /status cache tests ───────────────────────────────────────────────────────
+
+test('runHandler: /status cache returns same response within 60s for admin', async () => {
+  // Use an isolated cache Map so this test doesn't interact with others.
+  const CACHE_ENV = { ...ENV, ADMIN_CHAT_ID: '7001' };
+  let ghCallCount = 0;
+  const ownCache = new Map();
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => { ghCallCount++; return { watchlist: [], sha: 'sha-x' }; },
+    loadAllowedUsers: async () => ({ users: [], sha: null }),
+    loadInvites: async () => ({ invites: [], sha: null }),
+    fetchLastCommit: async () => null,
+    loadArchivedTenders: async () => ({ archive: [], sha: null }),
+    loadWatchedEntities: async () => ({ entities: [], sha: null }),
+    loadPendingDigest: async () => null,
+    loadTenderState: async () => null,
+    fetchLatestDeployCommit: async () => null,
+    statusCache: ownCache,
+  });
+
+  // First call — fresh fetch.
+  await runHandler({
+    update: { message: { chat: { id: 7001 }, text: '/status', message_id: 1 } },
+    env: CACHE_ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /🟢 Worker live/);
+  const callsAfterFirst = ghCallCount;
+  assert.ok(callsAfterFirst >= 1, 'should have fetched on first call');
+  assert.doesNotMatch(sent[0].text, /cached/);
+
+  // Second call immediately — should hit cache, no new GH calls.
+  await runHandler({
+    update: { message: { chat: { id: 7001 }, text: '/status', message_id: 2 } },
+    env: CACHE_ENV,
+    deps,
+  });
+  assert.equal(sent.length, 2);
+  assert.equal(ghCallCount, callsAfterFirst, 'no new GitHub calls on cache hit');
+  assert.match(sent[1].text, /cached/);
+  assert.match(sent[1].text, /с тому/);
+});
+
+test('runHandler: /status cache expires after 60s and rebuilds', async () => {
+  // Use an isolated cache Map so this test doesn't interact with others.
+  const CACHE_ENV = { ...ENV, ADMIN_CHAT_ID: '7002' };
+  let ghCallCount = 0;
+  const ownCache = new Map();
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => { ghCallCount++; return { watchlist: [], sha: 'sha-y' }; },
+    loadAllowedUsers: async () => ({ users: [], sha: null }),
+    loadInvites: async () => ({ invites: [], sha: null }),
+    fetchLastCommit: async () => null,
+    loadArchivedTenders: async () => ({ archive: [], sha: null }),
+    loadWatchedEntities: async () => ({ entities: [], sha: null }),
+    loadPendingDigest: async () => null,
+    loadTenderState: async () => null,
+    fetchLatestDeployCommit: async () => null,
+    statusCache: ownCache,
+  });
+
+  // Seed the cache with a first call.
+  await runHandler({
+    update: { message: { chat: { id: 7002 }, text: '/status', message_id: 1 } },
+    env: CACHE_ENV,
+    deps,
+  });
+  const callsAfterFirst = ghCallCount;
+
+  // Simulate cache expiry by advancing Date.now past 60s.
+  const realDateNow = Date.now;
+  try {
+    Date.now = () => realDateNow() + 61_000;
+    await runHandler({
+      update: { message: { chat: { id: 7002 }, text: '/status', message_id: 2 } },
+      env: CACHE_ENV,
+      deps,
+    });
+  } finally {
+    Date.now = realDateNow;
+  }
+
+  assert.equal(sent.length, 2);
+  // Cache expired → fresh fetch → no "(cached)" marker in the new response.
+  assert.doesNotMatch(sent[1].text, /cached/);
+  // New GH calls were made.
+  assert.ok(ghCallCount > callsAfterFirst, 'should have re-fetched after cache expiry');
 });

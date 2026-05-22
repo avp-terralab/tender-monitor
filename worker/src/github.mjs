@@ -198,3 +198,56 @@ export async function saveArchivedTenders(env, archive, sha, opts = {}) {
   const text = JSON.stringify(archive, null, 2) + '\n';
   return saveFile(env, ARCHIVED_TENDERS_FILE, text, sha, opts);
 }
+
+const PENDING_DIGEST_FILE = '_state/_pending_digest.json';
+
+export async function loadPendingDigest(env, opts = {}) {
+  const { content } = await loadFile(env, PENDING_DIGEST_FILE, opts);
+  if (content === null) return null;
+  try {
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+// Loads the cached snapshot for a single tender from _state/<tenderId>.json.
+// Returns the `snapshot` field (the Prozorro data), or null if not found.
+export async function loadTenderState(env, tenderId, opts = {}) {
+  const { content } = await loadFile(env, `_state/${tenderId}.json`, opts);
+  if (content === null) return null;
+  try {
+    const parsed = JSON.parse(content);
+    return parsed.snapshot ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Returns the latest non-bot commit on main — skips state-update and cursor-sync
+// commits made by the monitor cron so /status shows when code was last deployed.
+export async function fetchLatestDeployCommit(env, { fetch: fetchImpl = fetch } = {}) {
+  const res = await fetchImpl(
+    `${API_BASE}/repos/${REPO}/commits?per_page=20`,
+    {
+      headers: {
+        Authorization: `Bearer ${env.GITHUB_PAT}`,
+        'User-Agent': 'tender-monitor-worker',
+        Accept: 'application/vnd.github+json',
+      },
+    },
+  );
+  if (!res.ok) throw new Error(`GitHub commits API ${res.status}`);
+  const commits = await res.json();
+  const BOT_RE = /^(monitor: state update|monitor: cursor sync|bot:)/;
+  for (const c of commits) {
+    const msg = (c.commit?.message ?? '').split('\n')[0];
+    if (BOT_RE.test(msg)) continue;
+    return {
+      sha: (c.sha ?? '').slice(0, 7),
+      message: msg,
+      date: c.commit?.committer?.date ?? null,
+    };
+  }
+  return null;
+}

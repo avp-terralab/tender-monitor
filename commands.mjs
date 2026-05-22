@@ -292,10 +292,24 @@ export function formatInfo({ runIso, groups, errors = [] }) {
   return lines.join('\n');
 }
 
-export function handleStatus({ watchlist, sha, users, invites, lastCommit, now }) {
+const KYIV_HM_FMT = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
+});
+
+export function handleStatus({ watchlist, sha, users, invites, lastCommit, now, rich }) {
   const active = watchlist.filter(r => r.enabled).length;
   const lines = ['🟢 Worker live'];
+
   lines.push(`📋 Watchlist: ${watchlist.length} тендерів (${active} активних)`);
+
+  // Admin-only breakdown line directly below watchlist count
+  if (rich && rich.watchlistBreakdown) {
+    const { activeIntake, waiting } = rich.watchlistBreakdown;
+    if (activeIntake > 0 || waiting > 0) {
+      lines.push(`   ↳ ${activeIntake} в прийомі / ${waiting} очікують`);
+    }
+  }
+
   if (users) {
     const optedIn = users.filter(u => u.notifications === true).length;
     lines.push(`👥 Користувачі: ${users.length + 1} (admin + ${users.length}; opted-in на сповіщення: ${optedIn})`);
@@ -313,7 +327,40 @@ export function handleStatus({ watchlist, sha, users, invites, lastCommit, now }
       : `${Math.round(ageMin / 1440)} дн тому`;
     lines.push(`⏱ Останній tick: ${ageStr} (${lastCommit.sha})`);
   }
+
+  // Admin-only rich rows — inserted before "✅ GitHub auth:"
+  if (rich) {
+    lines.push(`📦 Архівованих: ${rich.archiveCount ?? 0}`);
+    lines.push(`🏢 Замовників у entity-watch: ${rich.watchedEntitiesCount ?? 0}`);
+
+    // Pending digest / night buffer
+    const pd = rich.pendingDigest;
+    if (!pd || pd.itemCount === 0) {
+      lines.push('🌙 Нічний буфер: порожній');
+    } else {
+      let bufLine = `🌙 Нічний буфер: ${pd.itemCount} тендерів`;
+      if (pd.oldestEventAt) {
+        const timeStr = KYIV_HM_FMT.format(new Date(pd.oldestEventAt));
+        bufLine += `, найстаріша подія ${timeStr}`;
+      }
+      lines.push(bufLine);
+    }
+
+    // Latest deploy commit (omit row if null)
+    if (rich.latestDeploy) {
+      const { sha: dSha, message: dMsg } = rich.latestDeploy;
+      const truncated = dMsg.length > 50 ? dMsg.slice(0, 50) + '…' : dMsg;
+      lines.push(`🚀 Деплой: ${dSha} · ${truncated}`);
+    }
+  }
+
   lines.push(`✅ GitHub auth: OK (sha ${sha.slice(0, 7)})`);
+
+  // Cached marker at the very end
+  if (rich && rich.cachedAgeSec > 0) {
+    lines.push(`\n<i>(cached, ${rich.cachedAgeSec}с тому)</i>`);
+  }
+
   return lines.join('\n');
 }
 
@@ -1050,7 +1097,7 @@ const HELP_EDIT_ARCHIVE = [
 
 const HELP_ADMIN = [
   'Адмін-команди:',
-  '/status — здоровʼя бота',
+  '/status — здоровʼя бота (розширена статистика для адміна)',
   '/invite [editor|viewer] [імʼя] — створити invite-посилання',
   '/role [editor|viewer] [chat_id] — змінити роль користувача',
   '/invites — активні invite-посилання',

@@ -2671,3 +2671,77 @@ test('handleWhoami: guest (not in allowlist, not admin) → shows guest message'
   assert.match(text, /999/);
   assert.match(text, /Звернись до адміна/);
 });
+
+// ── handleStatus rich-mode tests ──────────────────────────────────────────────
+
+test('handleStatus: without rich → unchanged 6-line output', () => {
+  const text = handleStatus({
+    watchlist: [{ tender_id: 'UA-X', enabled: true }],
+    sha: 'abc1234',
+    users: [],
+    invites: [],
+    lastCommit: { sha: '8d66bdd', date: new Date(Date.now() - 25 * 60_000).toISOString() },
+    now: () => new Date(),
+  });
+  assert.match(text, /🟢 Worker live/);
+  assert.match(text, /Watchlist: 1 тендер/);
+  assert.doesNotMatch(text, /Архівованих/);
+  assert.doesNotMatch(text, /Нічний буфер/);
+  assert.doesNotMatch(text, /cached/);
+});
+
+test('handleStatus: with rich → appends admin-only rows', () => {
+  const text = handleStatus({
+    watchlist: [{ tender_id: 'UA-X', enabled: true }],
+    sha: 'abc1234',
+    users: [],
+    invites: [],
+    lastCommit: { sha: '8d66bdd', date: new Date().toISOString() },
+    now: () => new Date(),
+    rich: {
+      watchlistBreakdown: { activeIntake: 3, waiting: 5, runIso: new Date().toISOString() },
+      archiveCount: 24,
+      watchedEntitiesCount: 2,
+      pendingDigest: null,
+      latestDeploy: { sha: 'deadbee', message: 'telegram: heartbeat groups tenders', date: new Date().toISOString() },
+      cachedAgeSec: 0,
+    },
+  });
+  assert.match(text, /3 в прийомі \/ 5 очікують/);
+  assert.match(text, /📦 Архівованих: 24/);
+  assert.match(text, /🏢 Замовників у entity-watch: 2/);
+  assert.match(text, /🌙 Нічний буфер: порожній/);
+  assert.match(text, /🚀 Деплой: deadbee · telegram: heartbeat groups tenders/);
+  assert.doesNotMatch(text, /cached/);
+});
+
+test('handleStatus: rich + non-empty buffer renders item count and oldest time', () => {
+  const text = handleStatus({
+    watchlist: [], sha: 'abc1234', users: [], invites: [],
+    lastCommit: null, now: () => new Date('2026-05-23T08:00:00Z'),
+    rich: {
+      watchlistBreakdown: { activeIntake: 0, waiting: 0, runIso: '2026-05-23T08:00:00Z' },
+      archiveCount: 0, watchedEntitiesCount: 0,
+      pendingDigest: { itemCount: 3, oldestEventAt: '2026-05-23T02:14:00Z' },
+      latestDeploy: null,
+      cachedAgeSec: 0,
+    },
+  });
+  // "найстаріша подія HH:MM" — time formatted in Kyiv tz from 02:14 UTC = 05:14 EEST
+  assert.match(text, /🌙 Нічний буфер: 3 тендер.*найстаріша подія 05:14/);
+  assert.doesNotMatch(text, /🚀 Деплой/);  // omitted when null
+});
+
+test('handleStatus: cachedAgeSec > 0 → appends cached marker', () => {
+  const text = handleStatus({
+    watchlist: [], sha: 'abc1234', users: [], invites: [],
+    lastCommit: null, now: () => new Date(),
+    rich: {
+      watchlistBreakdown: { activeIntake: 0, waiting: 0, runIso: new Date().toISOString() },
+      archiveCount: 0, watchedEntitiesCount: 0,
+      pendingDigest: null, latestDeploy: null,
+      cachedAgeSec: 23,
+    },
+  });
+  assert.match(text, /<i>\(cached, 23с тому\)<\/i>/);
+});

@@ -17,8 +17,14 @@ import {
   loadAllowedUsers, saveAllowedUsers,
   loadInvites, saveInvites,
   loadArchivedTenders, saveArchivedTenders,
+  loadPendingDigest, loadTenderState, fetchLatestDeployCommit,
   ConflictError,
 } from './github.mjs';
+
+// Module-scope 60-second cache for /status responses, keyed by chatId string.
+// Survives across invocations within the same CF Worker instance; cleared on cold start.
+const STATUS_CACHE = new Map(); // chatId → { text, builtAt: number }
+const STATUS_CACHE_TTL_MS = 60_000;
 
 const BOT_USERNAME = 'terralab_tenders_bot';
 
@@ -51,6 +57,11 @@ export async function runHandler({ update, env, deps = {} }) {
   const _answerCallbackQuery = deps.answerCallbackQuery ?? answerCallbackQuery;
   const _setMyCommands = deps.setMyCommands ?? setMyCommands;
   const _fetchLastCommit = deps.fetchLastCommit ?? fetchLastCommit;
+  const _loadPendingDigest = deps.loadPendingDigest ?? loadPendingDigest;
+  const _loadTenderState = deps.loadTenderState ?? loadTenderState;
+  const _fetchLatestDeployCommit = deps.fetchLatestDeployCommit ?? fetchLatestDeployCommit;
+  // Tests may inject their own Map to avoid cross-test cache pollution.
+  const _statusCache = deps.statusCache ?? STATUS_CACHE;
 
   const cq = update.callback_query;
   if (cq) {
@@ -204,20 +215,84 @@ export async function runHandler({ update, env, deps = {} }) {
   } else if (cmd.cmd === 'status') {
     if (!isAdmin) return;
     try {
-      // Parallel load to keep latency low. Individual side-fetches are best-effort
-      // — if one fails the others still surface in the reply.
-      const [wlRes, usersRes, invitesRes, lastCommitRes] = await Promise.allSettled([
-        _loadWatchlist(env),
-        _loadAllowedUsers(env),
-        _loadInvites(env),
-        _fetchLastCommit(env),
-      ]);
-      if (wlRes.status !== 'fulfilled') throw wlRes.reason;
-      const { watchlist, sha } = wlRes.value;
-      const users = usersRes.status === 'fulfilled' ? usersRes.value.users : undefined;
-      const invites = invitesRes.status === 'fulfilled' ? invitesRes.value.invites : undefined;
-      const lastCommit = lastCommitRes.status === 'fulfilled' ? lastCommitRes.value : null;
-      reply = handleStatus({ watchlist, sha, users, invites, lastCommit, now: _now });
+      const cacheKey = String(chatId);
+      const cached = _statusCache.get(cacheKey);
+      if (cached && Date.now() - cached.builtAt < STATUS_CACHE_TTL_MS) {
+        const ageSec = Math.round((Date.now() - cached.builtAt) / 1000);
+        reply = cached.text + `\n\n<i>(cached, ${ageSec}с тому)</i>`;
+      } else {
+        // Parallel base fetches; watchlist failure is fatal, others are best-effort.
+        const [wlRes, usersRes, invitesRes, lastCommitRes] = await Promise.allSettled([
+          _loadWatchlist(env),
+          _loadAllowedUsers(env),
+          _loadInvites(env),
+          _fetchLastCommit(env),
+        ]);
+        if (wlRes.status !== 'fulfilled') throw wlRes.reason;
+        const { watchlist, sha } = wlRes.value;
+        const users = usersRes.status === 'fulfilled' ? usersRes.value.users : undefined;
+        const invites = invitesRes.status === 'fulfilled' ? invitesRes.value.invites : undefined;
+        const lastCommit = lastCommitRes.status === 'fulfilled' ? lastCommitRes.value : null;
+
+        // Admin-only rich enrichment fetched in parallel (all best-effort).
+        const [archiveRes, entitiesRes, pendingDigestRes, latestDeployRes] = await Promise.allSettled([
+          _loadArchivedTenders(env),
+          _loadWatchedEntities(env),
+          _loadPendingDigest(env),
+          _fetchLatestDeployCommit(env),
+        ]);
+        const archiveArr = archiveRes.status === 'fulfilled'
+          ? (archiveRes.value.archive ?? archiveRes.value ?? [])
+          : [];
+        const entitiesArr = entitiesRes.status === 'fulfilled'
+          ? (entitiesRes.value.entities ?? entitiesRes.value ?? [])
+          : [];
+        const rawPendingDigest = pendingDigestRes.status === 'fulfilled' ? pendingDigestRes.value : null;
+        const latestDeploy = latestDeployRes.status === 'fulfilled' ? latestDeployRes.value : null;
+
+        // Compute watchlist breakdown: classify each enabled tender as activeIntake
+        // (deadline in the future) or waiting (past/missing deadline).
+        const enabledRows = watchlist.filter(r => r.enabled);
+        const snapshots = await Promise.all(
+          enabledRows.map(r => _loadTenderState(env, r.tender_id).catch(() => null))
+        );
+        const runIso = _now().toISOString();
+        let activeIntake = 0;
+        let waiting = 0;
+        for (const snap of snapshots) {
+          if (!snap?.tenderPeriod?.endDate) { waiting++; continue; }
+          if (new Date(snap.tenderPeriod.endDate) > new Date(runIso)) activeIntake++;
+          else waiting++;
+        }
+
+        // Summarise pending digest buffer.
+        let pendingDigestSummary = null;
+        if (rawPendingDigest) {
+          const items = rawPendingDigest.items ?? {};
+          const itemCount = Object.keys(items).length;
+          const allFiredAts = [
+            ...Object.values(items).map(i => i.first_fired_at),
+            ...(rawPendingDigest.archived ?? []).map(a => a.fired_at),
+            ...(rawPendingDigest.errors ?? []).map(e => e.fired_at),
+          ].filter(Boolean);
+          const oldestEventAt = allFiredAts.length > 0
+            ? allFiredAts.reduce((a, b) => (a < b ? a : b))
+            : null;
+          pendingDigestSummary = { itemCount, oldestEventAt };
+        }
+
+        const rich = {
+          watchlistBreakdown: { activeIntake, waiting, runIso },
+          archiveCount: Array.isArray(archiveArr) ? archiveArr.length : 0,
+          watchedEntitiesCount: Array.isArray(entitiesArr) ? entitiesArr.length : 0,
+          pendingDigest: pendingDigestSummary,
+          latestDeploy,
+          cachedAgeSec: 0,
+        };
+
+        reply = handleStatus({ watchlist, sha, users, invites, lastCommit, now: _now, rich });
+        _statusCache.set(cacheKey, { text: reply, builtAt: Date.now() });
+      }
     } catch (err) {
       console.error('worker: status loadWatchlist failed:', err.message);
       reply = `⚠️ Worker live, але GitHub недоступний: ${err.message}`;
