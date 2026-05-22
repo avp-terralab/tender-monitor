@@ -871,3 +871,10 @@ test('formatNightDigest: appends errors block when present', () => {
   assert.match(text, /⚠️ не вдалось перевірити \(вночі\)/);
   assert.match(text, /UA-B — fetch 500/);
 });
+
+test('formatNightDigest: header includes Kyiv date of the night', () => {
+  const pending = { items: {}, archived: [], errors: [] };
+  // runIso 2026-05-22T06:00:00Z = 09:00 Kyiv on 22.05.2026
+  const text = formatNightDigest('2026-05-22T06:00:00Z', pending);
+  assert.match(text, /🌙 Нічний дайджест за 22\.05\.2026/);
+});

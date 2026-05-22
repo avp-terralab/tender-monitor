@@ -328,7 +328,10 @@ export function formatHeartbeat(runIso, snapshots) {
 
 export function formatNightDigest(runIso, pending) {
   const groups = Object.values(pending.items ?? {});
-  let text = '🌙 Нічний дайджест';
+  const dateStr = new Intl.DateTimeFormat('uk-UA', {
+    timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', year: 'numeric',
+  }).format(new Date(runIso));
+  let text = `🌙 Нічний дайджест за ${dateStr}`;
   if (groups.length > 0) {
     text += '\n\n' + formatDigest(runIso, groups);
   }
