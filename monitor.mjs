@@ -30,6 +30,37 @@ export function isQuietHour(runIso) {
   return h >= 0 && h < 6;
 }
 
+export function emptyPending() {
+  return { items: {}, archived: [], errors: [] };
+}
+
+export function mergePending(pending, { groups = [], archived = [], errors = [], runIso }) {
+  const next = {
+    items: { ...pending.items },
+    archived: [...pending.archived, ...archived.map(a => ({ ...a, fired_at: runIso }))],
+    errors: [...pending.errors, ...errors.map(e => ({ ...e, fired_at: runIso }))],
+  };
+  for (const g of groups) {
+    const existing = next.items[g.tender_id];
+    if (existing) {
+      next.items[g.tender_id] = {
+        ...existing,
+        ...g,
+        events: [...existing.events, ...g.events],
+        first_fired_at: existing.first_fired_at,
+        last_fired_at: runIso,
+      };
+    } else {
+      next.items[g.tender_id] = {
+        ...g,
+        first_fired_at: runIso,
+        last_fired_at: runIso,
+      };
+    }
+  }
+  return next;
+}
+
 function kyivDate(runIso) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Kyiv',

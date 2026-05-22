@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runOnce, isQuietHour } from '../monitor.mjs';
+import { runOnce, isQuietHour, mergePending, emptyPending } from '../monitor.mjs';
 
 // Use valid tender_id format throughout (UA-YYYY-MM-DD-NNNNNN-x)
 const T_X      = 'UA-2026-05-01-000001-a';
@@ -636,4 +636,72 @@ test('isQuietHour: true at 00:00 Kyiv (boundary, EET/winter)', () => {
 
 test('isQuietHour: false at 15:00 Kyiv', () => {
   assert.equal(isQuietHour('2026-05-22T12:00:00Z'), false);
+});
+
+test('emptyPending: returns shape with empty items/archived/errors', () => {
+  const p = emptyPending();
+  assert.deepEqual(p, { items: {}, archived: [], errors: [] });
+});
+
+test('mergePending: adds new group with first_fired_at and last_fired_at', () => {
+  const before = emptyPending();
+  const group = {
+    tender_id: 'UA-2026-05-22-000001-a',
+    title: 'X', status: 'active.tendering', deadline: null,
+    prozorro_url: 'https://prozorro.gov.ua/tender/UA-2026-05-22-000001-a',
+    events: [{ type: 'td_amended', title: 'Doc' }],
+  };
+  const after = mergePending(before, { groups: [group], runIso: '2026-05-22T02:14:00Z' });
+  const item = after.items['UA-2026-05-22-000001-a'];
+  assert.ok(item, 'item present');
+  assert.equal(item.first_fired_at, '2026-05-22T02:14:00Z');
+  assert.equal(item.last_fired_at, '2026-05-22T02:14:00Z');
+  assert.deepEqual(item.events, [{ type: 'td_amended', title: 'Doc' }]);
+});
+
+test('mergePending: merges events for repeated tender_id, keeps first_fired_at, updates last_fired_at', () => {
+  const before = mergePending(emptyPending(), {
+    groups: [{
+      tender_id: 'UA-X', title: 'X', events: [{ type: 'td_amended' }],
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    }],
+    runIso: '2026-05-22T02:14:00Z',
+  });
+  const after = mergePending(before, {
+    groups: [{
+      tender_id: 'UA-X', title: 'X (renamed)', events: [{ type: 'new_question', title: 'Q' }],
+      prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+    }],
+    runIso: '2026-05-22T04:30:00Z',
+  });
+  const item = after.items['UA-X'];
+  assert.equal(item.first_fired_at, '2026-05-22T02:14:00Z');
+  assert.equal(item.last_fired_at, '2026-05-22T04:30:00Z');
+  assert.equal(item.title, 'X (renamed)');
+  assert.deepEqual(item.events.map(e => e.type), ['td_amended', 'new_question']);
+});
+
+test('mergePending: appends archived + errors with fired_at', () => {
+  const before = emptyPending();
+  const after = mergePending(before, {
+    archived: [{ tender_id: 'UA-A', status: 'complete' }],
+    errors: [{ tender_id: 'UA-B', error: '500', is_invalid: false }],
+    runIso: '2026-05-22T03:00:00Z',
+  });
+  assert.deepEqual(after.archived, [
+    { tender_id: 'UA-A', status: 'complete', fired_at: '2026-05-22T03:00:00Z' },
+  ]);
+  assert.deepEqual(after.errors, [
+    { tender_id: 'UA-B', error: '500', is_invalid: false, fired_at: '2026-05-22T03:00:00Z' },
+  ]);
+});
+
+test('mergePending: does not mutate input', () => {
+  const before = emptyPending();
+  const snapshot = JSON.stringify(before);
+  mergePending(before, {
+    groups: [{ tender_id: 'UA-X', events: [{ type: 'td_amended' }] }],
+    runIso: '2026-05-22T03:00:00Z',
+  });
+  assert.equal(JSON.stringify(before), snapshot);
 });
