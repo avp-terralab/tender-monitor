@@ -897,3 +897,29 @@ test('runOnce: 09:00 flush debounced by heartbeat date (same day → no re-flush
   assert.equal(sent.length, 0, 'flush debounced');
   assert.equal(cleared, false, 'buffer preserved');
 });
+
+test('runOnce: 09:00 with current events (no buffer) saves heartbeat date (prevents dupe-heartbeat at 09:30)', async () => {
+  const deadline = '2026-06-30T17:00:00+03:00';
+  const prev = baseSnap({ tenderPeriod: { endDate: deadline } });
+  const curr = { ...baseSnap({ tenderPeriod: { endDate: deadline } }), questions: [{ id: 'qN', title: 'New?' }] };
+  const sent = [];
+  let savedDate = null;
+  await runOnce({
+    runIso: '2026-05-22T06:00:00Z', // 09:00 Kyiv (EEST)
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: curr }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => prev,
+    saveState: async () => {},
+    sendDigest: async (text) => sent.push(text),
+    sendHeartbeat: async () => {},
+    updateSheet: async () => {},
+    loadPendingDigest: async () => null, // empty buffer
+    savePendingDigest: async () => {},
+    clearPendingDigest: async () => {},
+    loadHeartbeatDate: async () => null,
+    saveHeartbeatDate: async (d) => { savedDate = d; },
+  });
+  assert.equal(sent.length, 1, 'one current-cycle broadcast');
+  assert.equal(savedDate, '2026-05-22', 'heartbeat date stamped to prevent dupe fire');
+});

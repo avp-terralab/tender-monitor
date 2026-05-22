@@ -298,7 +298,9 @@ export async function runOnce(deps) {
   }
 
   // Phase D: persist heartbeat date if any 09:00-slot send actually happened
-  if (heartbeatDue && (nightFlushed || heartbeatSent) && deps.saveHeartbeatDate) {
+  const currentCycleBroadcast = !inQuietWindow && (!isSilent || archivedNow.length > 0);
+  const anySent = nightFlushed || heartbeatSent || currentCycleBroadcast;
+  if (heartbeatDue && anySent && deps.saveHeartbeatDate) {
     await deps.saveHeartbeatDate(today);
   }
 
