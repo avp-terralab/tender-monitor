@@ -306,23 +306,66 @@ export function formatHeartbeat(runIso, snapshots) {
     '',
     `Моніторю ${snapshots.length} ${plural(snapshots.length, ['тендер', 'тендери', 'тендерів'])} — без змін за добу.`,
   ];
-  if (snapshots.length > 0) {
-    lines.push('');
-    lines.push('Поточні дедлайни:');
-    for (const s of snapshots) {
-      const idLink = `<a href="https://prozorro.gov.ua/tender/${escapeHtml(s.tender_id)}">${escapeHtml(s.tender_id)}</a>`;
-      const deadlinePassed = s.deadline && new Date(s.deadline) - new Date(runIso) < 0;
-      if (deadlinePassed) {
-        // Deadline already passed (e.g. status moved to active.qualification) —
-        // showing "минув на N днів тому" is noise. Reframe as a historical fact.
-        lines.push(`— ${idLink} — ${fmtStatus(s.status)} (подача пропозицій була до ${fmtDeadline(s.deadline)})`);
-      } else {
-        const left = fmtTimeLeft(s.deadline, runIso);
-        const leftPart = left ? `, ⏰ ${left}` : '';
-        lines.push(`— ${idLink} — ${fmtStatus(s.status)} (до ${fmtDeadline(s.deadline)}${leftPart})`);
-      }
+
+  // Helper: extract DD.MM from an ISO datetime
+  const shortDate = (iso) => {
+    if (!iso) return '';
+    const parts = new Intl.DateTimeFormat('uk-UA', {
+      timeZone: 'Europe/Kyiv',
+      day: '2-digit',
+      month: '2-digit',
+    }).formatToParts(new Date(iso));
+    const day = parts.find(p => p.type === 'day')?.value || '';
+    const month = parts.find(p => p.type === 'month')?.value || '';
+    return `${day}.${month}`;
+  };
+
+  const now = new Date(runIso);
+  const active = [];
+  const waiting = [];
+
+  // Split into active (future deadline) and waiting (past/no deadline)
+  for (const s of snapshots) {
+    const d = s.deadline ? new Date(s.deadline) : null;
+    if (d && d - now > 0) {
+      active.push(s);
+    } else {
+      waiting.push(s);
     }
   }
+
+  // Sort each section by deadline ascending
+  active.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+  waiting.sort((a, b) => {
+    const aDeadline = a.deadline ? new Date(a.deadline) : new Date(0);
+    const bDeadline = b.deadline ? new Date(b.deadline) : new Date(0);
+    return aDeadline - bDeadline;
+  });
+
+  // Render active section
+  if (active.length > 0) {
+    lines.push('');
+    lines.push(`🎯 Активні дедлайни (${active.length}):`);
+    for (const s of active) {
+      const idLink = `<a href="https://prozorro.gov.ua/tender/${escapeHtml(s.tender_id)}">${escapeHtml(s.tender_id)}</a>`;
+      const left = fmtTimeLeft(s.deadline, runIso);
+      const leftPart = left ? `, ⏰ ${left}` : '';
+      lines.push(`— ${idLink} — до ${fmtDeadline(s.deadline)}${leftPart}`);
+    }
+  }
+
+  // Render waiting section
+  if (waiting.length > 0) {
+    lines.push('');
+    lines.push(`⏸ Очікують замовника (${waiting.length}):`);
+    for (const s of waiting) {
+      const idLink = `<a href="https://prozorro.gov.ua/tender/${escapeHtml(s.tender_id)}">${escapeHtml(s.tender_id)}</a>`;
+      const since = shortDate(s.deadline);
+      const sincePart = since ? ` (з ${since})` : '';
+      lines.push(`— ${idLink} — ${fmtStatus(s.status)}${sincePart}`);
+    }
+  }
+
   return lines.join('\n');
 }
 

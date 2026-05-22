@@ -347,32 +347,81 @@ test('formatHeartbeat: includes heading, count, and tenders with deadlines', () 
   assert.match(text, /Моніторю 2 тендери/);
   assert.match(text, /UA-X/);
   assert.match(text, /UA-Y/);
-  assert.match(text, /Приймання пропозицій/);
+  // UA-X has future deadline → active section without status
+  assert.match(text, /🎯 Активні дедлайни/);
+  // UA-Y has no deadline → waiting section with status
+  assert.match(text, /⏸ Очікують замовника/);
   assert.match(text, /Розгляд пропозицій/);
 });
 
-test('formatHeartbeat: passed deadline rendered as "подача пропозицій була до …" without time-left', () => {
+test('formatHeartbeat: passed deadline rendered in waiting section with "з DD.MM"', () => {
   // 2026-05-19 09:00 Kyiv; deadline 2026-05-15 08:00 Kyiv already passed
   const text = formatHeartbeat('2026-05-19T06:00:00.000Z', [
     { tender_id: 'UA-Z', title: 'Z', status: 'active.qualification', deadline: '2026-05-15T08:00:00+03:00' },
   ]);
-  assert.match(text, /UA-Z<\/a> — Розгляд пропозицій \(подача пропозицій була до 15\.05\.2026 до 08:00\)/);
-  assert.doesNotMatch(text, /минув на/);
-  assert.doesNotMatch(text, /год тому/);
+  assert.match(text, /⏸ Очікують замовника/);
+  assert.match(text, /UA-Z<\/a> — Розгляд пропозицій \(з 15\.05\)/);
+  assert.doesNotMatch(text, /подача пропозицій була/);
+  assert.doesNotMatch(text, /🎯/);
 });
 
-test('formatHeartbeat: future deadline still rendered with time-left', () => {
+test('formatHeartbeat: future deadline in active section without status, with time-left', () => {
   const text = formatHeartbeat('2026-05-08T06:00:00.000Z', [
     { tender_id: 'UA-A', title: 'A', status: 'active.tendering', deadline: '2026-05-15T14:00:00+03:00' },
   ]);
-  assert.match(text, /UA-A<\/a> — Приймання пропозицій \(до 15\.05\.2026 до 14:00, ⏰ /);
+  assert.match(text, /🎯 Активні дедлайни/);
+  assert.match(text, /UA-A<\/a> — до 15\.05\.2026 до 14:00, ⏰ /);
+  // Status label should NOT appear in active section
+  assert.doesNotMatch(text, /Приймання пропозицій \(до/);
 });
 
 test('formatHeartbeat: empty snapshots produces still-alive line without deadlines section', () => {
   const text = formatHeartbeat('2026-05-08T06:00:00.000Z', []);
   assert.match(text, /🟢 Heartbeat/);
   assert.match(text, /Моніторю 0 тендерів/);
-  assert.doesNotMatch(text, /Поточні дедлайни/);
+  assert.doesNotMatch(text, /🎯/);
+  assert.doesNotMatch(text, /⏸/);
+});
+
+test('formatHeartbeat: groups into 🎯 Активні дедлайни and ⏸ Очікують замовника', () => {
+  const runIso = '2026-05-22T06:25:00Z'; // 09:25 Kyiv
+  const snaps = [
+    { tender_id: 'UA-PAST-1', status: 'active.qualification', deadline: '2026-05-08T20:00:00Z' },
+    { tender_id: 'UA-FUTURE-1', status: 'active.tendering', deadline: '2026-05-25T21:00:00Z' },
+    { tender_id: 'UA-PAST-2', status: 'active.awarded', deadline: '2026-05-15T05:00:00Z' },
+    { tender_id: 'UA-FUTURE-2', status: 'active.tendering', deadline: '2026-05-27T09:00:00Z' },
+  ];
+  const text = formatHeartbeat(runIso, snaps);
+  assert.match(text, /🎯 Активні дедлайни \(2\):/);
+  assert.match(text, /⏸ Очікують замовника \(2\):/);
+  // Active comes before waiting in output.
+  assert.ok(text.indexOf('🎯') < text.indexOf('⏸'), 'active section before waiting');
+  // Active sorted by deadline asc: 25.05 before 27.05
+  assert.ok(text.indexOf('UA-FUTURE-1') < text.indexOf('UA-FUTURE-2'));
+  // Waiting sorted by deadline asc: 08.05 before 15.05 (longest waiting first)
+  assert.ok(text.indexOf('UA-PAST-1') < text.indexOf('UA-PAST-2'));
+});
+
+test('formatHeartbeat: only active deadlines → no waiting section rendered', () => {
+  const runIso = '2026-05-22T06:25:00Z';
+  const snaps = [
+    { tender_id: 'UA-FUTURE', status: 'active.tendering', deadline: '2026-05-25T21:00:00Z' },
+  ];
+  const text = formatHeartbeat(runIso, snaps);
+  assert.match(text, /🎯 Активні дедлайни \(1\):/);
+  assert.doesNotMatch(text, /⏸ Очікують/);
+});
+
+test('formatHeartbeat: only waiting → no active section rendered', () => {
+  const runIso = '2026-05-22T06:25:00Z';
+  const snaps = [
+    { tender_id: 'UA-PAST', status: 'active.qualification', deadline: '2026-05-08T20:00:00Z' },
+  ];
+  const text = formatHeartbeat(runIso, snaps);
+  assert.doesNotMatch(text, /🎯 Активні/);
+  assert.match(text, /⏸ Очікують замовника \(1\):/);
+  // Compact "з DD.MM" form, not full "(подача пропозицій була до...)"
+  assert.match(text, /\(з \d{2}\.\d{2}\)/);
 });
 
 test('truncate: returns string unchanged when shorter than max', () => {
