@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runOnce } from '../monitor.mjs';
+import { runOnce, isQuietHour } from '../monitor.mjs';
 
 // Use valid tender_id format throughout (UA-YYYY-MM-DD-NNNNNN-x)
 const T_X      = 'UA-2026-05-01-000001-a';
@@ -611,8 +611,6 @@ test('runOnce: watchlist-only events without new_tender_announced → opts undef
   assert.equal(sent.length, 1);
   assert.equal(sent[0].opts, undefined);
 });
-
-import { isQuietHour } from '../monitor.mjs';
 
 test('isQuietHour: true at 02:00 Kyiv (EEST/summer)', () => {
   // 02:00 Kyiv summer = 23:00 UTC previous day
