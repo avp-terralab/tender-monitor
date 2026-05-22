@@ -287,7 +287,6 @@ export async function runHandler({ update, env, deps = {} }) {
           watchedEntitiesCount: Array.isArray(entitiesArr) ? entitiesArr.length : 0,
           pendingDigest: pendingDigestSummary,
           latestDeploy,
-          cachedAgeSec: 0,
         };
 
         reply = handleStatus({ watchlist, sha, users, invites, lastCommit, now: _now, rich });

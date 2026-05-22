@@ -2732,16 +2732,3 @@ test('handleStatus: rich + non-empty buffer renders item count and oldest time',
   assert.doesNotMatch(text, /🚀 Деплой/);  // omitted when null
 });
 
-test('handleStatus: cachedAgeSec > 0 → appends cached marker', () => {
-  const text = handleStatus({
-    watchlist: [], sha: 'abc1234', users: [], invites: [],
-    lastCommit: null, now: () => new Date(),
-    rich: {
-      watchlistBreakdown: { activeIntake: 0, waiting: 0, runIso: new Date().toISOString() },
-      archiveCount: 0, watchedEntitiesCount: 0,
-      pendingDigest: null, latestDeploy: null,
-      cachedAgeSec: 23,
-    },
-  });
-  assert.match(text, /<i>\(cached, 23с тому\)<\/i>/);
-});

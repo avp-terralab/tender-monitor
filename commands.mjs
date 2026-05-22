@@ -356,11 +356,6 @@ export function handleStatus({ watchlist, sha, users, invites, lastCommit, now, 
 
   lines.push(`✅ GitHub auth: OK (sha ${sha.slice(0, 7)})`);
 
-  // Cached marker at the very end
-  if (rich && rich.cachedAgeSec > 0) {
-    lines.push(`\n<i>(cached, ${rich.cachedAgeSec}с тому)</i>`);
-  }
-
   return lines.join('\n');
 }
 
