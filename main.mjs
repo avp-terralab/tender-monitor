@@ -1,7 +1,7 @@
 import { runOnce } from './monitor.mjs';
 import { fetchTender, extractSnapshot } from './prozorro.mjs';
 import { sendDigest as tgSend } from './telegram.mjs';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,6 +9,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '.local-state');
 mkdirSync(ROOT, { recursive: true });
 mkdirSync(join(ROOT, '_state'), { recursive: true });
 
+const pendingDigestPath = join(ROOT, '_state', '_pending_digest.json');
 const watchlistPath = join(ROOT, 'watchlist.json');
 const secretsPath = join(ROOT, '.secrets.json');
 
@@ -49,6 +50,20 @@ const result = await runOnce({
     text,
   ),
   updateSheet: async () => { /* no-op locally */ },
+  loadPendingDigest: async () => {
+    if (!existsSync(pendingDigestPath)) return null;
+    try {
+      return JSON.parse(readFileSync(pendingDigestPath, 'utf-8'));
+    } catch {
+      return null;
+    }
+  },
+  savePendingDigest: async (obj) => {
+    writeFileSync(pendingDigestPath, JSON.stringify(obj, null, 2));
+  },
+  clearPendingDigest: async () => {
+    if (existsSync(pendingDigestPath)) unlinkSync(pendingDigestPath);
+  },
   disableTender: async (tenderId, reason) => {
     const wl = JSON.parse(readFileSync(watchlistPath, 'utf-8'));
     for (const row of wl) {

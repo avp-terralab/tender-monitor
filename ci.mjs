@@ -58,6 +58,7 @@ const watchedEntities = existsSync(watchedEntitiesPath)
 const cursorPath = join(stateDir, '_watched_feed_cursor.json');
 const seenPath = join(stateDir, '_watched_seen.json');
 const heartbeatStatePath = join(stateDir, '_heartbeat.json');
+const pendingDigestPath = join(stateDir, '_pending_digest.json');
 
 const result = await runOnce({
   runIso: new Date().toISOString(),
@@ -92,6 +93,20 @@ const result = await runOnce({
   },
   saveHeartbeatDate: async (d) => {
     writeFileSync(heartbeatStatePath, JSON.stringify({ last_kyiv_date: d }, null, 2));
+  },
+  loadPendingDigest: async () => {
+    if (!existsSync(pendingDigestPath)) return null;
+    try {
+      return JSON.parse(readFileSync(pendingDigestPath, 'utf-8'));
+    } catch {
+      return null;
+    }
+  },
+  savePendingDigest: async (obj) => {
+    writeFileSync(pendingDigestPath, JSON.stringify(obj, null, 2));
+  },
+  clearPendingDigest: async () => {
+    if (existsSync(pendingDigestPath)) unlinkSync(pendingDigestPath);
   },
   updateSheet: async () => { /* no-op in CI */ },
   watchedEntities,
