@@ -326,6 +326,23 @@ export function formatHeartbeat(runIso, snapshots) {
   return lines.join('\n');
 }
 
+export function formatNightDigest(runIso, pending) {
+  const groups = Object.values(pending.items ?? {});
+  let text = '🌙 Нічний дайджест';
+  if (groups.length > 0) {
+    text += '\n\n' + formatDigest(runIso, groups);
+  }
+  if ((pending.errors ?? []).length > 0) {
+    text += '\n\n⚠️ не вдалось перевірити (вночі):\n' +
+      pending.errors.map(e => `  • ${e.tender_id} — ${e.error}`).join('\n');
+  }
+  if ((pending.archived ?? []).length > 0) {
+    text += '\n\n📦 Архівовано (вночі):\n' +
+      pending.archived.map(a => `  • ${a.tender_id} — ${a.status}`).join('\n');
+  }
+  return text;
+}
+
 export function chunkMessage(text, max) {
   if (text.length <= max) return [text];
   // Split at double-newline (group boundary)

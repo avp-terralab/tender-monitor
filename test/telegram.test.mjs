@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, answerCallbackQuery, setMyCommands, broadcastDigest } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, formatNightDigest, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, answerCallbackQuery, setMyCommands, broadcastDigest } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -829,4 +829,45 @@ test('broadcastDigest: empty chatIds → no-op, no fetch call', async () => {
   const fakeFetch = async () => { called = true; return { ok: true, json: async () => ({}) }; };
   await broadcastDigest({ token: 'TOK', chatIds: [], fetch: fakeFetch }, 'hello');
   assert.equal(called, false);
+});
+
+test('formatNightDigest: header + delegates items to formatDigest', () => {
+  const pending = {
+    items: {
+      'UA-X': {
+        tender_id: 'UA-X', title: 'Лабораторні реактиви', status: 'active.tendering',
+        deadline: '2026-05-23T17:00:00+03:00',
+        prozorro_url: 'https://prozorro.gov.ua/tender/UA-X',
+        events: [{ type: 'td_amended', title: 'Доповнення №1' }],
+      },
+    },
+    archived: [],
+    errors: [],
+  };
+  const text = formatNightDigest('2026-05-22T06:00:00Z', pending);
+  assert.match(text, /🌙 Нічний дайджест/);
+  assert.match(text, /Лабораторні реактиви/);
+  assert.match(text, /Виправлення\/новий документ ТД/);
+});
+
+test('formatNightDigest: appends archived block when present', () => {
+  const pending = {
+    items: {},
+    archived: [{ tender_id: 'UA-A', status: 'complete', fired_at: '2026-05-22T02:00:00Z' }],
+    errors: [],
+  };
+  const text = formatNightDigest('2026-05-22T06:00:00Z', pending);
+  assert.match(text, /📦 Архівовано \(вночі\)/);
+  assert.match(text, /UA-A — complete/);
+});
+
+test('formatNightDigest: appends errors block when present', () => {
+  const pending = {
+    items: {},
+    archived: [],
+    errors: [{ tender_id: 'UA-B', error: 'fetch 500', is_invalid: false, fired_at: '2026-05-22T03:00:00Z' }],
+  };
+  const text = formatNightDigest('2026-05-22T06:00:00Z', pending);
+  assert.match(text, /⚠️ не вдалось перевірити \(вночі\)/);
+  assert.match(text, /UA-B — fetch 500/);
 });
