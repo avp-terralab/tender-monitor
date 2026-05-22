@@ -1,5 +1,5 @@
 import { diff, DEADLINE_THRESHOLD_KEYS } from './compare.mjs';
-import { formatDigest, formatHeartbeat } from './telegram.mjs';
+import { formatDigest, formatHeartbeat, formatNightDigest } from './telegram.mjs';
 
 const TENDER_ID_RE = /^UA-\d{4}-\d{2}-\d{2}-\d{6}-[a-z]$/;
 
@@ -75,6 +75,7 @@ export async function runOnce(deps) {
     runIso, watchlist, fetchTender, extractSnapshot,
     loadState, saveState, sendDigest, updateSheet,
     disableTender,
+    loadPendingDigest, savePendingDigest, clearPendingDigest,
   } = deps;
 
   const enabled = watchlist.filter(w => w.enabled);
@@ -195,49 +196,40 @@ export async function runOnce(deps) {
     }
   }
 
-  if (!hasContent && archivedNow.length === 0 && isHeartbeatHour(runIso)) {
-    // Debounce: multiple cron triggers can land in the same Kyiv-09 hour
-    // (GHA scheduled + external pinger). Skip if heartbeat already sent today.
-    const today = kyivDate(runIso);
-    const lastHeartbeatDate = deps.loadHeartbeatDate ? await deps.loadHeartbeatDate() : null;
-    if (lastHeartbeatDate !== today) {
-      const heartbeat = formatHeartbeat(runIso, results
-        .filter(r => !r.error && r.curr)
-        .map(r => ({
-          tender_id: r.row.tender_id,
-          title: r.curr.title,
-          status: r.curr.status,
-          deadline: r.curr.tenderPeriod?.endDate ?? null,
-        }))
+  const inQuietWindow = isQuietHour(runIso);
+  const inHeartbeatSlot = isHeartbeatHour(runIso);
+  const today = kyivDate(runIso);
+  const lastHeartbeatDate = inHeartbeatSlot && deps.loadHeartbeatDate
+    ? await deps.loadHeartbeatDate()
+    : null;
+  const heartbeatDue = inHeartbeatSlot && lastHeartbeatDate !== today;
+
+  // Phase A: flush pending night digest if heartbeat slot is due
+  let nightFlushed = false;
+  if (heartbeatDue && loadPendingDigest) {
+    const pending = await loadPendingDigest();
+    const pendingItems = pending ? Object.values(pending.items ?? {}) : [];
+    const pendingHasContent = pending && (
+      pendingItems.length > 0 ||
+      (pending.archived ?? []).length > 0 ||
+      (pending.errors ?? []).length > 0
+    );
+    if (pendingHasContent) {
+      const morningText = formatNightDigest(runIso, pending);
+      const nightButtons = pendingItems
+        .filter(g => g.events?.some(e => e.type === 'new_tender_announced'))
+        .map(g => g.tender_id);
+      await sendDigest(
+        morningText,
+        nightButtons.length > 0 ? { addButtonsForTenders: nightButtons } : undefined,
       );
-      // Heartbeat is operational ops info (admin-facing). Use sendHeartbeat if
-      // provided to route it to admin-only; fall back to sendDigest broadcast
-      // for backward-compat in tests.
-      if (deps.sendHeartbeat) {
-        await deps.sendHeartbeat(heartbeat);
-      } else {
-        await sendDigest(heartbeat);
-      }
-      if (deps.saveHeartbeatDate) await deps.saveHeartbeatDate(today);
+      if (clearPendingDigest) await clearPendingDigest();
+      nightFlushed = true;
     }
-    // Update sheet last_check, but DO NOT save state (no events to acknowledge)
-    await Promise.all(results.map(r =>
-      updateSheet(r.row.tender_id, {
-        last_check: runIso,
-        last_status: r.curr?.status,
-        last_dateModified: r.curr?.dateModified,
-      }).catch(() => {})
-    ));
-    return {
-      sent: lastHeartbeatDate !== today,
-      groups: 0,
-      errors: 0,
-      heartbeat: lastHeartbeatDate !== today,
-    };
   }
 
+  // Phase B: process current-cycle events
   const isSilent = !hasContent;
-
   if (!isSilent || archivedNow.length > 0) {
     let text = '';
     if (!isSilent) {
@@ -261,11 +253,22 @@ export async function runOnce(deps) {
     const addButtonsForTenders = groups
       .filter(g => g.events?.some(e => e.type === 'new_tender_announced'))
       .map(g => g.tender_id);
-    await sendDigest(text, addButtonsForTenders.length > 0 ? { addButtonsForTenders } : undefined);
 
-    // Save state only for tenders with events (errors → no save, retry next run).
-    // Archived tenders are skipped — their snapshot was unlinked by archiveTender
-    // and saving here would recreate a stale file for a row no longer in watchlist.
+    if (inQuietWindow) {
+      // Buffer instead of broadcast.
+      const prevPending = (loadPendingDigest ? await loadPendingDigest() : null) ?? emptyPending();
+      const updated = mergePending(prevPending, {
+        groups, archived: archivedNow, errors, runIso,
+      });
+      if (savePendingDigest) await savePendingDigest(updated);
+    } else {
+      await sendDigest(
+        text,
+        addButtonsForTenders.length > 0 ? { addButtonsForTenders } : undefined,
+      );
+    }
+
+    // saveState runs in both branches — dedup must hold across buffered events too.
     const archivedIds = new Set(archivedNow.map(a => a.tender_id));
     await Promise.all(results.map(async r => {
       if (r.error || r.events.length === 0) return;
@@ -274,18 +277,46 @@ export async function runOnce(deps) {
     }));
   }
 
-  // Always update sheet last_check timestamp for all attempted rows
+  // Phase C: admin heartbeat fallback (only if nothing else fired in the slot)
+  let heartbeatSent = false;
+  if (heartbeatDue && !nightFlushed && !hasContent && archivedNow.length === 0) {
+    const heartbeat = formatHeartbeat(runIso, results
+      .filter(r => !r.error && r.curr)
+      .map(r => ({
+        tender_id: r.row.tender_id,
+        title: r.curr.title,
+        status: r.curr.status,
+        deadline: r.curr.tenderPeriod?.endDate ?? null,
+      }))
+    );
+    if (deps.sendHeartbeat) {
+      await deps.sendHeartbeat(heartbeat);
+    } else {
+      await sendDigest(heartbeat);
+    }
+    heartbeatSent = true;
+  }
+
+  // Phase D: persist heartbeat date if any 09:00-slot send actually happened
+  if (heartbeatDue && (nightFlushed || heartbeatSent) && deps.saveHeartbeatDate) {
+    await deps.saveHeartbeatDate(today);
+  }
+
+  // Phase E: always update sheet last_check
   await Promise.all(results.map(r =>
     updateSheet(r.row.tender_id, {
       last_check: runIso,
       last_status: r.curr?.status,
       last_dateModified: r.curr?.dateModified,
-    }).catch(() => {}) // sheet update failure is non-fatal
+    }).catch(() => {})
   ));
 
   return {
-    sent: !isSilent || archivedNow.length > 0,
+    sent: nightFlushed || heartbeatSent || (!inQuietWindow && (!isSilent || archivedNow.length > 0)),
     groups: groups.length,
     errors: errors.length,
+    heartbeat: heartbeatSent,
+    nightFlushed,
+    buffered: inQuietWindow && (!isSilent || archivedNow.length > 0),
   };
 }

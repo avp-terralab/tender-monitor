@@ -705,3 +705,195 @@ test('mergePending: does not mutate input', () => {
   });
   assert.equal(JSON.stringify(before), snapshot);
 });
+
+// ─── Task 5: quiet-hour buffering + 09:00 flush ───────────────────────────────
+
+test('runOnce: quiet hour with events → buffer NOT send', async () => {
+  const deadline = '2026-05-22T17:00:00+03:00';
+  const prev = baseSnap({ tenderPeriod: { endDate: deadline } });
+  const curr = { ...baseSnap({ tenderPeriod: { endDate: deadline } }), questions: [{ id: 'q1', title: 'Q?' }] };
+  const sent = [], saved = [], savedState = [];
+  let pending = null;
+  await runOnce({
+    runIso: '2026-05-22T01:00:00Z', // 04:00 Kyiv (EEST) — quiet
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: curr }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => prev,
+    saveState: async (id, s) => savedState.push([id, s]),
+    sendDigest: async (text) => sent.push(text),
+    updateSheet: async () => {},
+    loadPendingDigest: async () => pending,
+    savePendingDigest: async (p) => { pending = p; saved.push(p); },
+    clearPendingDigest: async () => { pending = null; },
+  });
+  assert.equal(sent.length, 0, 'no broadcast in quiet hour');
+  assert.equal(saved.length, 1, 'pending saved once');
+  assert.ok(saved[0].items[T_X], 'tender buffered');
+  assert.equal(savedState.length, 1, 'state still saved (dedup)');
+});
+
+test('runOnce: quiet hour without events → no buffer, no send', async () => {
+  // Use far-future deadline to avoid triggering deadline_approaching events
+  const snap = baseSnap({ tenderPeriod: { endDate: '2026-06-30T17:00:00+03:00' } });
+  const sent = [], saved = [];
+  await runOnce({
+    runIso: '2026-05-22T01:00:00Z',
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: snap }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => snap, // identical → no events
+    saveState: async () => {},
+    sendDigest: async (text) => sent.push(text),
+    updateSheet: async () => {},
+    loadPendingDigest: async () => null,
+    savePendingDigest: async (p) => saved.push(p),
+    clearPendingDigest: async () => {},
+  });
+  assert.equal(sent.length, 0);
+  assert.equal(saved.length, 0);
+});
+
+test('runOnce: 09:00 with non-empty buffer → flush broadcast + clear, no admin heartbeat', async () => {
+  // Use far-future deadline to avoid triggering deadline_approaching in current cycle
+  const snap = baseSnap({ tenderPeriod: { endDate: '2026-06-30T17:00:00+03:00' } });
+  const stored = {
+    items: {
+      [T_X]: {
+        tender_id: T_X, title: 'X', status: 'active.tendering',
+        deadline: '2026-05-22T17:00:00+03:00',
+        prozorro_url: `https://prozorro.gov.ua/tender/${T_X}`,
+        events: [{ type: 'td_amended', title: 'Doc' }],
+        first_fired_at: '2026-05-22T02:00:00Z',
+        last_fired_at: '2026-05-22T02:00:00Z',
+      },
+    },
+    archived: [],
+    errors: [],
+  };
+  const sent = [], hbSent = [];
+  let cleared = false;
+  await runOnce({
+    runIso: '2026-05-22T06:00:00Z', // 09:00 Kyiv (EEST)
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: snap }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => snap, // identical → no current events
+    saveState: async () => {},
+    sendDigest: async (text) => sent.push(text),
+    sendHeartbeat: async (text) => hbSent.push(text),
+    updateSheet: async () => {},
+    loadPendingDigest: async () => stored,
+    savePendingDigest: async () => {},
+    clearPendingDigest: async () => { cleared = true; },
+    loadHeartbeatDate: async () => null,
+    saveHeartbeatDate: async () => {},
+  });
+  assert.equal(sent.length, 1, 'night digest broadcast');
+  assert.match(sent[0], /🌙 Нічний дайджест/);
+  assert.equal(cleared, true, 'pending cleared');
+  assert.equal(hbSent.length, 0, 'admin heartbeat suppressed');
+});
+
+test('runOnce: 09:00 with empty buffer and no events → admin heartbeat as before', async () => {
+  // Use far-future deadline to avoid triggering deadline_approaching (which would suppress heartbeat)
+  const snap = baseSnap({ tenderPeriod: { endDate: '2026-06-30T17:00:00+03:00' } });
+  const sent = [], hbSent = [];
+  await runOnce({
+    runIso: '2026-05-22T06:00:00Z',
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: snap }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => snap,
+    saveState: async () => {},
+    sendDigest: async (text) => sent.push(text),
+    sendHeartbeat: async (text) => hbSent.push(text),
+    updateSheet: async () => {},
+    loadPendingDigest: async () => null,
+    savePendingDigest: async () => {},
+    clearPendingDigest: async () => {},
+    loadHeartbeatDate: async () => null,
+    saveHeartbeatDate: async () => {},
+  });
+  assert.equal(sent.length, 0);
+  assert.equal(hbSent.length, 1, 'admin heartbeat fired');
+});
+
+test('runOnce: 09:00 with buffer AND new events → two sends (night digest + current digest)', async () => {
+  const deadline = '2026-05-22T17:00:00+03:00';
+  const prev = baseSnap({ tenderPeriod: { endDate: deadline } });
+  const curr = { ...baseSnap({ tenderPeriod: { endDate: deadline } }), questions: [{ id: 'qN', title: 'New?' }] };
+  const stored = {
+    items: {
+      'UA-OLD-XXXXX-X-x': {
+        tender_id: 'UA-OLD-XXXXX-X-x', title: 'Buffered', status: 'active.tendering',
+        prozorro_url: 'https://prozorro.gov.ua/tender/UA-OLD-XXXXX-X-x',
+        events: [{ type: 'td_amended', title: 'Doc' }],
+        first_fired_at: '2026-05-22T02:00:00Z',
+        last_fired_at: '2026-05-22T02:00:00Z',
+      },
+    },
+    archived: [],
+    errors: [],
+  };
+  const sent = [];
+  let cleared = false;
+  await runOnce({
+    runIso: '2026-05-22T06:00:00Z',
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: curr }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => prev,
+    saveState: async () => {},
+    sendDigest: async (text) => sent.push(text),
+    sendHeartbeat: async () => {},
+    updateSheet: async () => {},
+    loadPendingDigest: async () => stored,
+    savePendingDigest: async () => {},
+    clearPendingDigest: async () => { cleared = true; },
+    loadHeartbeatDate: async () => null,
+    saveHeartbeatDate: async () => {},
+  });
+  assert.equal(sent.length, 2, 'two broadcasts: night then current');
+  assert.match(sent[0], /🌙 Нічний дайджест/);
+  assert.match(sent[0], /Buffered/);
+  assert.match(sent[1], /Нове питання/); // current cycle
+  assert.equal(cleared, true);
+});
+
+test('runOnce: 09:00 flush debounced by heartbeat date (same day → no re-flush)', async () => {
+  // Use far-future deadline to avoid triggering deadline_approaching in current cycle
+  const snap = baseSnap({ tenderPeriod: { endDate: '2026-06-30T17:00:00+03:00' } });
+  const stored = {
+    items: {
+      [T_X]: {
+        tender_id: T_X, title: 'X',
+        prozorro_url: `https://prozorro.gov.ua/tender/${T_X}`,
+        events: [{ type: 'td_amended', title: 'Doc' }],
+        first_fired_at: '2026-05-22T02:00:00Z',
+        last_fired_at: '2026-05-22T02:00:00Z',
+      },
+    },
+    archived: [], errors: [],
+  };
+  const sent = [];
+  let cleared = false;
+  await runOnce({
+    runIso: '2026-05-22T06:30:00Z', // 09:30 Kyiv, same date
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: snap }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => snap,
+    saveState: async () => {},
+    sendDigest: async (text) => sent.push(text),
+    sendHeartbeat: async () => {},
+    updateSheet: async () => {},
+    loadPendingDigest: async () => stored,
+    savePendingDigest: async () => {},
+    clearPendingDigest: async () => { cleared = true; },
+    loadHeartbeatDate: async () => '2026-05-22', // already heartbeat'd today
+    saveHeartbeatDate: async () => {},
+  });
+  assert.equal(sent.length, 0, 'flush debounced');
+  assert.equal(cleared, false, 'buffer preserved');
+});
