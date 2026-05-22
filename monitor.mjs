@@ -20,6 +20,16 @@ function isHeartbeatHour(runIso) {
   return hour === '09';
 }
 
+export function isQuietHour(runIso) {
+  const hour = new Intl.DateTimeFormat('uk-UA', {
+    timeZone: 'Europe/Kyiv',
+    hour: '2-digit',
+    hour12: false,
+  }).format(new Date(runIso));
+  const h = parseInt(hour, 10);
+  return h >= 0 && h < 6;
+}
+
 function kyivDate(runIso) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Kyiv',

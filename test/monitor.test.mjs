@@ -611,3 +611,31 @@ test('runOnce: watchlist-only events without new_tender_announced → opts undef
   assert.equal(sent.length, 1);
   assert.equal(sent[0].opts, undefined);
 });
+
+import { isQuietHour } from '../monitor.mjs';
+
+test('isQuietHour: true at 02:00 Kyiv (EEST/summer)', () => {
+  // 02:00 Kyiv summer = 23:00 UTC previous day
+  assert.equal(isQuietHour('2026-05-21T23:00:00Z'), true);
+});
+
+test('isQuietHour: true at 05:59 Kyiv (EEST)', () => {
+  assert.equal(isQuietHour('2026-05-22T02:59:00Z'), true);
+});
+
+test('isQuietHour: false at 06:00 Kyiv (EEST)', () => {
+  assert.equal(isQuietHour('2026-05-22T03:00:00Z'), false);
+});
+
+test('isQuietHour: false at 23:59 Kyiv', () => {
+  assert.equal(isQuietHour('2026-05-21T20:59:00Z'), false);
+});
+
+test('isQuietHour: true at 00:00 Kyiv (boundary, EET/winter)', () => {
+  // 00:00 Kyiv winter (EET=+02) = 22:00 UTC previous day
+  assert.equal(isQuietHour('2026-01-14T22:00:00Z'), true);
+});
+
+test('isQuietHour: false at 15:00 Kyiv', () => {
+  assert.equal(isQuietHour('2026-05-22T12:00:00Z'), false);
+});
