@@ -41,7 +41,31 @@ jobs:
             echo "No state changes to commit."
             exit 0
           fi
-          git commit -m "monitor: state update $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          # Classify diff: "significant" = anything except the high-frequency cursor/seen
+          # files. _watched_feed_cursor.json and _watched_seen.json drift on every run even
+          # when nothing in the tender world changed, generating ~48 commits/day of pure
+          # noise. We still need to persist them, but committing once every ~6 hours is
+          # plenty (the feed cursor lookback handles missed events).
+          SIGNIFICANT=$(git diff --staged --name-only \
+            | grep -v -E '^_state/_watched_(feed_cursor|seen)\.json$' || true)
+
+          if [ -z "$SIGNIFICANT" ]; then
+            LAST_CURSOR_TS=$(git log -1 --format=%ct --grep='^monitor: cursor sync' 2>/dev/null || echo 0)
+            LAST_CURSOR_TS=${LAST_CURSOR_TS:-0}
+            NOW=$(date +%s)
+            AGE=$((NOW - LAST_CURSOR_TS))
+            if [ "$AGE" -lt 21600 ]; then
+              echo "Cursor-only diff; last sync ${AGE}s ago (<6h). Skipping commit."
+              git reset
+              exit 0
+            fi
+            MSG="monitor: cursor sync $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          else
+            MSG="monitor: state update $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          fi
+
+          git commit -m "$MSG"
           # Retry with rebase if origin moved during the run (concurrent push
           # from another workflow or manual commit). State files are append-only
           # / merge-friendly, so rebase is safe.
