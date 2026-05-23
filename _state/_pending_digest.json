@@ -1,0 +1,43 @@
+{
+  "items": {
+    "UA-2026-05-15-006953-a": {
+      "tender_id": "UA-2026-05-15-006953-a",
+      "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії\n",
+      "status": "active.tendering",
+      "deadline": "2026-05-25T00:00:00+03:00",
+      "procuring_entity": {
+        "name": "Комунальне некомерційне підприємство \"Білгород-Дністровська центральна районна лікарня\" Білгород-Дністровської міської ради",
+        "edrpou": "01998696"
+      },
+      "value": {
+        "amount": 226300,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurement_method_type": "aboveThreshold",
+      "classification": {
+        "id": "48810000-9",
+        "description": "Інформаційні системи",
+        "scheme": "ДК021"
+      },
+      "contact": {
+        "name": "Ольга Мартиненко",
+        "email": "akkerman.crbfin@gmail.com",
+        "telephone": "+380673384622, +380673384622"
+      },
+      "prozorro_url": "https://prozorro.gov.ua/tender/UA-2026-05-15-006953-a",
+      "events": [
+        {
+          "type": "deadline_approaching",
+          "threshold": "24h",
+          "hoursLeft": 23.6,
+          "deadline": "2026-05-25T00:00:00+03:00"
+        }
+      ],
+      "first_fired_at": "2026-05-23T21:25:26.161Z",
+      "last_fired_at": "2026-05-23T21:25:26.161Z"
+    }
+  },
+  "archived": [],
+  "errors": []
+}
