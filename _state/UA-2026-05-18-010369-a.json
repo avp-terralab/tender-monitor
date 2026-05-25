@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-05-18-010369-a",
-  "saved_at": "2026-05-24T21:25:36.962Z",
+  "saved_at": "2026-05-25T21:25:36.315Z",
   "snapshot": {
     "tender_id": "UA-2026-05-18-010369-a",
     "title": "код ДК 021:2015 72250000-2 «Послуги, пов’язані із системами та підтримкою»\n(Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії) \n",
-    "status": "active.tendering",
-    "dateModified": "2026-05-18T15:34:03.435958+03:00",
+    "status": "active.qualification",
+    "dateModified": "2026-05-26T00:02:43.882133+03:00",
     "tenderPeriod": {
       "endDate": "2026-05-26T00:00:00+03:00"
     },
@@ -80,7 +80,21 @@
     ],
     "questions": [],
     "complaints": [],
-    "awards": [],
+    "awards": [
+      {
+        "id": "62e0bb8611f34c4cb1c0f42885334ece",
+        "status": "pending",
+        "suppliers": [
+          {
+            "name": "ТОВ \"ТЕРРАЛАБ ПРО\"",
+            "identifier": {
+              "id": "46104055"
+            }
+          }
+        ],
+        "complaints": []
+      }
+    ],
     "contracts": [],
     "cancellations": [],
     "_notifiedDeadlines": [
