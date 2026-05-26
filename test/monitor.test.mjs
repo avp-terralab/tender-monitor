@@ -311,6 +311,35 @@ test('runOnce: appends entity-watch alerts to digest groups', async () => {
   assert.match(sent[0], /UA-NEW/);
 });
 
+test('runOnce: entity-watch alert suppressed when tender already in watchlist (dedup)', async () => {
+  const snap = baseSnap({ tender_id: T_X });
+  const sent = [];
+  await runOnce({
+    runIso: '2026-05-08T13:00:00+03:00',
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: snap }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => snap, // prev == curr → no watchlist events of its own
+    saveState: async () => {},
+    sendDigest: async (text) => { sent.push(text); },
+    updateSheet: async () => {},
+    checkWatchedEntities: async () => ({
+      alerts: [{
+        tender_id: T_X, // SAME tender as the watchlist row
+        title: 'X',
+        prozorro_url: `https://prozorro.gov.ua/tender/${T_X}`,
+        procuring_entity: { name: 'КНП Тест', edrpou: '12345678' },
+        events: [{ type: 'new_tender_announced' }],
+      }],
+      errors: [],
+    }),
+  });
+  // The "🆕 Нове оголошення" announcement is redundant — the tender is already
+  // monitored via the watchlist (which sends the richer digest) — so it must
+  // not be broadcast a second time.
+  assert.equal(sent.length, 0);
+});
+
 test('runOnce: works when checkWatchedEntities not provided (backward compat)', async () => {
   const result = await runOnce({
     runIso: '2026-05-08T13:00:00+03:00',

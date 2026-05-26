@@ -151,7 +151,14 @@ export async function runOnce(deps) {
         loadSeen: deps.loadSeen,
         saveSeen: deps.saveSeen,
       });
-      if (watchResult.alerts?.length) groups.push(...watchResult.alerts);
+      if (watchResult.alerts?.length) {
+        // Dedup against the watchlist: a tender already monitored by id would
+        // otherwise be double-reported — the entity-watch "🆕 Нове оголошення"
+        // alert plus the (richer) watchlist digest. The watchlist wins; suppress
+        // the entity alert for any tender_id already on the enabled watchlist.
+        const watchlistIds = new Set(enabled.map(w => w.tender_id));
+        groups.push(...watchResult.alerts.filter(a => !watchlistIds.has(a.tender_id)));
+      }
       if (watchResult.errors?.length) {
         for (const e of watchResult.errors) {
           errors.push({
