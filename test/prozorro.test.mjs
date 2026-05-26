@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { extractSnapshot } from '../prozorro.mjs';
+import { extractSnapshot, fetchTender } from '../prozorro.mjs';
 
 const raw = JSON.parse(
   readFileSync(new URL('./fixtures/raw_prozorro_response.json', import.meta.url))
@@ -270,4 +270,37 @@ test('fetchTendersFeed: returns empty when no next_page', async () => {
   });
   const result = await fetchTendersFeed({ fetch: fakeFetch });
   assert.equal(result.next, null);
+});
+
+test('fetchTender: retries a transient failure then succeeds', async () => {
+  let calls = 0;
+  const fakeFetch = async (url) => {
+    calls++;
+    if (calls === 1) throw new TypeError('fetch failed'); // first summary attempt: network blip
+    if (url.includes('/summary')) return { ok: true, json: async () => ({ id: 'uuid-1' }) };
+    return { ok: true, json: async () => ({ data: { tenderID: 'UA-X' } }) };
+  };
+  const res = await fetchTender('UA-2026-05-01-000001-a', { fetch: fakeFetch, retryDelayMs: 0 });
+  assert.equal(res.data.tenderID, 'UA-X');
+  assert.equal(calls, 3); // 1 failed summary + retried (summary + cdb)
+});
+
+test('fetchTender: does not retry a permanent 404', async () => {
+  let calls = 0;
+  const fakeFetch = async () => { calls++; return { ok: false, status: 404, text: async () => 'nf' }; };
+  await assert.rejects(
+    () => fetchTender('UA-X', { fetch: fakeFetch, retryDelayMs: 0 }),
+    /404/,
+  );
+  assert.equal(calls, 1); // permanent → no retry
+});
+
+test('fetchTender: exhausts retries on persistent transient error', async () => {
+  let calls = 0;
+  const fakeFetch = async () => { calls++; throw new TypeError('fetch failed'); };
+  await assert.rejects(
+    () => fetchTender('UA-X', { fetch: fakeFetch, retryDelayMs: 0, retries: 2 }),
+    /fetch failed/,
+  );
+  assert.equal(calls, 3); // initial + 2 retries
 });

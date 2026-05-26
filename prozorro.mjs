@@ -93,9 +93,18 @@ export function extractSnapshot(raw) {
   };
 }
 
-export async function fetchTender(tenderId) {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// 404 / missing-UUID mean the tender is genuinely gone — permanent, never retry
+// (and monitor.mjs auto-disables on these). Everything else (native "fetch
+// failed" network errors, 5xx, rate-limit) is treated as transient and retried.
+function isPermanentFetchError(err) {
+  return /\b404\b|no UUID|not found/i.test(err?.message ?? '');
+}
+
+async function fetchTenderOnce(tenderId, fetchImpl) {
   // Step 1: tenderID -> UUID
-  const summaryRes = await fetch(
+  const summaryRes = await fetchImpl(
     `https://prozorro.gov.ua/api/tenders/${encodeURIComponent(tenderId)}/summary`
   );
   if (!summaryRes.ok) {
@@ -107,13 +116,33 @@ export async function fetchTender(tenderId) {
     throw new Error(`Prozorro: no UUID returned for ${tenderId}`);
   }
   // Step 2: UUID -> full tender
-  const cdbRes = await fetch(
+  const cdbRes = await fetchImpl(
     `https://public-api.prozorro.gov.ua/api/2.5/tenders/${uuid}`
   );
   if (!cdbRes.ok) {
     throw new Error(`Prozorro CDB ${cdbRes.status}: ${uuid}`);
   }
   return cdbRes.json(); // {data: {...}}
+}
+
+// Retries transient failures with linear backoff so a momentary network blip
+// (a common cause of the "fetch failed" digest noise) doesn't surface as an
+// error. Permanent errors (404/no UUID) throw immediately without retrying.
+export async function fetchTender(
+  tenderId,
+  { fetch: fetchImpl = fetch, retries = 2, retryDelayMs = 500 } = {},
+) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fetchTenderOnce(tenderId, fetchImpl);
+    } catch (err) {
+      lastErr = err;
+      if (isPermanentFetchError(err) || attempt === retries) throw err;
+      await sleep(retryDelayMs * (attempt + 1));
+    }
+  }
+  throw lastErr; // defensive; loop either returns or throws above
 }
 
 export async function fetchContract(contractId, { fetch: fetchImpl = fetch } = {}) {
