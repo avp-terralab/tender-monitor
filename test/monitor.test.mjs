@@ -44,8 +44,32 @@ test('runOnce: silent when nothing changed', async () => {
   assert.equal(result.sent, false);
 });
 
-test('runOnce: sends digest on monitoring_started', async () => {
+test('runOnce: monitoring_started alone does not broadcast, but saves state', async () => {
+  // First-seen baseline is redundant: the bot already sends a detailed reply
+  // when a tender is added via /add, and entity-watch tenders already got a
+  // "🆕 Нове оголошення". So a monitoring_started-only cycle stays silent — but
+  // the snapshot must still be persisted so future diffs have a baseline.
   const snap = baseSnap();
+  const sent = [];
+  const saved = [];
+  await runOnce({
+    runIso: '2026-05-08T13:00:00+03:00',
+    watchlist: [{ tender_id: T_X, enabled: true }],
+    fetchTender: async () => ({ data: snap }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => null,
+    saveState: async (id) => { saved.push(id); },
+    sendDigest: async (text) => { sent.push(text); },
+    updateSheet: async () => {},
+  });
+  assert.equal(sent.length, 0);
+  assert.deepEqual(saved, [T_X]);
+});
+
+test('runOnce: first-seen with imminent deadline keeps the deadline alert, drops the doc-count baseline', async () => {
+  // prev null → monitoring_started; deadline 7h away → deadline_approaching.
+  // monitoring_started is suppressed but the actionable deadline alert remains.
+  const snap = baseSnap({ tenderPeriod: { endDate: '2026-05-08T20:00:00+03:00' } });
   const sent = [];
   await runOnce({
     runIso: '2026-05-08T13:00:00+03:00',
@@ -58,7 +82,8 @@ test('runOnce: sends digest on monitoring_started', async () => {
     updateSheet: async () => {},
   });
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /Статус:/);
+  assert.match(sent[0], /менше 24 годин/);
+  assert.doesNotMatch(sent[0], /📎 Документів/);
 });
 
 test('runOnce: skips disabled rows', async () => {
@@ -88,10 +113,12 @@ test('runOnce: continues on per-tender error and reports it', async () => {
     ],
     fetchTender: async (id) => {
       if (id === T_BAD) throw new Error('500');
-      return { data: baseSnap({ tender_id: T_OK }) };
+      // Real status change so T_OK legitimately appears in the digest (a
+      // monitoring_started-only tender would now be suppressed).
+      return { data: baseSnap({ tender_id: T_OK, status: 'active.qualification' }) };
     },
     extractSnapshot: (r) => r.data,
-    loadState: async () => null,
+    loadState: async (id) => id === T_OK ? baseSnap({ tender_id: T_OK, status: 'active.tendering' }) : null,
     saveState: async () => {},
     sendDigest: async (t) => sent.push(t),
     updateSheet: async () => {},
@@ -124,13 +151,19 @@ test('runOnce: saves state only for tenders with events', async () => {
 });
 
 test('runOnce: does not save state if sendDigest throws', async () => {
+  // Use a real change event (status transition) so a digest is actually sent —
+  // monitoring_started alone no longer broadcasts, so it can't exercise the
+  // send-failure path. The atomicity guarantee: a failed send must not advance
+  // state, so the event re-fires next run rather than being lost.
+  const prev = baseSnap({ status: 'active.tendering' });
+  const curr = baseSnap({ status: 'active.qualification' });
   const saved = [];
   await runOnce({
     runIso: '2026-05-08T13:00:00+03:00',
     watchlist: [{ tender_id: T_X, enabled: true }],
-    fetchTender: async () => ({ data: baseSnap() }),
+    fetchTender: async () => ({ data: curr }),
     extractSnapshot: (r) => r.data,
-    loadState: async () => null, // → monitoring_started
+    loadState: async () => prev,
     saveState: async (id, s) => saved.push(id),
     sendDigest: async () => { throw new Error('Telegram down'); },
     updateSheet: async () => {},

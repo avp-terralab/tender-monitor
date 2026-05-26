@@ -126,6 +126,13 @@ export async function runOnce(deps) {
       continue;
     }
     if (r.events.length === 0) continue;
+    // monitoring_started (first-seen baseline) is suppressed from broadcasts: it
+    // duplicates the detailed /add reply and the entity-watch announcement. The
+    // snapshot is still persisted below (saveState keys off r.events, which keeps
+    // monitoring_started), so future diffs have a baseline. Any other first-seen
+    // event — e.g. an imminent deadline — is still broadcast.
+    const notifyEvents = r.events.filter(e => e.type !== 'monitoring_started');
+    if (notifyEvents.length === 0) continue;
     groups.push({
       tender_id: r.row.tender_id,
       title: r.curr.title,
@@ -137,7 +144,7 @@ export async function runOnce(deps) {
       classification: r.curr.classification ?? null,
       contact: r.curr.contact ?? null,
       prozorro_url: `https://prozorro.gov.ua/tender/${r.row.tender_id}`,
-      events: r.events,
+      events: notifyEvents,
     });
   }
 
@@ -274,15 +281,20 @@ export async function runOnce(deps) {
         addButtonsForTenders.length > 0 ? { addButtonsForTenders } : undefined,
       );
     }
-
-    // saveState runs in both branches — dedup must hold across buffered events too.
-    const archivedIds = new Set(archivedNow.map(a => a.tender_id));
-    await Promise.all(results.map(async r => {
-      if (r.error || r.events.length === 0) return;
-      if (archivedIds.has(r.row.tender_id)) return;
-      await saveState(r.row.tender_id, r.curr);
-    }));
   }
+
+  // Persist state for every tender that produced events — independent of whether
+  // this cycle broadcast anything. A monitoring_started-only tender is silent (its
+  // event is suppressed above) but still needs its baseline saved, or it would be
+  // "first seen" forever. Placed AFTER the broadcast block so a thrown sendDigest
+  // aborts runOnce before state advances: a failed delivery must re-fire next run,
+  // not be lost. Dedup holds across buffered (quiet-hour) events too.
+  const archivedIds = new Set(archivedNow.map(a => a.tender_id));
+  await Promise.all(results.map(async r => {
+    if (r.error || r.events.length === 0) return;
+    if (archivedIds.has(r.row.tender_id)) return;
+    await saveState(r.row.tender_id, r.curr);
+  }));
 
   // Phase C: admin heartbeat fallback (only if nothing else fired in the slot)
   let heartbeatSent = false;
