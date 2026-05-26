@@ -310,6 +310,8 @@ const PHASES = [
 ];
 const OTHER_PHASE = { emoji: '📦', label: 'Інші статуси', statuses: [] };
 
+// deadline is a valid ISO string when non-null (validated upstream in monitor.mjs);
+// null sorts last via +Infinity.
 function deadlineKey(g) {
   return g.deadline ? new Date(g.deadline).getTime() : Number.POSITIVE_INFINITY;
 }

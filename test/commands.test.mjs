@@ -2819,3 +2819,13 @@ test('formatInfoPages: entry body equals formatInfoEntry output', () => {
   assert.ok(page.includes('UA-T'));
 });
 
+test('formatInfoPages: errors-only (no groups) still produces an errors page with header', () => {
+  const pages = formatInfoPages({
+    runIso: RUN, groups: [], errors: [{ tender_id: 'UA-ERR', error: 'Prozorro 503' }],
+  });
+  assert.equal(pages.length, 1);
+  assert.match(pages[0], /📋 Статус тендерів \(/);          // global header still prepended
+  assert.match(pages[0], /⚠️ Не вдалось перевірити \(1\)/);
+  assert.match(pages[0], /UA-ERR — Prozorro 503/);
+});
+
