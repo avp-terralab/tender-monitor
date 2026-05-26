@@ -292,6 +292,72 @@ export function formatInfo({ runIso, groups, errors = [] }) {
   return lines.join('\n');
 }
 
+const INFO_TIME_FMT = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
+});
+const INFO_DATE_FMT = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', year: 'numeric',
+});
+
+// Procurement-phase pages for /info, in lifecycle order. Any status not listed
+// here falls into the OTHER_PHASE bucket so nothing is silently dropped.
+const PHASES = [
+  { emoji: '📥', label: 'Приймання пропозицій',           statuses: ['active.tendering'] },
+  { emoji: '🧮', label: 'Прекваліфікація',                statuses: ['active.pre-qualification', 'active.pre-qualification.stand-still'] },
+  { emoji: '🔨', label: 'Триває аукціон',                 statuses: ['active.auction'] },
+  { emoji: '🔍', label: 'Розгляд пропозицій',             statuses: ['active.qualification'] },
+  { emoji: '✍️', label: 'Очікування підписання договору', statuses: ['active.awarded'] },
+];
+const OTHER_PHASE = { emoji: '📦', label: 'Інші статуси', statuses: [] };
+
+function deadlineKey(g) {
+  return g.deadline ? new Date(g.deadline).getTime() : Number.POSITIVE_INFINITY;
+}
+
+// Groups for the all-tenders /info view into one page (message) per non-empty
+// phase, in lifecycle order, plus an optional final errors page. The global
+// header is prepended to the first page only. Returns string[].
+export function formatInfoPages({ runIso, groups, errors = [] }) {
+  if (groups.length === 0 && errors.length === 0) {
+    return ['📭 Немає активних тендерів.'];
+  }
+
+  const known = new Set(PHASES.flatMap(p => p.statuses));
+  const buckets = PHASES.map(p => ({ ...p, items: groups.filter(g => p.statuses.includes(g.status)) }));
+  const otherItems = groups.filter(g => !known.has(g.status));
+  if (otherItems.length > 0) buckets.push({ ...OTHER_PHASE, items: otherItems });
+
+  for (const b of buckets) {
+    if (b.statuses.includes('active.tendering')) {
+      b.items.sort((a, c) => deadlineKey(a) - deadlineKey(c));
+    } else {
+      b.items.sort((a, c) => a.tender_id.localeCompare(c.tender_id));
+    }
+  }
+
+  const pages = [];
+  for (const b of buckets) {
+    if (b.items.length === 0) continue;
+    const lines = [`${b.emoji} ${b.label} (${b.items.length})`];
+    b.items.forEach((g, i) => {
+      lines.push('');
+      lines.push(`━━━━━━━━━━ ${i + 1} ━━━━━━━━━━`);
+      lines.push(formatInfoEntry(g, runIso));
+    });
+    pages.push(lines.join('\n'));
+  }
+
+  if (errors.length > 0) {
+    const lines = [`⚠️ Не вдалось перевірити (${errors.length})`];
+    for (const e of errors) lines.push(`  • ${e.tender_id} — ${e.error}`);
+    pages.push(lines.join('\n'));
+  }
+
+  const header = `📋 Статус тендерів (${INFO_TIME_FMT.format(new Date(runIso))}, ${INFO_DATE_FMT.format(new Date(runIso))})`;
+  pages[0] = `${header}\n\n${pages[0]}`;
+  return pages;
+}
+
 const KYIV_HM_FMT = new Intl.DateTimeFormat('uk-UA', {
   timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
 });
