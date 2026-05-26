@@ -5,7 +5,7 @@ import {
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
-  formatInfo, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD,
+  formatInfo, formatInfoPages, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD,
   TERMINAL_STATUSES, hydrateContractDocs,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
@@ -349,7 +349,9 @@ export async function runHandler({ update, env, deps = {} }) {
         }));
         const groups = results.filter(r => !r.error);
         const errors = results.filter(r => r.error);
-        reply = formatInfo({ runIso: new Date().toISOString(), groups, errors });
+        reply = cmd.tender_id
+          ? formatInfo({ runIso: new Date().toISOString(), groups, errors })
+          : formatInfoPages({ runIso: new Date().toISOString(), groups, errors });
 
         // Live archive: when /info UA-... shows a terminal status for a watchlist
         // tender, archive it inline. Reduces archive lag from monitor-cron cadence
@@ -585,16 +587,22 @@ export async function runHandler({ update, env, deps = {} }) {
     return; // free text or other unhandled — no reply
   }
 
-  try {
-    await _sendReply({
-      token: env.TELEGRAM_BOT_TOKEN,
-      chatId: msg.chat.id,
-      text: reply,
-      replyToMessageId: msg.message_id,
-      replyMarkup: notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined),
-    });
-  } catch (err) {
-    console.error('worker: sendReply failed:', err.message);
+  const pages = Array.isArray(reply) ? reply : [reply];
+  for (let i = 0; i < pages.length; i++) {
+    const isLast = i === pages.length - 1;
+    try {
+      await _sendReply({
+        token: env.TELEGRAM_BOT_TOKEN,
+        chatId: msg.chat.id,
+        text: pages[i],
+        replyToMessageId: i === 0 ? msg.message_id : undefined,
+        replyMarkup: isLast
+          ? (notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined))
+          : undefined,
+      });
+    } catch (err) {
+      console.error('worker: sendReply failed:', err.message);
+    }
   }
 
   // Keep this chat's "/" autocomplete in sync with the current role's command

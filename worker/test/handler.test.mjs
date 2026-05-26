@@ -606,8 +606,7 @@ test('runHandler: /info empty enabled watchlist → friendly reply', async () =>
   assert.match(sent[0].text, /📭 Немає активних тендерів/);
 });
 
-test('runHandler: /info partial Prozorro errors are listed in footer', async () => {
-  let count = 0;
+test('runHandler: /info partial Prozorro errors become a final page', async () => {
   const RAW = {
     data: {
       tenderID: 'UA-A', title: 'X', status: 'active.tendering',
@@ -625,19 +624,50 @@ test('runHandler: /info partial Prozorro errors are listed in footer', async () 
       sha: 'x',
     }),
     fetchTender: async (id) => {
-      count++;
       if (id === 'UA-B') throw new Error('Prozorro 503');
       return RAW;
     },
   });
   await runHandler({
     update: { message: { chat: { id: 123 }, text: '/info', message_id: 1 } },
-    env: ENV,
-    deps,
+    env: ENV, deps,
   });
+  assert.equal(sent.length, 2);
   assert.match(sent[0].text, /UA-A/);
-  assert.match(sent[0].text, /⚠️ не вдалось перевірити/);
-  assert.match(sent[0].text, /UA-B — Prozorro 503/);
+  assert.match(sent[1].text, /⚠️ Не вдалось перевірити/);
+  assert.match(sent[1].text, /UA-B — Prozorro 503/);
+});
+
+test('runHandler: /info sends one message per phase, keyboard on last only', async () => {
+  const RAW = (id, status) => ({
+    data: {
+      tenderID: id, title: 'X', status,
+      tenderPeriod: { endDate: '2026-06-01T14:00:00+03:00' },
+      procuringEntity: { name: 'Тест', identifier: { id: '11111111' } },
+      items: [],
+    },
+  });
+  const { deps, sent } = await makeDeps({
+    loadWatchlist: async () => ({
+      watchlist: [
+        { tender_id: 'UA-T', enabled: true },
+        { tender_id: 'UA-Q', enabled: true },
+      ],
+      sha: 'x',
+    }),
+    fetchTender: async (id) => RAW(id, id === 'UA-T' ? 'active.tendering' : 'active.qualification'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/info', message_id: 7 } },
+    env: ENV, deps,
+  });
+  assert.equal(sent.length, 2);
+  assert.match(sent[0].text, /📥 Приймання пропозицій/);
+  assert.match(sent[1].text, /🔍 Розгляд пропозицій/);
+  assert.equal(sent[0].replyToMessageId, 7);
+  assert.equal(sent[1].replyToMessageId, undefined);
+  assert.ok(sent[1].replyMarkup, 'last page carries the keyboard');
+  assert.equal(sent[0].replyMarkup, undefined);
 });
 
 test('runHandler: /info when loadWatchlist throws → ⚠️ reply', async () => {
