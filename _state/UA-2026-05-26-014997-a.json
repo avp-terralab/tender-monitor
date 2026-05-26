@@ -1,0 +1,80 @@
+{
+  "tender_id": "UA-2026-05-26-014997-a",
+  "saved_at": "2026-05-26T17:25:33.656Z",
+  "snapshot": {
+    "tender_id": "UA-2026-05-26-014997-a",
+    "title": "Послуги з програмного забезпечення  лабораторної  інформаційної системи  LIS TerraLab та ПЗ Analyzer Manager (код ДК 021:2015:72260000-5 - Послуги, пов’язані з програмним забезпеченням)\n\n",
+    "status": "active.tendering",
+    "dateModified": "2026-05-26T19:52:41.473557+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-06-03T08:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "Комунальне підприємство \"Полтавська обласна клінічна лікарня ім.М.В.Скліфосовського Полтавської обласної ради\" ",
+      "edrpou": "01999106"
+    },
+    "value": {
+      "amount": 780000,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": true
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Лариса Буханченко",
+      "email": "larisabuhanchenko301185@gmail.com",
+      "telephone": "+380532609547"
+    },
+    "documents": [
+      {
+        "id": "48354f1e0a8044b7b99d39203909be21",
+        "title": "ТД .docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-05-26T19:50:37.815527+03:00"
+      },
+      {
+        "id": "dabfa51dc9104864a2cff808c22d286b",
+        "title": "Додаток 1 Перелік документів учаснику.docx",
+        "documentType": null,
+        "datePublished": "2026-05-26T19:50:37.815527+03:00"
+      },
+      {
+        "id": "b439cea524f3481091dd39a71e1cd886",
+        "title": "Додаток 2 до ТД.doc",
+        "documentType": "technicalSpecifications",
+        "datePublished": "2026-05-26T19:50:37.815527+03:00"
+      },
+      {
+        "id": "155ba3e468194c339180e3816f042f84",
+        "title": "Додаток 4 Перелік документів переможцю.docx",
+        "documentType": null,
+        "datePublished": "2026-05-26T19:50:37.815527+03:00"
+      },
+      {
+        "id": "b8e9e9db41c64686bc3565dcad95557e",
+        "title": "Додаток 3 Проєкт договору.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-05-26T19:50:37.815527+03:00"
+      },
+      {
+        "id": "1ad2577a9900439ca0e2f7c65e19ced2",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-05-26T19:52:41.088207+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
