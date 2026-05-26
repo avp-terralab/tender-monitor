@@ -573,6 +573,29 @@ test('sendReply: omits reply_markup when not provided', async () => {
   assert.equal(calls[0].body.reply_markup, undefined);
 });
 
+test('sendReply: splits a message over the Telegram limit into multiple sends', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(Object.fromEntries(opts.body));
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: calls.length } }) };
+  };
+  // ~6000 chars across paragraph boundaries → must split (e.g. /info with many tenders).
+  const text = Array.from({ length: 12 }, (_, i) => `Параграф ${i} ` + 'x'.repeat(480)).join('\n\n');
+  const keyboard = { keyboard: [[{ text: 'A' }]], is_persistent: true };
+  await sendReply({
+    token: 'TOK', chatId: '5', text,
+    replyToMessageId: 7, replyMarkup: keyboard, fetch: fakeFetch,
+  });
+  assert.ok(calls.length >= 2, `expected multiple sends, got ${calls.length}`);
+  for (const c of calls) assert.ok(c.text.length <= 4096, `chunk too long: ${c.text.length}`);
+  // reply anchors to the user's message only on the first chunk
+  assert.equal(calls[0].reply_to_message_id, '7');
+  assert.equal(calls[1].reply_to_message_id, undefined);
+  // keyboard attaches to the last chunk only
+  assert.equal(calls[calls.length - 1].reply_markup, JSON.stringify(keyboard));
+  assert.equal(calls[0].reply_markup, undefined);
+});
+
 test('sendReply: throws on telegram-level not-ok', async () => {
   const fakeFetch = async () => ({
     ok: true,

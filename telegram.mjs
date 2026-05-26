@@ -485,7 +485,7 @@ export async function getUpdates({ token, offset, fetch: fetchImpl = fetch }) {
   return json.result ?? [];
 }
 
-export async function sendReply({ token, chatId, text, replyToMessageId, replyMarkup, fetch: fetchImpl = fetch }) {
+async function sendReplyOne({ token, chatId, text, replyToMessageId, replyMarkup, fetch: fetchImpl = fetch }) {
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   const params = {
     chat_id: String(chatId),
@@ -518,6 +518,28 @@ export async function sendReply({ token, chatId, text, replyToMessageId, replyMa
     }
   }
   throw lastErr;
+}
+
+// Telegram rejects any sendMessage over 4096 chars with HTTP 400. A reply that
+// exceeds it (e.g. /info with many active tenders) would otherwise fail silently
+// — the user sees nothing. Split on paragraph boundaries like sendDigest does,
+// anchoring the reply to the user's message on the first chunk and the keyboard
+// on the last.
+export async function sendReply({ token, chatId, text, replyToMessageId, replyMarkup, fetch: fetchImpl = fetch }) {
+  const chunks = chunkMessage(text, 4000);
+  let last;
+  for (let i = 0; i < chunks.length; i++) {
+    const annotated = chunks.length > 1
+      ? `${chunks[i]}\n\n— ${i + 1}/${chunks.length} —`
+      : chunks[i];
+    last = await sendReplyOne({
+      token, chatId, fetch: fetchImpl,
+      text: annotated,
+      replyToMessageId: i === 0 ? replyToMessageId : undefined,
+      replyMarkup: i === chunks.length - 1 ? replyMarkup : undefined,
+    });
+  }
+  return last;
 }
 
 export async function editMessageReplyMarkup({ token, chatId, messageId, replyMarkup, fetch: fetchImpl = fetch }) {
