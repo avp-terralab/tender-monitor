@@ -81,6 +81,8 @@ const result = await runOnce({
   sendDigest: async (text, opts) => broadcastDigest({ token, chatIds }, text, opts),
   // Heartbeats go only to admin — opted-in viewers don't need ops noise.
   sendHeartbeat: async (text) => broadcastDigest({ token, chatIds: [chatId] }, text),
+  // Transient fetch-error alerts also go only to admin (ops signal).
+  sendAdminAlert: async (text) => broadcastDigest({ token, chatIds: [chatId] }, text),
   // Debounce duplicate heartbeats within the same Kyiv day (multiple cron
   // triggers per hour: GHA scheduled at :00 UTC + external pinger at :30 UTC).
   loadHeartbeatDate: async () => {

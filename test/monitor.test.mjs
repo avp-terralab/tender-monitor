@@ -105,6 +105,7 @@ test('runOnce: skips disabled rows', async () => {
 
 test('runOnce: continues on per-tender error and reports it', async () => {
   const sent = [];
+  const adminSent = [];
   await runOnce({
     runIso: '2026-05-08T13:00:00+03:00',
     watchlist: [
@@ -121,12 +122,17 @@ test('runOnce: continues on per-tender error and reports it', async () => {
     loadState: async (id) => id === T_OK ? baseSnap({ tender_id: T_OK, status: 'active.tendering' }) : null,
     saveState: async () => {},
     sendDigest: async (t) => sent.push(t),
+    sendAdminAlert: async (t) => adminSent.push(t),
     updateSheet: async () => {},
   });
+  // T_OK (a real change) is broadcast to everyone; T_BAD's transient 500 is
+  // ops noise routed to the admin only — not in the public digest.
   assert.equal(sent.length, 1);
   assert.match(sent[0], new RegExp(T_OK));
-  assert.match(sent[0], new RegExp(T_BAD));
-  assert.match(sent[0], /не вдалось перевірити/);
+  assert.doesNotMatch(sent[0], new RegExp(T_BAD));
+  assert.equal(adminSent.length, 1);
+  assert.match(adminSent[0], new RegExp(T_BAD));
+  assert.match(adminSent[0], /Тимчасово не вдалось перевірити/);
 });
 
 test('runOnce: saves state only for tenders with events', async () => {
@@ -456,8 +462,9 @@ test('runOnce: stale threshold keys in prior _notifiedDeadlines are stripped on 
   assert.deepEqual(saved[0]._notifiedDeadlines.sort(), ['24h']);
 });
 
-test('runOnce: entity-watch errors propagate to digest', async () => {
+test('runOnce: entity-watch errors go to admin only, not the public digest', async () => {
   const sent = [];
+  const adminSent = [];
   await runOnce({
     runIso: '2026-05-08T13:00:00+03:00',
     watchlist: [],
@@ -466,14 +473,40 @@ test('runOnce: entity-watch errors propagate to digest', async () => {
     loadState: async () => null,
     saveState: async () => {},
     sendDigest: async (text) => { sent.push(text); },
+    sendAdminAlert: async (text) => { adminSent.push(text); },
     updateSheet: async () => {},
     checkWatchedEntities: async () => ({
       alerts: [],
       errors: [{ source: 'feed', error: 'Prozorro 503' }],
     }),
   });
-  assert.equal(sent.length, 1);
-  assert.match(sent[0], /Prozorro 503/);
+  // Transient feed error → ops noise → admin only; public digest stays silent.
+  assert.equal(sent.length, 0);
+  assert.equal(adminSent.length, 1);
+  assert.match(adminSent[0], /Prozorro 503/);
+});
+
+test('runOnce: global fetch outage (all enabled fail transiently) stays fully silent', async () => {
+  const sent = [];
+  const adminSent = [];
+  const result = await runOnce({
+    runIso: '2026-05-08T13:00:00+03:00',
+    watchlist: [
+      { tender_id: T_OK, enabled: true },
+      { tender_id: T_STABLE, enabled: true },
+    ],
+    fetchTender: async () => { throw new Error('fetch failed'); },
+    extractSnapshot: (r) => r.data,
+    loadState: async () => null,
+    saveState: async () => {},
+    sendDigest: async (text) => { sent.push(text); },
+    sendAdminAlert: async (text) => { adminSent.push(text); },
+    updateSheet: async () => {},
+  });
+  // Every tender failed the same transient way → treat as outage → tell nobody.
+  assert.equal(sent.length, 0, 'no public digest on a global outage');
+  assert.equal(adminSent.length, 0, 'no admin spam on a global outage either');
+  assert.equal(result.sent, false);
 });
 
 // ─── Task 9: terminal-status archival ─────────────────────────────────────────

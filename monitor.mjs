@@ -193,7 +193,25 @@ export async function runOnce(deps) {
     }
   }
 
-  const hasContent = groups.length > 0 || errors.length > 0;
+  // Partition errors by nature:
+  //  • invalid (404 / not found / no UUID / bad format) — permanent and
+  //    actionable (the tender was auto-disabled), so broadcast to everyone.
+  //  • transient (network "fetch failed", 5xx) — ops noise. Route to the admin
+  //    only; and when EVERY enabled watchlist tender failed transiently, treat
+  //    it as a Prozorro/runner outage and stay fully silent (it self-heals next
+  //    tick — no point telling anyone, including the admin).
+  const invalidErrors = errors.filter(e => e.is_invalid);
+  const transientErrors = errors.filter(e => !e.is_invalid);
+  const watchlistFetchFailures = results.filter(
+    r => r.error && !/(404|not found|no UUID|invalid tender_id format)/i.test(r.error)
+  ).length;
+  const globalOutage = enabled.length > 0 && watchlistFetchFailures === enabled.length;
+  if (globalOutage) {
+    console.error(`All ${enabled.length} watchlist tenders failed to fetch — transient outage, staying silent.`);
+  }
+  const adminErrors = globalOutage ? [] : transientErrors;
+
+  const hasContent = groups.length > 0 || invalidErrors.length > 0;
 
   // Collect terminal-status archival candidates.
   const archivedNow = [];
@@ -248,14 +266,11 @@ export async function runOnce(deps) {
     let text = '';
     if (!isSilent) {
       text = formatDigest(runIso, groups);
-      if (errors.length > 0) {
+      if (invalidErrors.length > 0) {
         text += '\n\n⚠️ не вдалось перевірити:\n' +
-          errors.map(e => {
-            const line = e.is_invalid
-              ? `  • ${e.tender_id} — не знайдено в Prozorro або невалідний формат, відключено від моніторингу`
-              : `  • ${e.tender_id} — ${e.error}`;
-            return line;
-          }).join('\n');
+          invalidErrors.map(e =>
+            `  • ${e.tender_id} — не знайдено в Prozorro або невалідний формат, відключено від моніторингу`
+          ).join('\n');
       }
     }
     if (archivedNow.length > 0) {
@@ -272,7 +287,7 @@ export async function runOnce(deps) {
       // Buffer instead of broadcast.
       const prevPending = (loadPendingDigest ? await loadPendingDigest() : null) ?? emptyPending();
       const updated = mergePending(prevPending, {
-        groups, archived: archivedNow, errors, runIso,
+        groups, archived: archivedNow, errors: invalidErrors, runIso,
       });
       if (savePendingDigest) await savePendingDigest(updated);
     } else {
@@ -280,6 +295,20 @@ export async function runOnce(deps) {
         text,
         addButtonsForTenders.length > 0 ? { addButtonsForTenders } : undefined,
       );
+    }
+  }
+
+  // Transient fetch errors → admin only, outside quiet hours (self-healing ops
+  // noise that nobody needs at 3am). Global outages were already dropped above,
+  // and invalid/permanent errors went to everyone in the digest. Best-effort:
+  // a failure here must not block state persistence below.
+  if (adminErrors.length > 0 && !inQuietWindow && deps.sendAdminAlert) {
+    const adminText = '⚠️ Тимчасово не вдалось перевірити (мережа/Prozorro, повтор наступного запуску):\n' +
+      adminErrors.map(e => `  • ${e.tender_id} — ${e.error}`).join('\n');
+    try {
+      await deps.sendAdminAlert(adminText);
+    } catch (err) {
+      console.error('sendAdminAlert failed:', err.message);
     }
   }
 
