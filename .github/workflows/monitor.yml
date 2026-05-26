@@ -42,13 +42,17 @@ jobs:
             exit 0
           fi
 
-          # Classify diff: "significant" = anything except the high-frequency cursor/seen
-          # files. _watched_feed_cursor.json and _watched_seen.json drift on every run even
-          # when nothing in the tender world changed, generating ~48 commits/day of pure
-          # noise. We still need to persist them, but committing once every ~6 hours is
-          # plenty (the feed cursor lookback handles missed events).
+          # Classify diff: "significant" = anything except the high-frequency feed cursor.
+          # _watched_feed_cursor.json drifts on every run even when nothing in the tender
+          # world changed, generating ~48 commits/day of pure noise; committing it once
+          # every ~6 hours is plenty (the feed cursor lookback handles missed events).
+          #
+          # _watched_seen.json is NOT debounced: it records which tenders we've already
+          # alerted on, so it only changes when a genuinely new watched-entity tender is
+          # announced — low frequency, and dropping the change re-alerts that tender on the
+          # next run (the duplicate-notification bug fixed here). It must persist on change.
           SIGNIFICANT=$(git diff --staged --name-only \
-            | grep -v -E '^_state/_watched_(feed_cursor|seen)\.json$' || true)
+            | grep -v -E '^_state/_watched_feed_cursor\.json$' || true)
 
           if [ -z "$SIGNIFICANT" ]; then
             LAST_CURSOR_TS=$(git log -1 --format=%ct --grep='^monitor: cursor sync' 2>/dev/null || echo 0)
