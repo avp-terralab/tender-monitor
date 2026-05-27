@@ -331,8 +331,13 @@ test('fetchAuditLog: returns first lines + dates', async () => {
 });
 
 test('fetchAuditLog: throws on non-ok', async () => {
-  const fakeFetch = async () => ({ ok: false, status: 500 });
+  const fakeFetch = async () => ({ ok: false, status: 500, text: async () => 'Internal Server Error' });
   await assert.rejects(() => fetchAuditLog(ENV, { fetch: fakeFetch }), /500/);
+});
+
+test('fetchAuditLog: throws on non-array response', async () => {
+  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ message: 'API rate limit exceeded' }) });
+  await assert.rejects(() => fetchAuditLog(ENV, { fetch: fakeFetch }), /shape/);
 });
 
 test('fetchLatestDeployCommit: skips audit: commits', async () => {

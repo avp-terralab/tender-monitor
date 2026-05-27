@@ -265,8 +265,9 @@ export async function fetchAuditLog(env, { fetch: fetchImpl = fetch, perPage = 1
       },
     },
   );
-  if (!res.ok) throw new Error(`GitHub commits API ${res.status}`);
+  if (!res.ok) throw new Error(`GitHub GET ${res.status}: ${await res.text()}`);
   const commits = await res.json();
+  if (!Array.isArray(commits)) throw new Error(`GitHub commits API: unexpected response shape`);
   return commits.map(c => ({
     message: (c.commit?.message ?? '').split('\n')[0],
     date: c.commit?.committer?.date ?? null,
