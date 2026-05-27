@@ -562,6 +562,23 @@ export function buildWatchedKeyboard(watchedEntities) {
   };
 }
 
+// VIEW mode: /watched shows the text list + this single button. Tapping it
+// switches the message into MANAGE mode (per-entity delete buttons).
+export const WATCHED_MANAGE_PROMPT = '🗑 Кого прибрати? Тапни замовника. «← Готово» — вийти.';
+
+export function buildWatchedViewKeyboard(watchedEntities) {
+  if (!watchedEntities || watchedEntities.length === 0) return null;
+  return { inline_keyboard: [[{ text: '🗑 Прибрати замовника', callback_data: 'watched:manage' }]] };
+}
+
+// MANAGE mode: the per-entity 🗑 rows (from buildWatchedKeyboard) plus a
+// trailing "← Готово" row that returns to VIEW mode.
+export function buildWatchedManageKeyboard(watchedEntities) {
+  const base = buildWatchedKeyboard(watchedEntities);
+  if (!base) return null;
+  return { inline_keyboard: [...base.inline_keyboard, [{ text: '← Готово', callback_data: 'watched:done' }]] };
+}
+
 export function handleUnwatch({ watchedEntities }, { edrpou }) {
   const existing = watchedEntities.find(e => e.edrpou === edrpou);
   if (!existing) {

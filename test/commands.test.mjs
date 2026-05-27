@@ -14,6 +14,7 @@ import {
   parseAuditCommit,
   formatAuditLog,
   buildWatchedKeyboard,
+  buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -3023,4 +3024,42 @@ test('BOT_COMMANDS_BY_ROLE: no role lists unwatch', () => {
   for (const set of Object.values(BOT_COMMANDS_BY_ROLE)) {
     assert.ok(!set.some(c => c.command === 'unwatch'));
   }
+});
+
+// ── Task 1: /watched VIEW + MANAGE keyboard builders ─────────────────────────
+
+test('buildWatchedViewKeyboard: single "Прибрати" button → watched:manage', () => {
+  const kb = buildWatchedViewKeyboard([{ edrpou: '12345678', name: 'КНП', enabled: true }]);
+  assert.equal(kb.inline_keyboard.length, 1);
+  assert.equal(kb.inline_keyboard[0].length, 1);
+  assert.equal(kb.inline_keyboard[0][0].callback_data, 'watched:manage');
+  assert.match(kb.inline_keyboard[0][0].text, /Прибрати/);
+});
+
+test('buildWatchedViewKeyboard: empty list → null', () => {
+  assert.equal(buildWatchedViewKeyboard([]), null);
+  assert.equal(buildWatchedViewKeyboard(null), null);
+});
+
+test('buildWatchedManageKeyboard: per-entity 🗑 rows + trailing Готово row', () => {
+  const kb = buildWatchedManageKeyboard([
+    { edrpou: '12345678', name: 'КНП «Лікарня №1»', enabled: true },
+    { edrpou: '01999106', name: 'ТОВ «X»', enabled: true },
+  ]);
+  assert.equal(kb.inline_keyboard.length, 3); // 2 entities + Готово
+  assert.equal(kb.inline_keyboard[0][0].callback_data, 'unwatch:12345678');
+  assert.equal(kb.inline_keyboard[1][0].callback_data, 'unwatch:01999106');
+  const doneRow = kb.inline_keyboard[2];
+  assert.equal(doneRow[0].callback_data, 'watched:done');
+  assert.match(doneRow[0].text, /Готово/);
+});
+
+test('buildWatchedManageKeyboard: empty list → null', () => {
+  assert.equal(buildWatchedManageKeyboard([]), null);
+  assert.equal(buildWatchedManageKeyboard(null), null);
+});
+
+test('WATCHED_MANAGE_PROMPT: exported non-empty string', () => {
+  assert.equal(typeof WATCHED_MANAGE_PROMPT, 'string');
+  assert.ok(WATCHED_MANAGE_PROMPT.length > 0);
 });
