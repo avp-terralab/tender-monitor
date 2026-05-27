@@ -734,7 +734,7 @@ const WATCHED_TWO = [
   { edrpou: '01999106', name: 'ТОВ «TERRALAB IT»', enabled: true },
 ];
 
-test('runHandler: /watched attaches inline unwatch keyboard for admin/editor', async () => {
+test('runHandler: /watched VIEW shows single "Прибрати" button for editor', async () => {
   const { deps, sent } = makeDeps({
     loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
   });
@@ -742,14 +742,12 @@ test('runHandler: /watched attaches inline unwatch keyboard for admin/editor', a
     update: { message: { chat: { id: 123 }, text: '/watched', message_id: 1 } },
     env: ENV, deps,
   });
-  assert.equal(sent.length, 1);
   const kb = sent[0].replyMarkup;
-  assert.ok(kb && kb.inline_keyboard, 'has inline_keyboard');
-  assert.equal(kb.inline_keyboard.length, 2);
-  assert.equal(kb.inline_keyboard[0][0].callback_data, 'unwatch:12345678');
+  assert.equal(kb.inline_keyboard.length, 1);
+  assert.equal(kb.inline_keyboard[0][0].callback_data, 'watched:manage');
 });
 
-test('runHandler: /watched for viewer has NO inline unwatch keyboard', async () => {
+test('runHandler: /watched VIEW for viewer → no inline keyboard', async () => {
   const { deps, sent } = makeDeps({
     loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
     loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
@@ -758,9 +756,8 @@ test('runHandler: /watched for viewer has NO inline unwatch keyboard', async () 
     update: { message: { chat: { id: 456 }, text: '/watched', message_id: 1 } },
     env: ENV, deps,
   });
-  assert.equal(sent.length, 1);
   const kb = sent[0].replyMarkup;
-  assert.ok(!kb || !kb.inline_keyboard, 'no inline_keyboard for viewer');
+  assert.ok(!kb || !kb.inline_keyboard);
 });
 
 test('runHandler: /watched empty list → no inline keyboard even for admin', async () => {
@@ -2367,7 +2364,7 @@ const CB = (data, fromChatId = 123, from = { first_name: 'Андрій' }) => ({
   callback_query: { id: 'cq1', data, from, message: { chat: { id: fromChatId }, message_id: 9 } },
 });
 
-test('callback unwatch: removes entity, refreshes via editMessageText, audits, toast', async () => {
+test('callback unwatch: removes entity, audits, toast (stays in MANAGE mode)', async () => {
   let savedOpts, edited, acked;
   const { deps } = makeDeps({
     loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
@@ -2377,24 +2374,13 @@ test('callback unwatch: removes entity, refreshes via editMessageText, audits, t
   });
   await runHandler({ update: CB('unwatch:12345678'), env: ENV, deps });
   assert.match(savedOpts.message, /^audit: unwatch 12345678 · Андрій \[123\/admin\]$/);
-  assert.match(edited.text, /01999106/);
-  assert.doesNotMatch(edited.text, /12345678/);
-  assert.equal(edited.replyMarkup.inline_keyboard.length, 1);
+  // MANAGE mode text is the prompt (not the entity list)
+  assert.match(edited.text, /Прибрати|Кого|Готово/);
+  // MANAGE mode keyboard: 1 remaining entity row + Готово button
+  assert.equal(edited.replyMarkup.inline_keyboard.length, 2);
   assert.equal(edited.replyMarkup.inline_keyboard[0][0].callback_data, 'unwatch:01999106');
+  assert.equal(edited.replyMarkup.inline_keyboard[1][0].callback_data, 'watched:done');
   assert.match(acked.text, /Прибрано/);
-});
-
-test('callback unwatch: last entity → empty-state text, no keyboard', async () => {
-  let edited;
-  const { deps } = makeDeps({
-    loadWatchedEntities: async () => ({ entities: [{ edrpou: '12345678', name: 'КНП', enabled: true }], sha: 's' }),
-    saveWatchedEntities: async () => {},
-    editMessageText: async (args) => { edited = args; },
-    answerCallbackQuery: async () => {},
-  });
-  await runHandler({ update: CB('unwatch:12345678'), env: ENV, deps });
-  assert.match(edited.text, /Не стежу за жодним замовником/);
-  assert.ok(edited.replyMarkup == null, 'no keyboard when list empty');
 });
 
 test('callback unwatch: double-tap (already gone) → "вже прибрано", no save', async () => {
@@ -2444,4 +2430,75 @@ test('runHandler: viewer /unwatch command → hint (not refusal)', async () => {
   });
   assert.equal(sent.length, 1);
   assert.match(sent[0].text, /\/watched/);
+});
+
+// ── Task 2: VIEW/MANAGE mode callbacks ────────────────────────────────────────
+
+test('callback watched:manage → editMessageText shows delete buttons + Готово', async () => {
+  let edited, acked;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
+    editMessageText: async (a) => { edited = a; },
+    answerCallbackQuery: async (a) => { acked = a; },
+  });
+  await runHandler({ update: CB('watched:manage'), env: ENV, deps });
+  assert.equal(edited.replyMarkup.inline_keyboard.length, 3);
+  assert.equal(edited.replyMarkup.inline_keyboard[0][0].callback_data, 'unwatch:12345678');
+  assert.equal(edited.replyMarkup.inline_keyboard[2][0].callback_data, 'watched:done');
+  assert.ok(acked);
+});
+
+test('callback watched:manage → viewer rejected', async () => {
+  let edited, acked;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
+    editMessageText: async (a) => { edited = a; },
+    answerCallbackQuery: async (a) => { acked = a; },
+  });
+  await runHandler({ update: CB('watched:manage', 456, { first_name: 'V' }), env: ENV, deps });
+  assert.equal(edited, undefined);
+  assert.match(acked.text, /редактор|🚫/);
+});
+
+test('callback watched:done → editMessageText returns to VIEW (single button)', async () => {
+  let edited;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
+    editMessageText: async (a) => { edited = a; },
+    answerCallbackQuery: async () => {},
+  });
+  await runHandler({ update: CB('watched:done'), env: ENV, deps });
+  assert.equal(edited.replyMarkup.inline_keyboard.length, 1);
+  assert.equal(edited.replyMarkup.inline_keyboard[0][0].callback_data, 'watched:manage');
+  assert.match(edited.text, /12345678/);
+});
+
+test('callback unwatch: after delete stays in MANAGE mode', async () => {
+  let savedOpts, edited, acked;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
+    saveWatchedEntities: async (_e, _ent, _s, opts) => { savedOpts = opts; },
+    editMessageText: async (a) => { edited = a; },
+    answerCallbackQuery: async (a) => { acked = a; },
+  });
+  await runHandler({ update: CB('unwatch:12345678'), env: ENV, deps });
+  assert.match(savedOpts.message, /^audit: unwatch 12345678 /);
+  assert.equal(edited.replyMarkup.inline_keyboard.length, 2); // 1 entity + Готово
+  assert.equal(edited.replyMarkup.inline_keyboard[0][0].callback_data, 'unwatch:01999106');
+  assert.equal(edited.replyMarkup.inline_keyboard[1][0].callback_data, 'watched:done');
+  assert.match(acked.text, /Прибрано/);
+});
+
+test('callback unwatch: last entity → empty-state text, no keyboard', async () => {
+  let edited;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: [{ edrpou: '12345678', name: 'КНП', enabled: true }], sha: 's' }),
+    saveWatchedEntities: async () => {},
+    editMessageText: async (a) => { edited = a; },
+    answerCallbackQuery: async () => {},
+  });
+  await runHandler({ update: CB('unwatch:12345678'), env: ENV, deps });
+  assert.match(edited.text, /Не стежу за жодним замовником/);
+  assert.ok(edited.replyMarkup == null);
 });
