@@ -13,6 +13,7 @@ import {
   sanitizeActor, formatAuditMessage,
   parseAuditCommit,
   formatAuditLog,
+  buildWatchedKeyboard,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -2976,5 +2977,32 @@ test('BOT_COMMANDS_BY_ROLE: all command names within Telegram 32-char limit', ()
   for (const set of Object.values(BOT_COMMANDS_BY_ROLE)) {
     for (const c of set) assert.ok(c.command.length <= 32);
   }
+});
+
+// ── Task 2: buildWatchedKeyboard ──────────────────────────────────────────
+
+test('buildWatchedKeyboard: one 🗑 row per entity with unwatch: callback_data', () => {
+  const kb = buildWatchedKeyboard([
+    { edrpou: '12345678', name: 'КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО "ЛІКАРНЯ №1"', enabled: true },
+    { edrpou: '01999106', name: '(unknown)', enabled: true },
+  ]);
+  assert.equal(kb.inline_keyboard.length, 2);
+  const [row1, row2] = kb.inline_keyboard;
+  assert.equal(row1[0].callback_data, 'unwatch:12345678');
+  assert.match(row1[0].text, /^🗑 12345678 — /);
+  assert.equal(row2[0].callback_data, 'unwatch:01999106');
+  // name === '(unknown)' → no " — name" suffix, just the ЄДРПОУ
+  assert.equal(row2[0].text, '🗑 01999106');
+});
+
+test('buildWatchedKeyboard: empty list → null', () => {
+  assert.equal(buildWatchedKeyboard([]), null);
+  assert.equal(buildWatchedKeyboard(null), null);
+});
+
+test('buildWatchedKeyboard: long name truncated in button label', () => {
+  const longName = 'А'.repeat(200);
+  const kb = buildWatchedKeyboard([{ edrpou: '12345678', name: longName, enabled: true }]);
+  assert.ok(kb.inline_keyboard[0][0].text.length < 80);
 });
 

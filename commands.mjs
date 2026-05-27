@@ -551,6 +551,21 @@ export function handleWatched({ watchedEntities }) {
   return rows.join('\n\n') + `\n\nВсього: ${watchedEntities.length}`;
 }
 
+// Inline keyboard for /watched — one 🗑 delete button per watched entity.
+// Rendered only for editor/admin (handler decides). Button text is plain
+// (Telegram does not HTML-parse button labels), so no escapeHtml here.
+export function buildWatchedKeyboard(watchedEntities) {
+  if (!watchedEntities || watchedEntities.length === 0) return null;
+  return {
+    inline_keyboard: watchedEntities.map(e => {
+      const name = e.name && e.name !== '(unknown)'
+        ? ` — ${truncate(abbreviateLegalForm(e.name), 40)}`
+        : '';
+      return [{ text: `🗑 ${e.edrpou}${name}`, callback_data: `unwatch:${e.edrpou}` }];
+    }),
+  };
+}
+
 export function handleUnwatch({ watchedEntities }, { edrpou }) {
   const existing = watchedEntities.find(e => e.edrpou === edrpou);
   if (!existing) {
