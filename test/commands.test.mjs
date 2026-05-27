@@ -2927,6 +2927,12 @@ test('formatAuditLog: escapes HTML in actor', () => {
   assert.match(out, /&lt;b&gt;/);
 });
 
+test('formatAuditLog: escapes HTML in the target (e.g. invite label)', () => {
+  const out = formatAuditLog([{ action: 'invite', target: 'editor:<b>x</b>', actor: 'admin', date: '2026-05-26T11:32:00Z' }], { limit: 20 });
+  assert.doesNotMatch(out, /<b>x<\/b>/);
+  assert.match(out, /&lt;b&gt;/);
+});
+
 test('formatAuditLog: respects limit', () => {
   const entries = Array.from({ length: 30 }, (_, i) => ({ action: 'add', target: `UA-${i}`, actor: 'X', date: D }));
   const out = formatAuditLog(entries, { limit: 5 });

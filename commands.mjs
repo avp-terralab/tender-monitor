@@ -190,6 +190,9 @@ export function sanitizeActor(name) {
     .slice(0, 40) || '?';
 }
 
+// `target` must not contain " · " — that token delimits actor in the commit line.
+// The only free-text target (the /invite label) is sanitized by the caller before
+// being passed here. Validated targets (tender_id, edrpou, chat_id) are safe.
 export function formatAuditMessage({ action, target, actor, chatId, role }) {
   const t = target ? ` ${target}` : '';
   return `audit: ${action}${t} · ${sanitizeActor(actor)} [${chatId}/${role}]`;
@@ -203,7 +206,7 @@ export function parseAuditCommit(message) {
 }
 
 function auditPhrase(e) {
-  const tgt = e.target ?? '';
+  const tgt = escapeHtml(e.target ?? '');
   switch (e.action) {
     case 'add':       return `додав ${tgt}`;
     case 'remove':    return `видалив ${tgt}`;
@@ -212,8 +215,9 @@ function auditPhrase(e) {
     case 'unarchive': return `повернув з архіву ${tgt}`;
     case 'revoke':    return `прибрав доступ ${tgt}`;
     case 'invite': {
-      const [role, ...rest] = tgt.split(':');
-      const label = rest.join(':');
+      const raw = e.target ?? '';
+      const [role, ...rest] = raw.split(':');
+      const label = escapeHtml(rest.join(':'));
       return `видав invite (${role}: ${label})`;
     }
     default:
