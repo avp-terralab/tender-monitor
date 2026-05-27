@@ -11,6 +11,7 @@ import {
   handleUnarchive,
   BOT_COMMANDS_BY_ROLE,
   sanitizeActor, formatAuditMessage,
+  parseAuditCommit,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -2857,5 +2858,38 @@ test('formatAuditMessage: null target → no double space', () => {
     formatAuditMessage({ action: 'role→editor', target: null, actor: 'admin', chatId: '9', role: 'admin' }),
     'audit: role→editor · admin [9/admin]'
   );
+});
+
+// ── Task 2: parseAuditCommit ──────────────────────────────────────────────
+
+test('parseAuditCommit: parses a full line', () => {
+  assert.deepEqual(
+    parseAuditCommit('audit: add UA-2026-04-30-010542-a · Андрій Парасина [786078813/editor]'),
+    { action: 'add', target: 'UA-2026-04-30-010542-a', actor: 'Андрій Парасина', chatId: '786078813', role: 'editor' }
+  );
+});
+
+test('parseAuditCommit: parses role→ and chat_id target', () => {
+  assert.deepEqual(
+    parseAuditCommit('audit: role→editor 7321709183 · admin [9/admin]'),
+    { action: 'role→editor', target: '7321709183', actor: 'admin', chatId: '9', role: 'admin' }
+  );
+});
+
+test('parseAuditCommit: returns null for non-audit messages', () => {
+  assert.equal(parseAuditCommit('bot: update watchlist 2026-05-26T00:00:00Z'), null);
+  assert.equal(parseAuditCommit('monitor: state update'), null);
+  assert.equal(parseAuditCommit(''), null);
+});
+
+test('parseAuditCommit: round-trips formatAuditMessage (cyrillic name with spaces)', () => {
+  const x = { action: 'invite', target: 'editor:Олег', actor: 'Андрій Парасина', chatId: '786078813', role: 'admin' };
+  const parsed = parseAuditCommit(formatAuditMessage(x));
+  assert.deepEqual(parsed, x);
+});
+
+test('parseAuditCommit: only reads the first line', () => {
+  const msg = 'audit: remove UA-2026-05-01-012131-a · Оксана [7321709183/editor]\n\nbody text';
+  assert.equal(parseAuditCommit(msg).action, 'remove');
 });
 

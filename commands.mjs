@@ -195,6 +195,13 @@ export function formatAuditMessage({ action, target, actor, chatId, role }) {
   return `audit: ${action}${t} · ${sanitizeActor(actor)} [${chatId}/${role}]`;
 }
 
+export function parseAuditCommit(message) {
+  const line = String(message ?? '').split('\n')[0];
+  const m = line.match(/^audit:\s+(\S+)(?:\s+(.+?))?\s+·\s+(.+?)\s+\[([^\/\]]+)\/([^\]]+)\]\s*$/);
+  if (!m) return null;
+  return { action: m[1], target: m[2] ?? null, actor: m[3], chatId: m[4], role: m[5] };
+}
+
 export function buildAutoNotes(snapshot) {
   const entity = snapshot?.procuringEntity?.name ?? '';
   const title = stripDkCode(snapshot?.title ?? '');
