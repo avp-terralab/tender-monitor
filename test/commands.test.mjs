@@ -719,16 +719,16 @@ test('parseCommand: /watch with non-8-digit → error', () => {
   assert.deepEqual(parseCommand('/watch abcdefgh'), { cmd: 'watch', error: 'invalid_edrpou' });
 });
 
-test('parseCommand: /unwatch with valid EDRPOU', () => {
-  assert.deepEqual(parseCommand('/unwatch 12345678'), { cmd: 'unwatch', edrpou: '12345678' });
+test('parseCommand: /unwatch with valid EDRPOU → unwatch_removed (command retired)', () => {
+  assert.deepEqual(parseCommand('/unwatch 12345678'), { cmd: 'unwatch_removed' });
 });
 
-test('parseCommand: /unwatch without args → error', () => {
-  assert.deepEqual(parseCommand('/unwatch'), { cmd: 'unwatch', error: 'missing_edrpou' });
+test('parseCommand: /unwatch without args → unwatch_removed (command retired)', () => {
+  assert.deepEqual(parseCommand('/unwatch'), { cmd: 'unwatch_removed' });
 });
 
-test('parseCommand: /unwatch invalid → error', () => {
-  assert.deepEqual(parseCommand('/unwatch 12345'), { cmd: 'unwatch', error: 'invalid_edrpou' });
+test('parseCommand: /unwatch invalid → unwatch_removed (command retired)', () => {
+  assert.deepEqual(parseCommand('/unwatch 12345'), { cmd: 'unwatch_removed' });
 });
 
 test('handleWatched: empty list', () => {
@@ -2388,7 +2388,7 @@ test('buildHelpText("editor") contains mutating, not admin', () => {
   assert.match(t, /\/add/);
   assert.match(t, /\/remove/);
   assert.match(t, /\/watch/);
-  assert.match(t, /\/unwatch/);
+  assert.doesNotMatch(t, /\/unwatch/);
   assert.match(t, /\/unarchive/);
   assert.doesNotMatch(t, /\/invite\b/);
   assert.doesNotMatch(t, /\/role\b/);
@@ -2423,7 +2423,7 @@ test('BOT_COMMANDS_BY_ROLE.editor contains mutating but not admin', () => {
   assert.ok(names.includes('add'));
   assert.ok(names.includes('remove'));
   assert.ok(names.includes('watch'));
-  assert.ok(names.includes('unwatch'));
+  assert.ok(!names.includes('unwatch'));
   assert.ok(names.includes('unarchive'));
   assert.ok(!names.includes('invite'));
   assert.ok(!names.includes('role'));
@@ -3006,3 +3006,21 @@ test('buildWatchedKeyboard: long name truncated in button label', () => {
   assert.ok(kb.inline_keyboard[0][0].text.length < 80);
 });
 
+// ── Task 3: retire /unwatch command ──────────────────────────────────────────
+
+test('parseCommand: /unwatch (any args) → unwatch_removed', () => {
+  assert.deepEqual(parseCommand('/unwatch'), { cmd: 'unwatch_removed' });
+  assert.deepEqual(parseCommand('/unwatch 12345678'), { cmd: 'unwatch_removed' });
+  assert.deepEqual(parseCommand('/unwatch@terralab_tenders_bot 12345678'), { cmd: 'unwatch_removed' });
+});
+
+test('buildHelpText: editor help no longer mentions /unwatch', () => {
+  assert.doesNotMatch(buildHelpText('editor'), /\/unwatch/);
+  assert.doesNotMatch(buildHelpText('admin'), /\/unwatch/);
+});
+
+test('BOT_COMMANDS_BY_ROLE: no role lists unwatch', () => {
+  for (const set of Object.values(BOT_COMMANDS_BY_ROLE)) {
+    assert.ok(!set.some(c => c.command === 'unwatch'));
+  }
+});

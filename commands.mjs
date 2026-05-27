@@ -103,12 +103,8 @@ export function parseCommand(text) {
     return { cmd: 'watch', edrpou: args };
   }
 
-  const unwatchMatch = trimmed.match(/^\/unwatch(?:@\w+)?(?:\s+(.*))?$/i);
-  if (unwatchMatch) {
-    const args = (unwatchMatch[1] || '').trim();
-    if (!args) return { cmd: 'unwatch', error: 'missing_edrpou' };
-    if (!EDRPOU_RE.test(args)) return { cmd: 'unwatch', error: 'invalid_edrpou' };
-    return { cmd: 'unwatch', edrpou: args };
+  if (/^\/unwatch(?:@\w+)?(?:\s+.*)?$/i.test(trimmed)) {
+    return { cmd: 'unwatch_removed' };
   }
 
   const archiveMatch = trimmed.match(/^\/archive(?:@\w+)?(?:\s+(.+))?$/i);
@@ -1245,7 +1241,6 @@ const HELP_EDIT_TENDERS = [
 
 const HELP_EDIT_ENTITIES = [
   '/watch ЄДРПОУ — стежити за замовником',
-  '/unwatch ЄДРПОУ — припинити стежити',
 ];
 
 const HELP_EDIT_ARCHIVE = [
@@ -1340,7 +1335,6 @@ const EDIT_COMMANDS = [
   { command: 'add',       description: 'Додати тендер у моніторинг' },
   { command: 'remove',    description: 'Видалити тендер' },
   { command: 'watch',     description: 'Стежити за замовником (ЄДРПОУ)' },
-  { command: 'unwatch',   description: 'Припинити стежити за замовником' },
   { command: 'unarchive', description: 'Видалити тендер з архіву' },
 ];
 const ADMIN_COMMANDS = [
