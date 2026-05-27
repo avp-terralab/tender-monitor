@@ -202,6 +202,40 @@ export function parseAuditCommit(message) {
   return { action: m[1], target: m[2] ?? null, actor: m[3], chatId: m[4], role: m[5] };
 }
 
+function auditPhrase(e) {
+  const tgt = e.target ?? '';
+  switch (e.action) {
+    case 'add':       return `додав ${tgt}`;
+    case 'remove':    return `видалив ${tgt}`;
+    case 'watch':     return `почав стеження за ${tgt}`;
+    case 'unwatch':   return `прибрав стеження за ${tgt}`;
+    case 'unarchive': return `повернув з архіву ${tgt}`;
+    case 'revoke':    return `прибрав доступ ${tgt}`;
+    case 'invite': {
+      const [role, ...rest] = tgt.split(':');
+      const label = rest.join(':');
+      return `видав invite (${role}: ${label})`;
+    }
+    default:
+      if (e.action.startsWith('role→')) {
+        return `змінив роль ${tgt} → ${e.action.slice('role→'.length)}`;
+      }
+      return `${e.action} ${tgt}`.trim();
+  }
+}
+
+export function formatAuditLog(entries, { limit }) {
+  if (!entries || entries.length === 0) {
+    return '📋 Журнал порожній — поки немає зафіксованих дій.';
+  }
+  const shown = entries.slice(0, limit);
+  const lines = shown.map(e => {
+    const when = e.date ? KYIV_DT_FMT.format(new Date(e.date)) : '??';
+    return `• ${when} — ${escapeHtml(e.actor)} ${auditPhrase(e)}`;
+  });
+  return `📋 Журнал дій (останні ${shown.length})\n\n` + lines.join('\n');
+}
+
 export function buildAutoNotes(snapshot) {
   const entity = snapshot?.procuringEntity?.name ?? '';
   const title = stripDkCode(snapshot?.title ?? '');
@@ -388,6 +422,16 @@ export function formatInfoPages({ runIso, groups, errors = [] }) {
 const KYIV_HM_FMT = new Intl.DateTimeFormat('uk-UA', {
   timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
 });
+
+const _KYIV_DATE_FMT = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit',
+});
+const _KYIV_TIME_FMT2 = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
+});
+const KYIV_DT_FMT = {
+  format: (d) => `${_KYIV_DATE_FMT.format(d)} ${_KYIV_TIME_FMT2.format(d)}`,
+};
 
 export function handleStatus({ watchlist, sha, users, invites, lastCommit, now, rich }) {
   const active = watchlist.filter(r => r.enabled).length;

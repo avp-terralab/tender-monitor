@@ -12,6 +12,7 @@ import {
   BOT_COMMANDS_BY_ROLE,
   sanitizeActor, formatAuditMessage,
   parseAuditCommit,
+  formatAuditLog,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -2891,5 +2892,45 @@ test('parseAuditCommit: round-trips formatAuditMessage (cyrillic name with space
 test('parseAuditCommit: only reads the first line', () => {
   const msg = 'audit: remove UA-2026-05-01-012131-a · Оксана [7321709183/editor]\n\nbody text';
   assert.equal(parseAuditCommit(msg).action, 'remove');
+});
+
+// ── Task 3: auditPhrase + formatAuditLog ─────────────────────────────────
+
+const D = '2026-05-26T11:32:00Z'; // 14:32 Kyiv (UTC+3)
+
+test('formatAuditLog: empty → placeholder', () => {
+  assert.match(formatAuditLog([], { limit: 20 }), /порожній/);
+});
+
+test('formatAuditLog: renders date, actor, and per-action phrase', () => {
+  const out = formatAuditLog([
+    { action: 'add', target: 'UA-2026-04-30-010542-a', actor: 'Андрій', date: D },
+  ], { limit: 20 });
+  assert.match(out, /26\.05 14:32/);
+  assert.match(out, /Андрій додав UA-2026-04-30-010542-a/);
+});
+
+test('formatAuditLog: phrase per action', () => {
+  const mk = (action, target) => formatAuditLog([{ action, target, actor: 'X', date: D }], { limit: 20 });
+  assert.match(mk('remove', 'UA-x'), /видалив UA-x/);
+  assert.match(mk('watch', '12345678'), /почав стеження за 12345678/);
+  assert.match(mk('unwatch', '12345678'), /прибрав стеження за 12345678/);
+  assert.match(mk('unarchive', 'UA-x'), /повернув з архіву UA-x/);
+  assert.match(mk('invite', 'editor:Олег'), /видав invite \(editor: Олег\)/);
+  assert.match(mk('revoke', '123'), /прибрав доступ 123/);
+  assert.match(mk('role→editor', '123'), /змінив роль 123 → editor/);
+});
+
+test('formatAuditLog: escapes HTML in actor', () => {
+  const out = formatAuditLog([{ action: 'add', target: 'UA-x', actor: '<b>x</b>', date: D }], { limit: 20 });
+  assert.doesNotMatch(out, /<b>x<\/b>/);
+  assert.match(out, /&lt;b&gt;/);
+});
+
+test('formatAuditLog: respects limit', () => {
+  const entries = Array.from({ length: 30 }, (_, i) => ({ action: 'add', target: `UA-${i}`, actor: 'X', date: D }));
+  const out = formatAuditLog(entries, { limit: 5 });
+  assert.match(out, /останні 5/);
+  assert.equal((out.match(/^•/gm) || []).length, 5);
 });
 
