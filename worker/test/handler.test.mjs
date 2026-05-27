@@ -1139,6 +1139,27 @@ test('runHandler: /archive (no arg) renders empty', async () => {
   assert.match(sent[0].text, /📭 Архів порожній/);
 });
 
+test('runHandler: /archive paginates a large archive into multiple messages', async () => {
+  const archive = Array.from({ length: 100 }, (_, i) => ({
+    tender_id: `UA-2026-05-01-${String(i).padStart(6, '0')}-a`,
+    archived_at: `2026-05-12T08:${String(i % 60).padStart(2, '0')}:00Z`,
+    final_status: 'complete',
+    final_snapshot: { procuringEntity: { name: 'КНП Лікарня' }, value: { amount: 350000, currency: 'UAH' } },
+  }));
+  const { deps, sent } = makeDeps({
+    loadArchivedTenders: async () => ({ archive, sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/archive', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.ok(sent.length >= 2, 'large archive split across multiple messages');
+  // every sent page is within Telegram's limit, and the total lands on the last
+  assert.ok(sent.every(s => s.text.length <= 4096));
+  assert.match(sent[sent.length - 1].text, /Всього в архіві: 100/);
+});
+
 test('runHandler: /archive UA-... uses fresh fetchTender for contracts', async () => {
   const archive = [{
     tender_id: 'UA-2026-04-30-010542-a',
