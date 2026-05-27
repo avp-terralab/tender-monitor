@@ -38,7 +38,7 @@ Set in repo Settings → Secrets and variables → Actions:
 - `/help` — повний список команд.
 
 Адмін-команди (тільки для `ADMIN_CHAT_ID`):
-- `/invite [ім'я]` — створити одноразове invite-посилання (TTL 7 днів). Бот видає `t.me/terralab_tenders_bot?start=<token>`, отримувач тапає → доступ автоматично.
+- `/invite [editor|viewer] [ім'я]` — створити одноразове invite-посилання (TTL 24 год) із вказаною роллю. Бот видає `t.me/terralab_tenders_bot?start=<token>`, отримувач тапає → доступ автоматично.
 - `/invites` — активні (pending) invite-посилання.
 - `/users` — список усіх допущених юзерів.
 - `/revoke [chat_id]` — прибрати юзера з allowlist.
