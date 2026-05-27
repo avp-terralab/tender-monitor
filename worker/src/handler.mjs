@@ -7,6 +7,7 @@ import {
   applyArchiveMutation,
   formatInfo, formatInfoPages, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD,
   TERMINAL_STATUSES, hydrateContractDocs,
+  formatAuditMessage,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
@@ -79,6 +80,9 @@ export async function runHandler({ update, env, deps = {} }) {
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const { isAdmin, isInvited, isAllowed, isEditor, role, userRecord } =
     await resolveUserContext({ chatId, adminChatId, env, _loadAllowedUsers, where: 'msg' });
+
+  const actorName = [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ')
+    || userRecord?.label || chatId;
 
   // /start works for everyone — reveals chat_id; for allowed users, also seeds chat-scope command list.
   // /start <token> is handled in a later branch.
@@ -197,6 +201,7 @@ export async function runHandler({ update, env, deps = {} }) {
         saveWatchlist: _saveWatchlist,
         computeMutation: ({ watchlist }) =>
           handleAdd({ watchlist, archive, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot }, cmd),
+        auditMessage: formatAuditMessage({ action: 'add', target: cmd.tender_id, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'remove') {
@@ -210,6 +215,7 @@ export async function runHandler({ update, env, deps = {} }) {
         loadWatchlist: _loadWatchlist,
         saveWatchlist: _saveWatchlist,
         computeMutation: ({ watchlist }) => handleRemove({ watchlist }, cmd),
+        auditMessage: formatAuditMessage({ action: 'remove', target: cmd.tender_id, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'status') {
@@ -628,8 +634,9 @@ async function handleCallbackQuery({
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const chatId = String(cq.message?.chat?.id ?? '');
   const messageId = cq.message?.message_id;
-  const { isAdmin, isAllowed, isEditor } =
+  const { isAdmin, isAllowed, isEditor, role } =
     await resolveUserContext({ chatId, adminChatId, env, _loadAllowedUsers, where: 'callback' });
+  const actorName = [cq.from?.first_name, cq.from?.last_name].filter(Boolean).join(' ') || chatId;
 
   const ack = (text, showAlert = false) => _answerCallbackQuery({
     token: env.TELEGRAM_BOT_TOKEN, callbackQueryId: cq.id, text, showAlert,
@@ -699,6 +706,7 @@ async function handleCallbackQuery({
           fetchTender: _fetchTender, extractSnapshot: _extractSnapshot,
         }, { tender_id: tenderId, notes: null });
       },
+      auditMessage: formatAuditMessage({ action: 'add', target: tenderId, actor: actorName, chatId, role }),
     });
     await onAddResult({ result, tenderId, chatId, messageId, env, _editMessageReplyMarkup, ack });
     return;
@@ -707,14 +715,14 @@ async function handleCallbackQuery({
   await ack('❓ Невідома кнопка');
 }
 
-async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, computeMutation }) {
+async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, computeMutation, auditMessage }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { watchlist, sha } = await loadWatchlist(env);
       const result = await computeMutation({ watchlist });
       if (!result.mutation) return result.reply;
       const newWatchlist = applyMutation(watchlist, result.mutation);
-      await saveWatchlist(env, newWatchlist, sha);
+      await saveWatchlist(env, newWatchlist, sha, { message: auditMessage });
       return result.reply;
     } catch (err) {
       if (err instanceof ConflictError && attempt === 0) continue;

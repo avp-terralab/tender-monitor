@@ -2129,3 +2129,88 @@ test('runHandler: /status cache expires after 60s and rebuilds', async () => {
   // New GH calls were made.
   assert.ok(ghCallCount > callsAfterFirst, 'should have re-fetched after cache expiry');
 });
+
+// ── Task 8: audit commit message on /add, /remove, callback add: ─────────────
+
+test('runHandler: /add records audit commit message with actor + role', async () => {
+  let savedOpts;
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    saveWatchlist: async (_env, _wl, _sha, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: { first_name: 'Андрій' }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.ok(savedOpts, 'saveWatchlist received opts');
+  assert.match(savedOpts.message, new RegExp(`^audit: add ${ID} · Андрій \\[123/admin\\]$`));
+});
+
+test('runHandler: /remove records audit commit message', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true }], sha: 's' }),
+    saveWatchlist: async (_e, _w, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: { first_name: 'Андрій' }, text: `/remove ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, new RegExp(`^audit: remove ${ID} `));
+});
+
+test('runHandler: /remove no-op does NOT save (nothing to log)', async () => {
+  let saved = false;
+  const { deps } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    saveWatchlist: async () => { saved = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/remove ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.equal(saved, false);
+});
+
+test('runHandler: actor falls back to allowed_users label when from is absent', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Оксана', role: 'editor' }], sha: 's' }),
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    saveWatchlist: async (_e, _w, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, new RegExp(`^audit: add ${ID} · Оксана \\[456/editor\\]$`));
+});
+
+test('runHandler: actor name with separators is sanitized in commit message', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    saveWatchlist: async (_e, _w, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: { first_name: 'Ан·ій', last_name: '[x]' }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  const { parseAuditCommit } = await import('../../commands.mjs');
+  assert.ok(parseAuditCommit(savedOpts.message), 'message remains parseable');
+});
+
+test('runHandler: callback add: records audit commit', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    saveWatchlist: async (_e, _w, _s, opts) => { savedOpts = opts; },
+    editMessageReplyMarkup: async () => {},
+    answerCallbackQuery: async () => {},
+  });
+  await runHandler({
+    update: { callback_query: { id: 'cq1', data: `add:${ID}`, from: { first_name: 'Оксана' }, message: { chat: { id: 123 }, message_id: 5 } } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, new RegExp(`^audit: add ${ID} · Оксана `));
+});
