@@ -20,7 +20,7 @@ const BUTTON_ALIASES = {
 
 // Reply keyboard sent with each bot response to an allowed user. Telegram
 // renders it persistently above the text input. Buttons with arguments
-// (/add, /watch, /remove, /unwatch, /info UA-..., /archive UA-...,
+// (/add, /watch, /remove, /info UA-..., /archive UA-...,
 // /unarchive UA-...) stay text-only since you can't put a tender_id on a
 // button label.
 export const MAIN_KEYBOARD = {
@@ -710,7 +710,7 @@ export async function handleWatch(deps, { edrpou }) {
     added_at: new Date().toISOString(),
   };
   const reply = entityName === '(unknown)'
-    ? `✅ ${edrpou} збережено. Серед ~1000 останніх публікацій Prozorro тендерів від цього замовника не виявлено — нормально, якщо замовник публікує рідко. Назва замовника зʼявиться у /watched коли bot знайде його перший новий тендер. Якщо ЄДРПОУ помилковий — /unwatch ${edrpou}.`
+    ? `✅ ${edrpou} збережено. Серед ~1000 останніх публікацій Prozorro тендерів від цього замовника не виявлено — нормально, якщо замовник публікує рідко. Назва замовника зʼявиться у /watched коли bot знайде його перший новий тендер. Якщо ЄДРПОУ помилковий — прибери його кнопкою 🗑 у /watched.`
     : `✅ Стежу за ${edrpou} — ${escapeHtml(abbreviateLegalForm(entityName))}\nПомічено як уже-побачені: ${bootstrapIds.length} активних тендерів. Алерт буде на нові.`;
   return {
     reply,

@@ -1,6 +1,6 @@
 import {
   parseCommand, handleAdd, handleStatus, handleRemove,
-  handleWatch, handleUnwatch, handleWatched,
+  handleWatch, handleUnwatch, handleWatched, buildWatchedKeyboard,
   handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, buildRoleChangeNotice, handleWhoami, handleUsersList, handleInvitesList,
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
@@ -121,8 +121,9 @@ export async function runHandler({ update, env, deps = {} }) {
   const cmd = parseCommand(msg.text);
   let reply;
   let notifyReplyMarkup = null;
+  let watchedReplyMarkup = null;
 
-  const MUTATING = new Set(['add', 'remove', 'watch', 'unwatch', 'unarchive']);
+  const MUTATING = new Set(['add', 'remove', 'watch', 'unarchive']);
   if (MUTATING.has(cmd.cmd) && !isEditor) {
     reply = '🚫 Це команда для редакторів. У тебе доступ лише для перегляду.';
   } else if (cmd.cmd === 'start') {
@@ -419,28 +420,17 @@ export async function runHandler({ update, env, deps = {} }) {
         auditMessage: formatAuditMessage({ action: 'watch', target: cmd.edrpou, actor: actorName, chatId, role }),
       });
     }
-  } else if (cmd.cmd === 'unwatch') {
-    if (cmd.error === 'invalid_edrpou') {
-      reply = '❌ ЄДРПОУ має бути 8 цифр';
-    } else if (cmd.error === 'missing_edrpou') {
-      reply = '❌ Не вказано ЄДРПОУ. /unwatch 12345678';
-    } else {
-      reply = await applyEntityMutationWithRetry({
-        env,
-        loadWatchedEntities: _loadWatchedEntities,
-        saveWatchedEntities: _saveWatchedEntities,
-        computeMutation: ({ entities }) => handleUnwatch({ watchedEntities: entities }, cmd),
-        auditMessage: formatAuditMessage({ action: 'unwatch', target: cmd.edrpou, actor: actorName, chatId, role }),
-      });
-    }
   } else if (cmd.cmd === 'watched') {
     try {
       const { entities } = await _loadWatchedEntities(env);
       reply = handleWatched({ watchedEntities: entities });
+      if (isEditor) watchedReplyMarkup = buildWatchedKeyboard(entities);
     } catch (err) {
       console.error('worker: /watched failed:', err.message);
       reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
     }
+  } else if (cmd.cmd === 'unwatch_removed') {
+    reply = 'ℹ️ Команду /unwatch прибрано. Відкрий /watched і тисни 🗑 біля замовника, щоб припинити стеження.';
   } else if (cmd.cmd === 'invite') {
     if (!isAdmin) return;
     if (cmd.error === 'missing_role') {
@@ -626,7 +616,7 @@ export async function runHandler({ update, env, deps = {} }) {
         text: pages[i],
         replyToMessageId: i === 0 ? msg.message_id : undefined,
         replyMarkup: isLast
-          ? (notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined))
+          ? (watchedReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined))
           : undefined,
       });
     } catch (err) {
