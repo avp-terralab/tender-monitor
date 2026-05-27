@@ -1,6 +1,7 @@
 import {
   parseCommand, handleAdd, handleStatus, handleRemove,
-  handleWatch, handleUnwatch, handleWatched, buildWatchedKeyboard,
+  handleWatch, handleUnwatch, handleWatched,
+  buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
   handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, buildRoleChangeNotice, handleWhoami, handleUsersList, handleInvitesList,
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
@@ -426,7 +427,7 @@ export async function runHandler({ update, env, deps = {} }) {
     try {
       const { entities } = await _loadWatchedEntities(env);
       reply = handleWatched({ watchedEntities: entities });
-      if (isEditor) watchedReplyMarkup = buildWatchedKeyboard(entities);
+      if (isEditor) watchedReplyMarkup = buildWatchedViewKeyboard(entities);
     } catch (err) {
       console.error('worker: /watched failed:', err.message);
       reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
@@ -640,6 +641,30 @@ const KYIV_TIME_FMT = new Intl.DateTimeFormat('uk-UA', {
   timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
 });
 
+async function renderWatchedManage({ _editMessageText, env, chatId, messageId, entities }) {
+  try {
+    await _editMessageText({
+      token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+      text: entities.length ? WATCHED_MANAGE_PROMPT : handleWatched({ watchedEntities: entities }),
+      replyMarkup: buildWatchedManageKeyboard(entities) ?? undefined,
+    });
+  } catch (err) {
+    console.error('worker: watched manage edit failed:', err.message);
+  }
+}
+
+async function renderWatchedView({ _editMessageText, env, chatId, messageId, entities }) {
+  try {
+    await _editMessageText({
+      token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+      text: handleWatched({ watchedEntities: entities }),
+      replyMarkup: buildWatchedViewKeyboard(entities) ?? undefined,
+    });
+  } catch (err) {
+    console.error('worker: watched view edit failed:', err.message);
+  }
+}
+
 async function handleCallbackQuery({
   cq, env, _editMessageReplyMarkup, _editMessageText, _answerCallbackQuery,
   _loadAllowedUsers, _saveAllowedUsers,
@@ -729,6 +754,28 @@ async function handleCallbackQuery({
     return;
   }
 
+  if (data === 'watched:manage' || data === 'watched:done') {
+    if (!isEditor) {
+      await ack('🚫 Це команда для редакторів', true);
+      return;
+    }
+    let entities = [];
+    try {
+      ({ entities } = await _loadWatchedEntities(env));
+    } catch (err) {
+      console.error('worker: watched mode load failed:', err.message);
+      await ack('⚠️ GitHub тимчасово недоступний', true);
+      return;
+    }
+    if (data === 'watched:manage') {
+      await renderWatchedManage({ _editMessageText, env, chatId, messageId, entities });
+    } else {
+      await renderWatchedView({ _editMessageText, env, chatId, messageId, entities });
+    }
+    await ack();
+    return;
+  }
+
   if (data.startsWith('unwatch:')) {
     if (!isEditor) {
       await ack('🚫 Це команда для редакторів', true);
@@ -749,15 +796,7 @@ async function handleCallbackQuery({
           newEntities = applyEntityMutation(entities, mutation);
           await _saveWatchedEntities(env, newEntities, sha, { message: auditMessage });
         }
-        try {
-          await _editMessageText({
-            token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
-            text: handleWatched({ watchedEntities: newEntities }),
-            replyMarkup: buildWatchedKeyboard(newEntities) ?? undefined,
-          });
-        } catch (err) {
-          console.error('worker: unwatch edit failed:', err.message);
-        }
+        await renderWatchedManage({ _editMessageText, env, chatId, messageId, entities: newEntities });
         await ack(mutation ? `✅ Прибрано ${edrpou}` : 'Вже прибрано');
         return;
       } catch (err) {
