@@ -890,7 +890,7 @@ export function paginateArchiveGroup({ header, entries, limit = ARCHIVE_PAGE_LIM
 
 export function handleArchive({ archive }) {
   if (!archive || archive.length === 0) {
-    return '📭 Архів порожній.';
+    return ['📭 Архів порожній.'];
   }
   // Group by service provider EDRPOU; entries without an active award land
   // in a synthetic "Без укладеного договору" group rendered last.
@@ -918,7 +918,7 @@ export function handleArchive({ archive }) {
     return (b.maxArchivedAt ?? '').localeCompare(a.maxArchivedAt ?? '');
   });
 
-  const sections = [];
+  const pages = [];
   for (const g of groupList) {
     const count = g.entries.length;
     const noun = plural(count, ['контракт', 'контракти', 'контрактів']);
@@ -930,10 +930,11 @@ export function handleArchive({ archive }) {
     } else {
       header = `📦 Без укладеного договору — ${count} ${noun}`;
     }
-    const body = g.entries.map((a, i) => renderArchiveItem(a, i)).join('\n\n');
-    sections.push(`${header}\n\n${body}`);
+    const entries = g.entries.map((a, i) => renderArchiveItem(a, i));
+    pages.push(...paginateArchiveGroup({ header, entries }));
   }
-  return sections.join('\n\n') + `\n\nВсього в архіві: ${archive.length}`;
+  pages[pages.length - 1] += `\n\nВсього в архіві: ${archive.length}`;
+  return pages;
 }
 
 function formatContractsBlock(contracts) {
