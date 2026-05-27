@@ -296,3 +296,24 @@ test('loadArchivedTenders: 404 → empty + sha null', async () => {
   assert.deepEqual(archive, []);
   assert.equal(sha, null);
 });
+
+test('saveWatchlist: uses custom message when provided', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 200, json: async () => ({}) }; };
+  await saveWatchlist(ENV, [], 'sha', { fetch: fakeFetch, message: 'audit: add UA-x · A [1/editor]' });
+  assert.equal(JSON.parse(calls[0].opts.body).message, 'audit: add UA-x · A [1/editor]');
+});
+
+test('saveWatchlist: default message unchanged when no message (back-compat)', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 200, json: async () => ({}) }; };
+  await saveWatchlist(ENV, [], 'sha', { fetch: fakeFetch });
+  assert.match(JSON.parse(calls[0].opts.body).message, /^bot: update watchlist /);
+});
+
+test('saveAllowedUsers: threads custom message through saveFile', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 200, json: async () => ({}) }; };
+  await saveAllowedUsers(ENV, [], 'sha', { fetch: fakeFetch, message: 'audit: revoke 1 · admin [9/admin]' });
+  assert.equal(JSON.parse(calls[0].opts.body).message, 'audit: revoke 1 · admin [9/admin]');
+});

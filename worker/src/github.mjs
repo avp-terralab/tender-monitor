@@ -55,12 +55,12 @@ export async function loadWatchlist(env, { fetch: fetchImpl = fetch } = {}) {
   return { watchlist: JSON.parse(text), sha };
 }
 
-export async function saveWatchlist(env, watchlist, sha, { fetch: fetchImpl = fetch } = {}) {
+export async function saveWatchlist(env, watchlist, sha, { fetch: fetchImpl = fetch, message } = {}) {
   const json = JSON.stringify(watchlist, null, 2) + '\n';
   const bytes = new TextEncoder().encode(json);
   const base64 = btoa(String.fromCharCode(...bytes));
   const body = {
-    message: `bot: update watchlist ${new Date().toISOString()}`,
+    message: message ?? `bot: update watchlist ${new Date().toISOString()}`,
     content: base64,
     sha,
     branch: 'main',
@@ -108,11 +108,11 @@ async function loadFile(env, filePath, { fetch: fetchImpl = fetch } = {}) {
   return { content: text, sha };
 }
 
-async function saveFile(env, filePath, text, sha, { fetch: fetchImpl = fetch } = {}) {
+async function saveFile(env, filePath, text, sha, { fetch: fetchImpl = fetch, message } = {}) {
   const bytes = new TextEncoder().encode(text);
   const base64 = btoa(String.fromCharCode(...bytes));
   const body = {
-    message: `bot: update ${filePath} ${new Date().toISOString()}`,
+    message: message ?? `bot: update ${filePath} ${new Date().toISOString()}`,
     content: base64,
     branch: 'main',
   };
