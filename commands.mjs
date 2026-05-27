@@ -1245,6 +1245,7 @@ const HELP_ADMIN = [
   '/invites — активні invite-посилання',
   '/users — список користувачів',
   '/revoke [chat_id] — видалити користувача',
+  '/log [N] — журнал дій користувачів (хто що додав/видалив)',
 ].join('\n');
 
 export function buildHelpText(role) {
@@ -1334,6 +1335,7 @@ const ADMIN_COMMANDS = [
   { command: 'invites', description: 'Активні invite-посилання' },
   { command: 'users',   description: 'Список користувачів' },
   { command: 'revoke',  description: 'Видалити користувача' },
+  { command: 'log',     description: 'Журнал дій користувачів' },
 ];
 
 export const BOT_COMMANDS_BY_ROLE = {

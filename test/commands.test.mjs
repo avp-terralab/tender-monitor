@@ -2958,3 +2958,23 @@ test('parseCommand: /log abc → unknown', () => {
   assert.deepEqual(parseCommand('/log abc'), { cmd: 'unknown' });
 });
 
+// ── Task 5: /log in help text + command list ──────────────────────────────
+
+test('buildHelpText: admin includes /log', () => {
+  assert.match(buildHelpText('admin'), /\/log/);
+});
+test('buildHelpText: editor/viewer do not include /log', () => {
+  assert.doesNotMatch(buildHelpText('editor'), /\/log/);
+  assert.doesNotMatch(buildHelpText('viewer'), /\/log/);
+});
+test('BOT_COMMANDS_BY_ROLE: only admin has log', () => {
+  assert.ok(BOT_COMMANDS_BY_ROLE.admin.some(c => c.command === 'log'));
+  assert.ok(!BOT_COMMANDS_BY_ROLE.editor.some(c => c.command === 'log'));
+  assert.ok(!BOT_COMMANDS_BY_ROLE.viewer.some(c => c.command === 'log'));
+});
+test('BOT_COMMANDS_BY_ROLE: all command names within Telegram 32-char limit', () => {
+  for (const set of Object.values(BOT_COMMANDS_BY_ROLE)) {
+    for (const c of set) assert.ok(c.command.length <= 32);
+  }
+});
+
