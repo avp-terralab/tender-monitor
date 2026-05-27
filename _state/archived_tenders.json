@@ -375,5 +375,140 @@
       ],
       "cancellations": []
     }
+  },
+  {
+    "tender_id": "UA-2026-05-08-005338-a",
+    "notes": "Комунальне некомерційне підприємство Охтирської міської ради «Охтирська  центральна районна лікарня» — Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи…",
+    "archived_at": "2026-05-27T08:25:36.659Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-08-005338-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії за кодом ДК 021:2015 - 72260000-5 Послуги, пов’язані з програмним забезпеченням",
+      "status": "complete",
+      "dateModified": "2026-05-27T11:06:15.646456+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-05-16T08:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне некомерційне підприємство Охтирської міської ради «Охтирська  центральна районна лікарня»",
+        "edrpou": "02007472"
+      },
+      "value": {
+        "amount": 284200,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5",
+        "72260000-5",
+        "72260000-5",
+        "72260000-5",
+        "72260000-5",
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Ольвач Людмила Анатоліївна",
+        "email": "ocrl76@ukr.net",
+        "telephone": "+380544641972"
+      },
+      "documents": [
+        {
+          "id": "cd6780f3f8264294a6660fed39adaa90",
+          "title": "Тендерна документація.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-08T11:54:29.906621+03:00"
+        },
+        {
+          "id": "02adf0f0612748eab605f3610e1f2cf4",
+          "title": "Додаток 1 до тендерної документації.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-08T11:54:29.906621+03:00"
+        },
+        {
+          "id": "c0774f809775443f8723bec8cc18eb78",
+          "title": "Додаток 2 до тендерної документації.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-08T11:54:29.906621+03:00"
+        },
+        {
+          "id": "a35178029e404d3d8797ac82a0c12b47",
+          "title": "Додаток 3 до тендерної документації.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-08T11:54:29.906621+03:00"
+        },
+        {
+          "id": "c667c253abc7445688154c51614001a1",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-08T11:56:15.113320+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "28d5c9b0b3e5432d852857edecdc47a2",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ ПРО\"",
+              "identifier": {
+                "id": "46104055"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "6e5d523ecaf9416baffaac8acc760a3c",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "title_en": "Договір.pdf",
+              "title_ru": "Договір.pdf",
+              "description": "SHA1: cdb13070c98e3cb15b9bd4f1535ef6216f52e6a4",
+              "id": "bcb832428b4d458b926516619a9673a1",
+              "hash": "md5:c81fa2a532f2e8c9e34e17445ac30f1a",
+              "title": "Договір",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/6e5d523ecaf9416baffaac8acc760a3c/documents/bcb832428b4d458b926516619a9673a1?download=1441a86e54d04ca89b25a3003a01ab13",
+              "documentOf": "contract",
+              "datePublished": "2026-05-27T11:04:18.441331+03:00",
+              "dateModified": "2026-05-27T11:04:18.441331+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "documentType": "notice",
+              "title_en": "sign.p7s",
+              "title_ru": "sign.p7s",
+              "description": "SHA1: 8e63c78422560cde5c2768f4c7dd27604e6e6be1",
+              "id": "8de0e9714d264158955555832e5f9931",
+              "hash": "md5:3a53e96dda7200dfeca07eda8ea22d16",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/6e5d523ecaf9416baffaac8acc760a3c/documents/8de0e9714d264158955555832e5f9931?download=516b502617a1401d85e36fed04e9b9e5",
+              "documentOf": "contract",
+              "datePublished": "2026-05-27T11:06:06.180743+03:00",
+              "dateModified": "2026-05-27T11:06:06.180743+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]

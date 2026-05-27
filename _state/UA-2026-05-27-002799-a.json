@@ -1,0 +1,80 @@
+{
+  "tender_id": "UA-2026-05-27-002799-a",
+  "saved_at": "2026-05-27T08:25:38.227Z",
+  "snapshot": {
+    "tender_id": "UA-2026-05-27-002799-a",
+    "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+    "status": "active.tendering",
+    "dateModified": "2026-05-27T10:44:31.914087+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-06-04T18:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ЗАЛІЩИЦЬКА ЦЕНТРАЛЬНА МІСЬКА ЛІКАРНЯ\" ЗАЛІЩИЦЬКОЇ МІСЬКОЇ РАДИ",
+      "edrpou": "02000659"
+    },
+    "value": {
+      "amount": 376534,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": true
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Мотринчук Тетяна Петрівна",
+      "email": "zcmlzk1@ukr.net",
+      "telephone": "+380355421053"
+    },
+    "documents": [
+      {
+        "id": "3ddd0be077de46e59ba8088dac63f7c0",
+        "title": "1. Тендерна документацiя.docx",
+        "documentType": null,
+        "datePublished": "2026-05-27T10:37:00.164239+03:00"
+      },
+      {
+        "id": "be066462d6df45e6a282685f8c89f0ac",
+        "title": "2. Додаток _1 Перелік документів та_або інформації_ які подаються учасником процедури закупівлі у складі тендерної пропозиції.docx",
+        "documentType": null,
+        "datePublished": "2026-05-27T10:37:00.164239+03:00"
+      },
+      {
+        "id": "d95ddf5a55c34ff996b180b74db892cb",
+        "title": "3. Додаток _2 Перелік документів та_або інформації_ які подаються переможцем процедури закупівлі.docx",
+        "documentType": null,
+        "datePublished": "2026-05-27T10:37:00.164239+03:00"
+      },
+      {
+        "id": "6801b1b47ea648a585f230cd4990e631",
+        "title": "4. Додаток _3 Проєкт договору.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-05-27T10:37:00.164239+03:00"
+      },
+      {
+        "id": "9b5437b901db4d659514478b83f295c4",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-05-27T10:39:56.804735+03:00"
+      },
+      {
+        "id": "9b5437b901db4d659514478b83f295c4",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-05-27T10:44:31.914087+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
