@@ -39,6 +39,8 @@ const makeDeps = (overrides = {}) => {
       loadTenderState: async () => null,
       fetchLatestDeployCommit: async () => null,
       fetchAuditLog: async () => [],
+      editMessageText: async () => {},
+      answerCallbackQuery: async () => {},
       ...overrides,
     },
   };
@@ -2357,4 +2359,89 @@ test('runHandler: /log handles GitHub failure gracefully', async () => {
   });
   assert.equal(sent.length, 1);
   assert.match(sent[0].text, /недоступн/);
+});
+
+// ── Task 5: unwatch:<edrpou> callback ────────────────────────────────────────
+
+const CB = (data, fromChatId = 123, from = { first_name: 'Андрій' }) => ({
+  callback_query: { id: 'cq1', data, from, message: { chat: { id: fromChatId }, message_id: 9 } },
+});
+
+test('callback unwatch: removes entity, refreshes via editMessageText, audits, toast', async () => {
+  let savedOpts, edited, acked;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
+    saveWatchedEntities: async (_e, _ent, _s, opts) => { savedOpts = opts; },
+    editMessageText: async (args) => { edited = args; },
+    answerCallbackQuery: async (args) => { acked = args; },
+  });
+  await runHandler({ update: CB('unwatch:12345678'), env: ENV, deps });
+  assert.match(savedOpts.message, /^audit: unwatch 12345678 · Андрій \[123\/admin\]$/);
+  assert.match(edited.text, /01999106/);
+  assert.doesNotMatch(edited.text, /12345678/);
+  assert.equal(edited.replyMarkup.inline_keyboard.length, 1);
+  assert.equal(edited.replyMarkup.inline_keyboard[0][0].callback_data, 'unwatch:01999106');
+  assert.match(acked.text, /Прибрано/);
+});
+
+test('callback unwatch: last entity → empty-state text, no keyboard', async () => {
+  let edited;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: [{ edrpou: '12345678', name: 'КНП', enabled: true }], sha: 's' }),
+    saveWatchedEntities: async () => {},
+    editMessageText: async (args) => { edited = args; },
+    answerCallbackQuery: async () => {},
+  });
+  await runHandler({ update: CB('unwatch:12345678'), env: ENV, deps });
+  assert.match(edited.text, /Не стежу за жодним замовником/);
+  assert.ok(edited.replyMarkup == null, 'no keyboard when list empty');
+});
+
+test('callback unwatch: double-tap (already gone) → "вже прибрано", no save', async () => {
+  let saved = false, acked;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: [{ edrpou: '01999106', name: 'X', enabled: true }], sha: 's' }),
+    saveWatchedEntities: async () => { saved = true; },
+    editMessageText: async () => {},
+    answerCallbackQuery: async (args) => { acked = args; },
+  });
+  await runHandler({ update: CB('unwatch:12345678'), env: ENV, deps });
+  assert.equal(saved, false);
+  assert.match(acked.text, /[Вв]же прибрано/);
+});
+
+test('callback unwatch: viewer rejected, no save', async () => {
+  let saved = false, acked;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
+    saveWatchedEntities: async () => { saved = true; },
+    answerCallbackQuery: async (args) => { acked = args; },
+  });
+  await runHandler({ update: CB('unwatch:12345678', 456, { first_name: 'V' }), env: ENV, deps });
+  assert.equal(saved, false);
+  assert.match(acked.text, /редактор|🚫/);
+});
+
+test('callback unwatch: invalid edrpou → toast, no save', async () => {
+  let saved = false, acked;
+  const { deps } = makeDeps({
+    saveWatchedEntities: async () => { saved = true; },
+    answerCallbackQuery: async (args) => { acked = args; },
+  });
+  await runHandler({ update: CB('unwatch:abc'), env: ENV, deps });
+  assert.equal(saved, false);
+  assert.match(acked.text, /Невалідн/);
+});
+
+test('runHandler: viewer /unwatch command → hint (not refusal)', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/unwatch 12345678', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /\/watched/);
 });
