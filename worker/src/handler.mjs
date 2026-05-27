@@ -9,6 +9,8 @@ import {
   TERMINAL_STATUSES, hydrateContractDocs,
   formatAuditMessage,
   sanitizeActor,
+  parseAuditCommit,
+  formatAuditLog,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
@@ -20,6 +22,7 @@ import {
   loadInvites, saveInvites,
   loadArchivedTenders, saveArchivedTenders,
   loadPendingDigest, loadTenderState, fetchLatestDeployCommit,
+  fetchAuditLog,
   ConflictError,
 } from './github.mjs';
 
@@ -62,6 +65,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const _loadPendingDigest = deps.loadPendingDigest ?? loadPendingDigest;
   const _loadTenderState = deps.loadTenderState ?? loadTenderState;
   const _fetchLatestDeployCommit = deps.fetchLatestDeployCommit ?? fetchLatestDeployCommit;
+  const _fetchAuditLog = deps.fetchAuditLog ?? fetchAuditLog;
   // Tests may inject their own Map to avoid cross-test cache pollution.
   const _statusCache = deps.statusCache ?? STATUS_CACHE;
 
@@ -593,6 +597,18 @@ export async function runHandler({ update, env, deps = {} }) {
           break;
         }
       }
+    }
+  } else if (cmd.cmd === 'log') {
+    if (!isAdmin) return;
+    try {
+      const raw = await _fetchAuditLog(env);
+      const entries = raw
+        .map(c => { const p = parseAuditCommit(c.message); return p ? { ...p, date: c.date } : null; })
+        .filter(Boolean);
+      reply = formatAuditLog(entries, { limit: cmd.limit });
+    } catch (err) {
+      console.error('worker: /log failed:', err.message);
+      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
     }
   } else if (cmd.cmd === 'unknown') {
     reply = '❓ Не розумію. /help';

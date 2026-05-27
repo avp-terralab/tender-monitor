@@ -38,6 +38,7 @@ const makeDeps = (overrides = {}) => {
       loadPendingDigest: async () => null,
       loadTenderState: async () => null,
       fetchLatestDeployCommit: async () => null,
+      fetchAuditLog: async () => [],
       ...overrides,
     },
   };
@@ -2340,4 +2341,49 @@ test('runHandler: /unarchive records audit commit', async () => {
     env: ENV, deps,
   });
   assert.match(savedOpts.message, new RegExp(`^audit: unarchive ${ID} `));
+});
+
+// ── Task 11: /log admin-only audit log command ────────────────────────────────
+
+const COMMITS = [
+  { message: 'audit: add UA-2026-04-30-010542-a · Андрій [786078813/editor]', date: '2026-05-26T11:00:00Z' },
+  { message: 'bot: update watchlist 2026', date: '2026-05-26T10:30:00Z' },
+  { message: 'monitor: state update', date: '2026-05-26T10:00:00Z' },
+  { message: 'audit: revoke 1402480451 · admin [123/admin]', date: '2026-05-25T09:00:00Z' },
+];
+
+test('runHandler: /log (admin) renders parsed audit actions only', async () => {
+  const { deps, sent } = makeDeps({ fetchAuditLog: async () => COMMITS });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/log', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /Журнал дій/);
+  assert.match(sent[0].text, /Андрій додав UA-2026-04-30-010542-a/);
+  assert.match(sent[0].text, /admin прибрав доступ 1402480451/);
+  assert.doesNotMatch(sent[0].text, /update watchlist/);
+  assert.doesNotMatch(sent[0].text, /state update/);
+});
+
+test('runHandler: /log non-admin → silent skip', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'X', role: 'editor' }], sha: 's' }),
+    fetchAuditLog: async () => COMMITS,
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/log', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.equal(sent.length, 0);
+});
+
+test('runHandler: /log handles GitHub failure gracefully', async () => {
+  const { deps, sent } = makeDeps({ fetchAuditLog: async () => { throw new Error('GitHub 500'); } });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/log', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /недоступн/);
 });
