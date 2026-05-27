@@ -10,6 +10,7 @@ import {
   applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
   BOT_COMMANDS_BY_ROLE,
+  sanitizeActor, formatAuditMessage,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -2827,5 +2828,34 @@ test('formatInfoPages: errors-only (no groups) still produces an errors page wit
   assert.match(pages[0], /📋 Статус тендерів \(/);          // global header still prepended
   assert.match(pages[0], /⚠️ Не вдалось перевірити \(1\)/);
   assert.match(pages[0], /UA-ERR — Prozorro 503/);
+});
+
+// ── Task 1: sanitizeActor + formatAuditMessage ────────────────────────────
+
+test('sanitizeActor: strips separators and newlines, collapses spaces', () => {
+  assert.equal(sanitizeActor('Ан\nдрій · [x]'), 'Ан дрій x');
+});
+
+test('sanitizeActor: empty → "?"', () => {
+  assert.equal(sanitizeActor(''), '?');
+  assert.equal(sanitizeActor(null), '?');
+});
+
+test('sanitizeActor: caps length at 40', () => {
+  assert.ok(sanitizeActor('a'.repeat(100)).length <= 40);
+});
+
+test('formatAuditMessage: builds audit line', () => {
+  assert.equal(
+    formatAuditMessage({ action: 'add', target: 'UA-2026-04-30-010542-a', actor: 'Андрій', chatId: '1', role: 'editor' }),
+    'audit: add UA-2026-04-30-010542-a · Андрій [1/editor]'
+  );
+});
+
+test('formatAuditMessage: null target → no double space', () => {
+  assert.equal(
+    formatAuditMessage({ action: 'role→editor', target: null, actor: 'admin', chatId: '9', role: 'admin' }),
+    'audit: role→editor · admin [9/admin]'
+  );
 });
 

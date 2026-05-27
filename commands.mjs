@@ -177,6 +177,24 @@ export function parseCommand(text) {
   return { cmd: null };
 }
 
+// ── Audit log ────────────────────────────────────────────────────────────
+// Mutating actions are recorded by enriching the commit message that already
+// accompanies each state write. Format (parseable first line):
+//   audit: <action> <target> · <actor> [<chatId>/<role>]
+
+export function sanitizeActor(name) {
+  return String(name ?? '')
+    .replace(/[\r\n·\[\]]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40) || '?';
+}
+
+export function formatAuditMessage({ action, target, actor, chatId, role }) {
+  const t = target ? ` ${target}` : '';
+  return `audit: ${action}${t} · ${sanitizeActor(actor)} [${chatId}/${role}]`;
+}
+
 export function buildAutoNotes(snapshot) {
   const entity = snapshot?.procuringEntity?.name ?? '';
   const title = stripDkCode(snapshot?.title ?? '');
