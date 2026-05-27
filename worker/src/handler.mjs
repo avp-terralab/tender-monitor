@@ -1,6 +1,6 @@
 import {
   parseCommand, handleAdd, handleStatus, handleRemove,
-  handleWatch, handleUnwatch, handleWatched, buildWatchedKeyboard,
+  handleWatch, handleUnwatch, handleWatched,
   buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
   handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, buildRoleChangeNotice, handleWhoami, handleUsersList, handleInvitesList,
   handleArchive, handleArchiveDetail, handleUnarchive,
