@@ -15,6 +15,7 @@ import {
   formatAuditLog,
   buildWatchedKeyboard,
   buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
+  paginateArchiveGroup, ARCHIVE_PAGE_LIMIT,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -3062,4 +3063,34 @@ test('buildWatchedManageKeyboard: empty list → null', () => {
 test('WATCHED_MANAGE_PROMPT: exported non-empty string', () => {
   assert.equal(typeof WATCHED_MANAGE_PROMPT, 'string');
   assert.ok(WATCHED_MANAGE_PROMPT.length > 0);
+});
+
+test('paginateArchiveGroup: fits in one page → no footer', () => {
+  const pages = paginateArchiveGroup({ header: 'H', entries: ['a', 'b', 'c'] });
+  assert.equal(pages.length, 1);
+  assert.equal(pages[0], 'H\n\na\n\nb\n\nc');
+  assert.doesNotMatch(pages[0], /Сторінка/);
+});
+
+test('paginateArchiveGroup: overflow → multiple pages, footer, entries intact', () => {
+  const big = (c) => c.repeat(1500);
+  const entries = [big('1'), big('2'), big('3'), big('4')];
+  const pages = paginateArchiveGroup({ header: 'HDR', entries, limit: 3900 });
+  assert.ok(pages.length >= 2, 'splits into >= 2 pages');
+  pages.forEach((p, i) => {
+    assert.ok(p.startsWith('HDR\n\n'), 'header repeated');
+    assert.match(p, new RegExp(`Сторінка ${i + 1}/${pages.length}$`));
+  });
+  for (const e of entries) {
+    const hits = pages.filter(p => p.includes(e)).length;
+    assert.equal(hits, 1, 'entry appears whole on exactly one page');
+  }
+});
+
+test('paginateArchiveGroup: a single oversized entry gets its own page', () => {
+  const huge = 'x'.repeat(5000);
+  const pages = paginateArchiveGroup({ header: 'H', entries: [huge, 'small'], limit: 3900 });
+  assert.equal(pages.length, 2);
+  assert.ok(pages[0].includes(huge));
+  assert.ok(pages[1].includes('small'));
 });

@@ -857,6 +857,37 @@ function renderArchiveItem(a, localIndex) {
   return `${mainLine}\n📄 <a href="${escapeHtml(docUrl)}">Завантажити договір</a>`;
 }
 
+// Telegram messages cap at 4096 chars. /archive splits one provider group's
+// entries into page strings under this limit (margin for the repeated header,
+// the "Сторінка k/n" footer, and HTML entities). Splits only at entry
+// boundaries — a single procurement's text is never cut across pages.
+export const ARCHIVE_PAGE_LIMIT = 3900;
+
+// `entries` are already-rendered entry strings. One bucket that fits → a single
+// page with NO footer. Otherwise pack entries into buckets (never splitting an
+// entry) and render each as `${header}\n\n${body}\n\nСторінка k/n`. An entry
+// that alone exceeds the limit still gets its own bucket (sendReply sub-chunks
+// it at send time).
+export function paginateArchiveGroup({ header, entries, limit = ARCHIVE_PAGE_LIMIT }) {
+  const pageLen = (bucket) => header.length + 2 + bucket.join('\n\n').length;
+  const buckets = [];
+  let current = [];
+  for (const e of entries) {
+    if (current.length > 0 && pageLen([...current, e]) > limit) {
+      buckets.push(current);
+      current = [];
+    }
+    current.push(e);
+  }
+  if (current.length > 0) buckets.push(current);
+
+  if (buckets.length <= 1) {
+    return [`${header}\n\n${entries.join('\n\n')}`];
+  }
+  const n = buckets.length;
+  return buckets.map((b, i) => `${header}\n\n${b.join('\n\n')}\n\nСторінка ${i + 1}/${n}`);
+}
+
 export function handleArchive({ archive }) {
   if (!archive || archive.length === 0) {
     return '📭 Архів порожній.';
