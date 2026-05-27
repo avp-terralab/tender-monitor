@@ -2198,6 +2198,7 @@ test('runHandler: actor name with separators is sanitized in commit message', as
   });
   const { parseAuditCommit } = await import('../../commands.mjs');
   assert.ok(parseAuditCommit(savedOpts.message), 'message remains parseable');
+  assert.doesNotMatch(parseAuditCommit(savedOpts.message).actor, /[·\[\]]/, 'actor must not contain separator characters');
 });
 
 test('runHandler: callback add: records audit commit', async () => {
@@ -2213,4 +2214,20 @@ test('runHandler: callback add: records audit commit', async () => {
     env: ENV, deps,
   });
   assert.match(savedOpts.message, new RegExp(`^audit: add ${ID} · Оксана `));
+});
+
+test('runHandler: callback add: uses label from allowed_users when from has no display name', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Оксана', role: 'editor' }], sha: 's' }),
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    saveWatchlist: async (_e, _w, _s, opts) => { savedOpts = opts; },
+    editMessageReplyMarkup: async () => {},
+    answerCallbackQuery: async () => {},
+  });
+  await runHandler({
+    update: { callback_query: { id: 'cq2', data: `add:${ID}`, from: { id: 456 }, message: { chat: { id: 456 }, message_id: 6 } } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, new RegExp(`^audit: add ${ID} · Оксана \\[456/editor\\]$`));
 });

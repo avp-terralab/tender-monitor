@@ -634,9 +634,10 @@ async function handleCallbackQuery({
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const chatId = String(cq.message?.chat?.id ?? '');
   const messageId = cq.message?.message_id;
-  const { isAdmin, isAllowed, isEditor, role } =
+  const { isAdmin, isAllowed, isEditor, role, userRecord } =
     await resolveUserContext({ chatId, adminChatId, env, _loadAllowedUsers, where: 'callback' });
-  const actorName = [cq.from?.first_name, cq.from?.last_name].filter(Boolean).join(' ') || chatId;
+  const actorName = [cq.from?.first_name, cq.from?.last_name].filter(Boolean).join(' ')
+    || userRecord?.label || chatId;
 
   const ack = (text, showAlert = false) => _answerCallbackQuery({
     token: env.TELEGRAM_BOT_TOKEN, callbackQueryId: cq.id, text, showAlert,
