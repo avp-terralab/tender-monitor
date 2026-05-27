@@ -13,6 +13,7 @@ import {
   sanitizeActor, formatAuditMessage,
   parseAuditCommit,
   formatAuditLog,
+  buildWatchedKeyboard,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -718,16 +719,16 @@ test('parseCommand: /watch with non-8-digit → error', () => {
   assert.deepEqual(parseCommand('/watch abcdefgh'), { cmd: 'watch', error: 'invalid_edrpou' });
 });
 
-test('parseCommand: /unwatch with valid EDRPOU', () => {
-  assert.deepEqual(parseCommand('/unwatch 12345678'), { cmd: 'unwatch', edrpou: '12345678' });
+test('parseCommand: /unwatch with valid EDRPOU → unwatch_removed (command retired)', () => {
+  assert.deepEqual(parseCommand('/unwatch 12345678'), { cmd: 'unwatch_removed' });
 });
 
-test('parseCommand: /unwatch without args → error', () => {
-  assert.deepEqual(parseCommand('/unwatch'), { cmd: 'unwatch', error: 'missing_edrpou' });
+test('parseCommand: /unwatch without args → unwatch_removed (command retired)', () => {
+  assert.deepEqual(parseCommand('/unwatch'), { cmd: 'unwatch_removed' });
 });
 
-test('parseCommand: /unwatch invalid → error', () => {
-  assert.deepEqual(parseCommand('/unwatch 12345'), { cmd: 'unwatch', error: 'invalid_edrpou' });
+test('parseCommand: /unwatch invalid → unwatch_removed (command retired)', () => {
+  assert.deepEqual(parseCommand('/unwatch 12345'), { cmd: 'unwatch_removed' });
 });
 
 test('handleWatched: empty list', () => {
@@ -2387,7 +2388,7 @@ test('buildHelpText("editor") contains mutating, not admin', () => {
   assert.match(t, /\/add/);
   assert.match(t, /\/remove/);
   assert.match(t, /\/watch/);
-  assert.match(t, /\/unwatch/);
+  assert.doesNotMatch(t, /\/unwatch/);
   assert.match(t, /\/unarchive/);
   assert.doesNotMatch(t, /\/invite\b/);
   assert.doesNotMatch(t, /\/role\b/);
@@ -2422,7 +2423,7 @@ test('BOT_COMMANDS_BY_ROLE.editor contains mutating but not admin', () => {
   assert.ok(names.includes('add'));
   assert.ok(names.includes('remove'));
   assert.ok(names.includes('watch'));
-  assert.ok(names.includes('unwatch'));
+  assert.ok(!names.includes('unwatch'));
   assert.ok(names.includes('unarchive'));
   assert.ok(!names.includes('invite'));
   assert.ok(!names.includes('role'));
@@ -2978,3 +2979,48 @@ test('BOT_COMMANDS_BY_ROLE: all command names within Telegram 32-char limit', ()
   }
 });
 
+// ── Task 2: buildWatchedKeyboard ──────────────────────────────────────────
+
+test('buildWatchedKeyboard: one 🗑 row per entity with unwatch: callback_data', () => {
+  const kb = buildWatchedKeyboard([
+    { edrpou: '12345678', name: 'КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО "ЛІКАРНЯ №1"', enabled: true },
+    { edrpou: '01999106', name: '(unknown)', enabled: true },
+  ]);
+  assert.equal(kb.inline_keyboard.length, 2);
+  const [row1, row2] = kb.inline_keyboard;
+  assert.equal(row1[0].callback_data, 'unwatch:12345678');
+  assert.match(row1[0].text, /^🗑 12345678 — /);
+  assert.equal(row2[0].callback_data, 'unwatch:01999106');
+  // name === '(unknown)' → no " — name" suffix, just the ЄДРПОУ
+  assert.equal(row2[0].text, '🗑 01999106');
+});
+
+test('buildWatchedKeyboard: empty list → null', () => {
+  assert.equal(buildWatchedKeyboard([]), null);
+  assert.equal(buildWatchedKeyboard(null), null);
+});
+
+test('buildWatchedKeyboard: long name truncated in button label', () => {
+  const longName = 'А'.repeat(200);
+  const kb = buildWatchedKeyboard([{ edrpou: '12345678', name: longName, enabled: true }]);
+  assert.ok(kb.inline_keyboard[0][0].text.length < 80);
+});
+
+// ── Task 3: retire /unwatch command ──────────────────────────────────────────
+
+test('parseCommand: /unwatch (any args) → unwatch_removed', () => {
+  assert.deepEqual(parseCommand('/unwatch'), { cmd: 'unwatch_removed' });
+  assert.deepEqual(parseCommand('/unwatch 12345678'), { cmd: 'unwatch_removed' });
+  assert.deepEqual(parseCommand('/unwatch@terralab_tenders_bot 12345678'), { cmd: 'unwatch_removed' });
+});
+
+test('buildHelpText: editor help no longer mentions /unwatch', () => {
+  assert.doesNotMatch(buildHelpText('editor'), /\/unwatch/);
+  assert.doesNotMatch(buildHelpText('admin'), /\/unwatch/);
+});
+
+test('BOT_COMMANDS_BY_ROLE: no role lists unwatch', () => {
+  for (const set of Object.values(BOT_COMMANDS_BY_ROLE)) {
+    assert.ok(!set.some(c => c.command === 'unwatch'));
+  }
+});

@@ -556,6 +556,22 @@ export async function editMessageReplyMarkup({ token, chatId, messageId, replyMa
   return json;
 }
 
+export async function editMessageText({ token, chatId, messageId, text, replyMarkup, fetch: fetchImpl = fetch }) {
+  const url = `https://api.telegram.org/bot${token}/editMessageText`;
+  const params = new URLSearchParams({
+    chat_id: String(chatId),
+    message_id: String(messageId),
+    text: String(text),
+    parse_mode: 'HTML',
+  });
+  if (replyMarkup != null) params.set('reply_markup', JSON.stringify(replyMarkup));
+  const res = await fetchImpl(url, { method: 'POST', body: params });
+  if (!res.ok) throw new Error(`Telegram editMessageText ${res.status}: ${await res.text()}`);
+  const json = await res.json();
+  if (!json.ok) throw new Error(`Telegram editMessageText: ${json.description ?? 'unknown'}`);
+  return json;
+}
+
 export async function answerCallbackQuery({ token, callbackQueryId, text, showAlert, fetch: fetchImpl = fetch }) {
   const url = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
   const params = new URLSearchParams({ callback_query_id: String(callbackQueryId) });

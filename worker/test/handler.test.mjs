@@ -39,6 +39,8 @@ const makeDeps = (overrides = {}) => {
       loadTenderState: async () => null,
       fetchLatestDeployCommit: async () => null,
       fetchAuditLog: async () => [],
+      editMessageText: async () => {},
+      answerCallbackQuery: async () => {},
       ...overrides,
     },
   };
@@ -727,62 +729,61 @@ test('runHandler: /watched when GitHub fails → ⚠️ reply', async () => {
   assert.match(sent[0].text, /⚠️ GitHub/);
 });
 
-test('runHandler: /unwatch invalid edrpou → ❌ reply, no save', async () => {
-  let saveCalled = false;
-  const { deps, sent } = await makeDeps({
-    saveWatchedEntities: async () => { saveCalled = true; },
+const WATCHED_TWO = [
+  { edrpou: '12345678', name: 'КНП «Лікарня №1»', enabled: true },
+  { edrpou: '01999106', name: 'ТОВ «TERRALAB IT»', enabled: true },
+];
+
+test('runHandler: /watched attaches inline unwatch keyboard for admin/editor', async () => {
+  const { deps, sent } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
   });
   await runHandler({
-    update: { message: { chat: { id: 123 }, text: '/unwatch abc', message_id: 1 } },
-    env: ENV,
-    deps,
+    update: { message: { chat: { id: 123 }, text: '/watched', message_id: 1 } },
+    env: ENV, deps,
   });
-  assert.match(sent[0].text, /ЄДРПОУ має бути 8 цифр/);
-  assert.equal(saveCalled, false);
+  assert.equal(sent.length, 1);
+  const kb = sent[0].replyMarkup;
+  assert.ok(kb && kb.inline_keyboard, 'has inline_keyboard');
+  assert.equal(kb.inline_keyboard.length, 2);
+  assert.equal(kb.inline_keyboard[0][0].callback_data, 'unwatch:12345678');
 });
 
-test('runHandler: /unwatch missing edrpou → "Не вказано" reply', async () => {
-  const { deps, sent } = await makeDeps();
-  await runHandler({
-    update: { message: { chat: { id: 123 }, text: '/unwatch', message_id: 1 } },
-    env: ENV,
-    deps,
+test('runHandler: /watched for viewer has NO inline unwatch keyboard', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
   });
-  assert.match(sent[0].text, /Не вказано/);
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/watched', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.equal(sent.length, 1);
+  const kb = sent[0].replyMarkup;
+  assert.ok(!kb || !kb.inline_keyboard, 'no inline_keyboard for viewer');
 });
 
-test('runHandler: /unwatch existing → save + reply ✅', async () => {
-  const saved = [];
-  const { deps, sent } = await makeDeps({
-    loadWatchedEntities: async () => ({
-      entities: [{ edrpou: '11111111', name: 'X', enabled: true }],
-      sha: 'sha1',
-    }),
-    saveWatchedEntities: async (env, entities, sha) => { saved.push({ entities, sha }); },
+test('runHandler: /watched empty list → no inline keyboard even for admin', async () => {
+  const { deps, sent } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: [], sha: 's' }),
   });
   await runHandler({
-    update: { message: { chat: { id: 123 }, text: '/unwatch 11111111', message_id: 1 } },
-    env: ENV,
-    deps,
+    update: { message: { chat: { id: 123 }, text: '/watched', message_id: 1 } },
+    env: ENV, deps,
   });
-  assert.match(sent[0].text, /✅ Прибрав 11111111/);
-  assert.equal(saved.length, 1);
-  assert.equal(saved[0].entities.length, 0);
+  const kb = sent[0].replyMarkup;
+  assert.ok(!kb || !kb.inline_keyboard);
 });
 
-test('runHandler: /unwatch non-existing → ❓, no save', async () => {
-  let saveCalled = false;
-  const { deps, sent } = await makeDeps({
-    loadWatchedEntities: async () => ({ entities: [], sha: 'sha1' }),
-    saveWatchedEntities: async () => { saveCalled = true; },
-  });
+test('runHandler: /unwatch command → hint pointing to /watched', async () => {
+  const { deps, sent } = makeDeps({});
   await runHandler({
-    update: { message: { chat: { id: 123 }, text: '/unwatch 11111111', message_id: 1 } },
-    env: ENV,
-    deps,
+    update: { message: { chat: { id: 123 }, text: '/unwatch 12345678', message_id: 1 } },
+    env: ENV, deps,
   });
-  assert.match(sent[0].text, /❓ 11111111/);
-  assert.equal(saveCalled, false);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /\/watched/);
+  assert.match(sent[0].text, /🗑/);
 });
 
 test('runHandler: /watch invalid → ❌ reply, no calls', async () => {
@@ -1618,21 +1619,6 @@ test('runHandler: viewer → /watch refused', async () => {
   assert.match(sent[0].text, /редакторів/);
 });
 
-test('runHandler: viewer → /unwatch refused', async () => {
-  let saveCalled = false;
-  const { deps, sent } = makeDeps({
-    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
-    saveWatchedEntities: async () => { saveCalled = true; },
-  });
-  await runHandler({
-    update: { message: { chat: { id: 456 }, text: '/unwatch 12345678', message_id: 1 } },
-    env: ENV,
-    deps,
-  });
-  assert.equal(saveCalled, false);
-  assert.match(sent[0].text, /редакторів/);
-});
-
 test('runHandler: viewer → /unarchive refused', async () => {
   const { deps, sent } = makeDeps({
     loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
@@ -2249,19 +2235,6 @@ test('runHandler: /watch records audit commit', async () => {
   assert.match(savedOpts.message, /^audit: watch 12345678 · Андрій \[123\/admin\]$/);
 });
 
-test('runHandler: /unwatch records audit commit', async () => {
-  let savedOpts;
-  const { deps } = makeDeps({
-    loadWatchedEntities: async () => ({ entities: [{ edrpou: '12345678', name: 'КНП', enabled: true }], sha: 's' }),
-    saveWatchedEntities: async (_e, _ent, _s, opts) => { savedOpts = opts; },
-  });
-  await runHandler({
-    update: { message: { chat: { id: 123 }, from: { first_name: 'Андрій' }, text: '/unwatch 12345678', message_id: 1 } },
-    env: ENV, deps,
-  });
-  assert.match(savedOpts.message, /^audit: unwatch 12345678 /);
-});
-
 // ── Task 10: audit commit message on /invite, /revoke, /role, /unarchive ──────
 
 const ADMIN_FROM = { first_name: 'Адмін' };
@@ -2386,4 +2359,89 @@ test('runHandler: /log handles GitHub failure gracefully', async () => {
   });
   assert.equal(sent.length, 1);
   assert.match(sent[0].text, /недоступн/);
+});
+
+// ── Task 5: unwatch:<edrpou> callback ────────────────────────────────────────
+
+const CB = (data, fromChatId = 123, from = { first_name: 'Андрій' }) => ({
+  callback_query: { id: 'cq1', data, from, message: { chat: { id: fromChatId }, message_id: 9 } },
+});
+
+test('callback unwatch: removes entity, refreshes via editMessageText, audits, toast', async () => {
+  let savedOpts, edited, acked;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
+    saveWatchedEntities: async (_e, _ent, _s, opts) => { savedOpts = opts; },
+    editMessageText: async (args) => { edited = args; },
+    answerCallbackQuery: async (args) => { acked = args; },
+  });
+  await runHandler({ update: CB('unwatch:12345678'), env: ENV, deps });
+  assert.match(savedOpts.message, /^audit: unwatch 12345678 · Андрій \[123\/admin\]$/);
+  assert.match(edited.text, /01999106/);
+  assert.doesNotMatch(edited.text, /12345678/);
+  assert.equal(edited.replyMarkup.inline_keyboard.length, 1);
+  assert.equal(edited.replyMarkup.inline_keyboard[0][0].callback_data, 'unwatch:01999106');
+  assert.match(acked.text, /Прибрано/);
+});
+
+test('callback unwatch: last entity → empty-state text, no keyboard', async () => {
+  let edited;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: [{ edrpou: '12345678', name: 'КНП', enabled: true }], sha: 's' }),
+    saveWatchedEntities: async () => {},
+    editMessageText: async (args) => { edited = args; },
+    answerCallbackQuery: async () => {},
+  });
+  await runHandler({ update: CB('unwatch:12345678'), env: ENV, deps });
+  assert.match(edited.text, /Не стежу за жодним замовником/);
+  assert.ok(edited.replyMarkup == null, 'no keyboard when list empty');
+});
+
+test('callback unwatch: double-tap (already gone) → "вже прибрано", no save', async () => {
+  let saved = false, acked;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: [{ edrpou: '01999106', name: 'X', enabled: true }], sha: 's' }),
+    saveWatchedEntities: async () => { saved = true; },
+    editMessageText: async () => {},
+    answerCallbackQuery: async (args) => { acked = args; },
+  });
+  await runHandler({ update: CB('unwatch:12345678'), env: ENV, deps });
+  assert.equal(saved, false);
+  assert.match(acked.text, /[Вв]же прибрано/);
+});
+
+test('callback unwatch: viewer rejected, no save', async () => {
+  let saved = false, acked;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
+    saveWatchedEntities: async () => { saved = true; },
+    answerCallbackQuery: async (args) => { acked = args; },
+  });
+  await runHandler({ update: CB('unwatch:12345678', 456, { first_name: 'V' }), env: ENV, deps });
+  assert.equal(saved, false);
+  assert.match(acked.text, /редактор|🚫/);
+});
+
+test('callback unwatch: invalid edrpou → toast, no save', async () => {
+  let saved = false, acked;
+  const { deps } = makeDeps({
+    saveWatchedEntities: async () => { saved = true; },
+    answerCallbackQuery: async (args) => { acked = args; },
+  });
+  await runHandler({ update: CB('unwatch:abc'), env: ENV, deps });
+  assert.equal(saved, false);
+  assert.match(acked.text, /Невалідн/);
+});
+
+test('runHandler: viewer /unwatch command → hint (not refusal)', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/unwatch 12345678', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /\/watched/);
 });

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat, formatNightDigest, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, answerCallbackQuery, setMyCommands, broadcastDigest } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, formatNightDigest, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, broadcastDigest } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -949,4 +949,41 @@ test('formatNightDigest: header includes Kyiv date of the night', () => {
   // runIso 2026-05-22T06:00:00Z = 09:00 Kyiv on 22.05.2026
   const text = formatNightDigest('2026-05-22T06:00:00Z', pending);
   assert.match(text, /🌙 Нічний дайджест за 22\.05\.2026/);
+});
+
+test('editMessageText: posts text + reply_markup to editMessageText endpoint', async () => {
+  let captured;
+  const fakeFetch = async (url, opts) => {
+    captured = { url, body: opts.body };
+    return { ok: true, status: 200, json: async () => ({ ok: true, result: {} }) };
+  };
+  await editMessageText({
+    token: 'T', chatId: 42, messageId: 7,
+    text: 'hello', replyMarkup: { inline_keyboard: [[{ text: 'x', callback_data: 'y' }]] },
+    fetch: fakeFetch,
+  });
+  assert.match(captured.url, /\/botT\/editMessageText$/);
+  const params = captured.body; // URLSearchParams
+  assert.equal(params.get('chat_id'), '42');
+  assert.equal(params.get('message_id'), '7');
+  assert.equal(params.get('text'), 'hello');
+  assert.match(params.get('reply_markup'), /inline_keyboard/);
+});
+
+test('editMessageText: omits reply_markup when not provided', async () => {
+  let captured;
+  const fakeFetch = async (url, opts) => {
+    captured = opts.body;
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  await editMessageText({ token: 'T', chatId: 1, messageId: 2, text: 'hi', fetch: fakeFetch });
+  assert.equal(captured.get('reply_markup'), null);
+});
+
+test('editMessageText: throws on non-ok HTTP', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 400, text: async () => 'bad' });
+  await assert.rejects(
+    () => editMessageText({ token: 'T', chatId: 1, messageId: 2, text: 'x', fetch: fakeFetch }),
+    /400/,
+  );
 });

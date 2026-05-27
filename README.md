@@ -34,7 +34,7 @@ Set in repo Settings → Secrets and variables → Actions:
 **Telegram (recommended):**
 - `/add UA-YYYY-MM-DD-NNNNNN-x` — додати тендер. Опційно: `/add UA-... мої нотатки`.
 - `/list` / `/info` — переглянути watchlist (короткий / детальний; `/info` групує за фазою — Приймання / Розгляд / Очікування договору тощо — кожна окремим повідомленням).
-- `/watch <EDRPOU>` / `/unwatch` / `/watched` — стежити за всіма новими тендерами замовника.
+- `/watch <EDRPOU>` / `/watched` — стежити за всіма новими тендерами замовника. Прибрати замовника — кнопкою 🗑 у списку `/watched`.
 - `/help` — повний список команд.
 
 Адмін-команди (тільки для `ADMIN_CHAT_ID`):

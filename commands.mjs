@@ -20,7 +20,7 @@ const BUTTON_ALIASES = {
 
 // Reply keyboard sent with each bot response to an allowed user. Telegram
 // renders it persistently above the text input. Buttons with arguments
-// (/add, /watch, /remove, /unwatch, /info UA-..., /archive UA-...,
+// (/add, /watch, /remove, /info UA-..., /archive UA-...,
 // /unarchive UA-...) stay text-only since you can't put a tender_id on a
 // button label.
 export const MAIN_KEYBOARD = {
@@ -103,12 +103,8 @@ export function parseCommand(text) {
     return { cmd: 'watch', edrpou: args };
   }
 
-  const unwatchMatch = trimmed.match(/^\/unwatch(?:@\w+)?(?:\s+(.*))?$/i);
-  if (unwatchMatch) {
-    const args = (unwatchMatch[1] || '').trim();
-    if (!args) return { cmd: 'unwatch', error: 'missing_edrpou' };
-    if (!EDRPOU_RE.test(args)) return { cmd: 'unwatch', error: 'invalid_edrpou' };
-    return { cmd: 'unwatch', edrpou: args };
+  if (/^\/unwatch(?:@\w+)?(?:\s+.*)?$/i.test(trimmed)) {
+    return { cmd: 'unwatch_removed' };
   }
 
   const archiveMatch = trimmed.match(/^\/archive(?:@\w+)?(?:\s+(.+))?$/i);
@@ -551,6 +547,21 @@ export function handleWatched({ watchedEntities }) {
   return rows.join('\n\n') + `\n\nВсього: ${watchedEntities.length}`;
 }
 
+// Inline keyboard for /watched — one 🗑 delete button per watched entity.
+// Rendered only for editor/admin (handler decides). Button text is plain
+// (Telegram does not HTML-parse button labels), so no escapeHtml here.
+export function buildWatchedKeyboard(watchedEntities) {
+  if (!watchedEntities || watchedEntities.length === 0) return null;
+  return {
+    inline_keyboard: watchedEntities.map(e => {
+      const name = e.name && e.name !== '(unknown)'
+        ? ` — ${truncate(abbreviateLegalForm(e.name), 40)}`
+        : '';
+      return [{ text: `🗑 ${e.edrpou}${name}`, callback_data: `unwatch:${e.edrpou}` }];
+    }),
+  };
+}
+
 export function handleUnwatch({ watchedEntities }, { edrpou }) {
   const existing = watchedEntities.find(e => e.edrpou === edrpou);
   if (!existing) {
@@ -699,7 +710,7 @@ export async function handleWatch(deps, { edrpou }) {
     added_at: new Date().toISOString(),
   };
   const reply = entityName === '(unknown)'
-    ? `✅ ${edrpou} збережено. Серед ~1000 останніх публікацій Prozorro тендерів від цього замовника не виявлено — нормально, якщо замовник публікує рідко. Назва замовника зʼявиться у /watched коли bot знайде його перший новий тендер. Якщо ЄДРПОУ помилковий — /unwatch ${edrpou}.`
+    ? `✅ ${edrpou} збережено. Серед ~1000 останніх публікацій Prozorro тендерів від цього замовника не виявлено — нормально, якщо замовник публікує рідко. Назва замовника зʼявиться у /watched коли bot знайде його перший новий тендер. Якщо ЄДРПОУ помилковий — прибери його кнопкою 🗑 у /watched.`
     : `✅ Стежу за ${edrpou} — ${escapeHtml(abbreviateLegalForm(entityName))}\nПомічено як уже-побачені: ${bootstrapIds.length} активних тендерів. Алерт буде на нові.`;
   return {
     reply,
@@ -1230,7 +1241,6 @@ const HELP_EDIT_TENDERS = [
 
 const HELP_EDIT_ENTITIES = [
   '/watch ЄДРПОУ — стежити за замовником',
-  '/unwatch ЄДРПОУ — припинити стежити',
 ];
 
 const HELP_EDIT_ARCHIVE = [
@@ -1325,7 +1335,6 @@ const EDIT_COMMANDS = [
   { command: 'add',       description: 'Додати тендер у моніторинг' },
   { command: 'remove',    description: 'Видалити тендер' },
   { command: 'watch',     description: 'Стежити за замовником (ЄДРПОУ)' },
-  { command: 'unwatch',   description: 'Припинити стежити за замовником' },
   { command: 'unarchive', description: 'Видалити тендер з архіву' },
 ];
 const ADMIN_COMMANDS = [

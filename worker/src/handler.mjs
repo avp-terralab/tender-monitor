@@ -1,6 +1,6 @@
 import {
   parseCommand, handleAdd, handleStatus, handleRemove,
-  handleWatch, handleUnwatch, handleWatched,
+  handleWatch, handleUnwatch, handleWatched, buildWatchedKeyboard,
   handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, buildRoleChangeNotice, handleWhoami, handleUsersList, handleInvitesList,
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
@@ -13,7 +13,7 @@ import {
   formatAuditLog,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
-import { sendReply, editMessageReplyMarkup, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
+import { sendReply, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
 import {
   loadWatchlist, saveWatchlist,
   loadWatchedEntities, saveWatchedEntities,
@@ -59,6 +59,7 @@ export async function runHandler({ update, env, deps = {} }) {
   });
   const _now = deps.now ?? (() => new Date());
   const _editMessageReplyMarkup = deps.editMessageReplyMarkup ?? editMessageReplyMarkup;
+  const _editMessageText = deps.editMessageText ?? editMessageText;
   const _answerCallbackQuery = deps.answerCallbackQuery ?? answerCallbackQuery;
   const _setMyCommands = deps.setMyCommands ?? setMyCommands;
   const _fetchLastCommit = deps.fetchLastCommit ?? fetchLastCommit;
@@ -72,9 +73,10 @@ export async function runHandler({ update, env, deps = {} }) {
   const cq = update.callback_query;
   if (cq) {
     return handleCallbackQuery({
-      cq, env, _editMessageReplyMarkup, _answerCallbackQuery,
+      cq, env, _editMessageReplyMarkup, _editMessageText, _answerCallbackQuery,
       _loadAllowedUsers, _saveAllowedUsers,
       _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
+      _loadWatchedEntities, _saveWatchedEntities,
       _fetchTender, _extractSnapshot,
     });
   }
@@ -121,8 +123,9 @@ export async function runHandler({ update, env, deps = {} }) {
   const cmd = parseCommand(msg.text);
   let reply;
   let notifyReplyMarkup = null;
+  let watchedReplyMarkup = null;
 
-  const MUTATING = new Set(['add', 'remove', 'watch', 'unwatch', 'unarchive']);
+  const MUTATING = new Set(['add', 'remove', 'watch', 'unarchive']);
   if (MUTATING.has(cmd.cmd) && !isEditor) {
     reply = '🚫 Це команда для редакторів. У тебе доступ лише для перегляду.';
   } else if (cmd.cmd === 'start') {
@@ -419,28 +422,17 @@ export async function runHandler({ update, env, deps = {} }) {
         auditMessage: formatAuditMessage({ action: 'watch', target: cmd.edrpou, actor: actorName, chatId, role }),
       });
     }
-  } else if (cmd.cmd === 'unwatch') {
-    if (cmd.error === 'invalid_edrpou') {
-      reply = '❌ ЄДРПОУ має бути 8 цифр';
-    } else if (cmd.error === 'missing_edrpou') {
-      reply = '❌ Не вказано ЄДРПОУ. /unwatch 12345678';
-    } else {
-      reply = await applyEntityMutationWithRetry({
-        env,
-        loadWatchedEntities: _loadWatchedEntities,
-        saveWatchedEntities: _saveWatchedEntities,
-        computeMutation: ({ entities }) => handleUnwatch({ watchedEntities: entities }, cmd),
-        auditMessage: formatAuditMessage({ action: 'unwatch', target: cmd.edrpou, actor: actorName, chatId, role }),
-      });
-    }
   } else if (cmd.cmd === 'watched') {
     try {
       const { entities } = await _loadWatchedEntities(env);
       reply = handleWatched({ watchedEntities: entities });
+      if (isEditor) watchedReplyMarkup = buildWatchedKeyboard(entities);
     } catch (err) {
       console.error('worker: /watched failed:', err.message);
       reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
     }
+  } else if (cmd.cmd === 'unwatch_removed') {
+    reply = 'ℹ️ Команду /unwatch прибрано. Відкрий /watched і тисни 🗑 біля замовника, щоб припинити стеження.';
   } else if (cmd.cmd === 'invite') {
     if (!isAdmin) return;
     if (cmd.error === 'missing_role') {
@@ -626,7 +618,7 @@ export async function runHandler({ update, env, deps = {} }) {
         text: pages[i],
         replyToMessageId: i === 0 ? msg.message_id : undefined,
         replyMarkup: isLast
-          ? (notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined))
+          ? (watchedReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined))
           : undefined,
       });
     } catch (err) {
@@ -649,9 +641,10 @@ const KYIV_TIME_FMT = new Intl.DateTimeFormat('uk-UA', {
 });
 
 async function handleCallbackQuery({
-  cq, env, _editMessageReplyMarkup, _answerCallbackQuery,
+  cq, env, _editMessageReplyMarkup, _editMessageText, _answerCallbackQuery,
   _loadAllowedUsers, _saveAllowedUsers,
   _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
+  _loadWatchedEntities, _saveWatchedEntities,
   _fetchTender, _extractSnapshot,
 }) {
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
@@ -733,6 +726,48 @@ async function handleCallbackQuery({
       auditMessage: formatAuditMessage({ action: 'add', target: tenderId, actor: actorName, chatId, role }),
     });
     await onAddResult({ result, tenderId, chatId, messageId, env, _editMessageReplyMarkup, ack });
+    return;
+  }
+
+  if (data.startsWith('unwatch:')) {
+    if (!isEditor) {
+      await ack('🚫 Це команда для редакторів', true);
+      return;
+    }
+    const edrpou = data.slice('unwatch:'.length);
+    if (!/^\d{8}$/.test(edrpou)) {
+      await ack('❌ Невалідний ЄДРПОУ');
+      return;
+    }
+    const auditMessage = formatAuditMessage({ action: 'unwatch', target: edrpou, actor: actorName, chatId, role });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { entities, sha } = await _loadWatchedEntities(env);
+        const { mutation } = handleUnwatch({ watchedEntities: entities }, { edrpou });
+        let newEntities = entities;
+        if (mutation) {
+          newEntities = applyEntityMutation(entities, mutation);
+          await _saveWatchedEntities(env, newEntities, sha, { message: auditMessage });
+        }
+        try {
+          await _editMessageText({
+            token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+            text: handleWatched({ watchedEntities: newEntities }),
+            replyMarkup: buildWatchedKeyboard(newEntities) ?? undefined,
+          });
+        } catch (err) {
+          console.error('worker: unwatch edit failed:', err.message);
+        }
+        await ack(mutation ? `✅ Прибрано ${edrpou}` : 'Вже прибрано');
+        return;
+      } catch (err) {
+        if (err instanceof ConflictError && attempt === 0) continue;
+        console.error('worker: unwatch callback failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+    }
+    await ack('⚠️ Не зміг зберегти');
     return;
   }
 
