@@ -2280,6 +2280,29 @@ test('runHandler: /invite records audit commit (label sanitized)', async () => {
   assert.match(savedOpts.message, /^audit: invite editor:Олег /);
 });
 
+test('runHandler: /invite label with separator chars is sanitized — commit remains parseable', async () => {
+  // Label contains all three separator chars used by parseAuditCommit: · [ ]
+  // Parser uses parts.slice(1).join(' ') so multi-word labels are kept intact.
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadInvites: async () => ({ invites: [], sha: 's' }),
+    saveInvites: async (_e, _inv, _s, opts) => { savedOpts = opts; },
+    generateToken: () => 'a'.repeat(32),
+    now: () => new Date('2026-05-27T10:00:00Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: ADMIN_FROM, text: '/invite editor Олег · [boss]', message_id: 1 } },
+    env: ENV, deps,
+  });
+  const { parseAuditCommit } = await import('../../commands.mjs');
+  const parsed = parseAuditCommit(savedOpts.message);
+  assert.ok(parsed, 'commit message must remain parseable after label sanitization');
+  assert.doesNotMatch(parsed.target, /[·\[\]]/, 'sanitized target must not contain separator chars');
+  assert.equal(parsed.action, 'invite', 'action must still be "invite"');
+  assert.equal(parsed.chatId, '123', 'chatId must still be "123"');
+  assert.equal(parsed.role, 'admin', 'role must still be "admin"');
+});
+
 test('runHandler: /revoke records audit commit', async () => {
   let savedOpts;
   const { deps } = makeDeps({
