@@ -2231,3 +2231,32 @@ test('runHandler: callback add: uses label from allowed_users when from has no d
   });
   assert.match(savedOpts.message, new RegExp(`^audit: add ${ID} · Оксана \\[456/editor\\]$`));
 });
+
+// ── Task 9: audit commit message on /watch and /unwatch ───────────────────────
+
+test('runHandler: /watch records audit commit', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: [], sha: 's' }),
+    saveWatchedEntities: async (_e, _ent, _s, opts) => { savedOpts = opts; },
+    searchTenderByEdrpou: async () => ({ name: 'КНП', ids: [] }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: { first_name: 'Андрій' }, text: '/watch 12345678', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, /^audit: watch 12345678 · Андрій \[123\/admin\]$/);
+});
+
+test('runHandler: /unwatch records audit commit', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: [{ edrpou: '12345678', name: 'КНП', enabled: true }], sha: 's' }),
+    saveWatchedEntities: async (_e, _ent, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: { first_name: 'Андрій' }, text: '/unwatch 12345678', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, /^audit: unwatch 12345678 /);
+});

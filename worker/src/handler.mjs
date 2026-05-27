@@ -411,6 +411,7 @@ export async function runHandler({ update, env, deps = {} }) {
             await _saveWatchedSeen(env, updated, sha);
           }
         },
+        auditMessage: formatAuditMessage({ action: 'watch', target: cmd.edrpou, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'unwatch') {
@@ -424,6 +425,7 @@ export async function runHandler({ update, env, deps = {} }) {
         loadWatchedEntities: _loadWatchedEntities,
         saveWatchedEntities: _saveWatchedEntities,
         computeMutation: ({ entities }) => handleUnwatch({ watchedEntities: entities }, cmd),
+        auditMessage: formatAuditMessage({ action: 'unwatch', target: cmd.edrpou, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'watched') {
@@ -780,14 +782,14 @@ async function applyInviteMutationWithRetry({ env, loadInvites, saveInvites, com
   return '⚠️ Не зміг зберегти, спробуй за хвилину';
 }
 
-async function applyEntityMutationWithRetry({ env, loadWatchedEntities, saveWatchedEntities, computeMutation, onSuccess }) {
+async function applyEntityMutationWithRetry({ env, loadWatchedEntities, saveWatchedEntities, computeMutation, onSuccess, auditMessage }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { entities, sha } = await loadWatchedEntities(env);
       const result = await computeMutation({ entities });
       if (!result.mutation) return result.reply;
       const newEntities = applyEntityMutation(entities, result.mutation);
-      await saveWatchedEntities(env, newEntities, sha);
+      await saveWatchedEntities(env, newEntities, sha, { message: auditMessage });
       if (onSuccess) await onSuccess(result.mutation);
       return result.reply;
     } catch (err) {
