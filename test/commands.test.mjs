@@ -15,6 +15,7 @@ import {
   formatAuditLog,
   buildWatchedKeyboard,
   buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
+  paginateArchiveGroup, ARCHIVE_PAGE_LIMIT,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -1581,14 +1582,14 @@ test('handleArchive: tender_id is rendered as Prozorro link', () => {
     archived_at: '2026-05-12T08:30:00Z',
     final_status: 'complete',
     final_snapshot: {},
-  }]});
+  }]}).join('\n\n');
   assert.match(reply, /<a href="https:\/\/prozorro\.gov\.ua\/tender\/UA-2026-04-16-005830-a">UA-2026-04-16-005830-a<\/a>/);
 });
 
 test('handleArchive: empty', () => {
-  assert.equal(
+  assert.deepEqual(
     handleArchive({ archive: [] }),
-    '📭 Архів порожній.'
+    ['📭 Архів порожній.']
   );
 });
 
@@ -1603,7 +1604,7 @@ test('handleArchive: lists complete with icon and money', () => {
         value: { amount: 350000, currency: 'UAH' },
       },
     },
-  ]});
+  ]}).join('\n\n');
   assert.match(reply, /✅ <a [^>]+>UA-2026-04-30-010542-a<\/a>/);
   assert.match(reply, /КНП Лікарня/);
   assert.match(reply, /350 000 UAH/);
@@ -1616,7 +1617,7 @@ test('handleArchive: maps statuses to icons', () => {
     { tender_id: 'UA-2026-05-01-000001-a', archived_at: '2026-05-12T08:00:00Z', final_status: 'complete', final_snapshot: {} },
     { tender_id: 'UA-2026-05-01-000002-a', archived_at: '2026-05-12T08:00:00Z', final_status: 'cancelled', final_snapshot: {} },
     { tender_id: 'UA-2026-05-01-000003-a', archived_at: '2026-05-12T08:00:00Z', final_status: 'unsuccessful', final_snapshot: {} },
-  ]});
+  ]}).join('\n\n');
   assert.match(reply, /✅ <a [^>]+>UA-2026-05-01-000001-a/);
   assert.match(reply, /⊘ <a [^>]+>UA-2026-05-01-000002-a/);
   assert.match(reply, /❌ <a [^>]+>UA-2026-05-01-000003-a/);
@@ -1637,7 +1638,7 @@ test('handleArchive: adds contract download link line when documents present', (
         ],
       }],
     },
-  }]});
+  }]}).join('\n\n');
   // Link should point to the non-'notice' document (signed PDF, not КЕП-signature)
   assert.match(reply, /📄.*Завантажити договір/);
   assert.match(reply, /https:\/\/x\/d1/);
@@ -1650,7 +1651,7 @@ test('handleArchive: no link line when no contract docs', () => {
     archived_at: '2026-05-12T08:00:00Z',
     final_status: 'cancelled',
     final_snapshot: { procuringEntity: { name: 'X' }, contracts: [] },
-  }]});
+  }]}).join('\n\n');
   assert.doesNotMatch(reply, /Завантажити договір/);
 });
 
@@ -1664,7 +1665,7 @@ test('handleArchive: no link line when only notice docs present', () => {
         { id: 'D1', title: 'sign.p7s', url: 'https://x/sign', documentType: 'notice' },
       ]}],
     },
-  }]});
+  }]}).join('\n\n');
   assert.doesNotMatch(reply, /Завантажити договір/);
 });
 
@@ -1677,7 +1678,7 @@ test('handleArchive: appends EDRPOU after procuring entity name', () => {
       procuringEntity: { name: 'КНП "Лікарня"', edrpou: '02000010' },
       value: { amount: 350000, currency: 'UAH' },
     },
-  }]});
+  }]}).join('\n\n');
   assert.match(reply, /КНП "Лікарня" \(ЄДРПОУ 02000010\) — 350 000 UAH/);
 });
 
@@ -1690,7 +1691,7 @@ test('handleArchive: omits EDRPOU when missing on entity', () => {
       procuringEntity: { name: 'КНП Лікарня' },
       value: { amount: 350000, currency: 'UAH' },
     },
-  }]});
+  }]}).join('\n\n');
   assert.match(reply, /КНП Лікарня — 350 000 UAH/);
   assert.doesNotMatch(reply, /ЄДРПОУ/);
 });
@@ -1726,7 +1727,7 @@ test('handleArchive: groups by service provider with local numbering', () => {
         awards: [{ id: 'aw3', status: 'active', suppliers: [{ name: 'ФОП Іванов', identifier: { id: '1234567890' } }] }],
       },
     },
-  ]});
+  ]}).join('\n\n');
   // Group A header with count (2 contracts)
   assert.match(reply, /👤 ТОВ «ТерраЛаб» \(ЄДРПОУ 40123456\) — 2 контракти/);
   // Group B header with count (1 contract)
@@ -1757,7 +1758,7 @@ test('handleArchive: single service provider still gets group header', () => {
         awards: [{ id: 'aw1', status: 'active', suppliers: [{ name: 'ТОВ «ТерраЛаб»', identifier: { id: '40123456' } }] }],
       },
     },
-  ]});
+  ]}).join('\n\n');
   assert.match(reply, /👤 ТОВ «ТерраЛаб» \(ЄДРПОУ 40123456\) — 1 контракт/);
 });
 
@@ -1769,7 +1770,7 @@ test('handleArchive: archive entry without active award falls into "Без до�
       final_status: 'cancelled',
       final_snapshot: { procuringEntity: { name: 'X' }, awards: [] },
     },
-  ]});
+  ]}).join('\n\n');
   assert.match(reply, /📦 Без укладеного договору — 1 контракт/);
 });
 
@@ -1784,10 +1785,10 @@ test('handleArchive: pluralizes контракт/контракти/контра
     },
   });
   // 5 contracts → "5 контрактів"
-  const reply5 = handleArchive({ archive: [mk(1,'X'), mk(2,'X'), mk(3,'X'), mk(4,'X'), mk(5,'X')] });
+  const reply5 = handleArchive({ archive: [mk(1,'X'), mk(2,'X'), mk(3,'X'), mk(4,'X'), mk(5,'X')] }).join('\n\n');
   assert.match(reply5, /— 5 контрактів/);
   // 3 contracts → "3 контракти"
-  const reply3 = handleArchive({ archive: [mk(1,'Y'), mk(2,'Y'), mk(3,'Y')] });
+  const reply3 = handleArchive({ archive: [mk(1,'Y'), mk(2,'Y'), mk(3,'Y')] }).join('\n\n');
   assert.match(reply3, /— 3 контракти/);
 });
 
@@ -1806,7 +1807,7 @@ test('handleArchive: ignores non-active awards when picking service provider', (
         ],
       },
     },
-  ]});
+  ]}).join('\n\n');
   assert.match(reply, /👤 Переможець \(ЄДРПОУ 40123456\)/);
   assert.doesNotMatch(reply, /Дискваліфікований/);
 });
@@ -1815,10 +1816,38 @@ test('handleArchive: sorts by archived_at desc', () => {
   const reply = handleArchive({ archive: [
     { tender_id: 'UA-2026-05-01-000001-a', archived_at: '2026-05-10T00:00:00Z', final_status: 'complete', final_snapshot: {} },
     { tender_id: 'UA-2026-05-01-000002-a', archived_at: '2026-05-12T00:00:00Z', final_status: 'complete', final_snapshot: {} },
-  ]});
+  ]}).join('\n\n');
   const idx1 = reply.indexOf('UA-2026-05-01-000001-a');
   const idx2 = reply.indexOf('UA-2026-05-01-000002-a');
   assert.ok(idx2 < idx1, 'newer should come first');
+});
+
+test('handleArchive: returns an array; total only on the last page', () => {
+  const archive = [
+    { tender_id: 'UA-2026-05-01-000001-a', archived_at: '2026-05-12T08:00:00Z', final_status: 'complete', final_snapshot: {} },
+    { tender_id: 'UA-2026-05-01-000002-a', archived_at: '2026-05-12T07:00:00Z', final_status: 'complete', final_snapshot: {} },
+  ];
+  const pages = handleArchive({ archive });
+  assert.ok(Array.isArray(pages));
+  const withTotal = pages.filter(p => /Всього в архіві:/.test(p));
+  assert.equal(withTotal.length, 1);
+  assert.ok(/Всього в архіві: 2/.test(pages[pages.length - 1]));
+  assert.ok(pages.every(p => !/Сторінка/.test(p)), 'no footer when it all fits');
+});
+
+test('handleArchive: a group with many contracts splits into footered pages', () => {
+  // All entries share the same (no-provider) group → one group, many entries → must split.
+  const archive = Array.from({ length: 100 }, (_, i) => ({
+    tender_id: `UA-2026-05-01-${String(i).padStart(6, '0')}-a`,
+    archived_at: `2026-05-12T08:${String(i % 60).padStart(2, '0')}:00Z`,
+    final_status: 'complete',
+    final_snapshot: { procuringEntity: { name: 'КНП Лікарня' }, value: { amount: 350000, currency: 'UAH' } },
+  }));
+  const pages = handleArchive({ archive });
+  assert.ok(pages.length >= 2, 'large group split across pages');
+  const paged = pages.filter(p => /Сторінка \d+\/\d+/.test(p));
+  assert.ok(paged.length >= 2, 'split pages carry Сторінка k/n');
+  assert.ok(/Всього в архіві: 100/.test(pages[pages.length - 1]));
 });
 
 test('handleArchiveDetail: unknown id', async () => {
@@ -3062,4 +3091,34 @@ test('buildWatchedManageKeyboard: empty list → null', () => {
 test('WATCHED_MANAGE_PROMPT: exported non-empty string', () => {
   assert.equal(typeof WATCHED_MANAGE_PROMPT, 'string');
   assert.ok(WATCHED_MANAGE_PROMPT.length > 0);
+});
+
+test('paginateArchiveGroup: fits in one page → no footer', () => {
+  const pages = paginateArchiveGroup({ header: 'H', entries: ['a', 'b', 'c'] });
+  assert.equal(pages.length, 1);
+  assert.equal(pages[0], 'H\n\na\n\nb\n\nc');
+  assert.doesNotMatch(pages[0], /Сторінка/);
+});
+
+test('paginateArchiveGroup: overflow → multiple pages, footer, entries intact', () => {
+  const big = (c) => c.repeat(1500);
+  const entries = [big('1'), big('2'), big('3'), big('4')];
+  const pages = paginateArchiveGroup({ header: 'HDR', entries, limit: 3900 });
+  assert.ok(pages.length >= 2, 'splits into >= 2 pages');
+  pages.forEach((p, i) => {
+    assert.ok(p.startsWith('HDR\n\n'), 'header repeated');
+    assert.match(p, new RegExp(`Сторінка ${i + 1}/${pages.length}$`));
+  });
+  for (const e of entries) {
+    const hits = pages.filter(p => p.includes(e)).length;
+    assert.equal(hits, 1, 'entry appears whole on exactly one page');
+  }
+});
+
+test('paginateArchiveGroup: a single oversized entry gets its own page', () => {
+  const huge = 'x'.repeat(5000);
+  const pages = paginateArchiveGroup({ header: 'H', entries: [huge, 'small'], limit: 3900 });
+  assert.equal(pages.length, 2);
+  assert.ok(pages[0].includes(huge));
+  assert.ok(pages[1].includes('small'));
 });
