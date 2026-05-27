@@ -2940,3 +2940,21 @@ test('formatAuditLog: respects limit', () => {
   assert.equal((out.match(/^•/gm) || []).length, 5);
 });
 
+// ── Task 4: parseCommand /log ─────────────────────────────────────────────
+
+test('parseCommand: /log default limit 20', () => {
+  assert.deepEqual(parseCommand('/log'), { cmd: 'log', limit: 20 });
+});
+test('parseCommand: /log N', () => {
+  assert.deepEqual(parseCommand('/log 5'), { cmd: 'log', limit: 5 });
+});
+test('parseCommand: /log caps at 50', () => {
+  assert.deepEqual(parseCommand('/log 999'), { cmd: 'log', limit: 50 });
+});
+test('parseCommand: /log floors at 1', () => {
+  assert.deepEqual(parseCommand('/log 0'), { cmd: 'log', limit: 1 });
+});
+test('parseCommand: /log abc → unknown', () => {
+  assert.deepEqual(parseCommand('/log abc'), { cmd: 'unknown' });
+});
+

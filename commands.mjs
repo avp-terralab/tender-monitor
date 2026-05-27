@@ -46,6 +46,12 @@ export function parseCommand(text) {
   if (/^\/watched(?:@\w+)?$/i.test(trimmed)) return { cmd: 'watched' };
   if (/^\/whoami(?:@\w+)?$/i.test(trimmed)) return { cmd: 'whoami' };
 
+  const logMatch = trimmed.match(/^\/log(?:@\w+)?(?:\s+(\d+))?\s*$/i);
+  if (logMatch) {
+    const n = logMatch[1] ? parseInt(logMatch[1], 10) : 20;
+    return { cmd: 'log', limit: Math.min(Math.max(n, 1), 50) };
+  }
+
   const notifyMatch = trimmed.match(/^\/notify(?:@\w+)?(?:\s+(\S+))?\s*$/i);
   if (notifyMatch) {
     const arg = (notifyMatch[1] || '').toLowerCase();
