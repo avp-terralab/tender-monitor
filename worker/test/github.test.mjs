@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers, loadArchivedTenders } from '../src/github.mjs';
+import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers, loadArchivedTenders, fetchAuditLog, fetchLatestDeployCommit } from '../src/github.mjs';
 
 const ENV = { GITHUB_PAT: 'PAT_VALUE' };
 
@@ -316,4 +316,30 @@ test('saveAllowedUsers: threads custom message through saveFile', async () => {
   const fakeFetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 200, json: async () => ({}) }; };
   await saveAllowedUsers(ENV, [], 'sha', { fetch: fakeFetch, message: 'audit: revoke 1 · admin [9/admin]' });
   assert.equal(JSON.parse(calls[0].opts.body).message, 'audit: revoke 1 · admin [9/admin]');
+});
+
+test('fetchAuditLog: returns first lines + dates', async () => {
+  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ([
+    { sha: 'a', commit: { message: 'audit: add UA-x · A [1/editor]\n\nbody', committer: { date: '2026-05-26T10:00:00Z' } } },
+    { sha: 'b', commit: { message: 'bot: update watchlist 2026', committer: { date: '2026-05-26T09:00:00Z' } } },
+  ]) });
+  const out = await fetchAuditLog(ENV, { fetch: fakeFetch });
+  assert.deepEqual(out, [
+    { message: 'audit: add UA-x · A [1/editor]', date: '2026-05-26T10:00:00Z' },
+    { message: 'bot: update watchlist 2026', date: '2026-05-26T09:00:00Z' },
+  ]);
+});
+
+test('fetchAuditLog: throws on non-ok', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 500 });
+  await assert.rejects(() => fetchAuditLog(ENV, { fetch: fakeFetch }), /500/);
+});
+
+test('fetchLatestDeployCommit: skips audit: commits', async () => {
+  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ([
+    { sha: 'aaaaaaa', commit: { message: 'audit: add UA-x · A [1/editor]', committer: { date: '2026-05-26T10:00:00Z' } } },
+    { sha: 'ddddddd', commit: { message: 'telegram: ship feature', committer: { date: '2026-05-25T10:00:00Z' } } },
+  ]) });
+  const out = await fetchLatestDeployCommit(ENV, { fetch: fakeFetch });
+  assert.equal(out.message, 'telegram: ship feature');
 });

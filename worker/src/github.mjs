@@ -239,7 +239,7 @@ export async function fetchLatestDeployCommit(env, { fetch: fetchImpl = fetch } 
   );
   if (!res.ok) throw new Error(`GitHub commits API ${res.status}`);
   const commits = await res.json();
-  const BOT_RE = /^(monitor: state update|monitor: cursor sync|bot:)/;
+  const BOT_RE = /^(monitor: state update|monitor: cursor sync|bot:|audit:)/;
   for (const c of commits) {
     const msg = (c.commit?.message ?? '').split('\n')[0];
     if (BOT_RE.test(msg)) continue;
@@ -250,4 +250,25 @@ export async function fetchLatestDeployCommit(env, { fetch: fetchImpl = fetch } 
     };
   }
   return null;
+}
+
+// Reads recent commits on main and returns their first-line message + date.
+// /log filters these by the `audit:` prefix to reconstruct the action log.
+export async function fetchAuditLog(env, { fetch: fetchImpl = fetch, perPage = 100 } = {}) {
+  const res = await fetchImpl(
+    `${API_BASE}/repos/${REPO}/commits?per_page=${perPage}`,
+    {
+      headers: {
+        Authorization: `Bearer ${env.GITHUB_PAT}`,
+        'User-Agent': 'tender-monitor-worker',
+        Accept: 'application/vnd.github+json',
+      },
+    },
+  );
+  if (!res.ok) throw new Error(`GitHub commits API ${res.status}`);
+  const commits = await res.json();
+  return commits.map(c => ({
+    message: (c.commit?.message ?? '').split('\n')[0],
+    date: c.commit?.committer?.date ?? null,
+  }));
 }
