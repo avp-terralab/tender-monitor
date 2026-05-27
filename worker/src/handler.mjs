@@ -8,6 +8,7 @@ import {
   formatInfo, formatInfoPages, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD,
   TERMINAL_STATUSES, hydrateContractDocs,
   formatAuditMessage,
+  sanitizeActor,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
@@ -451,6 +452,7 @@ export async function runHandler({ update, env, deps = {} }) {
         saveInvites: _saveInvites,
         computeMutation: ({ invites }) =>
           handleInvite({ invites, generateToken: _generateToken, now: _now, botUsername: BOT_USERNAME }, cmd),
+        auditMessage: formatAuditMessage({ action: 'invite', target: `${cmd.role}:${sanitizeActor(cmd.label)}`, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'invites') {
@@ -484,6 +486,7 @@ export async function runHandler({ update, env, deps = {} }) {
         saveAllowedUsers: _saveAllowedUsers,
         computeMutation: ({ users }) =>
           handleRevoke({ allowedUsers: users, adminChatId }, cmd),
+        auditMessage: formatAuditMessage({ action: 'revoke', target: cmd.chat_id, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'role') {
@@ -503,6 +506,7 @@ export async function runHandler({ update, env, deps = {} }) {
         saveAllowedUsers: _saveAllowedUsers,
         computeMutation: ({ users }) =>
           handleRole({ allowedUsers: users, adminChatId }, cmd),
+        auditMessage: formatAuditMessage({ action: `role→${cmd.role}`, target: cmd.chat_id, actor: actorName, chatId, role }),
       });
       // Success replies lead with the role icon (✏️ editor / 📄 viewer); error
       // and no-op replies use other prefixes (❓ 🚫 ℹ️). Detect success by the
@@ -549,6 +553,7 @@ export async function runHandler({ update, env, deps = {} }) {
         loadArchivedTenders: _loadArchivedTenders,
         saveArchivedTenders: _saveArchivedTenders,
         tender_id: cmd.tender_id,
+        auditMessage: formatAuditMessage({ action: 'unarchive', target: cmd.tender_id, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'help') {
@@ -740,14 +745,14 @@ async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, compu
   return '⚠️ Не зміг зберегти, спробуй за хвилину';
 }
 
-async function applyAllowedUsersMutationWithRetry({ env, loadAllowedUsers, saveAllowedUsers, computeMutation }) {
+async function applyAllowedUsersMutationWithRetry({ env, loadAllowedUsers, saveAllowedUsers, computeMutation, auditMessage }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { users, sha } = await loadAllowedUsers(env);
       const result = computeMutation({ users });
       if (!result.mutation) return result.reply;
       const next = applyAllowedUsersMutation(users, result.mutation);
-      await saveAllowedUsers(env, next, sha);
+      await saveAllowedUsers(env, next, sha, { message: auditMessage });
       return result.reply;
     } catch (err) {
       if (err instanceof ConflictError && attempt === 0) continue;
@@ -761,14 +766,14 @@ async function applyAllowedUsersMutationWithRetry({ env, loadAllowedUsers, saveA
   return '⚠️ Не зміг зберегти, спробуй за хвилину';
 }
 
-async function applyInviteMutationWithRetry({ env, loadInvites, saveInvites, computeMutation }) {
+async function applyInviteMutationWithRetry({ env, loadInvites, saveInvites, computeMutation, auditMessage }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { invites, sha } = await loadInvites(env);
       const result = computeMutation({ invites });
       if (!result.mutation) return result.reply;
       const next = applyInviteMutation(invites, result.mutation);
-      await saveInvites(env, next, sha);
+      await saveInvites(env, next, sha, { message: auditMessage });
       return result.reply;
     } catch (err) {
       if (err instanceof ConflictError && attempt === 0) continue;
@@ -859,13 +864,13 @@ async function applyLiveArchive({
   return archiveWritten;
 }
 
-async function applyUnarchive({ env, loadArchivedTenders, saveArchivedTenders, tender_id }) {
+async function applyUnarchive({ env, loadArchivedTenders, saveArchivedTenders, tender_id, auditMessage }) {
   try {
     const { archive, sha } = await loadArchivedTenders(env);
     const result = handleUnarchive({ archive }, { tender_id });
     if (!result.archiveMutation) return result.reply;
     const newArchive = applyArchiveMutation(archive, result.archiveMutation);
-    await saveArchivedTenders(env, newArchive, sha);
+    await saveArchivedTenders(env, newArchive, sha, { message: auditMessage });
     return result.reply;
   } catch (err) {
     if (err instanceof ConflictError) {

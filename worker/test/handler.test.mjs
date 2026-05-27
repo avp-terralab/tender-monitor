@@ -2260,3 +2260,61 @@ test('runHandler: /unwatch records audit commit', async () => {
   });
   assert.match(savedOpts.message, /^audit: unwatch 12345678 /);
 });
+
+// ── Task 10: audit commit message on /invite, /revoke, /role, /unarchive ──────
+
+const ADMIN_FROM = { first_name: 'Адмін' };
+
+test('runHandler: /invite records audit commit (label sanitized)', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadInvites: async () => ({ invites: [], sha: 's' }),
+    saveInvites: async (_e, _inv, _s, opts) => { savedOpts = opts; },
+    generateToken: () => 'a'.repeat(32),
+    now: () => new Date('2026-05-27T10:00:00Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: ADMIN_FROM, text: '/invite editor Олег', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, /^audit: invite editor:Олег /);
+});
+
+test('runHandler: /revoke records audit commit', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'X', role: 'viewer' }], sha: 's' }),
+    saveAllowedUsers: async (_e, _u, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: ADMIN_FROM, text: '/revoke 456', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, /^audit: revoke 456 /);
+});
+
+test('runHandler: /role records audit commit with role suffix', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'X', role: 'viewer' }], sha: 's' }),
+    saveAllowedUsers: async (_e, _u, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: ADMIN_FROM, text: '/role editor 456', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, /^audit: role→editor 456 /);
+});
+
+test('runHandler: /unarchive records audit commit', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadArchivedTenders: async () => ({ archive: [{ tender_id: ID, notes: '' }], sha: 's' }),
+    saveArchivedTenders: async (_e, _a, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: ADMIN_FROM, text: `/unarchive ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, new RegExp(`^audit: unarchive ${ID} `));
+});
