@@ -2474,6 +2474,30 @@ test('callback watched:done → editMessageText returns to VIEW (single button)'
   assert.match(edited.text, /12345678/);
 });
 
+test('callback watched:manage on empty list (stale) → empty-state, no keyboard', async () => {
+  let edited;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: [], sha: 's' }),
+    editMessageText: async (a) => { edited = a; },
+    answerCallbackQuery: async () => {},
+  });
+  await runHandler({ update: CB('watched:manage'), env: ENV, deps });
+  assert.match(edited.text, /Не стежу за жодним замовником/);
+  assert.ok(edited.replyMarkup == null);
+});
+
+test('callback watched:done on empty list (stale) → empty-state, no keyboard', async () => {
+  let edited;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: [], sha: 's' }),
+    editMessageText: async (a) => { edited = a; },
+    answerCallbackQuery: async () => {},
+  });
+  await runHandler({ update: CB('watched:done'), env: ENV, deps });
+  assert.match(edited.text, /Не стежу за жодним замовником/);
+  assert.ok(edited.replyMarkup == null);
+});
+
 test('callback unwatch: after delete stays in MANAGE mode', async () => {
   let savedOpts, edited, acked;
   const { deps } = makeDeps({
