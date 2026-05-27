@@ -46,6 +46,12 @@ export function parseCommand(text) {
   if (/^\/watched(?:@\w+)?$/i.test(trimmed)) return { cmd: 'watched' };
   if (/^\/whoami(?:@\w+)?$/i.test(trimmed)) return { cmd: 'whoami' };
 
+  const logMatch = trimmed.match(/^\/log(?:@\w+)?(?:\s+(\d+))?\s*$/i);
+  if (logMatch) {
+    const n = logMatch[1] ? parseInt(logMatch[1], 10) : 20;
+    return { cmd: 'log', limit: Math.min(Math.max(n, 1), 50) };
+  }
+
   const notifyMatch = trimmed.match(/^\/notify(?:@\w+)?(?:\s+(\S+))?\s*$/i);
   if (notifyMatch) {
     const arg = (notifyMatch[1] || '').toLowerCase();
@@ -175,6 +181,69 @@ export function parseCommand(text) {
 
   if (trimmed.startsWith('/')) return { cmd: 'unknown' };
   return { cmd: null };
+}
+
+// ── Audit log ────────────────────────────────────────────────────────────
+// Mutating actions are recorded by enriching the commit message that already
+// accompanies each state write. Format (parseable first line):
+//   audit: <action> <target> · <actor> [<chatId>/<role>]
+
+export function sanitizeActor(name) {
+  return String(name ?? '')
+    .replace(/[\r\n·\[\]]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40) || '?';
+}
+
+// `target` must not contain " · " — that token delimits actor in the commit line.
+// The only free-text target (the /invite label) is sanitized by the caller before
+// being passed here. Validated targets (tender_id, edrpou, chat_id) are safe.
+export function formatAuditMessage({ action, target, actor, chatId, role }) {
+  const t = target ? ` ${target}` : '';
+  return `audit: ${action}${t} · ${sanitizeActor(actor)} [${chatId}/${role}]`;
+}
+
+export function parseAuditCommit(message) {
+  const line = String(message ?? '').split('\n')[0];
+  const m = line.match(/^audit:\s+(\S+)(?:\s+(.+?))?\s+·\s+(.+?)\s+\[([^\/\]]+)\/([^\]]+)\]\s*$/);
+  if (!m) return null;
+  return { action: m[1], target: m[2] ?? null, actor: m[3], chatId: m[4], role: m[5] };
+}
+
+function auditPhrase(e) {
+  const tgt = escapeHtml(e.target ?? '');
+  switch (e.action) {
+    case 'add':       return `додав ${tgt}`;
+    case 'remove':    return `видалив ${tgt}`;
+    case 'watch':     return `почав стеження за ${tgt}`;
+    case 'unwatch':   return `прибрав стеження за ${tgt}`;
+    case 'unarchive': return `повернув з архіву ${tgt}`;
+    case 'revoke':    return `прибрав доступ ${tgt}`;
+    case 'invite': {
+      const raw = e.target ?? '';
+      const [role, ...rest] = raw.split(':');
+      const label = escapeHtml(rest.join(':'));
+      return `видав invite (${role}: ${label})`;
+    }
+    default:
+      if (e.action.startsWith('role→')) {
+        return `змінив роль ${tgt} → ${e.action.slice('role→'.length)}`;
+      }
+      return `${e.action} ${tgt}`.trim();
+  }
+}
+
+export function formatAuditLog(entries, { limit }) {
+  if (!entries || entries.length === 0) {
+    return '📋 Журнал порожній — поки немає зафіксованих дій.';
+  }
+  const shown = entries.slice(0, limit);
+  const lines = shown.map(e => {
+    const when = e.date ? KYIV_DT_FMT.format(new Date(e.date)) : '??';
+    return `• ${when} — ${escapeHtml(e.actor)} ${auditPhrase(e)}`;
+  });
+  return `📋 Журнал дій (останні ${shown.length})\n\n` + lines.join('\n');
 }
 
 export function buildAutoNotes(snapshot) {
@@ -363,6 +432,16 @@ export function formatInfoPages({ runIso, groups, errors = [] }) {
 const KYIV_HM_FMT = new Intl.DateTimeFormat('uk-UA', {
   timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
 });
+
+const _KYIV_DATE_FMT = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit',
+});
+const _KYIV_TIME_FMT2 = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
+});
+const KYIV_DT_FMT = {
+  format: (d) => `${_KYIV_DATE_FMT.format(d)} ${_KYIV_TIME_FMT2.format(d)}`,
+};
 
 export function handleStatus({ watchlist, sha, users, invites, lastCommit, now, rich }) {
   const active = watchlist.filter(r => r.enabled).length;
@@ -1166,6 +1245,7 @@ const HELP_ADMIN = [
   '/invites — активні invite-посилання',
   '/users — список користувачів',
   '/revoke [chat_id] — видалити користувача',
+  '/log [N] — журнал дій користувачів (хто що додав/видалив)',
 ].join('\n');
 
 export function buildHelpText(role) {
@@ -1255,6 +1335,7 @@ const ADMIN_COMMANDS = [
   { command: 'invites', description: 'Активні invite-посилання' },
   { command: 'users',   description: 'Список користувачів' },
   { command: 'revoke',  description: 'Видалити користувача' },
+  { command: 'log',     description: 'Журнал дій користувачів' },
 ];
 
 export const BOT_COMMANDS_BY_ROLE = {

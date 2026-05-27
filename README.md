@@ -42,6 +42,7 @@ Set in repo Settings → Secrets and variables → Actions:
 - `/invites` — активні (pending) invite-посилання.
 - `/users` — список усіх допущених юзерів.
 - `/revoke [chat_id]` — прибрати юзера з allowlist.
+- `/log [N]` — журнал дій користувачів (хто додав/видалив тендер чи замовника, видав/забрав доступ). Читає історію комітів; показує останні N (дефолт 20).
 
 Auth: адмін гейтиться `ADMIN_CHAT_ID` env (single id, не залежить від GitHub); інші юзери — у `_state/allowed_users.json` (заповнюється через `/invite` redeem). Інвайти зберігаються у `_state/invites.json` зі статусом pending/redeemed (audit-trail). Webhook через Cloudflare Worker — sub-second response. Зміна watchlist/allowlist комітиться у репо одразу після reply від бота.
 

@@ -10,6 +10,9 @@ import {
   applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
   BOT_COMMANDS_BY_ROLE,
+  sanitizeActor, formatAuditMessage,
+  parseAuditCommit,
+  formatAuditLog,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -2827,5 +2830,151 @@ test('formatInfoPages: errors-only (no groups) still produces an errors page wit
   assert.match(pages[0], /📋 Статус тендерів \(/);          // global header still prepended
   assert.match(pages[0], /⚠️ Не вдалось перевірити \(1\)/);
   assert.match(pages[0], /UA-ERR — Prozorro 503/);
+});
+
+// ── Task 1: sanitizeActor + formatAuditMessage ────────────────────────────
+
+test('sanitizeActor: strips separators and newlines, collapses spaces', () => {
+  assert.equal(sanitizeActor('Ан\nдрій · [x]'), 'Ан дрій x');
+});
+
+test('sanitizeActor: empty → "?"', () => {
+  assert.equal(sanitizeActor(''), '?');
+  assert.equal(sanitizeActor(null), '?');
+});
+
+test('sanitizeActor: caps length at 40', () => {
+  assert.ok(sanitizeActor('a'.repeat(100)).length <= 40);
+});
+
+test('formatAuditMessage: builds audit line', () => {
+  assert.equal(
+    formatAuditMessage({ action: 'add', target: 'UA-2026-04-30-010542-a', actor: 'Андрій', chatId: '1', role: 'editor' }),
+    'audit: add UA-2026-04-30-010542-a · Андрій [1/editor]'
+  );
+});
+
+test('formatAuditMessage: null target → no double space', () => {
+  assert.equal(
+    formatAuditMessage({ action: 'role→editor', target: null, actor: 'admin', chatId: '9', role: 'admin' }),
+    'audit: role→editor · admin [9/admin]'
+  );
+});
+
+// ── Task 2: parseAuditCommit ──────────────────────────────────────────────
+
+test('parseAuditCommit: parses a full line', () => {
+  assert.deepEqual(
+    parseAuditCommit('audit: add UA-2026-04-30-010542-a · Андрій Парасина [786078813/editor]'),
+    { action: 'add', target: 'UA-2026-04-30-010542-a', actor: 'Андрій Парасина', chatId: '786078813', role: 'editor' }
+  );
+});
+
+test('parseAuditCommit: parses role→ and chat_id target', () => {
+  assert.deepEqual(
+    parseAuditCommit('audit: role→editor 7321709183 · admin [9/admin]'),
+    { action: 'role→editor', target: '7321709183', actor: 'admin', chatId: '9', role: 'admin' }
+  );
+});
+
+test('parseAuditCommit: returns null for non-audit messages', () => {
+  assert.equal(parseAuditCommit('bot: update watchlist 2026-05-26T00:00:00Z'), null);
+  assert.equal(parseAuditCommit('monitor: state update'), null);
+  assert.equal(parseAuditCommit(''), null);
+});
+
+test('parseAuditCommit: round-trips formatAuditMessage (cyrillic name with spaces)', () => {
+  const x = { action: 'invite', target: 'editor:Олег', actor: 'Андрій Парасина', chatId: '786078813', role: 'admin' };
+  const parsed = parseAuditCommit(formatAuditMessage(x));
+  assert.deepEqual(parsed, x);
+});
+
+test('parseAuditCommit: only reads the first line', () => {
+  const msg = 'audit: remove UA-2026-05-01-012131-a · Оксана [7321709183/editor]\n\nbody text';
+  assert.equal(parseAuditCommit(msg).action, 'remove');
+});
+
+// ── Task 3: auditPhrase + formatAuditLog ─────────────────────────────────
+
+const D = '2026-05-26T11:32:00Z'; // 14:32 Kyiv (UTC+3)
+
+test('formatAuditLog: empty → placeholder', () => {
+  assert.match(formatAuditLog([], { limit: 20 }), /порожній/);
+});
+
+test('formatAuditLog: renders date, actor, and per-action phrase', () => {
+  const out = formatAuditLog([
+    { action: 'add', target: 'UA-2026-04-30-010542-a', actor: 'Андрій', date: D },
+  ], { limit: 20 });
+  assert.match(out, /26\.05 14:32/);
+  assert.match(out, /Андрій додав UA-2026-04-30-010542-a/);
+});
+
+test('formatAuditLog: phrase per action', () => {
+  const mk = (action, target) => formatAuditLog([{ action, target, actor: 'X', date: D }], { limit: 20 });
+  assert.match(mk('remove', 'UA-x'), /видалив UA-x/);
+  assert.match(mk('watch', '12345678'), /почав стеження за 12345678/);
+  assert.match(mk('unwatch', '12345678'), /прибрав стеження за 12345678/);
+  assert.match(mk('unarchive', 'UA-x'), /повернув з архіву UA-x/);
+  assert.match(mk('invite', 'editor:Олег'), /видав invite \(editor: Олег\)/);
+  assert.match(mk('revoke', '123'), /прибрав доступ 123/);
+  assert.match(mk('role→editor', '123'), /змінив роль 123 → editor/);
+});
+
+test('formatAuditLog: escapes HTML in actor', () => {
+  const out = formatAuditLog([{ action: 'add', target: 'UA-x', actor: '<b>x</b>', date: D }], { limit: 20 });
+  assert.doesNotMatch(out, /<b>x<\/b>/);
+  assert.match(out, /&lt;b&gt;/);
+});
+
+test('formatAuditLog: escapes HTML in the target (e.g. invite label)', () => {
+  const out = formatAuditLog([{ action: 'invite', target: 'editor:<b>x</b>', actor: 'admin', date: '2026-05-26T11:32:00Z' }], { limit: 20 });
+  assert.doesNotMatch(out, /<b>x<\/b>/);
+  assert.match(out, /&lt;b&gt;/);
+});
+
+test('formatAuditLog: respects limit', () => {
+  const entries = Array.from({ length: 30 }, (_, i) => ({ action: 'add', target: `UA-${i}`, actor: 'X', date: D }));
+  const out = formatAuditLog(entries, { limit: 5 });
+  assert.match(out, /останні 5/);
+  assert.equal((out.match(/^•/gm) || []).length, 5);
+});
+
+// ── Task 4: parseCommand /log ─────────────────────────────────────────────
+
+test('parseCommand: /log default limit 20', () => {
+  assert.deepEqual(parseCommand('/log'), { cmd: 'log', limit: 20 });
+});
+test('parseCommand: /log N', () => {
+  assert.deepEqual(parseCommand('/log 5'), { cmd: 'log', limit: 5 });
+});
+test('parseCommand: /log caps at 50', () => {
+  assert.deepEqual(parseCommand('/log 999'), { cmd: 'log', limit: 50 });
+});
+test('parseCommand: /log floors at 1', () => {
+  assert.deepEqual(parseCommand('/log 0'), { cmd: 'log', limit: 1 });
+});
+test('parseCommand: /log abc → unknown', () => {
+  assert.deepEqual(parseCommand('/log abc'), { cmd: 'unknown' });
+});
+
+// ── Task 5: /log in help text + command list ──────────────────────────────
+
+test('buildHelpText: admin includes /log', () => {
+  assert.match(buildHelpText('admin'), /\/log/);
+});
+test('buildHelpText: editor/viewer do not include /log', () => {
+  assert.doesNotMatch(buildHelpText('editor'), /\/log/);
+  assert.doesNotMatch(buildHelpText('viewer'), /\/log/);
+});
+test('BOT_COMMANDS_BY_ROLE: only admin has log', () => {
+  assert.ok(BOT_COMMANDS_BY_ROLE.admin.some(c => c.command === 'log'));
+  assert.ok(!BOT_COMMANDS_BY_ROLE.editor.some(c => c.command === 'log'));
+  assert.ok(!BOT_COMMANDS_BY_ROLE.viewer.some(c => c.command === 'log'));
+});
+test('BOT_COMMANDS_BY_ROLE: all command names within Telegram 32-char limit', () => {
+  for (const set of Object.values(BOT_COMMANDS_BY_ROLE)) {
+    for (const c of set) assert.ok(c.command.length <= 32);
+  }
 });
 

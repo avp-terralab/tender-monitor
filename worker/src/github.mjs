@@ -55,12 +55,12 @@ export async function loadWatchlist(env, { fetch: fetchImpl = fetch } = {}) {
   return { watchlist: JSON.parse(text), sha };
 }
 
-export async function saveWatchlist(env, watchlist, sha, { fetch: fetchImpl = fetch } = {}) {
+export async function saveWatchlist(env, watchlist, sha, { fetch: fetchImpl = fetch, message } = {}) {
   const json = JSON.stringify(watchlist, null, 2) + '\n';
   const bytes = new TextEncoder().encode(json);
   const base64 = btoa(String.fromCharCode(...bytes));
   const body = {
-    message: `bot: update watchlist ${new Date().toISOString()}`,
+    message: message ?? `bot: update watchlist ${new Date().toISOString()}`,
     content: base64,
     sha,
     branch: 'main',
@@ -108,11 +108,11 @@ async function loadFile(env, filePath, { fetch: fetchImpl = fetch } = {}) {
   return { content: text, sha };
 }
 
-async function saveFile(env, filePath, text, sha, { fetch: fetchImpl = fetch } = {}) {
+async function saveFile(env, filePath, text, sha, { fetch: fetchImpl = fetch, message } = {}) {
   const bytes = new TextEncoder().encode(text);
   const base64 = btoa(String.fromCharCode(...bytes));
   const body = {
-    message: `bot: update ${filePath} ${new Date().toISOString()}`,
+    message: message ?? `bot: update ${filePath} ${new Date().toISOString()}`,
     content: base64,
     branch: 'main',
   };
@@ -239,7 +239,7 @@ export async function fetchLatestDeployCommit(env, { fetch: fetchImpl = fetch } 
   );
   if (!res.ok) throw new Error(`GitHub commits API ${res.status}`);
   const commits = await res.json();
-  const BOT_RE = /^(monitor: state update|monitor: cursor sync|bot:)/;
+  const BOT_RE = /^(monitor: state update|monitor: cursor sync|bot:|audit:)/;
   for (const c of commits) {
     const msg = (c.commit?.message ?? '').split('\n')[0];
     if (BOT_RE.test(msg)) continue;
@@ -250,4 +250,26 @@ export async function fetchLatestDeployCommit(env, { fetch: fetchImpl = fetch } 
     };
   }
   return null;
+}
+
+// Reads recent commits on main and returns their first-line message + date.
+// /log filters these by the `audit:` prefix to reconstruct the action log.
+export async function fetchAuditLog(env, { fetch: fetchImpl = fetch, perPage = 100 } = {}) {
+  const res = await fetchImpl(
+    `${API_BASE}/repos/${REPO}/commits?per_page=${perPage}`,
+    {
+      headers: {
+        Authorization: `Bearer ${env.GITHUB_PAT}`,
+        'User-Agent': 'tender-monitor-worker',
+        Accept: 'application/vnd.github+json',
+      },
+    },
+  );
+  if (!res.ok) throw new Error(`GitHub GET ${res.status}: ${await res.text()}`);
+  const commits = await res.json();
+  if (!Array.isArray(commits)) throw new Error(`GitHub commits API: unexpected response shape`);
+  return commits.map(c => ({
+    message: (c.commit?.message ?? '').split('\n')[0],
+    date: c.commit?.committer?.date ?? null,
+  }));
 }

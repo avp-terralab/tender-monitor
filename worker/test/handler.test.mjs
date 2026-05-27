@@ -38,6 +38,7 @@ const makeDeps = (overrides = {}) => {
       loadPendingDigest: async () => null,
       loadTenderState: async () => null,
       fetchLatestDeployCommit: async () => null,
+      fetchAuditLog: async () => [],
       ...overrides,
     },
   };
@@ -2128,4 +2129,261 @@ test('runHandler: /status cache expires after 60s and rebuilds', async () => {
   assert.doesNotMatch(sent[1].text, /cached/);
   // New GH calls were made.
   assert.ok(ghCallCount > callsAfterFirst, 'should have re-fetched after cache expiry');
+});
+
+// ── Task 8: audit commit message on /add, /remove, callback add: ─────────────
+
+test('runHandler: /add records audit commit message with actor + role', async () => {
+  let savedOpts;
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    saveWatchlist: async (_env, _wl, _sha, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: { first_name: 'Андрій' }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.ok(savedOpts, 'saveWatchlist received opts');
+  assert.match(savedOpts.message, new RegExp(`^audit: add ${ID} · Андрій \\[123/admin\\]$`));
+});
+
+test('runHandler: /remove records audit commit message', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true }], sha: 's' }),
+    saveWatchlist: async (_e, _w, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: { first_name: 'Андрій' }, text: `/remove ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, new RegExp(`^audit: remove ${ID} `));
+});
+
+test('runHandler: /remove no-op does NOT save (nothing to log)', async () => {
+  let saved = false;
+  const { deps } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    saveWatchlist: async () => { saved = true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/remove ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.equal(saved, false);
+});
+
+test('runHandler: actor falls back to allowed_users label when from is absent', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Оксана', role: 'editor' }], sha: 's' }),
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    saveWatchlist: async (_e, _w, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, new RegExp(`^audit: add ${ID} · Оксана \\[456/editor\\]$`));
+});
+
+test('runHandler: actor name with separators is sanitized in commit message', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    saveWatchlist: async (_e, _w, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: { first_name: 'Ан·ій', last_name: '[x]' }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  const { parseAuditCommit } = await import('../../commands.mjs');
+  assert.ok(parseAuditCommit(savedOpts.message), 'message remains parseable');
+  assert.doesNotMatch(parseAuditCommit(savedOpts.message).actor, /[·\[\]]/, 'actor must not contain separator characters');
+});
+
+test('runHandler: callback add: records audit commit', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    saveWatchlist: async (_e, _w, _s, opts) => { savedOpts = opts; },
+    editMessageReplyMarkup: async () => {},
+    answerCallbackQuery: async () => {},
+  });
+  await runHandler({
+    update: { callback_query: { id: 'cq1', data: `add:${ID}`, from: { first_name: 'Оксана' }, message: { chat: { id: 123 }, message_id: 5 } } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, new RegExp(`^audit: add ${ID} · Оксана `));
+});
+
+test('runHandler: callback add: uses label from allowed_users when from has no display name', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Оксана', role: 'editor' }], sha: 's' }),
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    saveWatchlist: async (_e, _w, _s, opts) => { savedOpts = opts; },
+    editMessageReplyMarkup: async () => {},
+    answerCallbackQuery: async () => {},
+  });
+  await runHandler({
+    update: { callback_query: { id: 'cq2', data: `add:${ID}`, from: { id: 456 }, message: { chat: { id: 456 }, message_id: 6 } } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, new RegExp(`^audit: add ${ID} · Оксана \\[456/editor\\]$`));
+});
+
+// ── Task 9: audit commit message on /watch and /unwatch ───────────────────────
+
+test('runHandler: /watch records audit commit', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: [], sha: 's' }),
+    saveWatchedEntities: async (_e, _ent, _s, opts) => { savedOpts = opts; },
+    searchTenderByEdrpou: async () => ({ name: 'КНП', ids: [] }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: { first_name: 'Андрій' }, text: '/watch 12345678', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, /^audit: watch 12345678 · Андрій \[123\/admin\]$/);
+});
+
+test('runHandler: /unwatch records audit commit', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadWatchedEntities: async () => ({ entities: [{ edrpou: '12345678', name: 'КНП', enabled: true }], sha: 's' }),
+    saveWatchedEntities: async (_e, _ent, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: { first_name: 'Андрій' }, text: '/unwatch 12345678', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, /^audit: unwatch 12345678 /);
+});
+
+// ── Task 10: audit commit message on /invite, /revoke, /role, /unarchive ──────
+
+const ADMIN_FROM = { first_name: 'Адмін' };
+
+test('runHandler: /invite records audit commit (label sanitized)', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadInvites: async () => ({ invites: [], sha: 's' }),
+    saveInvites: async (_e, _inv, _s, opts) => { savedOpts = opts; },
+    generateToken: () => 'a'.repeat(32),
+    now: () => new Date('2026-05-27T10:00:00Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: ADMIN_FROM, text: '/invite editor Олег', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, /^audit: invite editor:Олег /);
+});
+
+test('runHandler: /invite label with separator chars is sanitized — commit remains parseable', async () => {
+  // Label contains all three separator chars used by parseAuditCommit: · [ ]
+  // Parser uses parts.slice(1).join(' ') so multi-word labels are kept intact.
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadInvites: async () => ({ invites: [], sha: 's' }),
+    saveInvites: async (_e, _inv, _s, opts) => { savedOpts = opts; },
+    generateToken: () => 'a'.repeat(32),
+    now: () => new Date('2026-05-27T10:00:00Z'),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: ADMIN_FROM, text: '/invite editor Олег · [boss]', message_id: 1 } },
+    env: ENV, deps,
+  });
+  const { parseAuditCommit } = await import('../../commands.mjs');
+  const parsed = parseAuditCommit(savedOpts.message);
+  assert.ok(parsed, 'commit message must remain parseable after label sanitization');
+  assert.doesNotMatch(parsed.target, /[·\[\]]/, 'sanitized target must not contain separator chars');
+  assert.equal(parsed.action, 'invite', 'action must still be "invite"');
+  assert.equal(parsed.chatId, '123', 'chatId must still be "123"');
+  assert.equal(parsed.role, 'admin', 'role must still be "admin"');
+});
+
+test('runHandler: /revoke records audit commit', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'X', role: 'viewer' }], sha: 's' }),
+    saveAllowedUsers: async (_e, _u, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: ADMIN_FROM, text: '/revoke 456', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, /^audit: revoke 456 /);
+});
+
+test('runHandler: /role records audit commit with role suffix', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'X', role: 'viewer' }], sha: 's' }),
+    saveAllowedUsers: async (_e, _u, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: ADMIN_FROM, text: '/role editor 456', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, /^audit: role→editor 456 /);
+});
+
+test('runHandler: /unarchive records audit commit', async () => {
+  let savedOpts;
+  const { deps } = makeDeps({
+    loadArchivedTenders: async () => ({ archive: [{ tender_id: ID, notes: '' }], sha: 's' }),
+    saveArchivedTenders: async (_e, _a, _s, opts) => { savedOpts = opts; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, from: ADMIN_FROM, text: `/unarchive ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(savedOpts.message, new RegExp(`^audit: unarchive ${ID} `));
+});
+
+// ── Task 11: /log admin-only audit log command ────────────────────────────────
+
+const COMMITS = [
+  { message: 'audit: add UA-2026-04-30-010542-a · Андрій [786078813/editor]', date: '2026-05-26T11:00:00Z' },
+  { message: 'bot: update watchlist 2026', date: '2026-05-26T10:30:00Z' },
+  { message: 'monitor: state update', date: '2026-05-26T10:00:00Z' },
+  { message: 'audit: revoke 1402480451 · admin [123/admin]', date: '2026-05-25T09:00:00Z' },
+];
+
+test('runHandler: /log (admin) renders parsed audit actions only', async () => {
+  const { deps, sent } = makeDeps({ fetchAuditLog: async () => COMMITS });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/log', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /Журнал дій/);
+  assert.match(sent[0].text, /Андрій додав UA-2026-04-30-010542-a/);
+  assert.match(sent[0].text, /admin прибрав доступ 1402480451/);
+  assert.doesNotMatch(sent[0].text, /update watchlist/);
+  assert.doesNotMatch(sent[0].text, /state update/);
+});
+
+test('runHandler: /log non-admin → silent skip', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'X', role: 'editor' }], sha: 's' }),
+    fetchAuditLog: async () => COMMITS,
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/log', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.equal(sent.length, 0);
+});
+
+test('runHandler: /log handles GitHub failure gracefully', async () => {
+  const { deps, sent } = makeDeps({ fetchAuditLog: async () => { throw new Error('GitHub 500'); } });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/log', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /недоступн/);
 });

@@ -7,6 +7,10 @@ import {
   applyArchiveMutation,
   formatInfo, formatInfoPages, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD,
   TERMINAL_STATUSES, hydrateContractDocs,
+  formatAuditMessage,
+  sanitizeActor,
+  parseAuditCommit,
+  formatAuditLog,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
@@ -18,6 +22,7 @@ import {
   loadInvites, saveInvites,
   loadArchivedTenders, saveArchivedTenders,
   loadPendingDigest, loadTenderState, fetchLatestDeployCommit,
+  fetchAuditLog,
   ConflictError,
 } from './github.mjs';
 
@@ -60,6 +65,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const _loadPendingDigest = deps.loadPendingDigest ?? loadPendingDigest;
   const _loadTenderState = deps.loadTenderState ?? loadTenderState;
   const _fetchLatestDeployCommit = deps.fetchLatestDeployCommit ?? fetchLatestDeployCommit;
+  const _fetchAuditLog = deps.fetchAuditLog ?? fetchAuditLog;
   // Tests may inject their own Map to avoid cross-test cache pollution.
   const _statusCache = deps.statusCache ?? STATUS_CACHE;
 
@@ -79,6 +85,9 @@ export async function runHandler({ update, env, deps = {} }) {
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const { isAdmin, isInvited, isAllowed, isEditor, role, userRecord } =
     await resolveUserContext({ chatId, adminChatId, env, _loadAllowedUsers, where: 'msg' });
+
+  const actorName = [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ')
+    || userRecord?.label || chatId;
 
   // /start works for everyone — reveals chat_id; for allowed users, also seeds chat-scope command list.
   // /start <token> is handled in a later branch.
@@ -197,6 +206,7 @@ export async function runHandler({ update, env, deps = {} }) {
         saveWatchlist: _saveWatchlist,
         computeMutation: ({ watchlist }) =>
           handleAdd({ watchlist, archive, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot }, cmd),
+        auditMessage: formatAuditMessage({ action: 'add', target: cmd.tender_id, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'remove') {
@@ -210,6 +220,7 @@ export async function runHandler({ update, env, deps = {} }) {
         loadWatchlist: _loadWatchlist,
         saveWatchlist: _saveWatchlist,
         computeMutation: ({ watchlist }) => handleRemove({ watchlist }, cmd),
+        auditMessage: formatAuditMessage({ action: 'remove', target: cmd.tender_id, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'status') {
@@ -405,6 +416,7 @@ export async function runHandler({ update, env, deps = {} }) {
             await _saveWatchedSeen(env, updated, sha);
           }
         },
+        auditMessage: formatAuditMessage({ action: 'watch', target: cmd.edrpou, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'unwatch') {
@@ -418,6 +430,7 @@ export async function runHandler({ update, env, deps = {} }) {
         loadWatchedEntities: _loadWatchedEntities,
         saveWatchedEntities: _saveWatchedEntities,
         computeMutation: ({ entities }) => handleUnwatch({ watchedEntities: entities }, cmd),
+        auditMessage: formatAuditMessage({ action: 'unwatch', target: cmd.edrpou, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'watched') {
@@ -443,6 +456,7 @@ export async function runHandler({ update, env, deps = {} }) {
         saveInvites: _saveInvites,
         computeMutation: ({ invites }) =>
           handleInvite({ invites, generateToken: _generateToken, now: _now, botUsername: BOT_USERNAME }, cmd),
+        auditMessage: formatAuditMessage({ action: 'invite', target: `${cmd.role}:${sanitizeActor(cmd.label)}`, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'invites') {
@@ -476,6 +490,7 @@ export async function runHandler({ update, env, deps = {} }) {
         saveAllowedUsers: _saveAllowedUsers,
         computeMutation: ({ users }) =>
           handleRevoke({ allowedUsers: users, adminChatId }, cmd),
+        auditMessage: formatAuditMessage({ action: 'revoke', target: cmd.chat_id, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'role') {
@@ -495,6 +510,7 @@ export async function runHandler({ update, env, deps = {} }) {
         saveAllowedUsers: _saveAllowedUsers,
         computeMutation: ({ users }) =>
           handleRole({ allowedUsers: users, adminChatId }, cmd),
+        auditMessage: formatAuditMessage({ action: `role→${cmd.role}`, target: cmd.chat_id, actor: actorName, chatId, role }),
       });
       // Success replies lead with the role icon (✏️ editor / 📄 viewer); error
       // and no-op replies use other prefixes (❓ 🚫 ℹ️). Detect success by the
@@ -541,6 +557,7 @@ export async function runHandler({ update, env, deps = {} }) {
         loadArchivedTenders: _loadArchivedTenders,
         saveArchivedTenders: _saveArchivedTenders,
         tender_id: cmd.tender_id,
+        auditMessage: formatAuditMessage({ action: 'unarchive', target: cmd.tender_id, actor: actorName, chatId, role }),
       });
     }
   } else if (cmd.cmd === 'help') {
@@ -580,6 +597,18 @@ export async function runHandler({ update, env, deps = {} }) {
           break;
         }
       }
+    }
+  } else if (cmd.cmd === 'log') {
+    if (!isAdmin) return;
+    try {
+      const raw = await _fetchAuditLog(env);
+      const entries = raw
+        .map(c => { const p = parseAuditCommit(c.message); return p ? { ...p, date: c.date } : null; })
+        .filter(Boolean);
+      reply = formatAuditLog(entries, { limit: cmd.limit });
+    } catch (err) {
+      console.error('worker: /log failed:', err.message);
+      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
     }
   } else if (cmd.cmd === 'unknown') {
     reply = '❓ Не розумію. /help';
@@ -628,8 +657,10 @@ async function handleCallbackQuery({
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const chatId = String(cq.message?.chat?.id ?? '');
   const messageId = cq.message?.message_id;
-  const { isAdmin, isAllowed, isEditor } =
+  const { isAdmin, isAllowed, isEditor, role, userRecord } =
     await resolveUserContext({ chatId, adminChatId, env, _loadAllowedUsers, where: 'callback' });
+  const actorName = [cq.from?.first_name, cq.from?.last_name].filter(Boolean).join(' ')
+    || userRecord?.label || chatId;
 
   const ack = (text, showAlert = false) => _answerCallbackQuery({
     token: env.TELEGRAM_BOT_TOKEN, callbackQueryId: cq.id, text, showAlert,
@@ -699,6 +730,7 @@ async function handleCallbackQuery({
           fetchTender: _fetchTender, extractSnapshot: _extractSnapshot,
         }, { tender_id: tenderId, notes: null });
       },
+      auditMessage: formatAuditMessage({ action: 'add', target: tenderId, actor: actorName, chatId, role }),
     });
     await onAddResult({ result, tenderId, chatId, messageId, env, _editMessageReplyMarkup, ack });
     return;
@@ -707,14 +739,14 @@ async function handleCallbackQuery({
   await ack('❓ Невідома кнопка');
 }
 
-async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, computeMutation }) {
+async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, computeMutation, auditMessage }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { watchlist, sha } = await loadWatchlist(env);
       const result = await computeMutation({ watchlist });
       if (!result.mutation) return result.reply;
       const newWatchlist = applyMutation(watchlist, result.mutation);
-      await saveWatchlist(env, newWatchlist, sha);
+      await saveWatchlist(env, newWatchlist, sha, { message: auditMessage });
       return result.reply;
     } catch (err) {
       if (err instanceof ConflictError && attempt === 0) continue;
@@ -729,14 +761,14 @@ async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, compu
   return '⚠️ Не зміг зберегти, спробуй за хвилину';
 }
 
-async function applyAllowedUsersMutationWithRetry({ env, loadAllowedUsers, saveAllowedUsers, computeMutation }) {
+async function applyAllowedUsersMutationWithRetry({ env, loadAllowedUsers, saveAllowedUsers, computeMutation, auditMessage }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { users, sha } = await loadAllowedUsers(env);
       const result = computeMutation({ users });
       if (!result.mutation) return result.reply;
       const next = applyAllowedUsersMutation(users, result.mutation);
-      await saveAllowedUsers(env, next, sha);
+      await saveAllowedUsers(env, next, sha, { message: auditMessage });
       return result.reply;
     } catch (err) {
       if (err instanceof ConflictError && attempt === 0) continue;
@@ -750,14 +782,14 @@ async function applyAllowedUsersMutationWithRetry({ env, loadAllowedUsers, saveA
   return '⚠️ Не зміг зберегти, спробуй за хвилину';
 }
 
-async function applyInviteMutationWithRetry({ env, loadInvites, saveInvites, computeMutation }) {
+async function applyInviteMutationWithRetry({ env, loadInvites, saveInvites, computeMutation, auditMessage }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { invites, sha } = await loadInvites(env);
       const result = computeMutation({ invites });
       if (!result.mutation) return result.reply;
       const next = applyInviteMutation(invites, result.mutation);
-      await saveInvites(env, next, sha);
+      await saveInvites(env, next, sha, { message: auditMessage });
       return result.reply;
     } catch (err) {
       if (err instanceof ConflictError && attempt === 0) continue;
@@ -771,14 +803,14 @@ async function applyInviteMutationWithRetry({ env, loadInvites, saveInvites, com
   return '⚠️ Не зміг зберегти, спробуй за хвилину';
 }
 
-async function applyEntityMutationWithRetry({ env, loadWatchedEntities, saveWatchedEntities, computeMutation, onSuccess }) {
+async function applyEntityMutationWithRetry({ env, loadWatchedEntities, saveWatchedEntities, computeMutation, onSuccess, auditMessage }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { entities, sha } = await loadWatchedEntities(env);
       const result = await computeMutation({ entities });
       if (!result.mutation) return result.reply;
       const newEntities = applyEntityMutation(entities, result.mutation);
-      await saveWatchedEntities(env, newEntities, sha);
+      await saveWatchedEntities(env, newEntities, sha, { message: auditMessage });
       if (onSuccess) await onSuccess(result.mutation);
       return result.reply;
     } catch (err) {
@@ -848,13 +880,13 @@ async function applyLiveArchive({
   return archiveWritten;
 }
 
-async function applyUnarchive({ env, loadArchivedTenders, saveArchivedTenders, tender_id }) {
+async function applyUnarchive({ env, loadArchivedTenders, saveArchivedTenders, tender_id, auditMessage }) {
   try {
     const { archive, sha } = await loadArchivedTenders(env);
     const result = handleUnarchive({ archive }, { tender_id });
     if (!result.archiveMutation) return result.reply;
     const newArchive = applyArchiveMutation(archive, result.archiveMutation);
-    await saveArchivedTenders(env, newArchive, sha);
+    await saveArchivedTenders(env, newArchive, sha, { message: auditMessage });
     return result.reply;
   } catch (err) {
     if (err instanceof ConflictError) {
