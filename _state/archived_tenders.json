@@ -510,5 +510,118 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-05-07-007348-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО ОБУХІВСЬКОЇ МІСЬКОЇ РАДИ \"ОБУХІВСЬКА БАГАТОПРОФІЛЬНА ЛІКАРНЯ ІНТЕНСИВНОГО ЛІКУВАННЯ\" — Послуги з постачання програмного забезпечення лабораторної інформаційної си…",
+    "archived_at": "2026-05-29T10:25:52.669Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-07-007348-a",
+      "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії (Код ДК 021:2015 72260000-5 Послуги, пов’язані з програмним забезпеченням)",
+      "status": "complete",
+      "dateModified": "2026-05-29T13:20:33.512352+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-05-15T08:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО ОБУХІВСЬКОЇ МІСЬКОЇ РАДИ \"ОБУХІВСЬКА БАГАТОПРОФІЛЬНА ЛІКАРНЯ ІНТЕНСИВНОГО ЛІКУВАННЯ\"",
+        "edrpou": "01994155"
+      },
+      "value": {
+        "amount": 342720,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Антосієв Сергій ",
+        "email": "s_antos@ukr.net",
+        "telephone": "380969128911"
+      },
+      "documents": [
+        {
+          "id": "3ecc11517d654114a4bc3fbfb71c3a29",
+          "title": "Тендерна_документація_ЛІС_.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-07T13:07:29.538659+03:00"
+        },
+        {
+          "id": "0c8b0fc4db124968bdbddfb03a3d4366",
+          "title": "Додаток 4  Договір (проєкт)_ЛІС_.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-07T13:07:29.538659+03:00"
+        },
+        {
+          "id": "79d44692e1e24f0785634acece1b4cfd",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-07T13:08:18.325174+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "d25bbaee52124fde96140cdab02b59ba",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "a08833390322446bbb02893b3359c895",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "relatedItem": "a08833390322446bbb02893b3359c895",
+              "id": "3af105f7ce9f462f87e50e4f86f5cedf",
+              "hash": "md5:3253dccb346b92aff26b3d4a0612f8fa",
+              "title": "Договір ТЕРРАЛАБ АЙ ТІ 21_05-01_435.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/a08833390322446bbb02893b3359c895/documents/3af105f7ce9f462f87e50e4f86f5cedf?download=835a4d5a8dc945a991b0db48c902d489",
+              "documentOf": "contract",
+              "datePublished": "2026-05-29T13:19:45.510320+03:00",
+              "dateModified": "2026-05-29T13:19:45.510320+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "relatedItem": "a08833390322446bbb02893b3359c895",
+              "id": "816dd0b27ab74de69ab945625bd048e2",
+              "hash": "md5:deb7878f553fdf4075667bd1f31c22a7",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/a08833390322446bbb02893b3359c895/documents/816dd0b27ab74de69ab945625bd048e2?download=6bafc43722b1407b8080aa544d239711",
+              "documentOf": "contract",
+              "datePublished": "2026-05-29T13:20:20.741509+03:00",
+              "dateModified": "2026-05-29T13:20:20.741509+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
