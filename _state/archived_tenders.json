@@ -623,5 +623,157 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-05-13-004442-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ПАВЛОГРАДСЬКА МІСЬКА ЛІКАРНЯ № 1\" ПАВЛОГРАДСЬКОЇ МІСЬКОЇ РАДИ — Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи …",
+    "archived_at": "2026-06-01T09:25:47.465Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-13-004442-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+      "status": "complete",
+      "dateModified": "2026-06-01T12:07:58.534932+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-05-21T10:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ПАВЛОГРАДСЬКА МІСЬКА ЛІКАРНЯ № 1\" ПАВЛОГРАДСЬКОЇ МІСЬКОЇ РАДИ",
+        "edrpou": "01987402"
+      },
+      "value": {
+        "amount": 360000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72268000-1",
+        "description": "Послуги з постачання програмного забезпечення",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72268000-1",
+        "72268000-1",
+        "72268000-1",
+        "72268000-1",
+        "72268000-1"
+      ],
+      "contact": {
+        "name": "Нікіта Камаєв",
+        "email": "gorodbolnica1@gmail.com",
+        "telephone": "+380996385359"
+      },
+      "documents": [
+        {
+          "id": "ee17f6bc58034310b1c351f6944d595f",
+          "title": "Додаток 1 до тендерної документації (кваліфікаційні критерії, вимоги).docx",
+          "documentType": "eligibilityCriteria",
+          "datePublished": "2026-05-13T11:32:55.772463+03:00"
+        },
+        {
+          "id": "f04c2537a7de47309844af25d64a08d7",
+          "title": "Додаток 2 до тендерної документації (технічні вимоги до предмета закупівлі) (1).docx",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-05-13T11:32:55.772463+03:00"
+        },
+        {
+          "id": "00ddb079b4354c2b91e0b6b46048f6c0",
+          "title": "Додаток 5 до тендерної документації.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-13T11:32:55.772463+03:00"
+        },
+        {
+          "id": "902db4ef96864310a2ce7e550d9789e1",
+          "title": "Тендерна документація за Особливостями.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-13T11:32:55.772463+03:00"
+        },
+        {
+          "id": "550bda47a2c14a39bc2dcd68d5ca0258",
+          "title": "Додаток 3 до тендерної документації (проєкт договору).docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-13T12:20:25.946949+03:00"
+        },
+        {
+          "id": "ec78a3c5cd4349219f5994297ebe2845",
+          "title": "Додаток 4 до тендерної документації.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-13T12:20:25.946949+03:00"
+        },
+        {
+          "id": "a796116a463a46b994cadcf823db5ce7",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-13T12:22:06.148250+03:00"
+        },
+        {
+          "id": "550bda47a2c14a39bc2dcd68d5ca0258",
+          "title": "Додаток 3 до тендерної документації (проєкт договору).docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-13T14:53:12.854894+03:00"
+        },
+        {
+          "id": "a796116a463a46b994cadcf823db5ce7",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-13T14:53:50.856512+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "486a93d587d9458d9441e5f155a05f7b",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "2b58251f9458461099cc612865f01729",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:37610521a5b40293d59e82e983d453b4f3704615;SHA2-384:d268af2773b3168d9ddfd9b9efa6a40f74b44db88a8a5f765688ccea46e820ba0d26b035db49c53bf612e791ea626ff9;Antivirus: ESET Antivirus",
+              "id": "d611f9d52784471babab6682beabe4c0",
+              "hash": "md5:24b3218bd0742686f88aafc51ce212b1",
+              "title": "Договір 26.05-01 від 01.06.2026.PDF",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/2b58251f9458461099cc612865f01729/documents/d611f9d52784471babab6682beabe4c0?download=3823b2381e8c4e9b88c4164ae71f665c",
+              "documentOf": "contract",
+              "datePublished": "2026-06-01T12:07:12.660474+03:00",
+              "dateModified": "2026-06-01T12:07:12.934759+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "011130d9cfb542c280f6cb25e9ded750",
+              "hash": "md5:efe17318c5d101c026635c8064b576f8",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/2b58251f9458461099cc612865f01729/documents/011130d9cfb542c280f6cb25e9ded750?download=72b76c88943e4750b8f75632c7ff79fb",
+              "documentOf": "contract",
+              "datePublished": "2026-06-01T12:07:58.328571+03:00",
+              "dateModified": "2026-06-01T12:07:58.328571+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
