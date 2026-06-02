@@ -30,5 +30,13 @@
     "role": "viewer",
     "notifications": true,
     "added_at": "2026-05-19T12:56:11.928Z"
+  },
+  {
+    "chat_id": "6887927156",
+    "label": "Діана Тиж",
+    "invited_via": "Діана Тиж",
+    "role": "viewer",
+    "notifications": false,
+    "added_at": "2026-06-02T06:41:13.776Z"
   }
 ]
