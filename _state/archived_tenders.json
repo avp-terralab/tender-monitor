@@ -775,5 +775,156 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-05-14-008910-a",
+    "notes": " Комунальне підприємство \"Балтська багатопрофільна лікарня\" Балтської міської ради Одеської області — Послуги з консультаційної підтримки програмного забезпечення - лабораторної інформаційної системи…",
+    "archived_at": "2026-06-02T06:25:31.479Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-14-008910-a",
+      "title": "Послуги з консультаційної підтримки програмного забезпечення - лабораторної інформаційної системи LIS TerraLab та Analyzer Manager для автоматизації лабораторних процесів у клініко-діагностичній лабораторії,  код ДК  021:2015:72250000-2 – Послуги, пов’язані із системами та підтримкою",
+      "status": "complete",
+      "dateModified": "2026-06-02T08:55:56.722602+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-05-22T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": " Комунальне підприємство \"Балтська багатопрофільна лікарня\" Балтської міської ради Одеської області",
+        "edrpou": "01998644"
+      },
+      "value": {
+        "amount": 189000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72250000-2",
+        "description": "Послуги, пов’язані із системами та підтримкою",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72250000-2",
+        "72250000-2",
+        "72250000-2",
+        "72250000-2"
+      ],
+      "contact": {
+        "name": "Олеся Усатенко",
+        "email": "balta_crb@ukr.net",
+        "telephone": "+380668589366, +380486621201"
+      },
+      "documents": [
+        {
+          "id": "0358041f7b404fe2ad366b120c5754ba",
+          "title": "Додаток №1 до ТД вимоги до учасників і переможця та спосіб їх підтвердження.docx",
+          "documentType": "evaluationCriteria",
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "9d5454b0d8754464b5d20e23508ac908",
+          "title": "ТД_інструкція_ ПЗ ЛІС для КДЛ_7225.doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "9691375c7c7d4d5c884094ff0f04ee54",
+          "title": "Додаток №1 до ТД вимоги до учасників і переможця та спосіб їх підтвердження.docx",
+          "documentType": "evaluationCriteria",
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "04a35ab1841347539a62eccacba42a9d",
+          "title": "Додаток №2  до ТД  технічні вимоги_7225.docx",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "a8324c075e7c4df587bb30ed76953b71",
+          "title": "Додаток №3 до ТД перелік документів та або інформації для учасника.docx",
+          "documentType": null,
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "4ade85f92fc54f429a7a90dd8e205d39",
+          "title": "Додаток №4 до ТД перелік документів та або інформації для переможця.docx",
+          "documentType": null,
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "1ddd8542dbec44b2b754974374fef1fa",
+          "title": "Додаток №6 до ТД форма розрахунку ЦП для переможця.docx",
+          "documentType": null,
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "b76f0bf855804518a43ab40877f38d71",
+          "title": "Додаток №5 до ТД проєкт договору_7225.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-14T14:29:55.673061+03:00"
+        },
+        {
+          "id": "bb99720629b84a6f84fbd9aae207e1d6",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-14T14:32:24.055984+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "f5cb6f1e6fe84cc2ba74839101720583",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "45a894c11ed245dcb4fe0494619ca063",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:d4d337e12357d913bda83501e121489deb8d587c;SHA2-384:cb6cf9502c6761af8ae963da4a742271b92d984288ea3e249ffe7ef6c88553521d3a1d75df15f4991418ff4cf6a7968c;Antivirus: ESET Antivirus",
+              "id": "b6983660fe674114b33f22722132396c",
+              "hash": "md5:b9caa4372bc11061143d7659f0630ade",
+              "title": "Договір про закупівлю №28_05-01_ВТ-О.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/45a894c11ed245dcb4fe0494619ca063/documents/b6983660fe674114b33f22722132396c?download=62eb42466c1547018edd4bbb1363b6c2",
+              "documentOf": "contract",
+              "datePublished": "2026-06-02T08:55:00.702514+03:00",
+              "dateModified": "2026-06-02T08:55:00.938358+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "1451e5774db5421e81fa9a63099578eb",
+              "hash": "md5:4031916140f4a4c0c7701b407b445cae",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/45a894c11ed245dcb4fe0494619ca063/documents/1451e5774db5421e81fa9a63099578eb?download=2fa997bdf5b146cab657c92119c7aeec",
+              "documentOf": "contract",
+              "datePublished": "2026-06-02T08:55:56.483556+03:00",
+              "dateModified": "2026-06-02T08:55:56.483556+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
