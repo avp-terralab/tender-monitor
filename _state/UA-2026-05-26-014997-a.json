@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-05-26-014997-a",
-  "saved_at": "2026-06-03T05:25:30.776Z",
+  "saved_at": "2026-06-03T14:25:49.131Z",
   "snapshot": {
     "tender_id": "UA-2026-05-26-014997-a",
     "title": "Послуги з програмного забезпечення  лабораторної  інформаційної системи  LIS TerraLab та ПЗ Analyzer Manager (код ДК 021:2015:72260000-5 - Послуги, пов’язані з програмним забезпеченням)\n\n",
-    "status": "active.qualification",
-    "dateModified": "2026-06-03T08:00:19.205808+03:00",
+    "status": "active.awarded",
+    "dateModified": "2026-06-03T17:18:27.394981+03:00",
     "tenderPeriod": {
       "endDate": "2026-06-03T08:00:00+03:00"
     },
@@ -76,7 +76,7 @@
     "awards": [
       {
         "id": "71e1c113fc574a5e97eb4fafd1308f96",
-        "status": "pending",
+        "status": "active",
         "suppliers": [
           {
             "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
@@ -88,7 +88,13 @@
         "complaints": []
       }
     ],
-    "contracts": [],
+    "contracts": [
+      {
+        "id": "f79b27278e85495785c6a1e75cdb2ba0",
+        "status": "pending",
+        "documents": []
+      }
+    ],
     "cancellations": [],
     "_notifiedDeadlines": [
       "24h"
