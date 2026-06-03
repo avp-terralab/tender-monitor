@@ -1054,5 +1054,141 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-05-18-010369-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО МЕРЕФ'ЯНСЬКОЇ МІСЬКОЇ РАДИ \"МЕРЕФ'ЯНСЬКА ЦЕНТРАЛЬНА РАЙОННА ЛІКАРНЯ\" — код ДК 021:2015 72250000-2 «Послуги, пов’язані із системами та підтримкою»\n(Послуги з поста…",
+    "archived_at": "2026-06-03T11:55:54.058Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-18-010369-a",
+      "title": "код ДК 021:2015 72250000-2 «Послуги, пов’язані із системами та підтримкою»\n(Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії) \n",
+      "status": "complete",
+      "dateModified": "2026-06-03T14:42:43.584652+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-05-26T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО МЕРЕФ'ЯНСЬКОЇ МІСЬКОЇ РАДИ \"МЕРЕФ'ЯНСЬКА ЦЕНТРАЛЬНА РАЙОННА ЛІКАРНЯ\"",
+        "edrpou": "02002227"
+      },
+      "value": {
+        "amount": 893033.33,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72250000-2",
+        "description": "Послуги, пов’язані із системами та підтримкою",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72250000-2",
+        "72250000-2",
+        "72250000-2",
+        "72250000-2",
+        "72250000-2",
+        "72250000-2",
+        "72250000-2",
+        "72250000-2"
+      ],
+      "contact": {
+        "name": "Ірина Закривидорога",
+        "email": "knp-mcrl.zakupki@ukr.net",
+        "telephone": "+380639702815"
+      },
+      "documents": [
+        {
+          "id": "fe23b18967824301bd5c0b8c8571d7e9",
+          "title": "Додаток 1 до ТД.docx",
+          "documentType": null,
+          "datePublished": "2026-05-18T15:32:33.271743+03:00"
+        },
+        {
+          "id": "0b70fa6b34b9431db6f254fb11e149f3",
+          "title": "Додаток 2 до ТД.docx",
+          "documentType": null,
+          "datePublished": "2026-05-18T15:32:33.271743+03:00"
+        },
+        {
+          "id": "345ef8b61a6e44dda4051fd50df5f521",
+          "title": "Додаток 3 (Проєкт договору).docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-18T15:32:33.271743+03:00"
+        },
+        {
+          "id": "007d5463b52843949e57e994f9dd3997",
+          "title": "Додаток 4 до ТД.docx",
+          "documentType": null,
+          "datePublished": "2026-05-18T15:32:33.271743+03:00"
+        },
+        {
+          "id": "9c58da4197ff473c84a26e3d8f8c9d5c",
+          "title": "ТД 7225.docx",
+          "documentType": null,
+          "datePublished": "2026-05-18T15:32:33.271743+03:00"
+        },
+        {
+          "id": "360b2ca9804b4b769c8452b0d61d6cf4",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-18T15:34:02.986079+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "62e0bb8611f34c4cb1c0f42885334ece",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ ПРО\"",
+              "identifier": {
+                "id": "46104055"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "8057f32151594c4893bd41a36bda7158",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "description": "SHA1:cbd9afdf3162167573e8b59f2d7c5d48a8b1d0c5;SHA2-384:1c323772729860177fb60e30bb792282bb576ad45bb31a19254c981ea86da2a275a39c8077bf21c7f18de82d0bdcdde4;Antivirus: ESET Antivirus",
+              "id": "c203a19c663d4435860cdd4d52d17700",
+              "hash": "md5:fcfd9b7edda8017900fb667d5129c0b6",
+              "title": "Договір 7225_0001.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/8057f32151594c4893bd41a36bda7158/documents/c203a19c663d4435860cdd4d52d17700?download=ce944cfebd1d47e09cc89bb9da124501",
+              "documentOf": "contract",
+              "datePublished": "2026-06-03T14:41:41.265863+03:00",
+              "dateModified": "2026-06-03T14:41:41.503995+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "24f892c094f5425c962533a30d58992f",
+              "hash": "md5:17acdfcd0637f09b79f5440ec57f3bd5",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/8057f32151594c4893bd41a36bda7158/documents/24f892c094f5425c962533a30d58992f?download=6756522de6f04acb9fe0550a3e8db497",
+              "documentOf": "contract",
+              "datePublished": "2026-06-03T14:42:43.388729+03:00",
+              "dateModified": "2026-06-03T14:42:43.388729+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
