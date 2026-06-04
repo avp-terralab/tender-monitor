@@ -38,5 +38,13 @@
     "role": "viewer",
     "notifications": false,
     "added_at": "2026-06-02T06:41:13.776Z"
+  },
+  {
+    "chat_id": "383016888",
+    "label": "Андрій Білий",
+    "invited_via": "Андрій Білий",
+    "role": "viewer",
+    "notifications": false,
+    "added_at": "2026-06-04T06:48:56.344Z"
   }
 ]
