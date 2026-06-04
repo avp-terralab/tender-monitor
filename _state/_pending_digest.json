@@ -1,0 +1,47 @@
+{
+  "items": {
+    "UA-2026-05-28-010064-a": {
+      "tender_id": "UA-2026-05-28-010064-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії (код ДК 021:2015 72260000-5 «Послуги, пов’язані з програмним забезпеченням», номенклатура - 72263000-6 Послуги зі впровадження програмного забезпечення)",
+      "status": "active.qualification",
+      "deadline": "2026-06-05T00:00:00+03:00",
+      "procuring_entity": {
+        "name": "КОМУНАЛЬНЕ ПІДПРИЄМСТВО \"ЛІКАРНЯ №2 ІМ. В.П.ПАВЛУСЕНКА\" ЖИТОМИРСЬКОЇ МІСЬКОЇ РАДИ",
+        "edrpou": "42789136"
+      },
+      "value": {
+        "amount": 442560,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurement_method_type": "aboveThreshold",
+      "classification": {
+        "id": "72263000-6",
+        "description": "Послуги зі впровадження програмного забезпечення",
+        "scheme": "ДК021"
+      },
+      "contact": {
+        "name": "Аліна Корзун",
+        "email": "tmo2_alina@ukr.net",
+        "telephone": "+380674141791"
+      },
+      "prozorro_url": "https://prozorro.gov.ua/tender/UA-2026-05-28-010064-a",
+      "events": [
+        {
+          "type": "qualification_started",
+          "old": "active.tendering",
+          "new": "active.qualification"
+        },
+        {
+          "type": "award_created",
+          "supplier_name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+          "supplier_edrpou": "39376596"
+        }
+      ],
+      "first_fired_at": "2026-06-04T21:25:26.772Z",
+      "last_fired_at": "2026-06-04T21:25:26.772Z"
+    }
+  },
+  "archived": [],
+  "errors": []
+}
