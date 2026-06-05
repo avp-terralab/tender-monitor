@@ -1,0 +1,75 @@
+{
+  "tender_id": "UA-2026-05-26-011600-a",
+  "saved_at": "2026-06-05T11:52:31.694Z",
+  "snapshot": {
+    "tender_id": "UA-2026-05-26-011600-a",
+    "title": "ДК 021:2015-72260000-5 Послуги, пов’язані з програмним забезпеченням (Послуги ,пов'язані з програмним забезпеченням лабораторної інформаційної системи  для автоматизації лабораторних процесів в лабораторії)",
+    "status": "active.tendering",
+    "dateModified": "2026-06-04T15:50:25.949902+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-06-12T00:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КОМУНАЛЬНИЙ ЗАКЛАД КИЇВСЬКОЇ ОБЛАСНОЇ РАДИ \"БАЗА СПЕЦІАЛЬНОГО МЕДИЧНОГО ПОСТАЧАННЯ\"",
+      "edrpou": "02125740"
+    },
+    "value": {
+      "amount": 96000,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": true
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5",
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Бешляга Андрій Олегович",
+      "email": "kzkorbazatender@gmail.com",
+      "telephone": "380734158868"
+    },
+    "documents": [
+      {
+        "id": "3fc84bda85b74b6fbfe14904951ac0fe",
+        "title": "ТД (програмне забезпечення).docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-05-26T15:39:33.917793+03:00"
+      },
+      {
+        "id": "1bbee41ff9b64dabb0a3849f1ce59d51",
+        "title": "ПРОЄКТ ДОГОВОРУ (7).docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-05-26T15:39:33.917793+03:00"
+      },
+      {
+        "id": "ba05b282adff4f4385e3be02b25b0f95",
+        "title": "ТД (програмне забезпечення).docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-05-26T15:39:33.917793+03:00"
+      },
+      {
+        "id": "2ab2c93ccba74e93ab6a2f069fd212c3",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-06-04T15:49:35.354424+03:00"
+      },
+      {
+        "id": "2ab2c93ccba74e93ab6a2f069fd212c3",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-06-04T15:50:25.949902+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
