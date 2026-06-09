@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-04-30-010542-a",
-  "saved_at": "2026-06-02T10:25:40.206Z",
+  "saved_at": "2026-06-09T16:55:37.757Z",
   "snapshot": {
     "tender_id": "UA-2026-04-30-010542-a",
     "title": "Консалтингові послуги з підготовки медичної лабораторії до акредитації згідно зі стандартом ISO 15189:2022 «Медичні лабораторії – Вимоги до якості та компетентності», код ДК 021:2015 – 71620000-0 - Аналітичні послуги",
-    "status": "active.qualification",
-    "dateModified": "2026-06-02T13:16:14.459373+03:00",
+    "status": "active.awarded",
+    "dateModified": "2026-06-09T19:38:52.565465+03:00",
     "tenderPeriod": {
       "endDate": "2026-05-08T23:00:00+03:00"
     },
@@ -126,7 +126,7 @@
       },
       {
         "id": "6552ea7a81ed4051baf2e22bc93a9065",
-        "status": "pending",
+        "status": "active",
         "suppliers": [
           {
             "name": "ФОП \"ШУЛЬГА НАТАЛІЯ ВОЛОДИМИРІВНА\"",
@@ -138,7 +138,13 @@
         "complaints": []
       }
     ],
-    "contracts": [],
+    "contracts": [
+      {
+        "id": "fa1490835ff84ef2ba74c895242174bf",
+        "status": "pending",
+        "documents": []
+      }
+    ],
     "cancellations": [],
     "_notifiedDeadlines": [
       "24h"
