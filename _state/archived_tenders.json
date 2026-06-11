@@ -1424,5 +1424,135 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-05-26-014997-a",
+    "notes": "Комунальне підприємство \"Полтавська обласна клінічна лікарня ім.М.В.Скліфосовського Полтавської обласної ради\"  — Послуги з програмного забезпечення  лабораторної  інформаційної системи  LIS TerraLab…",
+    "archived_at": "2026-06-11T13:56:04.756Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-26-014997-a",
+      "title": "Послуги з програмного забезпечення  лабораторної  інформаційної системи  LIS TerraLab та ПЗ Analyzer Manager (код ДК 021:2015:72260000-5 - Послуги, пов’язані з програмним забезпеченням)\n\n",
+      "status": "complete",
+      "dateModified": "2026-06-11T16:34:37.175214+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-06-03T08:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне підприємство \"Полтавська обласна клінічна лікарня ім.М.В.Скліфосовського Полтавської обласної ради\" ",
+        "edrpou": "01999106"
+      },
+      "value": {
+        "amount": 780000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Лариса Буханченко",
+        "email": "larisabuhanchenko301185@gmail.com",
+        "telephone": "+380532609547"
+      },
+      "documents": [
+        {
+          "id": "48354f1e0a8044b7b99d39203909be21",
+          "title": "ТД .docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-26T19:50:37.815527+03:00"
+        },
+        {
+          "id": "dabfa51dc9104864a2cff808c22d286b",
+          "title": "Додаток 1 Перелік документів учаснику.docx",
+          "documentType": null,
+          "datePublished": "2026-05-26T19:50:37.815527+03:00"
+        },
+        {
+          "id": "b439cea524f3481091dd39a71e1cd886",
+          "title": "Додаток 2 до ТД.doc",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-05-26T19:50:37.815527+03:00"
+        },
+        {
+          "id": "155ba3e468194c339180e3816f042f84",
+          "title": "Додаток 4 Перелік документів переможцю.docx",
+          "documentType": null,
+          "datePublished": "2026-05-26T19:50:37.815527+03:00"
+        },
+        {
+          "id": "b8e9e9db41c64686bc3565dcad95557e",
+          "title": "Додаток 3 Проєкт договору.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-26T19:50:37.815527+03:00"
+        },
+        {
+          "id": "1ad2577a9900439ca0e2f7c65e19ced2",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-26T19:52:41.088207+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "71e1c113fc574a5e97eb4fafd1308f96",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "f79b27278e85495785c6a1e75cdb2ba0",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:a488300420877339ef26c9eb3d651f16950376cf;SHA2-384:56722a5cfc304e3280df5b9a60257e4525c13cafd3949c8d1b17a0eccf4a1bb34e29b811f47b6fedcf7554453fd09690;Antivirus: ESET Antivirus",
+              "id": "c16b6a47b6754b7a955ac24acbfa9ab3",
+              "hash": "md5:e1b0fecae4e24caeb5c3c595b3626bf5",
+              "title": "Договір №04-06-01 (ТОВ Терралаб Ай Ті).pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/f79b27278e85495785c6a1e75cdb2ba0/documents/c16b6a47b6754b7a955ac24acbfa9ab3?download=1f08a4cce4f7437890577da07b354165",
+              "documentOf": "contract",
+              "datePublished": "2026-06-11T16:33:15.610936+03:00",
+              "dateModified": "2026-06-11T16:33:15.864689+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "8a6e0f3fc26d4d14b9a0a8a994e5d593",
+              "hash": "md5:bdf982bf19654511872eae47d77ddad6",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/f79b27278e85495785c6a1e75cdb2ba0/documents/8a6e0f3fc26d4d14b9a0a8a994e5d593?download=bc5dac13dd7240b7ad5625f91f688160",
+              "documentOf": "contract",
+              "datePublished": "2026-06-11T16:34:36.885291+03:00",
+              "dateModified": "2026-06-11T16:34:36.885291+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
