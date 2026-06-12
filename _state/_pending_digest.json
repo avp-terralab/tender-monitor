@@ -1,0 +1,43 @@
+{
+  "items": {
+    "UA-2026-05-26-011600-a": {
+      "tender_id": "UA-2026-05-26-011600-a",
+      "title": "ДК 021:2015-72260000-5 Послуги, пов’язані з програмним забезпеченням (Послуги ,пов'язані з програмним забезпеченням лабораторної інформаційної системи  для автоматизації лабораторних процесів в лабораторії)",
+      "status": "active.tendering",
+      "deadline": "2026-06-14T00:00:00+03:00",
+      "procuring_entity": {
+        "name": "КОМУНАЛЬНИЙ ЗАКЛАД КИЇВСЬКОЇ ОБЛАСНОЇ РАДИ \"БАЗА СПЕЦІАЛЬНОГО МЕДИЧНОГО ПОСТАЧАННЯ\"",
+        "edrpou": "02125740"
+      },
+      "value": {
+        "amount": 96000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurement_method_type": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "contact": {
+        "name": "Бешляга Андрій Олегович",
+        "email": "kzkorbazatender@gmail.com",
+        "telephone": "380734158868"
+      },
+      "prozorro_url": "https://prozorro.gov.ua/tender/UA-2026-05-26-011600-a",
+      "events": [
+        {
+          "type": "deadline_approaching",
+          "threshold": "24h",
+          "hoursLeft": 23.6,
+          "deadline": "2026-06-14T00:00:00+03:00"
+        }
+      ],
+      "first_fired_at": "2026-06-12T21:25:41.265Z",
+      "last_fired_at": "2026-06-12T21:25:41.265Z"
+    }
+  },
+  "archived": [],
+  "errors": []
+}
