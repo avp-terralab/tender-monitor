@@ -1875,5 +1875,141 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-05-27-002799-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ЗАЛІЩИЦЬКА ЦЕНТРАЛЬНА МІСЬКА ЛІКАРНЯ\" ЗАЛІЩИЦЬКОЇ МІСЬКОЇ РАДИ — Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи…",
+    "archived_at": "2026-06-19T09:55:43.131Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-27-002799-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+      "status": "complete",
+      "dateModified": "2026-06-19T12:40:55.333063+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-06-04T18:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ЗАЛІЩИЦЬКА ЦЕНТРАЛЬНА МІСЬКА ЛІКАРНЯ\" ЗАЛІЩИЦЬКОЇ МІСЬКОЇ РАДИ",
+        "edrpou": "02000659"
+      },
+      "value": {
+        "amount": 376534,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Мотринчук Тетяна Петрівна",
+        "email": "zcmlzk1@ukr.net",
+        "telephone": "+380355421053"
+      },
+      "documents": [
+        {
+          "id": "3ddd0be077de46e59ba8088dac63f7c0",
+          "title": "1. Тендерна документацiя.docx",
+          "documentType": null,
+          "datePublished": "2026-05-27T10:37:00.164239+03:00"
+        },
+        {
+          "id": "be066462d6df45e6a282685f8c89f0ac",
+          "title": "2. Додаток _1 Перелік документів та_або інформації_ які подаються учасником процедури закупівлі у складі тендерної пропозиції.docx",
+          "documentType": null,
+          "datePublished": "2026-05-27T10:37:00.164239+03:00"
+        },
+        {
+          "id": "d95ddf5a55c34ff996b180b74db892cb",
+          "title": "3. Додаток _2 Перелік документів та_або інформації_ які подаються переможцем процедури закупівлі.docx",
+          "documentType": null,
+          "datePublished": "2026-05-27T10:37:00.164239+03:00"
+        },
+        {
+          "id": "6801b1b47ea648a585f230cd4990e631",
+          "title": "4. Додаток _3 Проєкт договору.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-27T10:37:00.164239+03:00"
+        },
+        {
+          "id": "9b5437b901db4d659514478b83f295c4",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-27T10:39:56.804735+03:00"
+        },
+        {
+          "id": "9b5437b901db4d659514478b83f295c4",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-27T10:44:31.914087+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "c8e3ece1ca3642699c9f04d32e312d1c",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"МАЙЛАБ\"",
+              "identifier": {
+                "id": "41087617"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "704425c1264542ff8ab1b2e53eca3c2d",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "title_en": "Договір 11-06-01.PDF",
+              "title_ru": "Договір 11-06-01.PDF",
+              "description": "SHA1: b51f1aeb2620cfaf888b74e2452af79919d312c4",
+              "id": "6dea6b6caf77439ca95b68f017b067fa",
+              "hash": "md5:ab9c4bdaad722c4b59cfdef50784366e",
+              "title": "Договір 11-06-01.PDF",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/704425c1264542ff8ab1b2e53eca3c2d/documents/6dea6b6caf77439ca95b68f017b067fa?download=ccd8dc773903483ab5835603698b941b",
+              "documentOf": "contract",
+              "datePublished": "2026-06-19T12:26:14.308538+03:00",
+              "dateModified": "2026-06-19T12:26:14.308538+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "documentType": "notice",
+              "title_en": "sign.p7s",
+              "title_ru": "sign.p7s",
+              "description": "SHA1: d1a9d78b683be43928c3f8a5d19d9557023bde53",
+              "id": "9209da31c4184b7bbd10ec2f967d9560",
+              "hash": "md5:3ef9783bc55ed9b23d57c460d4c084b3",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/704425c1264542ff8ab1b2e53eca3c2d/documents/9209da31c4184b7bbd10ec2f967d9560?download=8d7253370c294f159178a5ae3d2b79f6",
+              "documentOf": "contract",
+              "datePublished": "2026-06-19T12:40:42.840137+03:00",
+              "dateModified": "2026-06-19T12:40:42.840137+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
