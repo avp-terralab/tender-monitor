@@ -1,0 +1,64 @@
+{
+  "tender_id": "UA-2026-06-19-008800-a",
+  "saved_at": "2026-06-19T11:55:53.982Z",
+  "snapshot": {
+    "tender_id": "UA-2026-06-19-008800-a",
+    "title": "Послуги, пов’язані з програмним забезпеченням - Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+    "status": "active.tendering",
+    "dateModified": "2026-06-19T14:24:37.507739+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-06-27T17:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО МІСЬКА КЛІНІЧНА ЛІКАРНЯ №1 ОДЕСЬКОЇ МІСЬКОЇ РАДИ",
+      "edrpou": "01998986"
+    },
+    "value": {
+      "amount": 292468,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": true
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5",
+      "72260000-5",
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "МОЛЯВКО НАТАЛЯ ВОЛОДИМИРІВНА",
+      "email": "evreiska@ukr.net",
+      "telephone": "380661340017"
+    },
+    "documents": [
+      {
+        "id": "1ab1d4dbb99844d6adf374eb07acc39e",
+        "title": "ТД програмне забезпечення на рік.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-06-19T14:24:28.295579+03:00"
+      },
+      {
+        "id": "f5f8f26039f44d9b99c0b46c8fce490b",
+        "title": "ПРДоговір.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-06-19T14:24:28.295579+03:00"
+      },
+      {
+        "id": "a1e823e0d41448f1acebee2d3c47a72d",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-06-19T14:24:35.219403+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
