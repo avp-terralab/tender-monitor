@@ -1369,3 +1369,96 @@ export const BOT_COMMANDS_BY_ROLE = {
   editor: [...VIEW_COMMANDS, ...EDIT_COMMANDS],
   admin:  [...VIEW_COMMANDS, ...EDIT_COMMANDS, ...ADMIN_COMMANDS],
 };
+
+// ── Agent trigger (Phase 3) ────────────────────────────────────────────────
+// Pure keyboards + the job record for handing a tender off to the offline
+// proposal-building agent. Company slugs are ASCII so they fit safely inside
+// callback_data (Telegram limit 64 bytes); the full Ukrainian name lives only
+// in the enqueued job and the confirm text. Worker dispatch/state is Task 6.
+
+// slug → full Ukrainian company name. Slugs are ASCII (callback_data-safe).
+export const AGENT_COMPANIES = {
+  maylab: 'МАЙЛАБ',
+  terralab_it: 'ТЕРРАЛАБ АЙ ТІ',
+  terralab_consulting: 'ТЕРРАЛАБ КОНСАЛТИНГ',
+  terralab_suprovid: 'ТЕРРАЛАБ СУПРОВІД',
+};
+
+export function companyForSlug(slug) {
+  return Object.prototype.hasOwnProperty.call(AGENT_COMPANIES, slug)
+    ? AGENT_COMPANIES[slug]
+    : null;
+}
+
+export function slugForCompany(name) {
+  const entry = Object.entries(AGENT_COMPANIES).find(([, n]) => n === name);
+  return entry ? entry[0] : null;
+}
+
+// Admin-only entry button shown under a tender. Returns a single-button row
+// (to splice into an existing keyboard) or null when the role isn't admin so
+// the caller simply omits it — mirrors how other admin-only UI is gated.
+export function agentTriggerButtonRow(tenderId, role) {
+  if (role !== 'admin') return null;
+  return [{ text: '🤖 Надіслати агенту', callback_data: `agent:start:${tenderId}` }];
+}
+
+// Step 1: pick the company. One button per company (1–2 per row) + cancel.
+// callback_data: agent:co:<tenderId>:<slug> — ASCII slug keeps it ≤ 64 bytes.
+export function buildAgentCompanyKeyboard(tenderId) {
+  const buttons = Object.entries(AGENT_COMPANIES).map(([slug, name]) => ({
+    text: name,
+    callback_data: `agent:co:${tenderId}:${slug}`,
+  }));
+  const rows = [];
+  for (let i = 0; i < buttons.length; i += 2) {
+    rows.push(buttons.slice(i, i + 2));
+  }
+  rows.push([{ text: '✖ Скасувати', callback_data: `agent:cancel:${tenderId}` }]);
+  return { inline_keyboard: rows };
+}
+
+// Step 2: validate the typed price. Returns a normalized string or null.
+// Accepts "auto" (case-insensitive) or a non-negative number that may use
+// spaces as thousands separators and either ',' or '.' as the decimal mark.
+export function validateAgentPrice(text) {
+  if (typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  if (trimmed === '') return null;
+  if (trimmed.toLowerCase() === 'auto') return 'auto';
+  // Only digits, spaces, and a single decimal separator are allowed.
+  if (!/^[\d ]+(?:[.,]\d+)?$/.test(trimmed)) return null;
+  // Collapse internal runs of spaces to one (keep the user's grouping).
+  return trimmed.replace(/ +/g, ' ');
+}
+
+// Step 3: final confirm. Company + price live in Worker dialog state (not in
+// callback_data), so confirm/cancel stay short.
+export function buildAgentConfirmKeyboard(tenderId) {
+  return {
+    inline_keyboard: [[
+      { text: '✅ Підтвердити', callback_data: `agent:confirm:${tenderId}` },
+      { text: '✖ Скасувати', callback_data: `agent:cancel:${tenderId}` },
+    ]],
+  };
+}
+
+// One-line confirm prompt summarising the queued request.
+export function buildAgentConfirmText({ company, price, tenderId, entityName }) {
+  const ent = entityName ? ` (${entityName})` : '';
+  return `🤖 Компанія: ${company} · Ціна: ${price} · Тендер: ${tenderId}${ent}`;
+}
+
+// The job record handed to the offline agent. Shape matches the integration
+// contract (snake_case keys, status 'pending'). `company` is the full name.
+export function buildAgentJob({ tenderId, link, company, price, requestedBy, createdAt }) {
+  return {
+    tender_id: tenderId,
+    link,
+    company,
+    price,
+    requested_by: requestedBy,
+    status: 'pending',
+    created_at: createdAt,
+  };
+}

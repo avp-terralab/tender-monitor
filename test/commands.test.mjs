@@ -15,6 +15,9 @@ import {
   formatAuditLog,
   buildWatchedKeyboard,
   buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
+  AGENT_COMPANIES, companyForSlug, slugForCompany,
+  agentTriggerButtonRow, buildAgentCompanyKeyboard, validateAgentPrice,
+  buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -3062,4 +3065,97 @@ test('buildWatchedManageKeyboard: empty list → null', () => {
 test('WATCHED_MANAGE_PROMPT: exported non-empty string', () => {
   assert.equal(typeof WATCHED_MANAGE_PROMPT, 'string');
   assert.ok(WATCHED_MANAGE_PROMPT.length > 0);
+});
+
+// ── Agent trigger (Phase 3 Task 5) ──────────────────────────────────────
+
+test('companyForSlug / slugForCompany: round-trip', () => {
+  assert.equal(companyForSlug('terralab_it'), 'ТЕРРАЛАБ АЙ ТІ');
+  assert.equal(companyForSlug('maylab'), 'МАЙЛАБ');
+  assert.equal(slugForCompany('МАЙЛАБ'), 'maylab');
+  assert.equal(slugForCompany('ТЕРРАЛАБ КОНСАЛТИНГ'), 'terralab_consulting');
+  assert.equal(companyForSlug('nope'), null);
+  assert.equal(slugForCompany('nope'), null);
+  assert.equal(Object.keys(AGENT_COMPANIES).length, 4);
+});
+
+test('agentTriggerButtonRow: admin gets row, others null', () => {
+  const row = agentTriggerButtonRow('UA-x', 'admin');
+  assert.ok(Array.isArray(row));
+  assert.equal(row.length, 1);
+  assert.equal(row[0].callback_data, 'agent:start:UA-x');
+  assert.match(row[0].text, /агенту/);
+  assert.equal(agentTriggerButtonRow('UA-x', 'editor'), null);
+  assert.equal(agentTriggerButtonRow('UA-x', 'viewer'), null);
+});
+
+test('buildAgentCompanyKeyboard: 4 companies + cancel, callback_data ≤ 64', () => {
+  const kb = buildAgentCompanyKeyboard('UA-x');
+  const buttons = kb.inline_keyboard.flat();
+  const companyButtons = buttons.filter(b => b.callback_data.startsWith('agent:co:'));
+  assert.equal(companyButtons.length, 4);
+  const maylab = companyButtons.find(b => b.callback_data === 'agent:co:UA-x:maylab');
+  assert.ok(maylab);
+  assert.equal(maylab.text, 'МАЙЛАБ');
+  const cancel = buttons.find(b => b.callback_data === 'agent:cancel:UA-x');
+  assert.ok(cancel);
+  for (const b of buttons) {
+    assert.ok(Buffer.byteLength(b.callback_data, 'utf8') <= 64, b.callback_data);
+  }
+});
+
+test('buildAgentCompanyKeyboard: callback_data stays ≤64 with 22-char tender id', () => {
+  const tid = 'UA-2026-04-30-010542-a';
+  const kb = buildAgentCompanyKeyboard(tid);
+  for (const b of kb.inline_keyboard.flat()) {
+    assert.ok(Buffer.byteLength(b.callback_data, 'utf8') <= 64, b.callback_data);
+  }
+});
+
+test('validateAgentPrice: accepts numbers and auto, rejects junk', () => {
+  assert.ok(validateAgentPrice('181200'));
+  assert.ok(validateAgentPrice('181 200'));
+  assert.ok(validateAgentPrice('181 200,00'));
+  assert.ok(validateAgentPrice('181200.00'));
+  assert.equal(validateAgentPrice('auto'), 'auto');
+  assert.equal(validateAgentPrice('AUTO'), 'auto');
+  assert.equal(validateAgentPrice('  Auto  '), 'auto');
+  assert.equal(validateAgentPrice(''), null);
+  assert.equal(validateAgentPrice('abc'), null);
+  assert.equal(validateAgentPrice('-5'), null);
+  assert.equal(validateAgentPrice('12abc'), null);
+});
+
+test('buildAgentConfirmKeyboard: confirm + cancel', () => {
+  const kb = buildAgentConfirmKeyboard('UA-x');
+  const buttons = kb.inline_keyboard.flat();
+  assert.ok(buttons.find(b => b.callback_data === 'agent:confirm:UA-x'));
+  assert.ok(buttons.find(b => b.callback_data === 'agent:cancel:UA-x'));
+});
+
+test('buildAgentJob: matches integration contract', () => {
+  const job = buildAgentJob({
+    tenderId: 'UA-x', link: 'L', company: 'МАЙЛАБ',
+    price: '181200', requestedBy: '42', createdAt: 't',
+  });
+  assert.deepEqual(job, {
+    tender_id: 'UA-x',
+    link: 'L',
+    company: 'МАЙЛАБ',
+    price: '181200',
+    requested_by: '42',
+    status: 'pending',
+    created_at: 't',
+  });
+});
+
+test('buildAgentConfirmText: one-line prompt with fields', () => {
+  const txt = buildAgentConfirmText({
+    company: 'МАЙЛАБ', price: '181200', tenderId: 'UA-x', entityName: 'Лікарня',
+  });
+  assert.equal(typeof txt, 'string');
+  assert.match(txt, /МАЙЛАБ/);
+  assert.match(txt, /181200/);
+  assert.match(txt, /UA-x/);
+  assert.match(txt, /Лікарня/);
 });
