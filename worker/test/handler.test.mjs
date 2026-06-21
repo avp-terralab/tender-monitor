@@ -2526,3 +2526,139 @@ test('callback unwatch: last entity → empty-state text, no keyboard', async ()
   assert.match(edited.text, /Не стежу за жодним замовником/);
   assert.ok(edited.replyMarkup == null);
 });
+
+// ── Phase 3 Task 6: agent-trigger dispatch + enqueue ──────────────────────────
+
+const AGENT_TID = 'UA-2026-04-30-010542-a';
+
+// In-memory agent-pending store factory: returns deps + a ref to the saved state.
+const makeAgentDeps = (overrides = {}) => {
+  const store = { pending: {}, sha: 's-pending' };
+  const sent = [];
+  const acks = [];
+  const edits = [];
+  const jobs = [];
+  const base = makeDeps({
+    sendReply: async (a) => { sent.push(a); },
+    answerCallbackQuery: async (a) => { acks.push(a); },
+    editMessageText: async (a) => { edits.push(a); },
+    editMessageReplyMarkup: async () => {},
+    loadAgentPending: async () => ({ pending: structuredClone(store.pending), sha: store.sha }),
+    saveAgentPending: async (_e, pending) => { store.pending = structuredClone(pending); },
+    saveAgentJob: async (_e, job) => { jobs.push(job); },
+    now: () => new Date('2026-06-21T10:00:00.000Z'),
+    ...overrides,
+  }).deps;
+  return { deps: base, store, sent, acks, edits, jobs };
+};
+
+const agentMsg = (text, chatId = 123) => ({
+  message: { chat: { id: chatId }, from: { first_name: 'Андрій' }, text, message_id: 7 },
+});
+
+test('agent:start (admin) → company keyboard shown', async () => {
+  const { deps, edits, acks } = makeAgentDeps();
+  await runHandler({ update: CB(`agent:start:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(edits.length, 1);
+  assert.match(edits[0].text, /Оберіть компанію/);
+  const data = JSON.stringify(edits[0].replyMarkup);
+  assert.match(data, new RegExp(`agent:co:${AGENT_TID}:maylab`));
+  assert.equal(acks.length, 1);
+});
+
+test('agent:start (non-admin) → rejected, no keyboard, no state write', async () => {
+  let pendingSaved = false;
+  const { deps, edits, acks } = makeAgentDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    saveAgentPending: async () => { pendingSaved = true; },
+  });
+  await runHandler({ update: CB(`agent:start:${AGENT_TID}`, 456), env: ENV, deps });
+  assert.equal(edits.length, 0, 'no company keyboard for non-admin');
+  assert.equal(pendingSaved, false, 'no pending state written');
+  assert.equal(acks.length, 1);
+  assert.match(acks[0].text, /адмін/i);
+});
+
+test('agent:co:<tid>:maylab → pending saved with company МАЙЛАБ + price prompt', async () => {
+  const { deps, store, sent, acks } = makeAgentDeps();
+  await runHandler({ update: CB(`agent:co:${AGENT_TID}:maylab`), env: ENV, deps });
+  assert.deepEqual(store.pending['123'], { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /Введіть ціну/);
+  assert.equal(acks.length, 1);
+});
+
+test('agent price reply "abc" → invalid, stays at await_price, no job', async () => {
+  const { deps, store, sent, jobs } = makeAgentDeps();
+  store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' };
+  await runHandler({ update: agentMsg('abc'), env: ENV, deps });
+  assert.equal(jobs.length, 0);
+  assert.equal(store.pending['123'].step, 'await_price', 'stays at await_price');
+  assert.match(sent[0].text, /Невірна ціна/);
+});
+
+test('agent price reply "0" → rejected (zero price invalid)', async () => {
+  const { deps, store, sent } = makeAgentDeps();
+  store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' };
+  await runHandler({ update: agentMsg('0'), env: ENV, deps });
+  assert.equal(store.pending['123'].step, 'await_price');
+  assert.match(sent[0].text, /Невірна ціна/);
+});
+
+test('agent price reply "181200" → confirm keyboard + price stored', async () => {
+  const { deps, store, sent } = makeAgentDeps();
+  store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' };
+  await runHandler({ update: agentMsg('181200'), env: ENV, deps });
+  assert.equal(store.pending['123'].step, 'confirm');
+  assert.equal(store.pending['123'].price, '181200');
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /МАЙЛАБ/);
+  assert.match(sent[0].text, /181200/);
+  const kb = JSON.stringify(sent[0].replyMarkup);
+  assert.match(kb, new RegExp(`agent:confirm:${AGENT_TID}`));
+});
+
+test('agent:confirm → saveAgentJob with contract-valid job, pending cleared, queued reply', async () => {
+  const { deps, store, sent, jobs, acks } = makeAgentDeps();
+  store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', price: '181200', step: 'confirm' };
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.deepEqual(jobs[0], {
+    tender_id: AGENT_TID,
+    link: `https://prozorro.gov.ua/tender/${AGENT_TID}`,
+    company: 'МАЙЛАБ',
+    price: '181200',
+    requested_by: '123',
+    status: 'pending',
+    created_at: '2026-06-21T10:00:00.000Z',
+  });
+  assert.equal(store.pending['123'], undefined, 'pending cleared');
+  assert.match(sent.at(-1).text, /черг/i);
+  assert.equal(acks.length, 1);
+});
+
+test('agent:confirm without matching pending → no job, soft ack', async () => {
+  const { deps, jobs, acks } = makeAgentDeps();
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 0);
+  assert.match(acks[0].text, /Немає активного|Невідома/i);
+});
+
+test('agent:cancel → pending cleared, Скасовано reply', async () => {
+  const { deps, store, sent, acks } = makeAgentDeps();
+  store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' };
+  await runHandler({ update: CB(`agent:cancel:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(store.pending['123'], undefined);
+  assert.match(sent.at(-1).text, /Скасовано/);
+  assert.equal(acks.length, 1);
+});
+
+test('non-admin text while no pending → normal handling (price step not triggered)', async () => {
+  // A viewer typing a number must not be swallowed by the agent price step.
+  const { deps, sent } = makeAgentDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+  });
+  await runHandler({ update: agentMsg('181200', 456), env: ENV, deps });
+  // Viewer's free-text number isn't a command → no agent confirm prompt.
+  assert.ok(!sent.some(s => /Підтвердити|МАЙЛАБ/.test(JSON.stringify(s))));
+});

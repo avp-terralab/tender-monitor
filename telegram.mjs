@@ -428,7 +428,7 @@ async function sendOne({ token, chatId, fetch: fetchImpl = fetch }, text, replyM
   throw lastErr;
 }
 
-export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, text, { addButtonsForTenders = [] } = {}) {
+export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, text, { addButtonsForTenders = [], role } = {}) {
   const chunks = chunkMessage(text, 4000);
   let last;
   for (let i = 0; i < chunks.length; i++) {
@@ -436,13 +436,18 @@ export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, te
       ? `${chunks[i]}\n\n— ${i + 1}/${chunks.length} —`
       : chunks[i];
     const buttonsHere = addButtonsForTenders.filter(id => annotated.includes(id));
-    const replyMarkup = buttonsHere.length > 0
-      ? {
-          inline_keyboard: buttonsHere.map(id => [
-            { text: `➕ Додати в моніторинг ${id}`, callback_data: `add:${id}` },
-          ]),
-        }
-      : null;
+    const rows = buttonsHere.flatMap(id => {
+      const row = [[{ text: `➕ Додати в моніторинг ${id}`, callback_data: `add:${id}` }]];
+      // Admin-only agent-trigger entry button, directly under the add button for
+      // the same tender. Inlined (rather than importing agentTriggerButtonRow from
+      // commands.mjs) to avoid a telegram.mjs ↔ commands.mjs import cycle; kept in
+      // sync with that helper's row shape.
+      if (role === 'admin') {
+        row.push([{ text: '🤖 Надіслати агенту', callback_data: `agent:start:${id}` }]);
+      }
+      return row;
+    });
+    const replyMarkup = rows.length > 0 ? { inline_keyboard: rows } : null;
     last = await sendOne({ token, chatId, fetch: fetchImpl }, annotated, replyMarkup);
   }
   return last;
@@ -463,7 +468,7 @@ export async function broadcastDigest({ token, chatIds, fetch: fetchImpl = fetch
     const role = isObj ? recipient.role : null;
     const effectiveOpts = role === 'viewer' && opts
       ? { ...opts, addButtonsForTenders: [] }
-      : opts;
+      : (opts ? { ...opts, role } : opts);
     try {
       await sendDigest({ token, chatId, fetch: fetchImpl }, text, effectiveOpts);
     } catch (err) {
