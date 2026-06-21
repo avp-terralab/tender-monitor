@@ -2582,7 +2582,7 @@ test('agent:start (non-admin) → rejected, no keyboard, no state write', async 
 test('agent:co:<tid>:maylab → pending saved with company МАЙЛАБ + price prompt', async () => {
   const { deps, store, sent, acks } = makeAgentDeps();
   await runHandler({ update: CB(`agent:co:${AGENT_TID}:maylab`), env: ENV, deps });
-  assert.deepEqual(store.pending['123'], { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' });
+  assert.deepEqual(store.pending['123'], { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price', at: '2026-06-21T10:00:00.000Z' });
   assert.equal(sent.length, 1);
   assert.match(sent[0].text, /Введіть ціну/);
   assert.equal(acks.length, 1);
@@ -2616,6 +2616,16 @@ test('agent price reply "181200" → confirm keyboard + price stored', async () 
   assert.match(sent[0].text, /181200/);
   const kb = JSON.stringify(sent[0].replyMarkup);
   assert.match(kb, new RegExp(`agent:confirm:${AGENT_TID}`));
+});
+
+test('agent price reply on stale pending (>15 min) → not consumed, pending dropped', async () => {
+  const { deps, store, sent, jobs } = makeAgentDeps();
+  // Opened the dialog ~20 min before the injected "now" (10:00:00) → expired.
+  store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price', at: '2026-06-21T09:40:00.000Z' };
+  await runHandler({ update: agentMsg('181200'), env: ENV, deps });
+  assert.equal(jobs.length, 0, 'no job from a stray number');
+  assert.equal(store.pending['123'], undefined, 'stale pending dropped');
+  assert.ok(!sent.some(s => /Підтвердити/.test(JSON.stringify(s))), 'no confirm prompt for stale tid');
 });
 
 test('agent:confirm → saveAgentJob with contract-valid job, pending cleared, queued reply', async () => {

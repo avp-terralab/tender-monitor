@@ -106,7 +106,7 @@ export async function runHandler({ update, env, deps = {} }) {
   if (isAdmin && typeof msg.text === 'string' && !msg.text.startsWith('/')) {
     const handled = await handleAgentPriceReply({
       env, chatId, msg, _sendReply,
-      _loadAgentPending, _saveAgentPending,
+      _loadAgentPending, _saveAgentPending, _now,
     });
     if (handled) return;
   }
@@ -847,6 +847,10 @@ async function handleCallbackQuery({
   await ack('❓ Невідома кнопка');
 }
 
+// Abandoned price dialogs older than this are dropped, so a stray later number
+// is not swallowed as the stale tender's price.
+const AGENT_PENDING_TTL_MS = 15 * 60 * 1000;
+
 // Drives the admin-only agent-trigger dialog (start → pick company → enter price
 // → confirm). State between the company tap and the price text lives in
 // _state/agent_pending.json keyed by chatId (the Worker is stateless across
@@ -890,7 +894,7 @@ async function handleAgentCallback({
     if (!company) { await ack('❌ Невідома компанія'); return; }
     try {
       const { pending, sha } = await _loadAgentPending(env);
-      pending[chatId] = { tid, company, step: 'await_price' };
+      pending[chatId] = { tid, company, step: 'await_price', at: _now().toISOString() };
       await _saveAgentPending(env, pending, sha);
     } catch (err) {
       console.error('worker: agent co save pending failed:', err.message);
@@ -974,7 +978,7 @@ async function clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPen
 // price step. Returns true if it consumed the message (so the caller stops),
 // false if there was no pending price step (caller continues normal parsing).
 async function handleAgentPriceReply({
-  env, chatId, msg, _sendReply, _loadAgentPending, _saveAgentPending,
+  env, chatId, msg, _sendReply, _loadAgentPending, _saveAgentPending, _now,
 }) {
   let pending, sha, entry;
   try {
@@ -985,6 +989,19 @@ async function handleAgentPriceReply({
     return false; // can't verify state → let normal handling proceed
   }
   if (!entry || entry.step !== 'await_price') return false;
+
+  // Expire an abandoned dialog: if the price step was opened long ago and never
+  // finished, do not consume an unrelated number as the stale tender's price.
+  const now = (_now ?? (() => new Date()))();
+  if (entry.at && now - new Date(entry.at) > AGENT_PENDING_TTL_MS) {
+    try {
+      delete pending[chatId];
+      await _saveAgentPending(env, pending, sha);
+    } catch (err) {
+      console.error('worker: agent stale-pending clear failed:', err.message);
+    }
+    return false; // treat as no pending → normal handling proceeds
+  }
 
   const send = (text, replyMarkup) => _sendReply({
     token: env.TELEGRAM_BOT_TOKEN, chatId: msg.chat.id, text,
