@@ -106,7 +106,6 @@ const LEGAL_FORM_ABBREVIATIONS = [
   [new RegExp(`^Комунальне\\s+підприємство${_SEP}`, 'i'), 'КП '],
   [new RegExp(`^Комунальний\\s+заклад${_SEP}`, 'i'), 'КЗ '],
   [new RegExp(`^Комунальна\\s+установа${_SEP}`, 'i'), 'КУ '],
-  [new RegExp(`^Територіальне\\s+медичне\\s+об['’ʼ]?єднання${_SEP}`, 'i'), 'ТМО '],
   [new RegExp(`^Товариство\\s+з\\s+обмеженою\\s+відповідальністю${_SEP}`, 'i'), 'ТОВ '],
   [new RegExp(`^Приватне\\s+акціонерне\\s+товариство${_SEP}`, 'i'), 'ПрАТ '],
   [new RegExp(`^Публічне\\s+акціонерне\\s+товариство${_SEP}`, 'i'), 'ПАТ '],
@@ -131,14 +130,32 @@ const GOV_FORM_ABBREVIATIONS = [
   [/селищної\s+ради/i, 'СР'],
 ];
 
+// Facility-type phrases ANYWHERE in the name (incl. inside a quoted core) ->
+// abbreviation. Longest/most-specific first so e.g. «центральна міська лікарня»
+// wins over «міська лікарня».
+const FACILITY_ABBREVIATIONS = [
+  [/територіальне\s+медичне\s+об['’ʼ]?єднання/i, 'ТМО'],
+  [/центральна\s+міська\s+лікарня/i, 'ЦМЛ'],
+  [/обласна\s+клінічна\s+лікарня/i, 'ОКЛ'],
+  [/міська\s+клінічна\s+лікарня/i, 'МКЛ'],
+  [/багатопрофільна\s+лікарня/i, 'БПЛ'],
+  [/швидкої\s+медичної\s+допомоги/i, 'ШМД'],
+  [/міська\s+лікарня/i, 'МЛ'],
+];
+
 export function abbreviateLegalForm(name) {
   if (!name) return name;
-  // Trim first — all leading-form regexes are anchored at ^ and Prozorro entries
-  // sometimes have leading/trailing whitespace. Apply the leading legal form
-  // (first match) then any governance suffix, so both ends get shortened.
+  // Trim first — leading-form regexes are anchored at ^ and Prozorro entries
+  // sometimes have surrounding whitespace. Apply the leading legal form (first
+  // match), then facility-type phrases and governance suffixes anywhere — so the
+  // whole name shortens, e.g. «КНП «Львівське територіальне медичне об'єднання…»
+  // … обласної ради» -> «КНП «Львівське ТМО…» … ОР».
   let s = name.trim();
   for (const [re, replacement] of LEGAL_FORM_ABBREVIATIONS) {
     if (re.test(s)) { s = s.replace(re, replacement); break; }
+  }
+  for (const [re, replacement] of FACILITY_ABBREVIATIONS) {
+    s = s.replace(re, replacement);
   }
   for (const [re, replacement] of GOV_FORM_ABBREVIATIONS) {
     s = s.replace(re, replacement);

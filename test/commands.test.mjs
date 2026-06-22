@@ -218,7 +218,7 @@ test('abbreviateLegalForm: matches when name follows form without a space (quote
   // Real Prozorro entry: EDRPOU 42409961 — no space between "ПІДПРИЄМСТВО" and the opening quote.
   assert.equal(
     abbreviateLegalForm('КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО"ЛЮБОТИНСЬКА МІСЬКА ЛІКАРНЯ" ЛЮБОТИНСЬКОЇ МІСЬКОЇ РАДИ ХАРКІВСЬКОЇ ОБЛАСТІ'),
-    'КНП "ЛЮБОТИНСЬКА МІСЬКА ЛІКАРНЯ" ЛЮБОТИНСЬКОЇ МР ХАРКІВСЬКОЇ ОБЛАСТІ'
+    'КНП "ЛЮБОТИНСЬКА МЛ" ЛЮБОТИНСЬКОЇ МР ХАРКІВСЬКОЇ ОБЛАСТІ'
   );
   // Same issue, other forms — also covered.
   assert.equal(
@@ -248,7 +248,7 @@ test('abbreviateLegalForm: КНП — accepts "товариство" alt form (s
   );
   assert.equal(
     abbreviateLegalForm('Комунальне некомерцийне товариство "Дніпропетровська обласна клінічна лікарня ім. І. І. Мечникова"'),
-    'КНП "Дніпропетровська обласна клінічна лікарня ім. І. І. Мечникова"'
+    'КНП "Дніпропетровська ОКЛ ім. І. І. Мечникова"'
   );
 });
 
@@ -307,7 +307,7 @@ test('abbreviateLegalForm: empty/null returns unchanged', () => {
 test('abbreviateLegalForm: leading/trailing whitespace does not block matching (Prozorro registry quirk)', () => {
   assert.equal(
     abbreviateLegalForm(' Комунальне підприємство "Балтська багатопрофільна лікарня" Балтської міської ради'),
-    'КП "Балтська багатопрофільна лікарня" Балтської МР',
+    'КП "Балтська БПЛ" Балтської МР',
   );
   assert.equal(
     abbreviateLegalForm('Товариство з обмеженою відповідальністю «ТерраЛаб»  '),
@@ -3264,4 +3264,17 @@ test('abbreviateLegalForm: ТМО / КУ / селищної ради (new forms)
   assert.match(abbreviateLegalForm("ТЕРИТОРІАЛЬНЕ МЕДИЧНЕ ОБ'ЄДНАННЯ «Х»"), /^ТМО «Х»/);
   assert.match(abbreviateLegalForm('КОМУНАЛЬНА УСТАНОВА «Y»'), /^КУ «Y»/);
   assert.match(abbreviateLegalForm('«Z» БОЯРСЬКОЇ СЕЛИЩНОЇ РАДИ'), /БОЯРСЬКОЇ СР$/);
+});
+
+
+test('abbreviateLegalForm: facility-type phrases (ТМО mid, МКЛ/ЦМЛ/ОКЛ/БПЛ/ШМД/МЛ)', () => {
+  const lviv = abbreviateLegalForm(`КНП "Львівське територіальне медичне об'єднання "Клінічна лікарня"`);
+  assert.match(lviv, /Львівське ТМО/);
+  assert.doesNotMatch(lviv, /територіальне медичне/i);
+  assert.match(abbreviateLegalForm('«Х» міська клінічна лікарня № 1'), /МКЛ № 1/);
+  assert.match(abbreviateLegalForm('центральна міська лікарня м. Суми'), /^ЦМЛ м\. Суми/);
+  assert.match(abbreviateLegalForm('обласна клінічна лікарня'), /^ОКЛ$/);
+  assert.match(abbreviateLegalForm('Балтська багатопрофільна лікарня'), /Балтська БПЛ/);
+  assert.match(abbreviateLegalForm('лікарня швидкої медичної допомоги'), /лікарня ШМД/);
+  assert.match(abbreviateLegalForm('Сумська міська лікарня № 5'), /Сумська МЛ № 5/);
 });
