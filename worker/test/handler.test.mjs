@@ -103,8 +103,8 @@ test('runHandler: allowed user reply carries reply_markup keyboard', async () =>
   assert.ok(Array.isArray(sent[0].replyMarkup.keyboard));
   const flat = sent[0].replyMarkup.keyboard.flat().map(b => b.text);
   assert.deepEqual(flat, [
-    '📋 Моніторинг закупівель',
     '👁 Моніторинг замовників',
+    '📋 Моніторинг закупівель',
     '📦 Архів закупівель',
     '🤖 Агент',
     '❓ Допомога (список команд)',

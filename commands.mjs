@@ -26,24 +26,24 @@ const BUTTON_ALIASES = {
 // button label.
 export const MAIN_KEYBOARD = {
   keyboard: [
-    [{ text: '📋 Моніторинг закупівель' }, { text: '👁 Моніторинг замовників' }],
-    [{ text: '📦 Архів закупівель' }],
+    [{ text: '👁 Моніторинг замовників' }, { text: '📋 Моніторинг закупівель' }, { text: '📦 Архів закупівель' }],
     [{ text: '❓ Допомога (список команд)' }],
   ],
   resize_keyboard: true,
   is_persistent: true,
 };
 
-// Role-aware reply keyboard. «❓ Допомога» sits on its own full-width (centered)
-// bottom row. Admins additionally get «🤖 Агент» paired next to «Архів» (taps map
-// to /agent via BUTTON_ALIASES). Everyone else gets the plain MAIN_KEYBOARD.
+// Role-aware reply keyboard. Three monitoring/archive buttons on one row;
+// «❓ Допомога» on its own full-width (centered) bottom row. Admins additionally
+// get a «🤖 Агент» row (taps map to /agent via BUTTON_ALIASES). Telegram centers
+// each button's label automatically.
 export function mainKeyboard(role) {
   if (role !== 'admin') return MAIN_KEYBOARD;
   return {
     ...MAIN_KEYBOARD,
     keyboard: [
-      [{ text: '📋 Моніторинг закупівель' }, { text: '👁 Моніторинг замовників' }],
-      [{ text: '📦 Архів закупівель' }, { text: '🤖 Агент' }],
+      [{ text: '👁 Моніторинг замовників' }, { text: '📋 Моніторинг закупівель' }, { text: '📦 Архів закупівель' }],
+      [{ text: '🤖 Агент' }],
       [{ text: '❓ Допомога (список команд)' }],
     ],
   };
@@ -573,7 +573,7 @@ export function buildWatchedKeyboard(watchedEntities) {
   return {
     inline_keyboard: watchedEntities.map(e => {
       const name = e.name && e.name !== '(unknown)'
-        ? ` — ${truncate(abbreviateLegalForm(e.name), 40)}`
+        ? ` — ${truncate(abbreviateLegalForm(e.name), 64)}`
         : '';
       return [{ text: `🗑 ${e.edrpou}${name}`, callback_data: `unwatch:${e.edrpou}` }];
     }),
@@ -1462,7 +1462,7 @@ export function buildAgentTenderListKeyboard(watchlist) {
   for (const r of (watchlist ?? [])) {
     if (!r || !r.enabled || !r.tender_id) continue;
     const note = (r.notes ?? '').trim();
-    const label = note ? abbreviateLegalForm(note).slice(0, 60) : r.tender_id;
+    const label = note ? abbreviateLegalForm(note).slice(0, 72) : r.tender_id;
     rows.push([{ text: `🤖 ${label}`, callback_data: `agent:start:${r.tender_id}` }]);
     // If a proposal was already prepared for this tender, surface a clickable
     // link (⬆️ points at the tender button above) straight to its Drive folder.
