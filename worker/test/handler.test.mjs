@@ -41,6 +41,7 @@ const makeDeps = (overrides = {}) => {
       fetchAuditLog: async () => [],
       editMessageText: async () => {},
       answerCallbackQuery: async () => {},
+      loadAgentJob: async () => null,
       ...overrides,
     },
   };
@@ -105,8 +106,8 @@ test('runHandler: allowed user reply carries reply_markup keyboard', async () =>
     '📋 Моніторинг закупівель',
     '👁 Моніторинг замовників',
     '📦 Архів закупівель',
-    '❓ Допомога (список команд)',
     '🤖 Агент',
+    '❓ Допомога (список команд)',
   ]);
 });
 
@@ -2760,4 +2761,17 @@ test('runHandler: /info <id> for non-tendering tender → no agent button', asyn
   await runHandler({ update: { message: { chat: { id: 123 }, text: `/info ${ID}`, message_id: 1 } }, env: ENV, deps });
   assert.ok(!JSON.stringify(sent.at(-1).replyMarkup ?? {}).includes('agent:start'),
     'no agent button for a non-tendering tender');
+});
+
+
+test('runHandler: /agent shows «підготовлена ✅» link for a tender with a done job', async () => {
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true, notes: 'КНП «Х»' }], sha: 's' }),
+    loadAgentJob: async () => ({ tender_id: ID, status: 'done', result: { drive_link: 'https://drive.google.com/drive/folders/REAL' } }),
+  });
+  await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
+  const kb = sent[0].replyMarkup.inline_keyboard;
+  assert.equal(kb[0][0].callback_data, `agent:start:${ID}`);
+  assert.match(kb[1][0].text, /Тендерна пропозиція підготовлена ✅/);
+  assert.equal(kb[1][0].url, 'https://drive.google.com/drive/folders/REAL');
 });

@@ -258,6 +258,19 @@ export async function saveAgentJob(env, job, { fetch: fetchImpl = fetch } = {}) 
   });
 }
 
+// Loads a single agent job (_state/agent_jobs/<tid>.json) — the poller writes
+// status/result (incl. result.drive_link) back here on completion. Returns the
+// parsed job, or null if missing/unparseable.
+export async function loadAgentJob(env, tenderId, { fetch: fetchImpl = fetch } = {}) {
+  const { content } = await loadFile(env, `_state/agent_jobs/${tenderId}.json`, { fetch: fetchImpl });
+  if (!content) return null;
+  try {
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
 // Returns the latest non-bot commit on main — skips state-update and cursor-sync
 // commits made by the monitor cron so /status shows when code was last deployed.
 export async function fetchLatestDeployCommit(env, { fetch: fetchImpl = fetch } = {}) {

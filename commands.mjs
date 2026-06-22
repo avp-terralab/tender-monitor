@@ -27,19 +27,25 @@ const BUTTON_ALIASES = {
 export const MAIN_KEYBOARD = {
   keyboard: [
     [{ text: '📋 Моніторинг закупівель' }, { text: '👁 Моніторинг замовників' }],
-    [{ text: '📦 Архів закупівель' }, { text: '❓ Допомога (список команд)' }],
+    [{ text: '📦 Архів закупівель' }],
+    [{ text: '❓ Допомога (список команд)' }],
   ],
   resize_keyboard: true,
   is_persistent: true,
 };
 
-// Role-aware reply keyboard: admins get an extra «🤖 Агент» row (taps map to
-// /agent via BUTTON_ALIASES). Everyone else gets the plain MAIN_KEYBOARD.
+// Role-aware reply keyboard. «❓ Допомога» sits on its own full-width (centered)
+// bottom row. Admins additionally get «🤖 Агент» paired next to «Архів» (taps map
+// to /agent via BUTTON_ALIASES). Everyone else gets the plain MAIN_KEYBOARD.
 export function mainKeyboard(role) {
   if (role !== 'admin') return MAIN_KEYBOARD;
   return {
     ...MAIN_KEYBOARD,
-    keyboard: [...MAIN_KEYBOARD.keyboard, [{ text: '🤖 Агент' }]],
+    keyboard: [
+      [{ text: '📋 Моніторинг закупівель' }, { text: '👁 Моніторинг замовників' }],
+      [{ text: '📦 Архів закупівель' }, { text: '🤖 Агент' }],
+      [{ text: '❓ Допомога (список команд)' }],
+    ],
   };
 }
 
@@ -1452,13 +1458,18 @@ export function agentTriggerButtonRow(tenderId, role) {
 // its notes (or the id), callback agent:start:<tid>. Returns an inline_keyboard
 // or null when there are no active tenders. Admin-only (gated by the caller).
 export function buildAgentTenderListKeyboard(watchlist) {
-  const rows = (watchlist ?? [])
-    .filter(r => r && r.enabled && r.tender_id)
-    .map(r => {
-      const note = (r.notes ?? '').trim();
-      const label = note ? abbreviateLegalForm(note).slice(0, 60) : r.tender_id;
-      return [{ text: `🤖 ${label}`, callback_data: `agent:start:${r.tender_id}` }];
-    });
+  const rows = [];
+  for (const r of (watchlist ?? [])) {
+    if (!r || !r.enabled || !r.tender_id) continue;
+    const note = (r.notes ?? '').trim();
+    const label = note ? abbreviateLegalForm(note).slice(0, 60) : r.tender_id;
+    rows.push([{ text: `🤖 ${label}`, callback_data: `agent:start:${r.tender_id}` }]);
+    // If a proposal was already prepared for this tender, surface a clickable
+    // link (⬆️ points at the tender button above) straight to its Drive folder.
+    if (r.preparedUrl) {
+      rows.push([{ text: '⬆️ Тендерна пропозиція підготовлена ✅', url: r.preparedUrl }]);
+    }
+  }
   return rows.length ? { inline_keyboard: rows } : null;
 }
 

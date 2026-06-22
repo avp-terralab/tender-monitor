@@ -3287,3 +3287,19 @@ test('mainKeyboard / 🤖 Агент alias: admin gets the agent button, others 
   assert.ok(!viewer.includes('🤖 Агент'), 'non-admin keyboard must NOT include the agent button');
   assert.deepEqual(parseCommand('🤖 Агент'), { cmd: 'agent' });
 });
+
+
+test('buildAgentTenderListKeyboard: prepared tender gets a clickable Drive-link row', () => {
+  const kb = buildAgentTenderListKeyboard([
+    { tender_id: 'UA-2026-01-01-000007-a', enabled: true, notes: 'КНП «Готовий»',
+      preparedUrl: 'https://drive.google.com/drive/folders/ABC' },
+    { tender_id: 'UA-2026-01-01-000008-a', enabled: true, notes: 'КНП «Новий»' },
+  ]);
+  // tender1: agent button + prepared link; tender2: agent button only
+  assert.equal(kb.inline_keyboard.length, 3);
+  assert.equal(kb.inline_keyboard[0][0].callback_data, 'agent:start:UA-2026-01-01-000007-a');
+  assert.match(kb.inline_keyboard[1][0].text, /^⬆️ Тендерна пропозиція підготовлена ✅$/);
+  assert.equal(kb.inline_keyboard[1][0].url, 'https://drive.google.com/drive/folders/ABC');
+  assert.equal(kb.inline_keyboard[2][0].callback_data, 'agent:start:UA-2026-01-01-000008-a');
+  assert.equal(kb.inline_keyboard[2][0].url, undefined);
+});

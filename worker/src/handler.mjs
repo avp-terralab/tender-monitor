@@ -27,7 +27,7 @@ import {
   loadArchivedTenders, saveArchivedTenders,
   loadPendingDigest, loadTenderState, fetchLatestDeployCommit,
   fetchAuditLog,
-  loadAgentPending, saveAgentPending, saveAgentJob,
+  loadAgentPending, saveAgentPending, saveAgentJob, loadAgentJob,
   ConflictError,
 } from './github.mjs';
 
@@ -75,6 +75,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const _loadAgentPending = deps.loadAgentPending ?? loadAgentPending;
   const _saveAgentPending = deps.saveAgentPending ?? saveAgentPending;
   const _saveAgentJob = deps.saveAgentJob ?? saveAgentJob;
+  const _loadAgentJob = deps.loadAgentJob ?? loadAgentJob;
   // Tests may inject their own Map to avoid cross-test cache pollution.
   const _statusCache = deps.statusCache ?? STATUS_CACHE;
 
@@ -638,7 +639,16 @@ export async function runHandler({ update, env, deps = {} }) {
         watchlist.filter(r => r.enabled).map(async r => {
           try {
             const snap = _extractSnapshot(await _fetchTender(r.tender_id));
-            return snap.status === 'active.tendering' ? r : null;
+            if (snap.status !== 'active.tendering') return null;
+            // If a proposal was already prepared, attach its Drive folder link.
+            let preparedUrl = null;
+            try {
+              const job = await _loadAgentJob(env, r.tender_id);
+              if (job && job.status === 'done' && job.result?.drive_link) {
+                preparedUrl = job.result.drive_link;
+              }
+            } catch { /* link is optional — ignore lookup failures */ }
+            return { ...r, preparedUrl };
           } catch { return null; }
         }),
       );
