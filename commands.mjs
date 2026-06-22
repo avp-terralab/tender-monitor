@@ -1440,52 +1440,12 @@ export function agentTriggerButtonRow(tenderId, role) {
 // /agent — on-demand picker: one button per ENABLED watched tender, labelled by
 // its notes (or the id), callback agent:start:<tid>. Returns an inline_keyboard
 // or null when there are no active tenders. Admin-only (gated by the caller).
-// Legal-form -> abbreviation, to keep /agent button labels short.
-const ENTITY_ABBR = [
-  ['КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО', 'КНП'],
-  ['КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ТОВАРИСТВО', 'КНТ'],
-  ['ДЕРЖАВНА НЕКОМЕРЦІЙНА УСТАНОВА', 'ДНУ'],
-  ['ТОВАРИСТВО З ОБМЕЖЕНОЮ ВІДПОВІДАЛЬНІСТЮ', 'ТОВ'],
-  ['КОМУНАЛЬНИЙ ЗАКЛАД', 'КЗ'],
-  ['КОМУНАЛЬНЕ ПІДПРИЄМСТВО', 'КП'],
-  ['ДЕРЖАВНЕ ПІДПРИЄМСТВО', 'ДП'],
-  ['ПРИВАТНЕ ПІДПРИЄМСТВО', 'ПП'],
-  ['ДЕРЖАВНА УСТАНОВА', 'ДУ'],
-];
-
-// Governance-suffix -> abbreviation (longest first), e.g.
-// «… ОДЕСЬКОЇ МІСЬКОЇ РАДИ» -> «… ОДЕСЬКОЇ МР».
-const GOV_ABBR = [
-  ['ОБЛАСНОЇ ДЕРЖАВНОЇ АДМІНІСТРАЦІЇ', 'ОДА'],
-  ['МІСЬКОЇ ДЕРЖАВНОЇ АДМІНІСТРАЦІЇ', 'МДА'],
-  ['РАЙОННОЇ ДЕРЖАВНОЇ АДМІНІСТРАЦІЇ', 'РДА'],
-  ['ОБЛАСНОЇ РАДИ', 'ОР'],
-  ['МІСЬКОЇ РАДИ', 'МР'],
-  ['РАЙОННОЇ РАДИ', 'РР'],
-  ['СІЛЬСЬКОЇ РАДИ', 'СР'],
-];
-
-// Shorten an institution name for compact labels: abbreviate the leading legal
-// form (КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО -> КНП) and the governance suffix
-// (ОДЕСЬКОЇ МІСЬКОЇ РАДИ -> ОДЕСЬКОЇ МР). Case-insensitive.
-export function shortenEntityName(text) {
-  let s = (text ?? '').trim();
-  for (const [phrase, abbr] of ENTITY_ABBR) {
-    const re = new RegExp(phrase, 'i');
-    if (re.test(s)) { s = s.replace(re, abbr); break; }
-  }
-  for (const [phrase, abbr] of GOV_ABBR) {
-    s = s.replace(new RegExp(phrase, 'i'), abbr);
-  }
-  return s.replace(/\s+/g, ' ').trim();
-}
-
 export function buildAgentTenderListKeyboard(watchlist) {
   const rows = (watchlist ?? [])
     .filter(r => r && r.enabled && r.tender_id)
     .map(r => {
       const note = (r.notes ?? '').trim();
-      const label = note ? shortenEntityName(note).slice(0, 60) : r.tender_id;
+      const label = note ? abbreviateLegalForm(note).slice(0, 60) : r.tender_id;
       return [{ text: `🤖 ${label}`, callback_data: `agent:start:${r.tender_id}` }];
     });
   return rows.length ? { inline_keyboard: rows } : null;

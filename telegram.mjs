@@ -104,26 +104,46 @@ const LEGAL_FORM_ABBREVIATIONS = [
   // entries like "Комунальне некомерцийне товариство" that are semantically КНП too.
   [new RegExp(`^Комунальне\\s+некомерц[іи]йне\\s+(?:підприємство|товариство)${_SEP}`, 'i'), 'КНП '],
   [new RegExp(`^Комунальне\\s+підприємство${_SEP}`, 'i'), 'КП '],
+  [new RegExp(`^Комунальний\\s+заклад${_SEP}`, 'i'), 'КЗ '],
+  [new RegExp(`^Комунальна\\s+установа${_SEP}`, 'i'), 'КУ '],
+  [new RegExp(`^Територіальне\\s+медичне\\s+об['’ʼ]?єднання${_SEP}`, 'i'), 'ТМО '],
   [new RegExp(`^Товариство\\s+з\\s+обмеженою\\s+відповідальністю${_SEP}`, 'i'), 'ТОВ '],
   [new RegExp(`^Приватне\\s+акціонерне\\s+товариство${_SEP}`, 'i'), 'ПрАТ '],
   [new RegExp(`^Публічне\\s+акціонерне\\s+товариство${_SEP}`, 'i'), 'ПАТ '],
   [new RegExp(`^Акціонерне\\s+товариство${_SEP}`, 'i'), 'АТ '],
+  [new RegExp(`^Державна\\s+некомерційна\\s+установа${_SEP}`, 'i'), 'ДНУ '],
   [new RegExp(`^Державне\\s+підприємство${_SEP}`, 'i'), 'ДП '],
+  [new RegExp(`^Державна\\s+установа${_SEP}`, 'i'), 'ДУ '],
   [new RegExp(`^Приватне\\s+підприємство${_SEP}`, 'i'), 'ПП '],
   [new RegExp(`^Фізична\\s+особа[-\\s]+підприємець${_SEP}`, 'i'), 'ФОП '],
 ];
 
+// Governance suffix -> abbreviation (longest first), applied AFTER the leading
+// legal form: «… Одеської міської ради» -> «… Одеської МР».
+const GOV_FORM_ABBREVIATIONS = [
+  [/обласної\s+державної\s+адміністрації/i, 'ОДА'],
+  [/міської\s+державної\s+адміністрації/i, 'МДА'],
+  [/районної\s+державної\s+адміністрації/i, 'РДА'],
+  [/обласної\s+ради/i, 'ОР'],
+  [/міської\s+ради/i, 'МР'],
+  [/районної\s+ради/i, 'РР'],
+  [/сільської\s+ради/i, 'СР'],
+  [/селищної\s+ради/i, 'СР'],
+];
+
 export function abbreviateLegalForm(name) {
   if (!name) return name;
-  // Prozorro registry sometimes returns names with leading/trailing whitespace
-  // (e.g. " Комунальне підприємство ..."). All abbreviation regexes are anchored
-  // at ^, so trim before matching — otherwise the regex misses and the long form
-  // leaks through to /watched, /info, digests, etc.
-  const trimmed = name.trim();
+  // Trim first — all leading-form regexes are anchored at ^ and Prozorro entries
+  // sometimes have leading/trailing whitespace. Apply the leading legal form
+  // (first match) then any governance suffix, so both ends get shortened.
+  let s = name.trim();
   for (const [re, replacement] of LEGAL_FORM_ABBREVIATIONS) {
-    if (re.test(trimmed)) return trimmed.replace(re, replacement).trim();
+    if (re.test(s)) { s = s.replace(re, replacement); break; }
   }
-  return trimmed;
+  for (const [re, replacement] of GOV_FORM_ABBREVIATIONS) {
+    s = s.replace(re, replacement);
+  }
+  return s.replace(/\s+/g, ' ').trim();
 }
 
 function fmtDate(iso) {

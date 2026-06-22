@@ -17,7 +17,7 @@ import {
   buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
   paginateArchiveGroup, ARCHIVE_PAGE_LIMIT,
   AGENT_COMPANIES, companyForSlug, slugForCompany,
-  agentTriggerButtonRow, buildAgentTenderListKeyboard, shortenEntityName, buildAgentCompanyKeyboard, validateAgentPrice,
+  agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
 } from '../commands.mjs';
 
@@ -218,7 +218,7 @@ test('abbreviateLegalForm: matches when name follows form without a space (quote
   // Real Prozorro entry: EDRPOU 42409961 — no space between "ПІДПРИЄМСТВО" and the opening quote.
   assert.equal(
     abbreviateLegalForm('КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО"ЛЮБОТИНСЬКА МІСЬКА ЛІКАРНЯ" ЛЮБОТИНСЬКОЇ МІСЬКОЇ РАДИ ХАРКІВСЬКОЇ ОБЛАСТІ'),
-    'КНП "ЛЮБОТИНСЬКА МІСЬКА ЛІКАРНЯ" ЛЮБОТИНСЬКОЇ МІСЬКОЇ РАДИ ХАРКІВСЬКОЇ ОБЛАСТІ'
+    'КНП "ЛЮБОТИНСЬКА МІСЬКА ЛІКАРНЯ" ЛЮБОТИНСЬКОЇ МР ХАРКІВСЬКОЇ ОБЛАСТІ'
   );
   // Same issue, other forms — also covered.
   assert.equal(
@@ -307,7 +307,7 @@ test('abbreviateLegalForm: empty/null returns unchanged', () => {
 test('abbreviateLegalForm: leading/trailing whitespace does not block matching (Prozorro registry quirk)', () => {
   assert.equal(
     abbreviateLegalForm(' Комунальне підприємство "Балтська багатопрофільна лікарня" Балтської міської ради'),
-    'КП "Балтська багатопрофільна лікарня" Балтської міської ради',
+    'КП "Балтська багатопрофільна лікарня" Балтської МР',
   );
   assert.equal(
     abbreviateLegalForm('Товариство з обмеженою відповідальністю «ТерраЛаб»  '),
@@ -3240,9 +3240,9 @@ test('buildAgentTenderListKeyboard: one agent:start button per enabled tender', 
 });
 
 
-test('shortenEntityName / buildAgentTenderListKeyboard: abbreviates the legal form', () => {
-  assert.match(shortenEntityName('КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Херсонський»'), /^КНП «Херсонський»/);
-  assert.equal(shortenEntityName('КОМУНАЛЬНИЙ ЗАКЛАД Київ').startsWith('КЗ '), true);
+test('abbreviateLegalForm / buildAgentTenderListKeyboard: abbreviates the legal form', () => {
+  assert.match(abbreviateLegalForm('КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Херсонський»'), /^КНП «Херсонський»/);
+  assert.equal(abbreviateLegalForm('КОМУНАЛЬНИЙ ЗАКЛАД Київ').startsWith('КЗ '), true);
   const kb = buildAgentTenderListKeyboard([
     { tender_id: 'UA-2026-01-01-000009-a', enabled: true,
       notes: 'КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Дніпро»' },
@@ -3252,9 +3252,16 @@ test('shortenEntityName / buildAgentTenderListKeyboard: abbreviates the legal fo
 });
 
 
-test('shortenEntityName: abbreviates governance suffix', () => {
-  assert.equal(shortenEntityName('КОМУНАЛЬНЕ ПІДПРИЄМСТВО «Х» ОДЕСЬКОЇ МІСЬКОЇ РАДИ'), 'КП «Х» ОДЕСЬКОЇ МР');
-  assert.match(shortenEntityName('«Лікарня» ЛЬВІВСЬКОЇ ОБЛАСНОЇ РАДИ'), /ЛЬВІВСЬКОЇ ОР$/);
-  assert.match(shortenEntityName('«ЦРЛ» БРОВАРСЬКОЇ РАЙОННОЇ РАДИ'), /БРОВАРСЬКОЇ РР$/);
-  assert.match(shortenEntityName('«А» КИЇВСЬКОЇ ОБЛАСНОЇ ДЕРЖАВНОЇ АДМІНІСТРАЦІЇ'), /КИЇВСЬКОЇ ОДА$/);
+test('abbreviateLegalForm: abbreviates governance suffix', () => {
+  assert.equal(abbreviateLegalForm('КОМУНАЛЬНЕ ПІДПРИЄМСТВО «Х» ОДЕСЬКОЇ МІСЬКОЇ РАДИ'), 'КП «Х» ОДЕСЬКОЇ МР');
+  assert.match(abbreviateLegalForm('«Лікарня» ЛЬВІВСЬКОЇ ОБЛАСНОЇ РАДИ'), /ЛЬВІВСЬКОЇ ОР$/);
+  assert.match(abbreviateLegalForm('«ЦРЛ» БРОВАРСЬКОЇ РАЙОННОЇ РАДИ'), /БРОВАРСЬКОЇ РР$/);
+  assert.match(abbreviateLegalForm('«А» КИЇВСЬКОЇ ОБЛАСНОЇ ДЕРЖАВНОЇ АДМІНІСТРАЦІЇ'), /КИЇВСЬКОЇ ОДА$/);
+});
+
+
+test('abbreviateLegalForm: ТМО / КУ / селищної ради (new forms)', () => {
+  assert.match(abbreviateLegalForm("ТЕРИТОРІАЛЬНЕ МЕДИЧНЕ ОБ'ЄДНАННЯ «Х»"), /^ТМО «Х»/);
+  assert.match(abbreviateLegalForm('КОМУНАЛЬНА УСТАНОВА «Y»'), /^КУ «Y»/);
+  assert.match(abbreviateLegalForm('«Z» БОЯРСЬКОЇ СЕЛИЩНОЇ РАДИ'), /БОЯРСЬКОЇ СР$/);
 });
