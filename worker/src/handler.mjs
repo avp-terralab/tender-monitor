@@ -6,7 +6,7 @@ import {
   handleArchive, handleArchiveDetail, handleUnarchive,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
-  formatInfo, formatInfoPages, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD,
+  formatInfo, formatInfoPages, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD, mainKeyboard,
   TERMINAL_STATUSES, hydrateContractDocs,
   formatAuditMessage,
   sanitizeActor,
@@ -123,7 +123,7 @@ export async function runHandler({ update, env, deps = {} }) {
         chatId: msg.chat.id,
         text: startReply,
         replyToMessageId: msg.message_id,
-        replyMarkup: isAllowed ? MAIN_KEYBOARD : undefined,
+        replyMarkup: isAllowed ? mainKeyboard(role) : undefined,
       });
     } catch (err) {
       console.error('worker: sendReply /start failed:', err.message);
@@ -669,7 +669,7 @@ export async function runHandler({ update, env, deps = {} }) {
         text: pages[i],
         replyToMessageId: i === 0 ? msg.message_id : undefined,
         replyMarkup: isLast
-          ? (agentReplyMarkup ?? watchedReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined))
+          ? (agentReplyMarkup ?? watchedReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
           : undefined,
       });
     } catch (err) {

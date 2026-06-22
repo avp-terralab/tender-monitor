@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseCommand, buildAutoNotes, formatAddReply,
+  parseCommand, mainKeyboard, buildAutoNotes, formatAddReply,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo, formatInfoPages,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
@@ -3277,4 +3277,13 @@ test('abbreviateLegalForm: facility-type phrases (ТМО mid, МКЛ/ЦМЛ/ОК
   assert.match(abbreviateLegalForm('Балтська багатопрофільна лікарня'), /Балтська БПЛ/);
   assert.match(abbreviateLegalForm('лікарня швидкої медичної допомоги'), /лікарня ШМД/);
   assert.match(abbreviateLegalForm('Сумська міська лікарня № 5'), /Сумська МЛ № 5/);
+});
+
+
+test('mainKeyboard / 🤖 Агент alias: admin gets the agent button, others do not', () => {
+  const admin = mainKeyboard('admin').keyboard.flat().map(b => b.text);
+  assert.ok(admin.includes('🤖 Агент'), 'admin keyboard must include the agent button');
+  const viewer = mainKeyboard('viewer').keyboard.flat().map(b => b.text);
+  assert.ok(!viewer.includes('🤖 Агент'), 'non-admin keyboard must NOT include the agent button');
+  assert.deepEqual(parseCommand('🤖 Агент'), { cmd: 'agent' });
 });

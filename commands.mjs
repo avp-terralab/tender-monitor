@@ -16,6 +16,7 @@ const BUTTON_ALIASES = {
   '👁 Моніторинг замовників': 'watched',
   '📦 Архів закупівель': 'archive',
   '❓ Допомога (список команд)': 'help',
+  '🤖 Агент': 'agent',
 };
 
 // Reply keyboard sent with each bot response to an allowed user. Telegram
@@ -31,6 +32,16 @@ export const MAIN_KEYBOARD = {
   resize_keyboard: true,
   is_persistent: true,
 };
+
+// Role-aware reply keyboard: admins get an extra «🤖 Агент» row (taps map to
+// /agent via BUTTON_ALIASES). Everyone else gets the plain MAIN_KEYBOARD.
+export function mainKeyboard(role) {
+  if (role !== 'admin') return MAIN_KEYBOARD;
+  return {
+    ...MAIN_KEYBOARD,
+    keyboard: [...MAIN_KEYBOARD.keyboard, [{ text: '🤖 Агент' }]],
+  };
+}
 
 export function parseCommand(text) {
   if (typeof text !== 'string') return { cmd: null };
