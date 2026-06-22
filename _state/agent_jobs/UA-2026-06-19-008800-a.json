@@ -4,6 +4,12 @@
   "company": "МАЙЛАБ",
   "price": "219500",
   "requested_by": "1744078008",
-  "status": "running",
-  "created_at": "2026-06-22T07:23:59.828Z"
+  "status": "done",
+  "created_at": "2026-06-22T07:23:59.828Z",
+  "result": {
+    "package_dir": "G:\\Мій диск\\AI\\Агент для тендерних закупівель\\22.06.26 МІСЬКА КЛІНІЧНА ЛІКАРНЯ №1\\Тендерна пропозиція",
+    "report_path": "G:\\Мій диск\\AI\\Агент для тендерних закупівель\\22.06.26 МІСЬКА КЛІНІЧНА ЛІКАРНЯ №1\\Тендерна пропозиція\\_ЗВІТ.md",
+    "n_docx": 9,
+    "drive_link": "https://drive.google.com/drive/folders/1Y8zVjp2F3DwfrpZUvkXcJpXfn2TXKGG3"
+  }
 }
