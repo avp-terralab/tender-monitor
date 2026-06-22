@@ -17,7 +17,7 @@ import {
   buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
   paginateArchiveGroup, ARCHIVE_PAGE_LIMIT,
   AGENT_COMPANIES, companyForSlug, slugForCompany,
-  agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
+  agentTriggerButtonRow, buildAgentTenderListKeyboard, shortenEntityName, buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
 } from '../commands.mjs';
 
@@ -3237,4 +3237,16 @@ test('buildAgentTenderListKeyboard: one agent:start button per enabled tender', 
   assert.match(kb.inline_keyboard[1][0].text, /UA-2026-01-01-000003-a/);
   assert.equal(buildAgentTenderListKeyboard([]), null);
   assert.equal(buildAgentTenderListKeyboard([{ tender_id: 'x', enabled: false }]), null);
+});
+
+
+test('shortenEntityName / buildAgentTenderListKeyboard: abbreviates the legal form', () => {
+  assert.match(shortenEntityName('КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Херсонський»'), /^КНП «Херсонський»/);
+  assert.equal(shortenEntityName('КОМУНАЛЬНИЙ ЗАКЛАД Київ').startsWith('КЗ '), true);
+  const kb = buildAgentTenderListKeyboard([
+    { tender_id: 'UA-2026-01-01-000009-a', enabled: true,
+      notes: 'КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Дніпро»' },
+  ]);
+  assert.match(kb.inline_keyboard[0][0].text, /КНП «Дніпро»/);
+  assert.doesNotMatch(kb.inline_keyboard[0][0].text, /КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ/);
 });

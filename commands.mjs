@@ -1440,12 +1440,36 @@ export function agentTriggerButtonRow(tenderId, role) {
 // /agent — on-demand picker: one button per ENABLED watched tender, labelled by
 // its notes (or the id), callback agent:start:<tid>. Returns an inline_keyboard
 // or null when there are no active tenders. Admin-only (gated by the caller).
+// Legal-form -> abbreviation, to keep /agent button labels short.
+const ENTITY_ABBR = [
+  ['КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО', 'КНП'],
+  ['КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ТОВАРИСТВО', 'КНТ'],
+  ['ДЕРЖАВНА НЕКОМЕРЦІЙНА УСТАНОВА', 'ДНУ'],
+  ['ТОВАРИСТВО З ОБМЕЖЕНОЮ ВІДПОВІДАЛЬНІСТЮ', 'ТОВ'],
+  ['КОМУНАЛЬНИЙ ЗАКЛАД', 'КЗ'],
+  ['КОМУНАЛЬНЕ ПІДПРИЄМСТВО', 'КП'],
+  ['ДЕРЖАВНЕ ПІДПРИЄМСТВО', 'ДП'],
+  ['ПРИВАТНЕ ПІДПРИЄМСТВО', 'ПП'],
+  ['ДЕРЖАВНА УСТАНОВА', 'ДУ'],
+];
+
+// Abbreviate the leading legal form, e.g.
+// «КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Х»» -> «КНП «Х»».
+export function shortenEntityName(text) {
+  let s = (text ?? '').trim();
+  for (const [phrase, abbr] of ENTITY_ABBR) {
+    const re = new RegExp(phrase, 'i');
+    if (re.test(s)) { s = s.replace(re, abbr).replace(/\s+/g, ' ').trim(); break; }
+  }
+  return s;
+}
+
 export function buildAgentTenderListKeyboard(watchlist) {
   const rows = (watchlist ?? [])
     .filter(r => r && r.enabled && r.tender_id)
     .map(r => {
       const note = (r.notes ?? '').trim();
-      const label = note ? `${note.slice(0, 40)} · ${r.tender_id}` : r.tender_id;
+      const label = note ? shortenEntityName(note).slice(0, 60) : r.tender_id;
       return [{ text: `🤖 ${label}`, callback_data: `agent:start:${r.tender_id}` }];
     });
   return rows.length ? { inline_keyboard: rows } : null;
