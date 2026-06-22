@@ -387,8 +387,10 @@ export async function runHandler({ update, env, deps = {} }) {
         reply = cmd.tender_id
           ? formatInfo({ runIso: new Date().toISOString(), groups, errors })
           : formatInfoPages({ runIso: new Date().toISOString(), groups, errors });
-        // Admin can fire the agent straight from a single-tender /info card.
-        if (cmd.tender_id && isAdmin) {
+        // Admin can fire the agent from a single-tender /info card — but only
+        // while proposals are still being accepted (active.tendering).
+        if (cmd.tender_id && isAdmin && groups.length === 1
+            && groups[0].status === 'active.tendering') {
           agentReplyMarkup = { inline_keyboard: [agentTriggerButtonRow(cmd.tender_id, 'admin')] };
         }
 
@@ -631,11 +633,20 @@ export async function runHandler({ update, env, deps = {} }) {
     if (!isAdmin) return;
     try {
       const { watchlist } = await _loadWatchlist(env);
-      const kb = buildAgentTenderListKeyboard(watchlist);
+      // Agent runs only while proposals are accepted — keep only active.tendering.
+      const checked = await Promise.all(
+        watchlist.filter(r => r.enabled).map(async r => {
+          try {
+            const snap = _extractSnapshot(await _fetchTender(r.tender_id));
+            return snap.status === 'active.tendering' ? r : null;
+          } catch { return null; }
+        }),
+      );
+      const kb = buildAgentTenderListKeyboard(checked.filter(Boolean));
       if (!kb) {
-        reply = '📭 Немає активних тендерів для агента. Додай: /add UA-…';
+        reply = '📭 Немає тендерів у статусі «Приймання пропозицій».';
       } else {
-        reply = '🤖 Оберіть тендер, щоб надіслати агенту:';
+        reply = '🤖 Оберіть тендер (приймання пропозицій), щоб надіслати агенту:';
         agentReplyMarkup = kb;
       }
     } catch (err) {
@@ -860,6 +871,7 @@ async function handleCallbackQuery({
     await handleAgentCallback({
       data, env, chatId, messageId, ack, _sendReply, _editMessageText,
       _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
+      _fetchTender, _extractSnapshot,
     });
     return;
   }
@@ -880,6 +892,7 @@ const AGENT_PENDING_TTL_MS = 15 * 60 * 1000;
 async function handleAgentCallback({
   data, env, chatId, messageId, ack, _sendReply, _editMessageText,
   _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
+  _fetchTender, _extractSnapshot,
 }) {
   const parts = data.split(':'); // agent:<action>:<tid>[:<slug>]
   const action = parts[1];
@@ -890,6 +903,17 @@ async function handleAgentCallback({
   });
 
   if (action === 'start') {
+    // Authoritative gate (covers /agent, /info and digest buttons): the agent
+    // runs only while the tender is accepting proposals (active.tendering).
+    try {
+      const snap = _extractSnapshot(await _fetchTender(tid));
+      if (snap.status !== 'active.tendering') {
+        await ack('🚫 Тендер не приймає пропозиції — агент недоступний', true);
+        return;
+      }
+    } catch (err) {
+      console.error('worker: agent start status check failed:', err.message);
+    }
     try {
       await _editMessageText({
         token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,

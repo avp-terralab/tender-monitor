@@ -2722,3 +2722,41 @@ test('runHandler: /info <id> (admin) attaches the «Надіслати аген�
   assert.ok(sent.at(-1).replyMarkup.inline_keyboard, 'agent button expected on /info card');
   assert.equal(sent.at(-1).replyMarkup.inline_keyboard[0][0].callback_data, `agent:start:${ID}`);
 });
+
+
+test('runHandler: /agent keeps only active.tendering tenders', async () => {
+  const OTHER = 'UA-2026-04-30-088888-b';
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [
+      { tender_id: ID, enabled: true, notes: 'Тендеринг' },
+      { tender_id: OTHER, enabled: true, notes: 'Розгляд' },
+    ], sha: 's' }),
+    fetchTender: async (id) => id === ID
+      ? RAW_OK
+      : { data: { ...RAW_OK.data, tenderID: OTHER, status: 'active.qualification' } },
+  });
+  await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
+  const kb = sent[0].replyMarkup.inline_keyboard;
+  assert.equal(kb.length, 1, 'only the active.tendering tender');
+  assert.equal(kb[0][0].callback_data, `agent:start:${ID}`);
+});
+
+test('runHandler: /agent with none in tendering → no buttons', async () => {
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true }], sha: 's' }),
+    fetchTender: async () => ({ data: { ...RAW_OK.data, status: 'active.qualification' } }),
+  });
+  await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
+  assert.match(sent[0].text, /Немає тендерів/);
+  assert.ok(!sent[0].replyMarkup || !sent[0].replyMarkup.inline_keyboard);
+});
+
+test('runHandler: /info <id> for non-tendering tender → no agent button', async () => {
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true }], sha: 's' }),
+    fetchTender: async () => ({ data: { ...RAW_OK.data, status: 'active.qualification' } }),
+  });
+  await runHandler({ update: { message: { chat: { id: 123 }, text: `/info ${ID}`, message_id: 1 } }, env: ENV, deps });
+  assert.ok(!JSON.stringify(sent.at(-1).replyMarkup ?? {}).includes('agent:start'),
+    'no agent button for a non-tendering tender');
+});
