@@ -17,7 +17,7 @@ import {
   buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
   paginateArchiveGroup, ARCHIVE_PAGE_LIMIT,
   AGENT_COMPANIES, companyForSlug, slugForCompany,
-  agentTriggerButtonRow, buildAgentCompanyKeyboard, validateAgentPrice,
+  agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
 } from '../commands.mjs';
 
@@ -3217,4 +3217,24 @@ test('buildAgentConfirmText: one-line prompt with fields', () => {
   assert.match(txt, /181200/);
   assert.match(txt, /UA-x/);
   assert.match(txt, /Лікарня/);
+});
+
+
+test('parseCommand: /agent', () => {
+  assert.deepEqual(parseCommand('/agent'), { cmd: 'agent' });
+  assert.deepEqual(parseCommand('/agent@terralab_tenders_bot'), { cmd: 'agent' });
+});
+
+test('buildAgentTenderListKeyboard: one agent:start button per enabled tender', () => {
+  const kb = buildAgentTenderListKeyboard([
+    { tender_id: 'UA-2026-01-01-000001-a', enabled: true, notes: 'Херсон ОНКО' },
+    { tender_id: 'UA-2026-01-01-000002-a', enabled: false },
+    { tender_id: 'UA-2026-01-01-000003-a', enabled: true },
+  ]);
+  assert.equal(kb.inline_keyboard.length, 2);
+  assert.equal(kb.inline_keyboard[0][0].callback_data, 'agent:start:UA-2026-01-01-000001-a');
+  assert.match(kb.inline_keyboard[0][0].text, /Херсон ОНКО/);
+  assert.match(kb.inline_keyboard[1][0].text, /UA-2026-01-01-000003-a/);
+  assert.equal(buildAgentTenderListKeyboard([]), null);
+  assert.equal(buildAgentTenderListKeyboard([{ tender_id: 'x', enabled: false }]), null);
 });

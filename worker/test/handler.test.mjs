@@ -2693,3 +2693,32 @@ test('non-admin text while no pending → normal handling (price step not trigge
   // Viewer's free-text number isn't a command → no agent confirm prompt.
   assert.ok(!sent.some(s => /Підтвердити|МАЙЛАБ/.test(JSON.stringify(s))));
 });
+
+
+test('runHandler: /agent (admin) lists watched tenders as agent:start buttons', async () => {
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true, notes: 'Тест' }], sha: 's' }),
+  });
+  await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0].replyMarkup.inline_keyboard, 'inline_keyboard expected');
+  assert.equal(sent[0].replyMarkup.inline_keyboard[0][0].callback_data, `agent:start:${ID}`);
+});
+
+test('runHandler: /agent for non-admin → no reply', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+  });
+  await runHandler({ update: { message: { chat: { id: 456 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
+  assert.equal(sent.length, 0, 'non-admin /agent must be ignored');
+});
+
+test('runHandler: /info <id> (admin) attaches the «Надіслати агенту» button', async () => {
+  const { deps, sent } = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true }], sha: 's' }),
+  });
+  await runHandler({ update: { message: { chat: { id: 123 }, text: `/info ${ID}`, message_id: 1 } }, env: ENV, deps });
+  assert.equal(sent.length, 1);
+  assert.ok(sent.at(-1).replyMarkup.inline_keyboard, 'agent button expected on /info card');
+  assert.equal(sent.at(-1).replyMarkup.inline_keyboard[0][0].callback_data, `agent:start:${ID}`);
+});

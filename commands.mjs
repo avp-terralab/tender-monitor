@@ -45,6 +45,7 @@ export function parseCommand(text) {
   if (/^\/status(?:@\w+)?$/i.test(trimmed)) return { cmd: 'status' };
   if (/^\/watched(?:@\w+)?$/i.test(trimmed)) return { cmd: 'watched' };
   if (/^\/whoami(?:@\w+)?$/i.test(trimmed)) return { cmd: 'whoami' };
+  if (/^\/agent(?:@\w+)?$/i.test(trimmed)) return { cmd: 'agent' };
 
   const logMatch = trimmed.match(/^\/log(?:@\w+)?(?:\s+(\d+))?\s*$/i);
   if (logMatch) {
@@ -1387,6 +1388,7 @@ const EDIT_COMMANDS = [
   { command: 'unarchive', description: 'Видалити тендер з архіву' },
 ];
 const ADMIN_COMMANDS = [
+  { command: 'agent',   description: 'Надіслати тендер агенту' },
   { command: 'status',  description: 'Здоровʼя бота' },
   { command: 'invite',  description: 'Створити invite-посилання' },
   { command: 'role',    description: 'Змінити роль користувача' },
@@ -1433,6 +1435,20 @@ export function slugForCompany(name) {
 export function agentTriggerButtonRow(tenderId, role) {
   if (role !== 'admin') return null;
   return [{ text: '🤖 Надіслати агенту', callback_data: `agent:start:${tenderId}` }];
+}
+
+// /agent — on-demand picker: one button per ENABLED watched tender, labelled by
+// its notes (or the id), callback agent:start:<tid>. Returns an inline_keyboard
+// or null when there are no active tenders. Admin-only (gated by the caller).
+export function buildAgentTenderListKeyboard(watchlist) {
+  const rows = (watchlist ?? [])
+    .filter(r => r && r.enabled && r.tender_id)
+    .map(r => {
+      const note = (r.notes ?? '').trim();
+      const label = note ? `${note.slice(0, 40)} · ${r.tender_id}` : r.tender_id;
+      return [{ text: `🤖 ${label}`, callback_data: `agent:start:${r.tender_id}` }];
+    });
+  return rows.length ? { inline_keyboard: rows } : null;
 }
 
 // Step 1: pick the company. One button per company (1–2 per row) + cancel.

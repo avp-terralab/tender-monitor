@@ -12,7 +12,7 @@ import {
   sanitizeActor,
   parseAuditCommit,
   formatAuditLog,
-  companyForSlug,
+  companyForSlug, agentTriggerButtonRow, buildAgentTenderListKeyboard,
   buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
 } from '../../commands.mjs';
@@ -144,6 +144,7 @@ export async function runHandler({ update, env, deps = {} }) {
   let reply;
   let notifyReplyMarkup = null;
   let watchedReplyMarkup = null;
+  let agentReplyMarkup = null;
 
   const MUTATING = new Set(['add', 'remove', 'watch', 'unarchive']);
   if (MUTATING.has(cmd.cmd) && !isEditor) {
@@ -386,6 +387,10 @@ export async function runHandler({ update, env, deps = {} }) {
         reply = cmd.tender_id
           ? formatInfo({ runIso: new Date().toISOString(), groups, errors })
           : formatInfoPages({ runIso: new Date().toISOString(), groups, errors });
+        // Admin can fire the agent straight from a single-tender /info card.
+        if (cmd.tender_id && isAdmin) {
+          agentReplyMarkup = { inline_keyboard: [agentTriggerButtonRow(cmd.tender_id, 'admin')] };
+        }
 
         // Live archive: when /info UA-... shows a terminal status for a watchlist
         // tender, archive it inline. Reduces archive lag from monitor-cron cadence
@@ -622,6 +627,21 @@ export async function runHandler({ update, env, deps = {} }) {
       console.error('worker: /log failed:', err.message);
       reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
     }
+  } else if (cmd.cmd === 'agent') {
+    if (!isAdmin) return;
+    try {
+      const { watchlist } = await _loadWatchlist(env);
+      const kb = buildAgentTenderListKeyboard(watchlist);
+      if (!kb) {
+        reply = '📭 Немає активних тендерів для агента. Додай: /add UA-…';
+      } else {
+        reply = '🤖 Оберіть тендер, щоб надіслати агенту:';
+        agentReplyMarkup = kb;
+      }
+    } catch (err) {
+      console.error('worker: /agent failed:', err.message);
+      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+    }
   } else if (cmd.cmd === 'unknown') {
     reply = '❓ Не розумію. /help';
   } else {
@@ -638,7 +658,7 @@ export async function runHandler({ update, env, deps = {} }) {
         text: pages[i],
         replyToMessageId: i === 0 ? msg.message_id : undefined,
         replyMarkup: isLast
-          ? (watchedReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined))
+          ? (agentReplyMarkup ?? watchedReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined))
           : undefined,
       });
     } catch (err) {
