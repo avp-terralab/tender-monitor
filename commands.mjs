@@ -1453,15 +1453,31 @@ const ENTITY_ABBR = [
   ['ДЕРЖАВНА УСТАНОВА', 'ДУ'],
 ];
 
-// Abbreviate the leading legal form, e.g.
-// «КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Х»» -> «КНП «Х»».
+// Governance-suffix -> abbreviation (longest first), e.g.
+// «… ОДЕСЬКОЇ МІСЬКОЇ РАДИ» -> «… ОДЕСЬКОЇ МР».
+const GOV_ABBR = [
+  ['ОБЛАСНОЇ ДЕРЖАВНОЇ АДМІНІСТРАЦІЇ', 'ОДА'],
+  ['МІСЬКОЇ ДЕРЖАВНОЇ АДМІНІСТРАЦІЇ', 'МДА'],
+  ['РАЙОННОЇ ДЕРЖАВНОЇ АДМІНІСТРАЦІЇ', 'РДА'],
+  ['ОБЛАСНОЇ РАДИ', 'ОР'],
+  ['МІСЬКОЇ РАДИ', 'МР'],
+  ['РАЙОННОЇ РАДИ', 'РР'],
+  ['СІЛЬСЬКОЇ РАДИ', 'СР'],
+];
+
+// Shorten an institution name for compact labels: abbreviate the leading legal
+// form (КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО -> КНП) and the governance suffix
+// (ОДЕСЬКОЇ МІСЬКОЇ РАДИ -> ОДЕСЬКОЇ МР). Case-insensitive.
 export function shortenEntityName(text) {
   let s = (text ?? '').trim();
   for (const [phrase, abbr] of ENTITY_ABBR) {
     const re = new RegExp(phrase, 'i');
-    if (re.test(s)) { s = s.replace(re, abbr).replace(/\s+/g, ' ').trim(); break; }
+    if (re.test(s)) { s = s.replace(re, abbr); break; }
   }
-  return s;
+  for (const [phrase, abbr] of GOV_ABBR) {
+    s = s.replace(new RegExp(phrase, 'i'), abbr);
+  }
+  return s.replace(/\s+/g, ' ').trim();
 }
 
 export function buildAgentTenderListKeyboard(watchlist) {

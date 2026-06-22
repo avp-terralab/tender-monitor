@@ -3250,3 +3250,11 @@ test('shortenEntityName / buildAgentTenderListKeyboard: abbreviates the legal fo
   assert.match(kb.inline_keyboard[0][0].text, /КНП «Дніпро»/);
   assert.doesNotMatch(kb.inline_keyboard[0][0].text, /КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ/);
 });
+
+
+test('shortenEntityName: abbreviates governance suffix', () => {
+  assert.equal(shortenEntityName('КОМУНАЛЬНЕ ПІДПРИЄМСТВО «Х» ОДЕСЬКОЇ МІСЬКОЇ РАДИ'), 'КП «Х» ОДЕСЬКОЇ МР');
+  assert.match(shortenEntityName('«Лікарня» ЛЬВІВСЬКОЇ ОБЛАСНОЇ РАДИ'), /ЛЬВІВСЬКОЇ ОР$/);
+  assert.match(shortenEntityName('«ЦРЛ» БРОВАРСЬКОЇ РАЙОННОЇ РАДИ'), /БРОВАРСЬКОЇ РР$/);
+  assert.match(shortenEntityName('«А» КИЇВСЬКОЇ ОБЛАСНОЇ ДЕРЖАВНОЇ АДМІНІСТРАЦІЇ'), /КИЇВСЬКОЇ ОДА$/);
+});
