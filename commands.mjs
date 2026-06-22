@@ -33,18 +33,16 @@ export const MAIN_KEYBOARD = {
   is_persistent: true,
 };
 
-// Role-aware reply keyboard. Three monitoring/archive buttons on one row;
-// «❓ Допомога» on its own full-width (centered) bottom row. Admins additionally
-// get a «🤖 Агент» row (taps map to /agent via BUTTON_ALIASES). Telegram centers
-// each button's label automatically.
+// Role-aware reply keyboard. Three monitoring/archive buttons on one row.
+// Non-admins get «❓ Допомога» on its own bottom row; admins get «🤖 Агент» and
+// «❓ Допомога» together on one row (taps map to commands via BUTTON_ALIASES).
 export function mainKeyboard(role) {
   if (role !== 'admin') return MAIN_KEYBOARD;
   return {
     ...MAIN_KEYBOARD,
     keyboard: [
       [{ text: '👁 Моніторинг замовників' }, { text: '📋 Моніторинг закупівель' }, { text: '📦 Архів закупівель' }],
-      [{ text: '🤖 Агент' }],
-      [{ text: '❓ Допомога (список команд)' }],
+      [{ text: '🤖 Агент' }, { text: '❓ Допомога (список команд)' }],
     ],
   };
 }
