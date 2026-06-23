@@ -1041,3 +1041,14 @@ test('editMessageText: throws on non-ok HTTP', async () => {
     /400/,
   );
 });
+
+
+test('editMessageText: disables web page preview (no misleading link-preview card)', async () => {
+  let params;
+  const fakeFetch = async (url, opts) => {
+    params = new URLSearchParams(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: 1 } }) };
+  };
+  await editMessageText({ token: 'TOK', chatId: '1', messageId: 2, text: 'hi', fetch: fakeFetch });
+  assert.equal(params.get('disable_web_page_preview'), 'true');
+});

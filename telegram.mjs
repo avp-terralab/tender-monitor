@@ -605,6 +605,7 @@ export async function editMessageText({ token, chatId, messageId, text, replyMar
     message_id: String(messageId),
     text: String(text),
     parse_mode: 'HTML',
+    disable_web_page_preview: 'true',
   });
   if (replyMarkup != null) params.set('reply_markup', JSON.stringify(replyMarkup));
   const res = await fetchImpl(url, { method: 'POST', body: params });
