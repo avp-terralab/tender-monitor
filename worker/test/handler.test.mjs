@@ -1141,7 +1141,7 @@ test('runHandler: /archive (no arg) renders empty', async () => {
   assert.match(sent[0].text, /📭 Архів порожній/);
 });
 
-test('runHandler: /archive paginates a large archive into multiple messages', async () => {
+test('runHandler: /archive (no arg) shows the grouped-nav menu in one message', async () => {
   const archive = Array.from({ length: 100 }, (_, i) => ({
     tender_id: `UA-2026-05-01-${String(i).padStart(6, '0')}-a`,
     archived_at: `2026-05-12T08:${String(i % 60).padStart(2, '0')}:00Z`,
@@ -1156,10 +1156,38 @@ test('runHandler: /archive paginates a large archive into multiple messages', as
     env: ENV,
     deps,
   });
-  assert.ok(sent.length >= 2, 'large archive split across multiple messages');
-  // every sent page is within Telegram's limit, and the total lands on the last
-  assert.ok(sent.every(s => s.text.length <= 4096));
-  assert.match(sent[sent.length - 1].text, /Всього в архіві: 100/);
+  assert.equal(sent.length, 1, 'archive button shows a single menu message');
+  assert.match(sent[0].text, /усього 100/);
+  assert.deepEqual(
+    sent[0].replyMarkup.inline_keyboard[0].map(b => b.callback_data),
+    ['arch:co', 'arch:pe'],
+  );
+});
+
+test('runHandler: arch: callback navigates the archive (edits in place)', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-05-01-000001-a', archived_at: '2026-05-12T08:00:00Z', final_status: 'complete',
+    final_snapshot: {
+      procuringEntity: { name: 'КНП Лікарня', edrpou: '111' }, value: { amount: 350000, currency: 'UAH' },
+      awards: [{ status: 'active', suppliers: [{ name: 'ТОВ МАЙЛАБ', identifier: { id: '41087617' } }] }],
+      contracts: [{ id: 'c1', status: 'active', documents: [{ url: 'https://x/c.pdf', datePublished: '2026-04-10T00:00:00Z' }] }],
+    },
+  }];
+  const acks = [];
+  const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'cbq1', data: 'arch:co', message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({ loadArchivedTenders: async () => ({ archive, sha: 's' }) }).deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageText: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(edits.length, 1, 'callback edits the message in place');
+  assert.match(edits[0].text, /компанією/);
+  assert.match(JSON.stringify(edits[0].replyMarkup), /arch:co:0:0/);
+  assert.equal(acks.length, 1);
 });
 
 test('runHandler: /archive UA-... uses fresh fetchTender for contracts', async () => {
