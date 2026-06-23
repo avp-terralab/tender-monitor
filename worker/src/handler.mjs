@@ -3,7 +3,7 @@ import {
   handleWatch, handleUnwatch, handleWatched,
   buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
   handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, buildRoleChangeNotice, handleWhoami, handleUsersList, handleInvitesList,
-  handleArchive, handleArchiveDetail, handleUnarchive,
+  handleArchive, handleArchiveDetail, handleUnarchive, buildArchiveMenu, handleArchiveNav,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
   formatInfo, formatInfoPages, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD,
@@ -125,6 +125,7 @@ export async function runHandler({ update, env, deps = {} }) {
   let reply;
   let notifyReplyMarkup = null;
   let watchedReplyMarkup = null;
+  let archiveReplyMarkup = null;
 
   const MUTATING = new Set(['add', 'remove', 'watch', 'unarchive']);
   if (MUTATING.has(cmd.cmd) && !isEditor) {
@@ -533,7 +534,9 @@ export async function runHandler({ update, env, deps = {} }) {
           cmd,
         );
       } else {
-        reply = handleArchive({ archive });
+        const menu = buildArchiveMenu({ archive });
+        reply = menu.text;
+        archiveReplyMarkup = menu.keyboard ?? undefined;
       }
     } catch (err) {
       console.error('worker: /archive failed:', err.message);
@@ -619,7 +622,7 @@ export async function runHandler({ update, env, deps = {} }) {
         text: pages[i],
         replyToMessageId: i === 0 ? msg.message_id : undefined,
         replyMarkup: isLast
-          ? (watchedReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined))
+          ? (archiveReplyMarkup ?? watchedReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined))
           : undefined,
       });
     } catch (err) {
@@ -719,6 +722,32 @@ async function handleCallbackQuery({
       }
     }
     await ack('⚠️ Не зміг зберегти');
+    return;
+  }
+
+  if (data.startsWith('arch:')) {
+    if (!isAllowed) { await ack('🚫 Немає доступу', true); return; }
+    if (data === 'arch:noop') { await ack(); return; }
+    let archive = [];
+    try {
+      ({ archive } = await _loadArchivedTenders(env));
+    } catch (err) {
+      console.error('worker: archive nav load failed:', err.message);
+      await ack('⚠️ GitHub тимчасово недоступний', true);
+      return;
+    }
+    const view = handleArchiveNav({ archive, data });
+    if (view) {
+      try {
+        await _editMessageText({
+          token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+          text: view.text, replyMarkup: view.keyboard ?? undefined,
+        });
+      } catch (err) {
+        console.error('worker: archive nav edit failed:', err.message);
+      }
+    }
+    await ack();
     return;
   }
 

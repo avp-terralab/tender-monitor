@@ -16,6 +16,8 @@ import {
   buildWatchedKeyboard,
   buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
   paginateArchiveGroup, ARCHIVE_PAGE_LIMIT,
+  findContractDate, buildArchiveMenu, groupArchiveByProvider, buildArchiveCompanyList,
+  groupArchiveByYear, buildArchiveYearList, buildArchiveMonthList, renderArchivePage, handleArchiveNav,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -3121,4 +3123,111 @@ test('paginateArchiveGroup: a single oversized entry gets its own page', () => {
   assert.equal(pages.length, 2);
   assert.ok(pages[0].includes(huge));
   assert.ok(pages[1].includes('small'));
+});
+
+
+// ── Archive grouped + paginated navigation ──────────────────────────────────
+function archEntry({ id = 'UA-2026-05-01-000001-a', provEdrpou = '41087617',
+  provName = 'ТОВ «МАЙЛАБ»', custName = 'КНП «Лікарня»', custEdrpou = '111',
+  amount = 100000, contractDate = '2026-05-10T10:00:00+03:00', status = 'complete' } = {}) {
+  return {
+    tender_id: id, archived_at: '2026-05-12T12:00:00Z', final_status: status,
+    final_snapshot: {
+      procuringEntity: { name: custName, edrpou: custEdrpou },
+      value: { amount, currency: 'UAH' },
+      awards: [{ status: 'active', suppliers: [{ name: provName, identifier: { id: provEdrpou } }] }],
+      contracts: [{ id: 'c1', status: 'active', documents: [{ url: 'https://x/c.pdf', datePublished: contractDate }] }],
+    },
+  };
+}
+
+test('findContractDate: datePublished of contract doc', () => {
+  assert.equal(findContractDate(archEntry({ contractDate: '2026-03-15T09:00:00+03:00' })), '2026-03-15T09:00:00+03:00');
+});
+
+test('findContractDate: skips notice docs, falls back to archived_at', () => {
+  const e = { archived_at: '2026-01-02T00:00:00Z', final_snapshot: { contracts: [{ documents: [{ url: 'x', documentType: 'notice', datePublished: '2030-01-01' }] }] } };
+  assert.equal(findContractDate(e), '2026-01-02T00:00:00Z');
+});
+
+test('buildArchiveMenu: empty archive', () => {
+  assert.equal(buildArchiveMenu({ archive: [] }).keyboard, null);
+});
+
+test('buildArchiveMenu: two entry buttons + count', () => {
+  const m = buildArchiveMenu({ archive: [archEntry()] });
+  assert.deepEqual(m.keyboard.inline_keyboard[0].map((b) => b.callback_data), ['arch:co', 'arch:pe']);
+  assert.match(m.text, /усього 1/);
+});
+
+test('groupArchiveByProvider: groups by provider, no-provider last', () => {
+  const g = groupArchiveByProvider([
+    archEntry({ provEdrpou: '111', provName: 'A' }),
+    archEntry({ provEdrpou: '222', provName: 'B' }),
+    archEntry({ provEdrpou: '111', provName: 'A' }),
+    { tender_id: 'x', final_snapshot: { awards: [] } },
+  ]);
+  assert.equal(g.length, 3);
+  assert.equal(g[g.length - 1].provider, null);
+  assert.equal(g.find((x) => x.provider?.edrpou === '111').entries.length, 2);
+});
+
+test('buildArchiveCompanyList: one row per provider + back to menu', () => {
+  const rows = buildArchiveCompanyList({ archive: [archEntry({ provEdrpou: '111' }), archEntry({ provEdrpou: '222' })] }).keyboard.inline_keyboard;
+  assert.equal(rows.length, 3);
+  assert.equal(rows[2][0].callback_data, 'arch:menu');
+  assert.match(rows[0][0].callback_data, /^arch:co:0:0$/);
+});
+
+test('groupArchiveByYear: by contract date year, desc', () => {
+  const y = groupArchiveByYear([
+    archEntry({ contractDate: '2025-06-01T00:00:00Z' }),
+    archEntry({ contractDate: '2026-02-01T00:00:00Z' }),
+    archEntry({ contractDate: '2026-08-01T00:00:00Z' }),
+  ]);
+  assert.deepEqual(y.map(([yr]) => yr), ['2026', '2025']);
+  assert.equal(y[0][1].length, 2);
+});
+
+test('buildArchiveMonthList: months of the year, desc, with counts', () => {
+  const rows = buildArchiveMonthList({ archive: [
+    archEntry({ contractDate: '2026-02-10T00:00:00Z' }),
+    archEntry({ contractDate: '2026-02-20T00:00:00Z' }),
+    archEntry({ contractDate: '2026-05-01T00:00:00Z' }),
+    archEntry({ contractDate: '2025-01-01T00:00:00Z' }),
+  ], year: '2026' }).keyboard.inline_keyboard;
+  assert.equal(rows.length, 3);
+  assert.match(rows[0][0].text, /Травень 2026 \(1\)/);
+  assert.match(rows[1][0].text, /Лютий 2026 \(2\)/);
+  assert.equal(rows[0][0].callback_data, 'arch:pe:2026:05:0');
+});
+
+test('renderArchivePage: 6 per page with nav arrows', () => {
+  const archive = Array.from({ length: 8 }, (_, i) =>
+    archEntry({ id: `UA-2026-05-0${i + 1}-00000${i}-a`, provEdrpou: '111', contractDate: `2026-05-0${i + 1}T00:00:00Z` }));
+  const nav0 = renderArchivePage({ archive, filter: { type: 'company', index: 0 }, page: 0 }).keyboard.inline_keyboard[0];
+  assert.ok(nav0.some((b) => b.text === 'Далі ▶'));
+  assert.ok(nav0.some((b) => b.text === '1/2'));
+  assert.ok(!nav0.some((b) => b.text === '◀ Назад'));
+  const nav1 = renderArchivePage({ archive, filter: { type: 'company', index: 0 }, page: 1 }).keyboard.inline_keyboard[0];
+  assert.ok(nav1.some((b) => b.text === '◀ Назад'));
+  assert.ok(!nav1.some((b) => b.text === 'Далі ▶'));
+});
+
+test('renderArchivePage: shows contract date + UA link + договір', () => {
+  const pg = renderArchivePage({ archive: [archEntry({ provEdrpou: '111', contractDate: '2026-03-15T00:00:00Z' })], filter: { type: 'company', index: 0 } });
+  assert.match(pg.text, /15\.03\.2026/);
+  assert.match(pg.text, /prozorro\.gov\.ua\/tender\//);
+  assert.match(pg.text, /Завантажити договір/);
+});
+
+test('handleArchiveNav: noop → null; menu/co/pe/month routing', () => {
+  const archive = [archEntry({ provEdrpou: '111', contractDate: '2026-04-01T00:00:00Z' })];
+  assert.equal(handleArchiveNav({ archive, data: 'arch:noop' }), null);
+  assert.deepEqual(handleArchiveNav({ archive, data: 'arch:menu' }).keyboard.inline_keyboard[0].map((b) => b.callback_data), ['arch:co', 'arch:pe']);
+  assert.match(handleArchiveNav({ archive, data: 'arch:co' }).text, /компанією/);
+  assert.match(handleArchiveNav({ archive, data: 'arch:pe' }).text, /роком/);
+  assert.match(handleArchiveNav({ archive, data: 'arch:pe:2026' }).text, /оберіть місяць/);
+  assert.match(handleArchiveNav({ archive, data: 'arch:co:0:0' }).text, /Завантажити договір/);
+  assert.match(handleArchiveNav({ archive, data: 'arch:pe:2026:04:0' }).text, /Квітень 2026/);
 });

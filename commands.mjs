@@ -835,7 +835,7 @@ function findServiceProvider(entry) {
   return { name: s.name, edrpou: s.identifier?.id ?? null };
 }
 
-function renderArchiveItem(a, localIndex) {
+function renderArchiveItem(a, localIndex, dateIso) {
   const icon = ARCHIVE_ICONS[a.final_status] ?? '📦';
   const customerRaw = a.final_snapshot?.procuringEntity?.name ?? '';
   const customerEdrpou = a.final_snapshot?.procuringEntity?.edrpou ?? null;
@@ -848,7 +848,8 @@ function renderArchiveItem(a, localIndex) {
     const amt = formatMoney(a.final_snapshot.value.amount);
     value = ` — ${amt} ${a.final_snapshot.value.currency}`;
   }
-  const dateSuffix = a.archived_at ? ` (${fmtArchivedDate(a.archived_at)})` : '';
+  const when = dateIso ?? a.archived_at;
+  const dateSuffix = when ? ` (${fmtArchivedDate(when)})` : '';
   const tenderUrl = `https://prozorro.gov.ua/tender/${a.tender_id}`;
   const idLink = `<a href="${escapeHtml(tenderUrl)}">${escapeHtml(a.tender_id)}</a>`;
   const mainLine = `${localIndex + 1}. ${icon} ${idLink}${customer}${value}${dateSuffix}`;
@@ -935,6 +936,193 @@ export function handleArchive({ archive }) {
   }
   pages[pages.length - 1] += `\n\nВсього в архіві: ${archive.length}`;
   return pages;
+}
+
+// -- Archive: grouped + paginated navigation (inline keyboard) --
+// Contract date = datePublished of the signed contract PDF (skip 'notice' = KEP .p7s);
+// fallback archived_at. Used for period grouping + display.
+export function findContractDate(entry) {
+  for (const c of entry.final_snapshot?.contracts ?? []) {
+    for (const d of c.documents ?? []) {
+      if (!d.url || d.documentType === 'notice') continue;
+      if (d.datePublished) return d.datePublished;
+    }
+  }
+  return entry.archived_at ?? null;
+}
+
+const ARCH_PER_PAGE = 6;
+const MONTHS_UK = ['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень',
+  'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'];
+
+export function buildArchiveMenu({ archive }) {
+  const n = archive?.length ?? 0;
+  if (!n) return { text: '📭 Архів порожній.', keyboard: null };
+  return {
+    text: `📦 <b>Архів завершених закупівель</b> — усього ${n}`,
+    keyboard: { inline_keyboard: [[
+      { text: '🏢 За компанією (ТОВ)', callback_data: 'arch:co' },
+      { text: '📅 За роком/місяцем', callback_data: 'arch:pe' },
+    ]] },
+  };
+}
+
+// Group by service provider (TOV); sort by latest contract date desc; synthetic
+// "no provider" group last. Deterministic order -> array index is a stable
+// callback key within a render.
+export function groupArchiveByProvider(archive) {
+  const NO = '__no_provider__';
+  const map = new Map();
+  for (const a of archive ?? []) {
+    const sp = findServiceProvider(a);
+    const key = sp?.edrpou ?? (sp?.name ? `name:${sp.name}` : NO);
+    if (!map.has(key)) map.set(key, { key, provider: sp, entries: [] });
+    map.get(key).entries.push(a);
+  }
+  const list = [...map.values()].map((g) => {
+    g.entries.sort((x, y) => (findContractDate(y) ?? '').localeCompare(findContractDate(x) ?? ''));
+    g.maxDate = findContractDate(g.entries[0]) ?? '';
+    return g;
+  });
+  list.sort((a, b) => {
+    if (!a.provider && b.provider) return 1;
+    if (a.provider && !b.provider) return -1;
+    return (b.maxDate ?? '').localeCompare(a.maxDate ?? '');
+  });
+  return list;
+}
+
+export function buildArchiveCompanyList({ archive }) {
+  const groups = groupArchiveByProvider(archive);
+  const rows = groups.map((g, i) => [{
+    text: `${g.provider ? abbreviateLegalForm(g.provider.name) : 'Без укладеного договору'} (${g.entries.length})`,
+    callback_data: `arch:co:${i}:0`,
+  }]);
+  rows.push([{ text: '⬅ Меню', callback_data: 'arch:menu' }]);
+  return { text: '🏢 <b>Архів за компанією (ТОВ):</b>', keyboard: { inline_keyboard: rows } };
+}
+
+// [[year, entries], ...] year desc (by contract date).
+export function groupArchiveByYear(archive) {
+  const map = new Map();
+  for (const a of archive ?? []) {
+    const y = String(findContractDate(a) ?? '').slice(0, 4) || '—';
+    if (!map.has(y)) map.set(y, []);
+    map.get(y).push(a);
+  }
+  return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+}
+
+export function buildArchiveYearList({ archive }) {
+  const rows = groupArchiveByYear(archive).map(([y, entries]) => [{
+    text: `${y} (${entries.length})`, callback_data: `arch:pe:${y}`,
+  }]);
+  rows.push([{ text: '⬅ Меню', callback_data: 'arch:menu' }]);
+  return { text: '📅 <b>Архів за роком:</b>', keyboard: { inline_keyboard: rows } };
+}
+
+export function buildArchiveMonthList({ archive, year }) {
+  const map = new Map();
+  for (const a of archive ?? []) {
+    const d = String(findContractDate(a) ?? '');
+    if (d.slice(0, 4) !== year) continue;
+    const m = d.slice(5, 7) || '—';
+    if (!map.has(m)) map.set(m, []);
+    map.get(m).push(a);
+  }
+  const rows = [...map.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([m, entries]) => [{
+    text: `${MONTHS_UK[Number(m) - 1] ?? m} ${year} (${entries.length})`,
+    callback_data: `arch:pe:${year}:${m}:0`,
+  }]);
+  rows.push([
+    { text: '⬅ Роки', callback_data: 'arch:pe' },
+    { text: '⬅ Меню', callback_data: 'arch:menu' },
+  ]);
+  return { text: `📅 <b>${year} — оберіть місяць:</b>`, keyboard: { inline_keyboard: rows } };
+}
+
+// Resolve a filter to sorted entries + header + back-row.
+function archiveFilterEntries(archive, filter) {
+  if (filter.type === 'company') {
+    const g = groupArchiveByProvider(archive)[filter.index];
+    if (!g) return null;
+    const name = g.provider ? abbreviateLegalForm(g.provider.name) : 'Без укладеного договору';
+    const edr = g.provider?.edrpou ? ` (ЄДРПОУ ${g.provider.edrpou})` : '';
+    return {
+      entries: g.entries,
+      header: `🏢 <b>${escapeHtml(name)}</b>${edr} — ${g.entries.length}`,
+      back: [
+        { text: '⬅ Компанії', callback_data: 'arch:co' },
+        { text: '⬅ Меню', callback_data: 'arch:menu' },
+      ],
+      cbBase: `arch:co:${filter.index}`,
+    };
+  }
+  const entries = (archive ?? [])
+    .filter((a) => {
+      const d = String(findContractDate(a) ?? '');
+      return d.slice(0, 4) === filter.year && d.slice(5, 7) === filter.month;
+    })
+    .sort((x, y) => (findContractDate(y) ?? '').localeCompare(findContractDate(x) ?? ''));
+  const label = MONTHS_UK[Number(filter.month) - 1] ?? filter.month;
+  return {
+    entries,
+    header: `📅 <b>${label} ${filter.year}</b> — завершені (${entries.length})`,
+    back: [
+      { text: '⬅ Місяці', callback_data: `arch:pe:${filter.year}` },
+      { text: '⬅ Меню', callback_data: 'arch:menu' },
+    ],
+    cbBase: `arch:pe:${filter.year}:${filter.month}`,
+  };
+}
+
+export function renderArchivePage({ archive, filter, page = 0 }) {
+  const resolved = archiveFilterEntries(archive, filter);
+  if (!resolved || resolved.entries.length === 0) {
+    return {
+      text: '📭 Порожньо.',
+      keyboard: { inline_keyboard: [[{ text: '⬅ Меню', callback_data: 'arch:menu' }]] },
+    };
+  }
+  const { entries, header, back, cbBase } = resolved;
+  const pages = Math.max(1, Math.ceil(entries.length / ARCH_PER_PAGE));
+  const p = Math.min(Math.max(0, page | 0), pages - 1);
+  const start = p * ARCH_PER_PAGE;
+  const body = entries.slice(start, start + ARCH_PER_PAGE)
+    .map((a, i) => renderArchiveItem(a, start + i, findContractDate(a)))
+    .join('\n\n');
+  const rows = [];
+  if (pages > 1) {
+    const nav = [];
+    if (p > 0) nav.push({ text: '◀ Назад', callback_data: `${cbBase}:${p - 1}` });
+    nav.push({ text: `${p + 1}/${pages}`, callback_data: 'arch:noop' });
+    if (p < pages - 1) nav.push({ text: 'Далі ▶', callback_data: `${cbBase}:${p + 1}` });
+    rows.push(nav);
+  }
+  rows.push(back);
+  return { text: `${header}\n\n${body}`, keyboard: { inline_keyboard: rows } };
+}
+
+// Single entry point for any `arch:` callback. Pure: returns { text, keyboard }
+// or null for `arch:noop` (caller just acks).
+export function handleArchiveNav({ archive, data }) {
+  if (data === 'arch:noop') return null;
+  if (data === 'arch:menu' || data === 'arch') return buildArchiveMenu({ archive });
+  if (data === 'arch:co') return buildArchiveCompanyList({ archive });
+  if (data === 'arch:pe') return buildArchiveYearList({ archive });
+  const parts = data.split(':');
+  if (parts[1] === 'co') {
+    return renderArchivePage({
+      archive, filter: { type: 'company', index: Number(parts[2]) }, page: Number(parts[3] ?? 0),
+    });
+  }
+  if (parts[1] === 'pe') {
+    if (parts.length === 3) return buildArchiveMonthList({ archive, year: parts[2] });
+    return renderArchivePage({
+      archive, filter: { type: 'month', year: parts[2], month: parts[3] }, page: Number(parts[4] ?? 0),
+    });
+  }
+  return buildArchiveMenu({ archive });
 }
 
 function formatContractsBlock(contracts) {
