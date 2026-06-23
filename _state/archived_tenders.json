@@ -510,5 +510,1666 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-05-07-007348-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО ОБУХІВСЬКОЇ МІСЬКОЇ РАДИ \"ОБУХІВСЬКА БАГАТОПРОФІЛЬНА ЛІКАРНЯ ІНТЕНСИВНОГО ЛІКУВАННЯ\" — Послуги з постачання програмного забезпечення лабораторної інформаційної си…",
+    "archived_at": "2026-05-29T10:25:52.669Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-07-007348-a",
+      "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії (Код ДК 021:2015 72260000-5 Послуги, пов’язані з програмним забезпеченням)",
+      "status": "complete",
+      "dateModified": "2026-05-29T13:20:33.512352+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-05-15T08:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО ОБУХІВСЬКОЇ МІСЬКОЇ РАДИ \"ОБУХІВСЬКА БАГАТОПРОФІЛЬНА ЛІКАРНЯ ІНТЕНСИВНОГО ЛІКУВАННЯ\"",
+        "edrpou": "01994155"
+      },
+      "value": {
+        "amount": 342720,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Антосієв Сергій ",
+        "email": "s_antos@ukr.net",
+        "telephone": "380969128911"
+      },
+      "documents": [
+        {
+          "id": "3ecc11517d654114a4bc3fbfb71c3a29",
+          "title": "Тендерна_документація_ЛІС_.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-07T13:07:29.538659+03:00"
+        },
+        {
+          "id": "0c8b0fc4db124968bdbddfb03a3d4366",
+          "title": "Додаток 4  Договір (проєкт)_ЛІС_.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-07T13:07:29.538659+03:00"
+        },
+        {
+          "id": "79d44692e1e24f0785634acece1b4cfd",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-07T13:08:18.325174+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "d25bbaee52124fde96140cdab02b59ba",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "a08833390322446bbb02893b3359c895",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "relatedItem": "a08833390322446bbb02893b3359c895",
+              "id": "3af105f7ce9f462f87e50e4f86f5cedf",
+              "hash": "md5:3253dccb346b92aff26b3d4a0612f8fa",
+              "title": "Договір ТЕРРАЛАБ АЙ ТІ 21_05-01_435.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/a08833390322446bbb02893b3359c895/documents/3af105f7ce9f462f87e50e4f86f5cedf?download=835a4d5a8dc945a991b0db48c902d489",
+              "documentOf": "contract",
+              "datePublished": "2026-05-29T13:19:45.510320+03:00",
+              "dateModified": "2026-05-29T13:19:45.510320+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "relatedItem": "a08833390322446bbb02893b3359c895",
+              "id": "816dd0b27ab74de69ab945625bd048e2",
+              "hash": "md5:deb7878f553fdf4075667bd1f31c22a7",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/a08833390322446bbb02893b3359c895/documents/816dd0b27ab74de69ab945625bd048e2?download=6bafc43722b1407b8080aa544d239711",
+              "documentOf": "contract",
+              "datePublished": "2026-05-29T13:20:20.741509+03:00",
+              "dateModified": "2026-05-29T13:20:20.741509+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
+  },
+  {
+    "tender_id": "UA-2026-05-13-004442-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ПАВЛОГРАДСЬКА МІСЬКА ЛІКАРНЯ № 1\" ПАВЛОГРАДСЬКОЇ МІСЬКОЇ РАДИ — Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи …",
+    "archived_at": "2026-06-01T09:25:47.465Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-13-004442-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+      "status": "complete",
+      "dateModified": "2026-06-01T12:07:58.534932+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-05-21T10:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ПАВЛОГРАДСЬКА МІСЬКА ЛІКАРНЯ № 1\" ПАВЛОГРАДСЬКОЇ МІСЬКОЇ РАДИ",
+        "edrpou": "01987402"
+      },
+      "value": {
+        "amount": 360000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72268000-1",
+        "description": "Послуги з постачання програмного забезпечення",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72268000-1",
+        "72268000-1",
+        "72268000-1",
+        "72268000-1",
+        "72268000-1"
+      ],
+      "contact": {
+        "name": "Нікіта Камаєв",
+        "email": "gorodbolnica1@gmail.com",
+        "telephone": "+380996385359"
+      },
+      "documents": [
+        {
+          "id": "ee17f6bc58034310b1c351f6944d595f",
+          "title": "Додаток 1 до тендерної документації (кваліфікаційні критерії, вимоги).docx",
+          "documentType": "eligibilityCriteria",
+          "datePublished": "2026-05-13T11:32:55.772463+03:00"
+        },
+        {
+          "id": "f04c2537a7de47309844af25d64a08d7",
+          "title": "Додаток 2 до тендерної документації (технічні вимоги до предмета закупівлі) (1).docx",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-05-13T11:32:55.772463+03:00"
+        },
+        {
+          "id": "00ddb079b4354c2b91e0b6b46048f6c0",
+          "title": "Додаток 5 до тендерної документації.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-13T11:32:55.772463+03:00"
+        },
+        {
+          "id": "902db4ef96864310a2ce7e550d9789e1",
+          "title": "Тендерна документація за Особливостями.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-13T11:32:55.772463+03:00"
+        },
+        {
+          "id": "550bda47a2c14a39bc2dcd68d5ca0258",
+          "title": "Додаток 3 до тендерної документації (проєкт договору).docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-13T12:20:25.946949+03:00"
+        },
+        {
+          "id": "ec78a3c5cd4349219f5994297ebe2845",
+          "title": "Додаток 4 до тендерної документації.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-13T12:20:25.946949+03:00"
+        },
+        {
+          "id": "a796116a463a46b994cadcf823db5ce7",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-13T12:22:06.148250+03:00"
+        },
+        {
+          "id": "550bda47a2c14a39bc2dcd68d5ca0258",
+          "title": "Додаток 3 до тендерної документації (проєкт договору).docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-13T14:53:12.854894+03:00"
+        },
+        {
+          "id": "a796116a463a46b994cadcf823db5ce7",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-13T14:53:50.856512+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "486a93d587d9458d9441e5f155a05f7b",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "2b58251f9458461099cc612865f01729",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:37610521a5b40293d59e82e983d453b4f3704615;SHA2-384:d268af2773b3168d9ddfd9b9efa6a40f74b44db88a8a5f765688ccea46e820ba0d26b035db49c53bf612e791ea626ff9;Antivirus: ESET Antivirus",
+              "id": "d611f9d52784471babab6682beabe4c0",
+              "hash": "md5:24b3218bd0742686f88aafc51ce212b1",
+              "title": "Договір 26.05-01 від 01.06.2026.PDF",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/2b58251f9458461099cc612865f01729/documents/d611f9d52784471babab6682beabe4c0?download=3823b2381e8c4e9b88c4164ae71f665c",
+              "documentOf": "contract",
+              "datePublished": "2026-06-01T12:07:12.660474+03:00",
+              "dateModified": "2026-06-01T12:07:12.934759+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "011130d9cfb542c280f6cb25e9ded750",
+              "hash": "md5:efe17318c5d101c026635c8064b576f8",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/2b58251f9458461099cc612865f01729/documents/011130d9cfb542c280f6cb25e9ded750?download=72b76c88943e4750b8f75632c7ff79fb",
+              "documentOf": "contract",
+              "datePublished": "2026-06-01T12:07:58.328571+03:00",
+              "dateModified": "2026-06-01T12:07:58.328571+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
+  },
+  {
+    "tender_id": "UA-2026-05-14-008910-a",
+    "notes": " Комунальне підприємство \"Балтська багатопрофільна лікарня\" Балтської міської ради Одеської області — Послуги з консультаційної підтримки програмного забезпечення - лабораторної інформаційної системи…",
+    "archived_at": "2026-06-02T06:25:31.479Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-14-008910-a",
+      "title": "Послуги з консультаційної підтримки програмного забезпечення - лабораторної інформаційної системи LIS TerraLab та Analyzer Manager для автоматизації лабораторних процесів у клініко-діагностичній лабораторії,  код ДК  021:2015:72250000-2 – Послуги, пов’язані із системами та підтримкою",
+      "status": "complete",
+      "dateModified": "2026-06-02T08:55:56.722602+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-05-22T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": " Комунальне підприємство \"Балтська багатопрофільна лікарня\" Балтської міської ради Одеської області",
+        "edrpou": "01998644"
+      },
+      "value": {
+        "amount": 189000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72250000-2",
+        "description": "Послуги, пов’язані із системами та підтримкою",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72250000-2",
+        "72250000-2",
+        "72250000-2",
+        "72250000-2"
+      ],
+      "contact": {
+        "name": "Олеся Усатенко",
+        "email": "balta_crb@ukr.net",
+        "telephone": "+380668589366, +380486621201"
+      },
+      "documents": [
+        {
+          "id": "0358041f7b404fe2ad366b120c5754ba",
+          "title": "Додаток №1 до ТД вимоги до учасників і переможця та спосіб їх підтвердження.docx",
+          "documentType": "evaluationCriteria",
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "9d5454b0d8754464b5d20e23508ac908",
+          "title": "ТД_інструкція_ ПЗ ЛІС для КДЛ_7225.doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "9691375c7c7d4d5c884094ff0f04ee54",
+          "title": "Додаток №1 до ТД вимоги до учасників і переможця та спосіб їх підтвердження.docx",
+          "documentType": "evaluationCriteria",
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "04a35ab1841347539a62eccacba42a9d",
+          "title": "Додаток №2  до ТД  технічні вимоги_7225.docx",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "a8324c075e7c4df587bb30ed76953b71",
+          "title": "Додаток №3 до ТД перелік документів та або інформації для учасника.docx",
+          "documentType": null,
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "4ade85f92fc54f429a7a90dd8e205d39",
+          "title": "Додаток №4 до ТД перелік документів та або інформації для переможця.docx",
+          "documentType": null,
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "1ddd8542dbec44b2b754974374fef1fa",
+          "title": "Додаток №6 до ТД форма розрахунку ЦП для переможця.docx",
+          "documentType": null,
+          "datePublished": "2026-05-14T14:26:50.409375+03:00"
+        },
+        {
+          "id": "b76f0bf855804518a43ab40877f38d71",
+          "title": "Додаток №5 до ТД проєкт договору_7225.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-14T14:29:55.673061+03:00"
+        },
+        {
+          "id": "bb99720629b84a6f84fbd9aae207e1d6",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-14T14:32:24.055984+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "f5cb6f1e6fe84cc2ba74839101720583",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "45a894c11ed245dcb4fe0494619ca063",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:d4d337e12357d913bda83501e121489deb8d587c;SHA2-384:cb6cf9502c6761af8ae963da4a742271b92d984288ea3e249ffe7ef6c88553521d3a1d75df15f4991418ff4cf6a7968c;Antivirus: ESET Antivirus",
+              "id": "b6983660fe674114b33f22722132396c",
+              "hash": "md5:b9caa4372bc11061143d7659f0630ade",
+              "title": "Договір про закупівлю №28_05-01_ВТ-О.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/45a894c11ed245dcb4fe0494619ca063/documents/b6983660fe674114b33f22722132396c?download=62eb42466c1547018edd4bbb1363b6c2",
+              "documentOf": "contract",
+              "datePublished": "2026-06-02T08:55:00.702514+03:00",
+              "dateModified": "2026-06-02T08:55:00.938358+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "1451e5774db5421e81fa9a63099578eb",
+              "hash": "md5:4031916140f4a4c0c7701b407b445cae",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/45a894c11ed245dcb4fe0494619ca063/documents/1451e5774db5421e81fa9a63099578eb?download=2fa997bdf5b146cab657c92119c7aeec",
+              "documentOf": "contract",
+              "datePublished": "2026-06-02T08:55:56.483556+03:00",
+              "dateModified": "2026-06-02T08:55:56.483556+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
+  },
+  {
+    "tender_id": "UA-2026-05-15-006953-a",
+    "notes": "Комунальне некомерційне підприємство \"Білгород-Дністровська центральна районна лікарня\" Білгород-Дністровської міської ради — Послуги з постачання програмного забезпечення лабораторної інформаційної …",
+    "archived_at": "2026-06-02T08:55:42.262Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-15-006953-a",
+      "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії\n",
+      "status": "complete",
+      "dateModified": "2026-06-02T11:42:06.111906+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-05-25T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне некомерційне підприємство \"Білгород-Дністровська центральна районна лікарня\" Білгород-Дністровської міської ради",
+        "edrpou": "01998696"
+      },
+      "value": {
+        "amount": 226300,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "48810000-9",
+        "description": "Інформаційні системи",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "48810000-9",
+        "48810000-9",
+        "48810000-9",
+        "48810000-9",
+        "48810000-9"
+      ],
+      "contact": {
+        "name": "Ольга Мартиненко",
+        "email": "akkerman.crbfin@gmail.com",
+        "telephone": "+380673384622, +380673384622"
+      },
+      "documents": [
+        {
+          "id": "95393655b7d4470fac58cf7baaf42a9c",
+          "title": "Проєкт_Договору.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-15T13:02:46.286354+03:00"
+        },
+        {
+          "id": "318782ee809f4080ba3abbc772d6f8a9",
+          "title": "ТД  (3).docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-15T13:02:46.286354+03:00"
+        },
+        {
+          "id": "37d06a1f939a4b38ae1586a198d961ba",
+          "title": "Перелік_документів, які подаються_переможцем.docx",
+          "documentType": "evaluationCriteria",
+          "datePublished": "2026-05-15T13:12:29.465148+03:00"
+        },
+        {
+          "id": "e53122bffb2b4c02b8a2ef06a0354989",
+          "title": "технічні х-ки , документи  учасника закупівлі (2).docx",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-05-15T13:12:29.465148+03:00"
+        },
+        {
+          "id": "1bba7ec0153a4f50aebded741264ad4e",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-15T13:17:27.301466+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "b0fc295fa4d646c2849d7e28e649b3e2",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "3ebc16caaa614a4a909b79caab3f41d0",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:b6370073215453f61deeab2a064f45c58b2156c0;SHA2-384:ab3c76d84e128766f520c028c0e4945fe7c0ec58d7430e12886af80aaf5a46e19f2b5e8d8c01ff6cb41f531a00a48287;Antivirus: ESET Antivirus",
+              "id": "8274e98211bf4c909c64743193c1a896",
+              "hash": "md5:9914151086a51abfc0bd50ed8908fb9f",
+              "title": "Договір і додатки1.PDF",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/3ebc16caaa614a4a909b79caab3f41d0/documents/8274e98211bf4c909c64743193c1a896?download=d6be4920f17849998b7f399aa44a82da",
+              "documentOf": "contract",
+              "datePublished": "2026-06-02T11:40:58.241116+03:00",
+              "dateModified": "2026-06-02T11:40:58.465439+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "b9af1c760c264e00b4948191c91b8247",
+              "hash": "md5:c2b9b75a4f2d0ee44de9c9d99513d37a",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/3ebc16caaa614a4a909b79caab3f41d0/documents/b9af1c760c264e00b4948191c91b8247?download=7b7fcca81d7a44019faa06cc52fd458c",
+              "documentOf": "contract",
+              "datePublished": "2026-06-02T11:42:05.844883+03:00",
+              "dateModified": "2026-06-02T11:42:05.844883+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
+  },
+  {
+    "tender_id": "UA-2026-05-18-010369-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО МЕРЕФ'ЯНСЬКОЇ МІСЬКОЇ РАДИ \"МЕРЕФ'ЯНСЬКА ЦЕНТРАЛЬНА РАЙОННА ЛІКАРНЯ\" — код ДК 021:2015 72250000-2 «Послуги, пов’язані із системами та підтримкою»\n(Послуги з поста…",
+    "archived_at": "2026-06-03T11:55:54.058Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-18-010369-a",
+      "title": "код ДК 021:2015 72250000-2 «Послуги, пов’язані із системами та підтримкою»\n(Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії) \n",
+      "status": "complete",
+      "dateModified": "2026-06-03T14:42:43.584652+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-05-26T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО МЕРЕФ'ЯНСЬКОЇ МІСЬКОЇ РАДИ \"МЕРЕФ'ЯНСЬКА ЦЕНТРАЛЬНА РАЙОННА ЛІКАРНЯ\"",
+        "edrpou": "02002227"
+      },
+      "value": {
+        "amount": 893033.33,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72250000-2",
+        "description": "Послуги, пов’язані із системами та підтримкою",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72250000-2",
+        "72250000-2",
+        "72250000-2",
+        "72250000-2",
+        "72250000-2",
+        "72250000-2",
+        "72250000-2",
+        "72250000-2"
+      ],
+      "contact": {
+        "name": "Ірина Закривидорога",
+        "email": "knp-mcrl.zakupki@ukr.net",
+        "telephone": "+380639702815"
+      },
+      "documents": [
+        {
+          "id": "fe23b18967824301bd5c0b8c8571d7e9",
+          "title": "Додаток 1 до ТД.docx",
+          "documentType": null,
+          "datePublished": "2026-05-18T15:32:33.271743+03:00"
+        },
+        {
+          "id": "0b70fa6b34b9431db6f254fb11e149f3",
+          "title": "Додаток 2 до ТД.docx",
+          "documentType": null,
+          "datePublished": "2026-05-18T15:32:33.271743+03:00"
+        },
+        {
+          "id": "345ef8b61a6e44dda4051fd50df5f521",
+          "title": "Додаток 3 (Проєкт договору).docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-18T15:32:33.271743+03:00"
+        },
+        {
+          "id": "007d5463b52843949e57e994f9dd3997",
+          "title": "Додаток 4 до ТД.docx",
+          "documentType": null,
+          "datePublished": "2026-05-18T15:32:33.271743+03:00"
+        },
+        {
+          "id": "9c58da4197ff473c84a26e3d8f8c9d5c",
+          "title": "ТД 7225.docx",
+          "documentType": null,
+          "datePublished": "2026-05-18T15:32:33.271743+03:00"
+        },
+        {
+          "id": "360b2ca9804b4b769c8452b0d61d6cf4",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-18T15:34:02.986079+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "62e0bb8611f34c4cb1c0f42885334ece",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ ПРО\"",
+              "identifier": {
+                "id": "46104055"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "8057f32151594c4893bd41a36bda7158",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "description": "SHA1:cbd9afdf3162167573e8b59f2d7c5d48a8b1d0c5;SHA2-384:1c323772729860177fb60e30bb792282bb576ad45bb31a19254c981ea86da2a275a39c8077bf21c7f18de82d0bdcdde4;Antivirus: ESET Antivirus",
+              "id": "c203a19c663d4435860cdd4d52d17700",
+              "hash": "md5:fcfd9b7edda8017900fb667d5129c0b6",
+              "title": "Договір 7225_0001.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/8057f32151594c4893bd41a36bda7158/documents/c203a19c663d4435860cdd4d52d17700?download=ce944cfebd1d47e09cc89bb9da124501",
+              "documentOf": "contract",
+              "datePublished": "2026-06-03T14:41:41.265863+03:00",
+              "dateModified": "2026-06-03T14:41:41.503995+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "24f892c094f5425c962533a30d58992f",
+              "hash": "md5:17acdfcd0637f09b79f5440ec57f3bd5",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/8057f32151594c4893bd41a36bda7158/documents/24f892c094f5425c962533a30d58992f?download=6756522de6f04acb9fe0550a3e8db497",
+              "documentOf": "contract",
+              "datePublished": "2026-06-03T14:42:43.388729+03:00",
+              "dateModified": "2026-06-03T14:42:43.388729+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
+  },
+  {
+    "tender_id": "UA-2026-05-26-011868-a",
+    "notes": "КП \"Славутська міська лікарня ім. Ф.М. Михайлова\" Славутської міської ради — Послуги з підключення, налаштування та надання права на використання програмного забезпечення, що  забезпечує передачу дан…",
+    "archived_at": "2026-06-03T12:55:41.950Z",
+    "final_status": "unsuccessful",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-26-011868-a",
+      "title": "Послуги з підключення, налаштування та надання права на використання програмного забезпечення, що  забезпечує передачу даних між аналітичним обладнанням та інформаційною системою за кодом ДК 021:2015 – 48210000-3 - Пакети мережевого програмного забезпечення",
+      "status": "unsuccessful",
+      "dateModified": "2026-06-03T15:52:17.061088+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-06-03T15:52:17+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КП \"Славутська міська лікарня ім. Ф.М. Михайлова\" Славутської міської ради",
+        "edrpou": "02004410"
+      },
+      "value": {
+        "amount": 24500,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "48210000-3",
+        "description": "Пакети мережевого програмного забезпечення",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "48210000-3",
+        "48210000-3"
+      ],
+      "contact": {
+        "name": "Каминіна Наталія Миколаївна",
+        "email": "nata-crl@ukr.net",
+        "telephone": "+380384271167"
+      },
+      "documents": [
+        {
+          "id": "3fc3705f813c41a380012e0db7f98b83",
+          "title": "ТД.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-26T15:47:30.525765+03:00"
+        },
+        {
+          "id": "37155928fd5545178dda4e1ecb59a729",
+          "title": "Додаток 4 Проєкт договору.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-26T15:47:30.525765+03:00"
+        },
+        {
+          "id": "1779aa268b4a4bf6b3bcc9619dee95d7",
+          "title": "Додаток_5_перелік_документів__що_подається_учасником.docx",
+          "documentType": "eligibilityCriteria",
+          "datePublished": "2026-05-26T15:47:30.525765+03:00"
+        },
+        {
+          "id": "6855af9494694252a343708c32a1aaa4",
+          "title": "Додаток 6 перелік документів_ що подається переможцем.docx",
+          "documentType": "eligibilityCriteria",
+          "datePublished": "2026-05-26T15:47:30.525765+03:00"
+        },
+        {
+          "id": "e6e68c3d768a45848e5bae048b5424ec",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-26T15:52:28.949610+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [],
+      "contracts": [],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
+  },
+  {
+    "tender_id": "UA-2026-05-19-002203-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ХЕРСОНСЬКА МІСЬКА КЛІНІЧНА ЛІКАРНЯ ІМЕНІ О.С.ЛУЧАНСЬКОГО\" ХЕРСОНСЬКОЇ МІСЬКОЇ РАДИ — Послуги з постачання та налаштування програмного забезпечення лабораторної і…",
+    "archived_at": "2026-06-08T06:55:40.854Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-19-002203-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії.",
+      "status": "complete",
+      "dateModified": "2026-06-08T09:26:36.936365+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-05-27T12:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ХЕРСОНСЬКА МІСЬКА КЛІНІЧНА ЛІКАРНЯ ІМЕНІ О.С.ЛУЧАНСЬКОГО\" ХЕРСОНСЬКОЇ МІСЬКОЇ РАДИ",
+        "edrpou": "05396876"
+      },
+      "value": {
+        "amount": 350000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Марія Кальченко",
+        "email": "knpluch21@ukr.net",
+        "telephone": "+380989410742"
+      },
+      "documents": [
+        {
+          "id": "a300a02fe9b6491e9ec336f90cd9c7ed",
+          "title": "Основна тендерна документація.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-19T10:12:55.011333+03:00"
+        },
+        {
+          "id": "37cd35831a424443824174b646bb95ee",
+          "title": "Дод. №1 до ТД.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-19T10:12:55.011333+03:00"
+        },
+        {
+          "id": "5e20aaf531634c17b53312716ef87362",
+          "title": "Дод. №2 до ТД.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-19T10:12:55.011333+03:00"
+        },
+        {
+          "id": "7bb62187347f44f889802747b6aa0b99",
+          "title": "Дод. №3 до ТД - технічні характеристики.docx",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-05-19T10:12:55.011333+03:00"
+        },
+        {
+          "id": "4f910486de8f4b58bcfd1bff4a8c66ce",
+          "title": "Дод. №4 до ТД.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-19T10:12:55.011333+03:00"
+        },
+        {
+          "id": "4dd63b1be58d49229cb31f94262cfc46",
+          "title": "Дод. №5 до ТД.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-19T10:12:55.011333+03:00"
+        },
+        {
+          "id": "b2304ff6f1ad4db3912f899b37b99c94",
+          "title": "Дод. №6 до ТД - проєкт договору.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-19T10:12:55.011333+03:00"
+        },
+        {
+          "id": "2ebc5b07c9a444fa8960ffcbcf778373",
+          "title": "Дод. №7 до ТД .docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-19T10:12:55.011333+03:00"
+        },
+        {
+          "id": "61755fcdb7d04fe2a01edd7c53470ad3",
+          "title": "Дод. №8 до ТД..docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-19T10:12:55.011333+03:00"
+        },
+        {
+          "id": "738272b4a6ca4a9bbb7ff8ebe1a8540c",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-19T10:16:24.636868+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "8b7c74a3f96e407bafe3783d2ae71fde",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "731655b594534004b11925f90be01eba",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:cf50a6d9537195591d10d26ad2a64d550bbe7ca9;SHA2-384:7da184c4e1a6c2aeafca35d5d67a2113b19b133e5a388d770a0d2192174f93c6ff002102b7ea7b61e808f35bad601dab;Antivirus: ESET Antivirus",
+              "id": "9e3ec82eadf84f80b748dc13d5ad886e",
+              "hash": "md5:85462e79ab189006de3cc24e61e9201f",
+              "title": "Договір №109.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/731655b594534004b11925f90be01eba/documents/9e3ec82eadf84f80b748dc13d5ad886e?download=b237bb5f348a4967b9d24f9d17800e0a",
+              "documentOf": "contract",
+              "datePublished": "2026-06-08T09:25:28.136884+03:00",
+              "dateModified": "2026-06-08T09:25:28.377007+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "d72d962336a64690a0412846af3f9b51",
+              "hash": "md5:964caf4f473b953eb467e8e36af79d8c",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/731655b594534004b11925f90be01eba/documents/d72d962336a64690a0412846af3f9b51?download=29292b6a5534425bbb3e709920b7777f",
+              "documentOf": "contract",
+              "datePublished": "2026-06-08T09:26:36.715713+03:00",
+              "dateModified": "2026-06-08T09:26:36.715713+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
+  },
+  {
+    "tender_id": "UA-2026-05-26-014997-a",
+    "notes": "Комунальне підприємство \"Полтавська обласна клінічна лікарня ім.М.В.Скліфосовського Полтавської обласної ради\"  — Послуги з програмного забезпечення  лабораторної  інформаційної системи  LIS TerraLab…",
+    "archived_at": "2026-06-11T13:56:04.756Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-26-014997-a",
+      "title": "Послуги з програмного забезпечення  лабораторної  інформаційної системи  LIS TerraLab та ПЗ Analyzer Manager (код ДК 021:2015:72260000-5 - Послуги, пов’язані з програмним забезпеченням)\n\n",
+      "status": "complete",
+      "dateModified": "2026-06-11T16:34:37.175214+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-06-03T08:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне підприємство \"Полтавська обласна клінічна лікарня ім.М.В.Скліфосовського Полтавської обласної ради\" ",
+        "edrpou": "01999106"
+      },
+      "value": {
+        "amount": 780000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Лариса Буханченко",
+        "email": "larisabuhanchenko301185@gmail.com",
+        "telephone": "+380532609547"
+      },
+      "documents": [
+        {
+          "id": "48354f1e0a8044b7b99d39203909be21",
+          "title": "ТД .docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-26T19:50:37.815527+03:00"
+        },
+        {
+          "id": "dabfa51dc9104864a2cff808c22d286b",
+          "title": "Додаток 1 Перелік документів учаснику.docx",
+          "documentType": null,
+          "datePublished": "2026-05-26T19:50:37.815527+03:00"
+        },
+        {
+          "id": "b439cea524f3481091dd39a71e1cd886",
+          "title": "Додаток 2 до ТД.doc",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-05-26T19:50:37.815527+03:00"
+        },
+        {
+          "id": "155ba3e468194c339180e3816f042f84",
+          "title": "Додаток 4 Перелік документів переможцю.docx",
+          "documentType": null,
+          "datePublished": "2026-05-26T19:50:37.815527+03:00"
+        },
+        {
+          "id": "b8e9e9db41c64686bc3565dcad95557e",
+          "title": "Додаток 3 Проєкт договору.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-26T19:50:37.815527+03:00"
+        },
+        {
+          "id": "1ad2577a9900439ca0e2f7c65e19ced2",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-26T19:52:41.088207+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "71e1c113fc574a5e97eb4fafd1308f96",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "f79b27278e85495785c6a1e75cdb2ba0",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:a488300420877339ef26c9eb3d651f16950376cf;SHA2-384:56722a5cfc304e3280df5b9a60257e4525c13cafd3949c8d1b17a0eccf4a1bb34e29b811f47b6fedcf7554453fd09690;Antivirus: ESET Antivirus",
+              "id": "c16b6a47b6754b7a955ac24acbfa9ab3",
+              "hash": "md5:e1b0fecae4e24caeb5c3c595b3626bf5",
+              "title": "Договір №04-06-01 (ТОВ Терралаб Ай Ті).pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/f79b27278e85495785c6a1e75cdb2ba0/documents/c16b6a47b6754b7a955ac24acbfa9ab3?download=1f08a4cce4f7437890577da07b354165",
+              "documentOf": "contract",
+              "datePublished": "2026-06-11T16:33:15.610936+03:00",
+              "dateModified": "2026-06-11T16:33:15.864689+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "8a6e0f3fc26d4d14b9a0a8a994e5d593",
+              "hash": "md5:bdf982bf19654511872eae47d77ddad6",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/f79b27278e85495785c6a1e75cdb2ba0/documents/8a6e0f3fc26d4d14b9a0a8a994e5d593?download=bc5dac13dd7240b7ad5625f91f688160",
+              "documentOf": "contract",
+              "datePublished": "2026-06-11T16:34:36.885291+03:00",
+              "dateModified": "2026-06-11T16:34:36.885291+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
+  },
+  {
+    "tender_id": "UA-2026-04-30-010542-a",
+    "notes": "КОМУНАЛЬНЕ ПІДПРИЄМСТВО \"РІВНЕНСЬКА ОБЛАСНА КЛІНІЧНА ЛІКАРНЯ ІМЕНІ ЮРІЯ СЕМЕНЮКА\" РІВНЕНСЬКОЇ ОБЛАСНОЇ РАДИ — Консалтингові послуги з підготовки медичної лабораторії до акредитації згідно зі стандарт…",
+    "archived_at": "2026-06-16T10:25:48.932Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-04-30-010542-a",
+      "title": "Консалтингові послуги з підготовки медичної лабораторії до акредитації згідно зі стандартом ISO 15189:2022 «Медичні лабораторії – Вимоги до якості та компетентності», код ДК 021:2015 – 71620000-0 - Аналітичні послуги",
+      "status": "complete",
+      "dateModified": "2026-06-16T13:16:33.757730+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-05-08T23:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ ПІДПРИЄМСТВО \"РІВНЕНСЬКА ОБЛАСНА КЛІНІЧНА ЛІКАРНЯ ІМЕНІ ЮРІЯ СЕМЕНЮКА\" РІВНЕНСЬКОЇ ОБЛАСНОЇ РАДИ",
+        "edrpou": "02000010"
+      },
+      "value": {
+        "amount": 498000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "71620000-0",
+        "description": "Аналітичні послуги",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "71620000-0"
+      ],
+      "contact": {
+        "name": "Людмила Романчук",
+        "email": "skprokl@gmail.com",
+        "telephone": "+380362643715, +380362281692"
+      },
+      "documents": [
+        {
+          "id": "e108e06615c74ced8466d7746129cad0",
+          "title": "4. Додаток 4 (Проєкт договору ).docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-04-30T16:50:16.601010+03:00"
+        },
+        {
+          "id": "b67327a88a7744d4b6280912050639ef",
+          "title": "1. Додаток 1 (кваліф. критерії)..docx",
+          "documentType": null,
+          "datePublished": "2026-04-30T16:50:16.601010+03:00"
+        },
+        {
+          "id": "c42621e404a64b9ebda00e0d1ff19dc8",
+          "title": "2. Додаток 2  (підстави відхилення)..docx",
+          "documentType": null,
+          "datePublished": "2026-04-30T16:50:16.601010+03:00"
+        },
+        {
+          "id": "526f9a3fc9694c02b8685086594d579f",
+          "title": "3. Додаток 3 технічні характеристики.docx",
+          "documentType": null,
+          "datePublished": "2026-04-30T16:50:16.601010+03:00"
+        },
+        {
+          "id": "697f5c13324144ea8100ca5252b96e47",
+          "title": "5. Додаток  5 (перелік документів для учасника)..docx",
+          "documentType": null,
+          "datePublished": "2026-04-30T16:50:16.601010+03:00"
+        },
+        {
+          "id": "8c6da09df0cc4b3db8e662ee470190df",
+          "title": "6. Додаток 6 (перелік документів для переможця)..docx",
+          "documentType": null,
+          "datePublished": "2026-04-30T16:50:16.601010+03:00"
+        },
+        {
+          "id": "83eb25e943d5436eb9800b78f3969e4e",
+          "title": "ТД.docx",
+          "documentType": null,
+          "datePublished": "2026-04-30T16:50:16.601010+03:00"
+        },
+        {
+          "id": "d1026fff3e7f430a9b6f8b0655813bc8",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-04-30T16:51:40.365069+03:00"
+        },
+        {
+          "id": "0cb1fdcd575a4703acb5876a1fc2cb43",
+          "title": "audit_24bba48fbd154ca68690335ccf7d888e_6dee592f3cdc4059abf9a34341f05bb7.yaml",
+          "documentType": null,
+          "datePublished": "2026-05-11T11:39:51.567667+03:00"
+        }
+      ],
+      "questions": [
+        {
+          "id": "c24ef864b30f46cbb051faa267540500",
+          "title": "Щодо підтвердження кваліфікаційних вимог.",
+          "answer": "Шановний учаснику!\n\nЗамовник дякує за надане звернення та повідомляє наступне.\n\nКваліфікаційна вимога Додатку № 1 до тендерної документації встановлює необхідність наявності в учасника працівника, який має спеціальність лікаря-мікробіолога. Йдеться про спеціальність, тобто кваліфікацію, що підтверджується відповідним документом про освіту/професійну підготовку (диплом, сертифікат лікаря-спеціаліста, посвідчення про закінчення інтернатури тощо), затверджену у встановленому порядку наказами Міністерства охорони здоров'я України.\n\nНатомість, наведений у Вашому зверненні Національний класифікатор ДК 003:2010 «Класифікатор професій» регулює перелік посад (професій), які відображаються у штатних розписах, наказах про прийняття на роботу та трудових книжках, і не визначає переліку лікарських спеціальностей.\n\nЦе різні нормативні категорії.\n\nВідповідно, замовнику не суттєво, яку саме посаду згідно з ДК 003:2010 обіймає працівник учасника (наприклад, лікар-бактеріолог, лікар-вірусолог, лікар-мікробіолог-вірусолог тощо). Принциповою є наявність у такого працівника підтвердженої спеціальності у сфері мікробіології, яка може бути підтверджена документами про освіту, інтернатуру, проходження циклу спеціалізації/тематичного удосконалення з мікробіології (бактеріології, вірусології) тощо, та досвіду роботи у клініко-діагностичній та бактеріологічній лабораторії не менше 1 року.\n\nПідтвердження здійснюється у спосіб, передбачений Додатком № 1 (копія трудової книжки, документи про освіту, накази про прийняття на роботу, документи про додаткову професійну підготовку).\n\nЗамовник підкреслює, що формулювання вимоги тендерної документації не обмежує учасників, у штаті яких є фахівці із суміжними спеціальностями у сфері мікробіології (бактеріологія, вірусологія), за умови документального підтвердження цих спеціальностей."
+        }
+      ],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "e6806f1c8922400aa52479e49122381c",
+          "status": "unsuccessful",
+          "suppliers": [
+            {
+              "name": "ДЕРЖАВНЕ ПІДПРИЄМСТВО \"КРИВОРІЗЬКИЙ ЕКСПЕРТНО-ТЕХНІЧНИЙ ЦЕНТР ДЕРЖПРАЦІ\"",
+              "identifier": {
+                "id": "31223828"
+              }
+            }
+          ],
+          "complaints": []
+        },
+        {
+          "id": "35c595a0f9794874a9eef03c3d6610e8",
+          "status": "unsuccessful",
+          "suppliers": [
+            {
+              "name": "ТОВ \"\"ЕССЕ ВЕРІТАС\"\"",
+              "identifier": {
+                "id": "46103679"
+              }
+            }
+          ],
+          "complaints": []
+        },
+        {
+          "id": "6552ea7a81ed4051baf2e22bc93a9065",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ФОП \"ШУЛЬГА НАТАЛІЯ ВОЛОДИМИРІВНА\"",
+              "identifier": {
+                "id": "3660203382"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "fa1490835ff84ef2ba74c895242174bf",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "description": "SHA1:b18979733284122e36760bf4115a8a8c006b389d;SHA2-384:1e442b8f217b8dbb2ad61f26b3f95718e7dc4772445139fb5b82a2d3f3abcc13d604a63279376cb590c50bd91b1b63fa;Antivirus: ESET Antivirus",
+              "id": "0f811ae7339c4801b91bb78aff9e8df6",
+              "hash": "md5:f523bfe6489ce00a587f6360342465d7",
+              "title": "Tendernyi_dohovir_FOP_Shulha_N_ta_Rivnenska_OKL_im._Iu._Semeniuka.pdf.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/fa1490835ff84ef2ba74c895242174bf/documents/0f811ae7339c4801b91bb78aff9e8df6?download=01e5395275e24568a3eb87f5bd2a2c82",
+              "documentOf": "contract",
+              "datePublished": "2026-06-16T13:15:02.109385+03:00",
+              "dateModified": "2026-06-16T13:15:02.316085+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "e63ef95f9f9a495cbfc2b4e36ff892aa",
+              "hash": "md5:62450507e90e6dc23bdd966fd651d6ae",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/fa1490835ff84ef2ba74c895242174bf/documents/e63ef95f9f9a495cbfc2b4e36ff892aa?download=37d68f1d711b4325853a05b90bb8bb3a",
+              "documentOf": "contract",
+              "datePublished": "2026-06-16T13:16:33.541717+03:00",
+              "dateModified": "2026-06-16T13:16:33.541717+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
+  },
+  {
+    "tender_id": "UA-2026-05-28-010064-a",
+    "notes": "КОМУНАЛЬНЕ ПІДПРИЄМСТВО \"ЛІКАРНЯ №2 ІМ. В.П.ПАВЛУСЕНКА\" ЖИТОМИРСЬКОЇ МІСЬКОЇ РАДИ — Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації …",
+    "archived_at": "2026-06-16T12:56:04.846Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-28-010064-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії (код ДК 021:2015 72260000-5 «Послуги, пов’язані з програмним забезпеченням», номенклатура - 72263000-6 Послуги зі впровадження програмного забезпечення)",
+      "status": "complete",
+      "dateModified": "2026-06-16T15:35:14.436901+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-06-05T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ ПІДПРИЄМСТВО \"ЛІКАРНЯ №2 ІМ. В.П.ПАВЛУСЕНКА\" ЖИТОМИРСЬКОЇ МІСЬКОЇ РАДИ",
+        "edrpou": "42789136"
+      },
+      "value": {
+        "amount": 442560,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72263000-6",
+        "description": "Послуги зі впровадження програмного забезпечення",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72263000-6"
+      ],
+      "contact": {
+        "name": "Аліна Корзун",
+        "email": "tmo2_alina@ukr.net",
+        "telephone": "+380674141791"
+      },
+      "documents": [
+        {
+          "id": "3554c9bdd70d446b8e09424dedf2b60d",
+          "title": "ТД програмне забезпечення.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-28T15:43:21.846497+03:00"
+        },
+        {
+          "id": "fd0d07b8f786432b82a142eb4dac0d06",
+          "title": "Додаток 1 Кваліфікаційні вимоги.docx",
+          "documentType": "eligibilityCriteria",
+          "datePublished": "2026-05-28T15:43:21.846497+03:00"
+        },
+        {
+          "id": "bd3da22a116241708a7e3ee79e18c5ce",
+          "title": "Додаток 2.1. Перелік документів Учасник.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-28T15:43:21.846497+03:00"
+        },
+        {
+          "id": "ba2efee8fe9f475bab41d84fe37b6f7e",
+          "title": "Додаток 2.2. Перелік документів Переможець.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-28T15:43:21.846497+03:00"
+        },
+        {
+          "id": "be3e186f7d574fa9bd9888e25d11f546",
+          "title": "Додаток 3 Технічне завдання програмне забезпечення.docx",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-05-28T15:43:21.846497+03:00"
+        },
+        {
+          "id": "4366ffc2efc74a8497c82647f790f88a",
+          "title": "Додаток 4. Проєкт договору.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-28T15:43:21.846497+03:00"
+        },
+        {
+          "id": "4c0c30a7d0514c44ba5ff916bd14ec63",
+          "title": "Додаток 5 Форма пропозиції.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-28T15:43:21.846497+03:00"
+        },
+        {
+          "id": "9324f491de514f3abd4e6e1854386abc",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-28T15:47:08.585097+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "40b28c75b95645d793006ea8ba2dade5",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "5ee9efd1a87a47e49ffe118ab3ae687b",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:a4d650aff1ea958f65d4fba6e99b9319037984f1;SHA2-384:838b39c4b6d5ebd0027e10c43c6d066b24d0a7058401a39732142f523a8e202310d6970ea7a5945e47ae3d3bb4981610;Antivirus: ESET Antivirus",
+              "id": "048cfc5b2d9a49be81a7473a42c637a8",
+              "hash": "md5:49a9f9162eb8e9dbb696d78ba4de2ba1",
+              "title": "09-06-01.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/5ee9efd1a87a47e49ffe118ab3ae687b/documents/048cfc5b2d9a49be81a7473a42c637a8?download=06d2219cb7c5459b9933b868e1a5dd83",
+              "documentOf": "contract",
+              "datePublished": "2026-06-16T15:34:38.606214+03:00",
+              "dateModified": "2026-06-16T15:34:38.832052+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "b9e7437ca0174ec495366aa011219680",
+              "hash": "md5:e815b48b62ab9aaa629fa00290521fc5",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/5ee9efd1a87a47e49ffe118ab3ae687b/documents/b9e7437ca0174ec495366aa011219680?download=5ada9dd1ee2b45a9a0fe39bc9c4e2511",
+              "documentOf": "contract",
+              "datePublished": "2026-06-16T15:35:14.164681+03:00",
+              "dateModified": "2026-06-16T15:35:14.164681+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
+  },
+  {
+    "tender_id": "UA-2026-05-27-002799-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ЗАЛІЩИЦЬКА ЦЕНТРАЛЬНА МІСЬКА ЛІКАРНЯ\" ЗАЛІЩИЦЬКОЇ МІСЬКОЇ РАДИ — Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи…",
+    "archived_at": "2026-06-19T09:55:43.131Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-27-002799-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+      "status": "complete",
+      "dateModified": "2026-06-19T12:40:55.333063+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-06-04T18:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ЗАЛІЩИЦЬКА ЦЕНТРАЛЬНА МІСЬКА ЛІКАРНЯ\" ЗАЛІЩИЦЬКОЇ МІСЬКОЇ РАДИ",
+        "edrpou": "02000659"
+      },
+      "value": {
+        "amount": 376534,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Мотринчук Тетяна Петрівна",
+        "email": "zcmlzk1@ukr.net",
+        "telephone": "+380355421053"
+      },
+      "documents": [
+        {
+          "id": "3ddd0be077de46e59ba8088dac63f7c0",
+          "title": "1. Тендерна документацiя.docx",
+          "documentType": null,
+          "datePublished": "2026-05-27T10:37:00.164239+03:00"
+        },
+        {
+          "id": "be066462d6df45e6a282685f8c89f0ac",
+          "title": "2. Додаток _1 Перелік документів та_або інформації_ які подаються учасником процедури закупівлі у складі тендерної пропозиції.docx",
+          "documentType": null,
+          "datePublished": "2026-05-27T10:37:00.164239+03:00"
+        },
+        {
+          "id": "d95ddf5a55c34ff996b180b74db892cb",
+          "title": "3. Додаток _2 Перелік документів та_або інформації_ які подаються переможцем процедури закупівлі.docx",
+          "documentType": null,
+          "datePublished": "2026-05-27T10:37:00.164239+03:00"
+        },
+        {
+          "id": "6801b1b47ea648a585f230cd4990e631",
+          "title": "4. Додаток _3 Проєкт договору.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-27T10:37:00.164239+03:00"
+        },
+        {
+          "id": "9b5437b901db4d659514478b83f295c4",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-27T10:39:56.804735+03:00"
+        },
+        {
+          "id": "9b5437b901db4d659514478b83f295c4",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-27T10:44:31.914087+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "c8e3ece1ca3642699c9f04d32e312d1c",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"МАЙЛАБ\"",
+              "identifier": {
+                "id": "41087617"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "704425c1264542ff8ab1b2e53eca3c2d",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "title_en": "Договір 11-06-01.PDF",
+              "title_ru": "Договір 11-06-01.PDF",
+              "description": "SHA1: b51f1aeb2620cfaf888b74e2452af79919d312c4",
+              "id": "6dea6b6caf77439ca95b68f017b067fa",
+              "hash": "md5:ab9c4bdaad722c4b59cfdef50784366e",
+              "title": "Договір 11-06-01.PDF",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/704425c1264542ff8ab1b2e53eca3c2d/documents/6dea6b6caf77439ca95b68f017b067fa?download=ccd8dc773903483ab5835603698b941b",
+              "documentOf": "contract",
+              "datePublished": "2026-06-19T12:26:14.308538+03:00",
+              "dateModified": "2026-06-19T12:26:14.308538+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "documentType": "notice",
+              "title_en": "sign.p7s",
+              "title_ru": "sign.p7s",
+              "description": "SHA1: d1a9d78b683be43928c3f8a5d19d9557023bde53",
+              "id": "9209da31c4184b7bbd10ec2f967d9560",
+              "hash": "md5:3ef9783bc55ed9b23d57c460d4c084b3",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/704425c1264542ff8ab1b2e53eca3c2d/documents/9209da31c4184b7bbd10ec2f967d9560?download=8d7253370c294f159178a5ae3d2b79f6",
+              "documentOf": "contract",
+              "datePublished": "2026-06-19T12:40:42.840137+03:00",
+              "dateModified": "2026-06-19T12:40:42.840137+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
+  },
+  {
+    "tender_id": "UA-2026-05-26-013289-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ТОВАРИСТВО «ДНІПРОПЕТРОВСЬКА ОБЛАСНА КЛІНІЧНА ЛІКАРНЯ ІМ. І.І. МЕЧНИКОВА» ДНІПРОПЕТРОВСЬКОЇ ОБЛАСНОЇ РАДИ» — 72260000-5 Послуги, пов’язані з програмним забезпеченням,  Послуги…",
+    "archived_at": "2026-06-23T11:56:01.469Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-26-013289-a",
+      "title": "72260000-5 Послуги, пов’язані з програмним забезпеченням,  Послуги з надання права на використання програмного забезпечення комп’ютерної програми Analyzer Manager (або еквівалент) (Річна ліцензія) для підключення 37 приладів;  Послуги з підключення та налагодження медичного (лабораторного) обладнання (11 аналізатори) для забезпечення автоматичної передачі даних між аналітичним обладнанням та інформаційними системами;  Послуги з надання права на використання  комп'ютерної програми TerraLab або еквівалент   (програмний модуль інформаційної взаємодії  TerraLab eHealth) (Річна ліцензія) для однієї бази даних (передача діагностичних звітів);  Надання консультаційних послуг щодо інтеграції з Сobas Infinity;  Надання консультаційних послуг з обслуговування програмного забезпечення комп’ютерних програм TerraLab  або еквівалент та Analyzer Manager  або еквівалент, в т.ч. спеціалізованих модулів: Контролю якості , Складського обліку , Мікробіології , TerraLab eHealth  або еквівалент ; Надання консультаційних послуг з налаштування програмного забезпечення комп’ютерної програми TerraLab (створення, налаштування та редагування бланків  та звітів (понад 90 штук); роботи з базою даних (зміна додаткових функцій на форму для коректного запису інформації та її відображення); відправлення повідомлень про готовність досліджень; збереження бекапу, налаштування скринінг 40+);  Надання консультаційних послуг щодо інтеграції між інформаційними системами сторонніх розробників;  Надання права доступу до оновлень до програмного забезпечення комп’ютерної програми TerraLab (або еквівалент) на період 1 (один) рік",
+      "status": "complete",
+      "dateModified": "2026-06-23T14:42:48.852562+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-06-03T17:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ТОВАРИСТВО «ДНІПРОПЕТРОВСЬКА ОБЛАСНА КЛІНІЧНА ЛІКАРНЯ ІМ. І.І. МЕЧНИКОВА» ДНІПРОПЕТРОВСЬКОЇ ОБЛАСНОЇ РАДИ»",
+        "edrpou": "01985423"
+      },
+      "value": {
+        "amount": 1945526.66,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72268000-1",
+        "description": "Послуги з постачання програмного забезпечення",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72268000-1",
+        "72268000-1",
+        "72268000-1",
+        "72266000-7",
+        "72266000-7",
+        "72266000-7",
+        "72266000-7",
+        "72268000-1"
+      ],
+      "contact": {
+        "name": "Приходько Олена Геннадіївна",
+        "email": "tender.dnepr.po@ukr.net",
+        "telephone": "380562339500"
+      },
+      "documents": [
+        {
+          "id": "e4b5e497069a4931bc148b6f2f5f9ca5",
+          "title": "Додаток №1ВТ LIMS  2026.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-26T16:29:30.069138+03:00"
+        },
+        {
+          "id": "2bf14c033439421295d9ff8bc44b2364",
+          "title": "Додаток №2 ВТLIMS 2026.doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-26T16:29:30.069138+03:00"
+        },
+        {
+          "id": "3637401e51f74e96bdf36c914670644a",
+          "title": "Додаток №3 ВТ LIMS 2026.doc",
+          "documentType": "evaluationCriteria",
+          "datePublished": "2026-05-26T16:29:30.069138+03:00"
+        },
+        {
+          "id": "7e241efd9f5346e19f2b2767ae44cbbf",
+          "title": "Додаток №4 ВТLIMS 2026.doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-26T16:29:30.069138+03:00"
+        },
+        {
+          "id": "96e123dcc0d84443ac3429a290ea9ed9",
+          "title": "Додаток №5 ВТLIMS 2026.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-26T16:29:30.069138+03:00"
+        },
+        {
+          "id": "bcee086a684d4a529f71caa3a9ced8a4",
+          "title": "Додаток №6  LIMS2026.doc",
+          "documentType": "eligibilityCriteria",
+          "datePublished": "2026-05-26T16:29:30.069138+03:00"
+        },
+        {
+          "id": "b764b3317cbe4674b34c1f98adefedcb",
+          "title": "Додаток №7_LIMS 2026.doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-26T16:29:30.069138+03:00"
+        },
+        {
+          "id": "a5c25b38dd4d46c9b2b9166c343022b4",
+          "title": "Додаток №8 ВТ LIMS 2026.doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-26T16:29:30.069138+03:00"
+        },
+        {
+          "id": "8547dd494fef4c79ae75323fefc4f527",
+          "title": "ТД  LIMS 2026.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-26T16:29:30.069138+03:00"
+        },
+        {
+          "id": "f6fa36d2a5e74503b37388509dd39dae",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-05-26T16:29:36.642465+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "04e9d3ca83a24f158379c60d9315f4ba",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "30de961ca54e41b88ba694716ae0c374",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "id": "5980c987eba44a559460bddc7181b209",
+              "hash": "md5:2d07d39c5651214299310b67374026b4",
+              "title": "Дог ТОВ ТЕРРАЛАБ АЙ ТІ_№ 10-06-01 від 22.06.26((LІС).pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/30de961ca54e41b88ba694716ae0c374/documents/5980c987eba44a559460bddc7181b209?download=9b13d071640442e9ac958548e04a361f",
+              "documentOf": "contract",
+              "datePublished": "2026-06-23T14:40:55.214691+03:00",
+              "dateModified": "2026-06-23T14:40:55.214691+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "029cd9512873494eb5345923927911be",
+              "hash": "md5:415c301283e195e59e3d13d79713a8e0",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/30de961ca54e41b88ba694716ae0c374/documents/029cd9512873494eb5345923927911be?download=7bb386413fce4f84a4cdbdb2481c41d9",
+              "documentOf": "contract",
+              "datePublished": "2026-06-23T14:42:48.192246+03:00",
+              "dateModified": "2026-06-23T14:42:48.192246+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]

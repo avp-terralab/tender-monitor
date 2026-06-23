@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseCommand, buildAutoNotes, formatAddReply,
+  parseCommand, mainKeyboard, buildAutoNotes, formatAddReply,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo, formatInfoPages,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
@@ -18,6 +18,9 @@ import {
   paginateArchiveGroup, ARCHIVE_PAGE_LIMIT,
   findContractDate, buildArchiveMenu, groupArchiveByProvider, buildArchiveCompanyList,
   groupArchiveByYear, buildArchiveYearList, buildArchiveMonthList, renderArchivePage, handleArchiveNav,
+  AGENT_COMPANIES, companyForSlug, slugForCompany,
+  agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
+  buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -217,7 +220,7 @@ test('abbreviateLegalForm: matches when name follows form without a space (quote
   // Real Prozorro entry: EDRPOU 42409961 — no space between "ПІДПРИЄМСТВО" and the opening quote.
   assert.equal(
     abbreviateLegalForm('КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО"ЛЮБОТИНСЬКА МІСЬКА ЛІКАРНЯ" ЛЮБОТИНСЬКОЇ МІСЬКОЇ РАДИ ХАРКІВСЬКОЇ ОБЛАСТІ'),
-    'КНП "ЛЮБОТИНСЬКА МІСЬКА ЛІКАРНЯ" ЛЮБОТИНСЬКОЇ МІСЬКОЇ РАДИ ХАРКІВСЬКОЇ ОБЛАСТІ'
+    'КНП "ЛЮБОТИНСЬКА МЛ" ЛЮБОТИНСЬКОЇ МР ХАРКІВСЬКОЇ ОБЛАСТІ'
   );
   // Same issue, other forms — also covered.
   assert.equal(
@@ -247,7 +250,7 @@ test('abbreviateLegalForm: КНП — accepts "товариство" alt form (s
   );
   assert.equal(
     abbreviateLegalForm('Комунальне некомерцийне товариство "Дніпропетровська обласна клінічна лікарня ім. І. І. Мечникова"'),
-    'КНП "Дніпропетровська обласна клінічна лікарня ім. І. І. Мечникова"'
+    'КНП "Дніпропетровська ОКЛ ім. І. І. Мечникова"'
   );
 });
 
@@ -306,7 +309,7 @@ test('abbreviateLegalForm: empty/null returns unchanged', () => {
 test('abbreviateLegalForm: leading/trailing whitespace does not block matching (Prozorro registry quirk)', () => {
   assert.equal(
     abbreviateLegalForm(' Комунальне підприємство "Балтська багатопрофільна лікарня" Балтської міської ради'),
-    'КП "Балтська багатопрофільна лікарня" Балтської міської ради',
+    'КП "Балтська БПЛ" Балтської МР',
   );
   assert.equal(
     abbreviateLegalForm('Товариство з обмеженою відповідальністю «ТерраЛаб»  '),
@@ -3123,6 +3126,184 @@ test('paginateArchiveGroup: a single oversized entry gets its own page', () => {
   assert.equal(pages.length, 2);
   assert.ok(pages[0].includes(huge));
   assert.ok(pages[1].includes('small'));
+});
+
+// ── Agent trigger (Phase 3 Task 5) ──────────────────────────────────────
+
+test('companyForSlug / slugForCompany: round-trip', () => {
+  assert.equal(companyForSlug('terralab_it'), 'ТЕРРАЛАБ АЙ ТІ');
+  assert.equal(companyForSlug('maylab'), 'МАЙЛАБ');
+  assert.equal(slugForCompany('МАЙЛАБ'), 'maylab');
+  assert.equal(slugForCompany('ТЕРРАЛАБ КОНСАЛТИНГ'), 'terralab_consulting');
+  assert.equal(companyForSlug('nope'), null);
+  assert.equal(slugForCompany('nope'), null);
+  assert.equal(Object.keys(AGENT_COMPANIES).length, 4);
+});
+
+test('agentTriggerButtonRow: admin gets row, others null', () => {
+  const row = agentTriggerButtonRow('UA-x', 'admin');
+  assert.ok(Array.isArray(row));
+  assert.equal(row.length, 1);
+  assert.equal(row[0].callback_data, 'agent:start:UA-x');
+  assert.match(row[0].text, /агенту/);
+  assert.equal(agentTriggerButtonRow('UA-x', 'editor'), null);
+  assert.equal(agentTriggerButtonRow('UA-x', 'viewer'), null);
+});
+
+test('buildAgentCompanyKeyboard: 4 companies + cancel, callback_data ≤ 64', () => {
+  const kb = buildAgentCompanyKeyboard('UA-x');
+  const buttons = kb.inline_keyboard.flat();
+  const companyButtons = buttons.filter(b => b.callback_data.startsWith('agent:co:'));
+  assert.equal(companyButtons.length, 4);
+  const maylab = companyButtons.find(b => b.callback_data === 'agent:co:UA-x:maylab');
+  assert.ok(maylab);
+  assert.equal(maylab.text, 'МАЙЛАБ');
+  const cancel = buttons.find(b => b.callback_data === 'agent:cancel:UA-x');
+  assert.ok(cancel);
+  for (const b of buttons) {
+    assert.ok(Buffer.byteLength(b.callback_data, 'utf8') <= 64, b.callback_data);
+  }
+});
+
+test('buildAgentCompanyKeyboard: callback_data stays ≤64 with 22-char tender id', () => {
+  const tid = 'UA-2026-04-30-010542-a';
+  const kb = buildAgentCompanyKeyboard(tid);
+  for (const b of kb.inline_keyboard.flat()) {
+    assert.ok(Buffer.byteLength(b.callback_data, 'utf8') <= 64, b.callback_data);
+  }
+});
+
+test('validateAgentPrice: accepts numbers and auto, rejects junk', () => {
+  assert.ok(validateAgentPrice('181200'));
+  assert.ok(validateAgentPrice('181 200'));
+  assert.ok(validateAgentPrice('181 200,00'));
+  assert.ok(validateAgentPrice('181200.00'));
+  assert.equal(validateAgentPrice('auto'), 'auto');
+  assert.equal(validateAgentPrice('AUTO'), 'auto');
+  assert.equal(validateAgentPrice('  Auto  '), 'auto');
+  assert.equal(validateAgentPrice(''), null);
+  assert.equal(validateAgentPrice('abc'), null);
+  assert.equal(validateAgentPrice('-5'), null);
+  assert.equal(validateAgentPrice('12abc'), null);
+});
+
+test('buildAgentConfirmKeyboard: confirm + cancel', () => {
+  const kb = buildAgentConfirmKeyboard('UA-x');
+  const buttons = kb.inline_keyboard.flat();
+  assert.ok(buttons.find(b => b.callback_data === 'agent:confirm:UA-x'));
+  assert.ok(buttons.find(b => b.callback_data === 'agent:cancel:UA-x'));
+});
+
+test('buildAgentJob: matches integration contract', () => {
+  const job = buildAgentJob({
+    tenderId: 'UA-x', link: 'L', company: 'МАЙЛАБ',
+    price: '181200', requestedBy: '42', createdAt: 't',
+  });
+  assert.deepEqual(job, {
+    tender_id: 'UA-x',
+    link: 'L',
+    company: 'МАЙЛАБ',
+    price: '181200',
+    requested_by: '42',
+    status: 'pending',
+    created_at: 't',
+  });
+});
+
+test('buildAgentConfirmText: one-line prompt with fields', () => {
+  const txt = buildAgentConfirmText({
+    company: 'МАЙЛАБ', price: '181200', tenderId: 'UA-x', entityName: 'Лікарня',
+  });
+  assert.equal(typeof txt, 'string');
+  assert.match(txt, /МАЙЛАБ/);
+  assert.match(txt, /181200/);
+  assert.match(txt, /UA-x/);
+  assert.match(txt, /Лікарня/);
+});
+
+
+test('parseCommand: /agent', () => {
+  assert.deepEqual(parseCommand('/agent'), { cmd: 'agent' });
+  assert.deepEqual(parseCommand('/agent@terralab_tenders_bot'), { cmd: 'agent' });
+});
+
+test('buildAgentTenderListKeyboard: one agent:start button per enabled tender', () => {
+  const kb = buildAgentTenderListKeyboard([
+    { tender_id: 'UA-2026-01-01-000001-a', enabled: true, notes: 'Херсон ОНКО' },
+    { tender_id: 'UA-2026-01-01-000002-a', enabled: false },
+    { tender_id: 'UA-2026-01-01-000003-a', enabled: true },
+  ]);
+  assert.equal(kb.inline_keyboard.length, 2);
+  assert.equal(kb.inline_keyboard[0][0].callback_data, 'agent:start:UA-2026-01-01-000001-a');
+  assert.match(kb.inline_keyboard[0][0].text, /Херсон ОНКО/);
+  assert.match(kb.inline_keyboard[1][0].text, /UA-2026-01-01-000003-a/);
+  assert.equal(buildAgentTenderListKeyboard([]), null);
+  assert.equal(buildAgentTenderListKeyboard([{ tender_id: 'x', enabled: false }]), null);
+});
+
+
+test('abbreviateLegalForm / buildAgentTenderListKeyboard: abbreviates the legal form', () => {
+  assert.match(abbreviateLegalForm('КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Херсонський»'), /^КНП «Херсонський»/);
+  assert.equal(abbreviateLegalForm('КОМУНАЛЬНИЙ ЗАКЛАД Київ').startsWith('КЗ '), true);
+  const kb = buildAgentTenderListKeyboard([
+    { tender_id: 'UA-2026-01-01-000009-a', enabled: true,
+      notes: 'КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Дніпро»' },
+  ]);
+  assert.match(kb.inline_keyboard[0][0].text, /КНП «Дніпро»/);
+  assert.doesNotMatch(kb.inline_keyboard[0][0].text, /КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ/);
+});
+
+
+test('abbreviateLegalForm: abbreviates governance suffix', () => {
+  assert.equal(abbreviateLegalForm('КОМУНАЛЬНЕ ПІДПРИЄМСТВО «Х» ОДЕСЬКОЇ МІСЬКОЇ РАДИ'), 'КП «Х» ОДЕСЬКОЇ МР');
+  assert.match(abbreviateLegalForm('«Лікарня» ЛЬВІВСЬКОЇ ОБЛАСНОЇ РАДИ'), /ЛЬВІВСЬКОЇ ОР$/);
+  assert.match(abbreviateLegalForm('«ЦРЛ» БРОВАРСЬКОЇ РАЙОННОЇ РАДИ'), /БРОВАРСЬКОЇ РР$/);
+  assert.match(abbreviateLegalForm('«А» КИЇВСЬКОЇ ОБЛАСНОЇ ДЕРЖАВНОЇ АДМІНІСТРАЦІЇ'), /КИЇВСЬКОЇ ОДА$/);
+});
+
+
+test('abbreviateLegalForm: ТМО / КУ / селищної ради (new forms)', () => {
+  assert.match(abbreviateLegalForm("ТЕРИТОРІАЛЬНЕ МЕДИЧНЕ ОБ'ЄДНАННЯ «Х»"), /^ТМО «Х»/);
+  assert.match(abbreviateLegalForm('КОМУНАЛЬНА УСТАНОВА «Y»'), /^КУ «Y»/);
+  assert.match(abbreviateLegalForm('«Z» БОЯРСЬКОЇ СЕЛИЩНОЇ РАДИ'), /БОЯРСЬКОЇ СР$/);
+});
+
+
+test('abbreviateLegalForm: facility-type phrases (ТМО mid, МКЛ/ЦМЛ/ОКЛ/БПЛ/ШМД/МЛ)', () => {
+  const lviv = abbreviateLegalForm(`КНП "Львівське територіальне медичне об'єднання "Клінічна лікарня"`);
+  assert.match(lviv, /Львівське ТМО/);
+  assert.doesNotMatch(lviv, /територіальне медичне/i);
+  assert.match(abbreviateLegalForm('«Х» міська клінічна лікарня № 1'), /МКЛ № 1/);
+  assert.match(abbreviateLegalForm('центральна міська лікарня м. Суми'), /^ЦМЛ м\. Суми/);
+  assert.match(abbreviateLegalForm('обласна клінічна лікарня'), /^ОКЛ$/);
+  assert.match(abbreviateLegalForm('Балтська багатопрофільна лікарня'), /Балтська БПЛ/);
+  assert.match(abbreviateLegalForm('лікарня швидкої медичної допомоги'), /лікарня ШМД/);
+  assert.match(abbreviateLegalForm('Сумська міська лікарня № 5'), /Сумська МЛ № 5/);
+});
+
+
+test('mainKeyboard / 🤖 Агент alias: admin gets the agent button, others do not', () => {
+  const admin = mainKeyboard('admin').keyboard.flat().map(b => b.text);
+  assert.ok(admin.includes('🤖 Агент'), 'admin keyboard must include the agent button');
+  const viewer = mainKeyboard('viewer').keyboard.flat().map(b => b.text);
+  assert.ok(!viewer.includes('🤖 Агент'), 'non-admin keyboard must NOT include the agent button');
+  assert.deepEqual(parseCommand('🤖 Агент'), { cmd: 'agent' });
+});
+
+
+test('buildAgentTenderListKeyboard: prepared tender gets a clickable Drive-link row', () => {
+  const kb = buildAgentTenderListKeyboard([
+    { tender_id: 'UA-2026-01-01-000007-a', enabled: true, notes: 'КНП «Готовий»',
+      preparedUrl: 'https://drive.google.com/drive/folders/ABC' },
+    { tender_id: 'UA-2026-01-01-000008-a', enabled: true, notes: 'КНП «Новий»' },
+  ]);
+  // tender1: agent button + prepared link; tender2: agent button only
+  assert.equal(kb.inline_keyboard.length, 3);
+  assert.equal(kb.inline_keyboard[0][0].callback_data, 'agent:start:UA-2026-01-01-000007-a');
+  assert.match(kb.inline_keyboard[1][0].text, /^⬆️ Тендерна пропозиція підготовлена ✅$/);
+  assert.equal(kb.inline_keyboard[1][0].url, 'https://drive.google.com/drive/folders/ABC');
+  assert.equal(kb.inline_keyboard[2][0].callback_data, 'agent:start:UA-2026-01-01-000008-a');
+  assert.equal(kb.inline_keyboard[2][0].url, undefined);
 });
 
 

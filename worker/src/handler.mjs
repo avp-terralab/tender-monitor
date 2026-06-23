@@ -6,12 +6,15 @@ import {
   handleArchive, handleArchiveDetail, handleUnarchive, buildArchiveMenu, handleArchiveNav,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
-  formatInfo, formatInfoPages, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD,
+  formatInfo, formatInfoPages, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD, mainKeyboard,
   TERMINAL_STATUSES, hydrateContractDocs,
   formatAuditMessage,
   sanitizeActor,
   parseAuditCommit,
   formatAuditLog,
+  companyForSlug, agentTriggerButtonRow, buildAgentTenderListKeyboard,
+  buildAgentCompanyKeyboard, validateAgentPrice,
+  buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
@@ -24,6 +27,7 @@ import {
   loadArchivedTenders, saveArchivedTenders,
   loadPendingDigest, loadTenderState, fetchLatestDeployCommit,
   fetchAuditLog,
+  loadAgentPending, saveAgentPending, saveAgentJob, loadAgentJob,
   ConflictError,
 } from './github.mjs';
 
@@ -68,17 +72,22 @@ export async function runHandler({ update, env, deps = {} }) {
   const _loadTenderState = deps.loadTenderState ?? loadTenderState;
   const _fetchLatestDeployCommit = deps.fetchLatestDeployCommit ?? fetchLatestDeployCommit;
   const _fetchAuditLog = deps.fetchAuditLog ?? fetchAuditLog;
+  const _loadAgentPending = deps.loadAgentPending ?? loadAgentPending;
+  const _saveAgentPending = deps.saveAgentPending ?? saveAgentPending;
+  const _saveAgentJob = deps.saveAgentJob ?? saveAgentJob;
+  const _loadAgentJob = deps.loadAgentJob ?? loadAgentJob;
   // Tests may inject their own Map to avoid cross-test cache pollution.
   const _statusCache = deps.statusCache ?? STATUS_CACHE;
 
   const cq = update.callback_query;
   if (cq) {
     return handleCallbackQuery({
-      cq, env, _editMessageReplyMarkup, _editMessageText, _answerCallbackQuery,
+      cq, env, _editMessageReplyMarkup, _editMessageText, _answerCallbackQuery, _sendReply,
       _loadAllowedUsers, _saveAllowedUsers,
       _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
       _loadWatchedEntities, _saveWatchedEntities,
       _fetchTender, _extractSnapshot,
+      _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
     });
   }
 
@@ -92,6 +101,17 @@ export async function runHandler({ update, env, deps = {} }) {
   const actorName = [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ')
     || userRecord?.label || chatId;
 
+  // Agent-trigger price step: if this admin has a pending dialog awaiting a price,
+  // the next plain text message is the price — intercept it before command parsing.
+  // Admin-only (the dialog can only be opened by an admin in the first place).
+  if (isAdmin && typeof msg.text === 'string' && !msg.text.startsWith('/')) {
+    const handled = await handleAgentPriceReply({
+      env, chatId, msg, _sendReply,
+      _loadAgentPending, _saveAgentPending, _now,
+    });
+    if (handled) return;
+  }
+
   // /start works for everyone — reveals chat_id; for allowed users, also seeds chat-scope command list.
   // /start <token> is handled in a later branch.
   if (typeof msg.text === 'string' && /^\/start(?:@\w+)?\s*$/i.test(msg.text)) {
@@ -104,7 +124,7 @@ export async function runHandler({ update, env, deps = {} }) {
         chatId: msg.chat.id,
         text: startReply,
         replyToMessageId: msg.message_id,
-        replyMarkup: isAllowed ? MAIN_KEYBOARD : undefined,
+        replyMarkup: isAllowed ? mainKeyboard(role) : undefined,
       });
     } catch (err) {
       console.error('worker: sendReply /start failed:', err.message);
@@ -126,6 +146,7 @@ export async function runHandler({ update, env, deps = {} }) {
   let notifyReplyMarkup = null;
   let watchedReplyMarkup = null;
   let archiveReplyMarkup = null;
+  let agentReplyMarkup = null;
 
   const MUTATING = new Set(['add', 'remove', 'watch', 'unarchive']);
   if (MUTATING.has(cmd.cmd) && !isEditor) {
@@ -368,6 +389,12 @@ export async function runHandler({ update, env, deps = {} }) {
         reply = cmd.tender_id
           ? formatInfo({ runIso: new Date().toISOString(), groups, errors })
           : formatInfoPages({ runIso: new Date().toISOString(), groups, errors });
+        // Admin can fire the agent from a single-tender /info card — but only
+        // while proposals are still being accepted (active.tendering).
+        if (cmd.tender_id && isAdmin && groups.length === 1
+            && groups[0].status === 'active.tendering') {
+          agentReplyMarkup = { inline_keyboard: [agentTriggerButtonRow(cmd.tender_id, 'admin')] };
+        }
 
         // Live archive: when /info UA-... shows a terminal status for a watchlist
         // tender, archive it inline. Reduces archive lag from monitor-cron cadence
@@ -606,6 +633,39 @@ export async function runHandler({ update, env, deps = {} }) {
       console.error('worker: /log failed:', err.message);
       reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
     }
+  } else if (cmd.cmd === 'agent') {
+    if (!isAdmin) return;
+    try {
+      const { watchlist } = await _loadWatchlist(env);
+      // Agent runs only while proposals are accepted — keep only active.tendering.
+      const checked = await Promise.all(
+        watchlist.filter(r => r.enabled).map(async r => {
+          try {
+            const snap = _extractSnapshot(await _fetchTender(r.tender_id));
+            if (snap.status !== 'active.tendering') return null;
+            // If a proposal was already prepared, attach its Drive folder link.
+            let preparedUrl = null;
+            try {
+              const job = await _loadAgentJob(env, r.tender_id);
+              if (job && job.status === 'done' && job.result?.drive_link) {
+                preparedUrl = job.result.drive_link;
+              }
+            } catch { /* link is optional — ignore lookup failures */ }
+            return { ...r, preparedUrl };
+          } catch { return null; }
+        }),
+      );
+      const kb = buildAgentTenderListKeyboard(checked.filter(Boolean));
+      if (!kb) {
+        reply = '📭 Немає тендерів у статусі «Приймання пропозицій».';
+      } else {
+        reply = '🤖 Оберіть тендер (приймання пропозицій), щоб надіслати агенту:';
+        agentReplyMarkup = kb;
+      }
+    } catch (err) {
+      console.error('worker: /agent failed:', err.message);
+      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+    }
   } else if (cmd.cmd === 'unknown') {
     reply = '❓ Не розумію. /help';
   } else {
@@ -622,7 +682,7 @@ export async function runHandler({ update, env, deps = {} }) {
         text: pages[i],
         replyToMessageId: i === 0 ? msg.message_id : undefined,
         replyMarkup: isLast
-          ? (archiveReplyMarkup ?? watchedReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? MAIN_KEYBOARD : undefined))
+          ? (archiveReplyMarkup ?? agentReplyMarkup ?? watchedReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
           : undefined,
       });
     } catch (err) {
@@ -669,11 +729,12 @@ async function renderWatchedView({ _editMessageText, env, chatId, messageId, ent
 }
 
 async function handleCallbackQuery({
-  cq, env, _editMessageReplyMarkup, _editMessageText, _answerCallbackQuery,
+  cq, env, _editMessageReplyMarkup, _editMessageText, _answerCallbackQuery, _sendReply,
   _loadAllowedUsers, _saveAllowedUsers,
   _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
   _loadWatchedEntities, _saveWatchedEntities,
   _fetchTender, _extractSnapshot,
+  _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
 }) {
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const chatId = String(cq.message?.chat?.id ?? '');
@@ -839,7 +900,231 @@ async function handleCallbackQuery({
     return;
   }
 
+  if (data.startsWith('agent:')) {
+    // Every agent step is admin-only. Non-admin allowed users get a clear reject
+    // (they never see the entry button, but guard the callback regardless).
+    if (!isAdmin) {
+      await ack('🚫 Лише адмін', true);
+      return;
+    }
+    await handleAgentCallback({
+      data, env, chatId, messageId, ack, _sendReply, _editMessageText,
+      _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
+      _fetchTender, _extractSnapshot,
+    });
+    return;
+  }
+
   await ack('❓ Невідома кнопка');
+}
+
+// Abandoned price dialogs older than this are dropped, so a stray later number
+// is not swallowed as the stale tender's price.
+const AGENT_PENDING_TTL_MS = 15 * 60 * 1000;
+
+// Drives the admin-only agent-trigger dialog (start → pick company → enter price
+// → confirm). State between the company tap and the price text lives in
+// _state/agent_pending.json keyed by chatId (the Worker is stateless across
+// invocations). Messages go out without HTML-sensitive interpolation: company
+// names are Cyrillic, price is digits, tenderId is an id — so the HTML parse_mode
+// the send helpers always set is harmless. entityName is intentionally omitted.
+async function handleAgentCallback({
+  data, env, chatId, messageId, ack, _sendReply, _editMessageText,
+  _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
+  _fetchTender, _extractSnapshot,
+}) {
+  const parts = data.split(':'); // agent:<action>:<tid>[:<slug>]
+  const action = parts[1];
+  const tid = parts[2] ?? '';
+
+  const sendNew = (text, replyMarkup) => _sendReply({
+    token: env.TELEGRAM_BOT_TOKEN, chatId: Number(chatId), text, replyMarkup,
+  });
+
+  if (action === 'start') {
+    // Authoritative gate (covers /agent, /info and digest buttons): the agent
+    // runs only while the tender is accepting proposals (active.tendering).
+    try {
+      const snap = _extractSnapshot(await _fetchTender(tid));
+      if (snap.status !== 'active.tendering') {
+        await ack('🚫 Тендер не приймає пропозиції — агент недоступний', true);
+        return;
+      }
+    } catch (err) {
+      console.error('worker: agent start status check failed:', err.message);
+    }
+    try {
+      await _editMessageText({
+        token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+        text: 'Оберіть компанію-учасника:',
+        replyMarkup: buildAgentCompanyKeyboard(tid),
+      });
+    } catch (err) {
+      console.error('worker: agent start edit failed:', err.message);
+      try {
+        await sendNew('Оберіть компанію-учасника:', buildAgentCompanyKeyboard(tid));
+      } catch (err2) {
+        console.error('worker: agent start send failed:', err2.message);
+      }
+    }
+    await ack();
+    return;
+  }
+
+  if (action === 'co') {
+    const slug = parts[3] ?? '';
+    const company = companyForSlug(slug);
+    if (!company) { await ack('❌ Невідома компанія'); return; }
+    try {
+      const { pending, sha } = await _loadAgentPending(env);
+      pending[chatId] = { tid, company, step: 'await_price', at: _now().toISOString() };
+      await _saveAgentPending(env, pending, sha);
+    } catch (err) {
+      console.error('worker: agent co save pending failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
+    }
+    try {
+      await sendNew('Введіть ціну пропозиції (грн) або «auto»:');
+    } catch (err) {
+      console.error('worker: agent co prompt send failed:', err.message);
+    }
+    await ack();
+    return;
+  }
+
+  if (action === 'confirm') {
+    let entry;
+    try {
+      const loaded = await _loadAgentPending(env);
+      entry = loaded.pending?.[chatId];
+    } catch (err) {
+      console.error('worker: agent confirm load pending failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
+    }
+    if (!entry || entry.tid !== tid || entry.step !== 'confirm' || !entry.price) {
+      await ack('⚠️ Немає активного запиту');
+      return;
+    }
+    const link = `https://prozorro.gov.ua/tender/${tid}`;
+    const job = buildAgentJob({
+      tenderId: tid, link, company: entry.company, price: entry.price,
+      requestedBy: String(chatId), createdAt: _now().toISOString(),
+    });
+    try {
+      await _saveAgentJob(env, job);
+    } catch (err) {
+      console.error('worker: saveAgentJob failed:', err.message);
+      await ack('⚠️ Не зміг поставити в чергу, спробуй ще раз', true);
+      return;
+    }
+    await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
+    try {
+      await sendNew('✅ Завдання поставлено в чергу. Сповіщу, коли буде готово.');
+    } catch (err) {
+      console.error('worker: agent confirm reply failed:', err.message);
+    }
+    await ack('✅ В черзі');
+    return;
+  }
+
+  if (action === 'cancel') {
+    await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
+    try {
+      await sendNew('Скасовано.');
+    } catch (err) {
+      console.error('worker: agent cancel reply failed:', err.message);
+    }
+    await ack('Скасовано');
+    return;
+  }
+
+  await ack('❓ Невідома кнопка');
+}
+
+// Removes this chat's pending agent dialog entry. Best-effort — a failure here
+// just means a stale entry lingers; the next confirm/cancel re-clears it.
+async function clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending }) {
+  try {
+    const { pending, sha } = await _loadAgentPending(env);
+    if (pending[chatId]) {
+      delete pending[chatId];
+      await _saveAgentPending(env, pending, sha);
+    }
+  } catch (err) {
+    console.error('worker: clearAgentPending failed:', err.message);
+  }
+}
+
+// Handles a plain text message from an admin who is mid-agent-dialog at the
+// price step. Returns true if it consumed the message (so the caller stops),
+// false if there was no pending price step (caller continues normal parsing).
+async function handleAgentPriceReply({
+  env, chatId, msg, _sendReply, _loadAgentPending, _saveAgentPending, _now,
+}) {
+  let pending, sha, entry;
+  try {
+    ({ pending, sha } = await _loadAgentPending(env));
+    entry = pending?.[chatId];
+  } catch (err) {
+    console.error('worker: agent price load pending failed:', err.message);
+    return false; // can't verify state → let normal handling proceed
+  }
+  if (!entry || entry.step !== 'await_price') return false;
+
+  // Expire an abandoned dialog: if the price step was opened long ago and never
+  // finished, do not consume an unrelated number as the stale tender's price.
+  const now = (_now ?? (() => new Date()))();
+  if (entry.at && now - new Date(entry.at) > AGENT_PENDING_TTL_MS) {
+    try {
+      delete pending[chatId];
+      await _saveAgentPending(env, pending, sha);
+    } catch (err) {
+      console.error('worker: agent stale-pending clear failed:', err.message);
+    }
+    return false; // treat as no pending → normal handling proceeds
+  }
+
+  const send = (text, replyMarkup) => _sendReply({
+    token: env.TELEGRAM_BOT_TOKEN, chatId: msg.chat.id, text,
+    replyToMessageId: msg.message_id, replyMarkup,
+  });
+
+  const price = validateAgentPrice(msg.text);
+  // Reject null AND a zero price ('0', '0,00', etc.) — validateAgentPrice allows
+  // '0' but a zero-priced proposal is never intended.
+  const isZero = typeof price === 'string' && price !== 'auto'
+    && parseFloat(price.replace(/\s/g, '').replace(',', '.')) === 0;
+  if (price === null || isZero) {
+    try {
+      await send('Невірна ціна. Введіть число (грн) або «auto».');
+    } catch (err) {
+      console.error('worker: agent invalid-price reply failed:', err.message);
+    }
+    return true; // consumed; stay at await_price
+  }
+
+  // Advance to confirm.
+  try {
+    pending[chatId] = { ...entry, price, step: 'confirm' };
+    await _saveAgentPending(env, pending, sha);
+  } catch (err) {
+    console.error('worker: agent price save pending failed:', err.message);
+    try {
+      await send('⚠️ Помилка, спробуй ще раз.');
+    } catch {}
+    return true;
+  }
+  try {
+    await send(
+      buildAgentConfirmText({ company: entry.company, price, tenderId: entry.tid }),
+      buildAgentConfirmKeyboard(entry.tid),
+    );
+  } catch (err) {
+    console.error('worker: agent confirm prompt failed:', err.message);
+  }
+  return true;
 }
 
 async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, computeMutation, auditMessage }) {

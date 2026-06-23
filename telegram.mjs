@@ -104,26 +104,63 @@ const LEGAL_FORM_ABBREVIATIONS = [
   // entries like "Комунальне некомерцийне товариство" that are semantically КНП too.
   [new RegExp(`^Комунальне\\s+некомерц[іи]йне\\s+(?:підприємство|товариство)${_SEP}`, 'i'), 'КНП '],
   [new RegExp(`^Комунальне\\s+підприємство${_SEP}`, 'i'), 'КП '],
+  [new RegExp(`^Комунальний\\s+заклад${_SEP}`, 'i'), 'КЗ '],
+  [new RegExp(`^Комунальна\\s+установа${_SEP}`, 'i'), 'КУ '],
   [new RegExp(`^Товариство\\s+з\\s+обмеженою\\s+відповідальністю${_SEP}`, 'i'), 'ТОВ '],
   [new RegExp(`^Приватне\\s+акціонерне\\s+товариство${_SEP}`, 'i'), 'ПрАТ '],
   [new RegExp(`^Публічне\\s+акціонерне\\s+товариство${_SEP}`, 'i'), 'ПАТ '],
   [new RegExp(`^Акціонерне\\s+товариство${_SEP}`, 'i'), 'АТ '],
+  [new RegExp(`^Державна\\s+некомерційна\\s+установа${_SEP}`, 'i'), 'ДНУ '],
   [new RegExp(`^Державне\\s+підприємство${_SEP}`, 'i'), 'ДП '],
+  [new RegExp(`^Державна\\s+установа${_SEP}`, 'i'), 'ДУ '],
   [new RegExp(`^Приватне\\s+підприємство${_SEP}`, 'i'), 'ПП '],
   [new RegExp(`^Фізична\\s+особа[-\\s]+підприємець${_SEP}`, 'i'), 'ФОП '],
 ];
 
+// Governance suffix -> abbreviation (longest first), applied AFTER the leading
+// legal form: «… Одеської міської ради» -> «… Одеської МР».
+const GOV_FORM_ABBREVIATIONS = [
+  [/обласної\s+державної\s+адміністрації/i, 'ОДА'],
+  [/міської\s+державної\s+адміністрації/i, 'МДА'],
+  [/районної\s+державної\s+адміністрації/i, 'РДА'],
+  [/обласної\s+ради/i, 'ОР'],
+  [/міської\s+ради/i, 'МР'],
+  [/районної\s+ради/i, 'РР'],
+  [/сільської\s+ради/i, 'СР'],
+  [/селищної\s+ради/i, 'СР'],
+];
+
+// Facility-type phrases ANYWHERE in the name (incl. inside a quoted core) ->
+// abbreviation. Longest/most-specific first so e.g. «центральна міська лікарня»
+// wins over «міська лікарня».
+const FACILITY_ABBREVIATIONS = [
+  [/територіальне\s+медичне\s+об['’ʼ]?єднання/i, 'ТМО'],
+  [/центральна\s+міська\s+лікарня/i, 'ЦМЛ'],
+  [/обласна\s+клінічна\s+лікарня/i, 'ОКЛ'],
+  [/міська\s+клінічна\s+лікарня/i, 'МКЛ'],
+  [/багатопрофільна\s+лікарня/i, 'БПЛ'],
+  [/швидкої\s+медичної\s+допомоги/i, 'ШМД'],
+  [/міська\s+лікарня/i, 'МЛ'],
+];
+
 export function abbreviateLegalForm(name) {
   if (!name) return name;
-  // Prozorro registry sometimes returns names with leading/trailing whitespace
-  // (e.g. " Комунальне підприємство ..."). All abbreviation regexes are anchored
-  // at ^, so trim before matching — otherwise the regex misses and the long form
-  // leaks through to /watched, /info, digests, etc.
-  const trimmed = name.trim();
+  // Trim first — leading-form regexes are anchored at ^ and Prozorro entries
+  // sometimes have surrounding whitespace. Apply the leading legal form (first
+  // match), then facility-type phrases and governance suffixes anywhere — so the
+  // whole name shortens, e.g. «КНП «Львівське територіальне медичне об'єднання…»
+  // … обласної ради» -> «КНП «Львівське ТМО…» … ОР».
+  let s = name.trim();
   for (const [re, replacement] of LEGAL_FORM_ABBREVIATIONS) {
-    if (re.test(trimmed)) return trimmed.replace(re, replacement).trim();
+    if (re.test(s)) { s = s.replace(re, replacement); break; }
   }
-  return trimmed;
+  for (const [re, replacement] of FACILITY_ABBREVIATIONS) {
+    s = s.replace(re, replacement);
+  }
+  for (const [re, replacement] of GOV_FORM_ABBREVIATIONS) {
+    s = s.replace(re, replacement);
+  }
+  return s.replace(/\s+/g, ' ').trim();
 }
 
 function fmtDate(iso) {
@@ -428,7 +465,7 @@ async function sendOne({ token, chatId, fetch: fetchImpl = fetch }, text, replyM
   throw lastErr;
 }
 
-export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, text, { addButtonsForTenders = [] } = {}) {
+export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, text, { addButtonsForTenders = [], role } = {}) {
   const chunks = chunkMessage(text, 4000);
   let last;
   for (let i = 0; i < chunks.length; i++) {
@@ -436,13 +473,18 @@ export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, te
       ? `${chunks[i]}\n\n— ${i + 1}/${chunks.length} —`
       : chunks[i];
     const buttonsHere = addButtonsForTenders.filter(id => annotated.includes(id));
-    const replyMarkup = buttonsHere.length > 0
-      ? {
-          inline_keyboard: buttonsHere.map(id => [
-            { text: `➕ Додати в моніторинг ${id}`, callback_data: `add:${id}` },
-          ]),
-        }
-      : null;
+    const rows = buttonsHere.flatMap(id => {
+      const row = [[{ text: `➕ Додати в моніторинг ${id}`, callback_data: `add:${id}` }]];
+      // Admin-only agent-trigger entry button, directly under the add button for
+      // the same tender. Inlined (rather than importing agentTriggerButtonRow from
+      // commands.mjs) to avoid a telegram.mjs ↔ commands.mjs import cycle; kept in
+      // sync with that helper's row shape.
+      if (role === 'admin') {
+        row.push([{ text: '🤖 Надіслати агенту', callback_data: `agent:start:${id}` }]);
+      }
+      return row;
+    });
+    const replyMarkup = rows.length > 0 ? { inline_keyboard: rows } : null;
     last = await sendOne({ token, chatId, fetch: fetchImpl }, annotated, replyMarkup);
   }
   return last;
@@ -463,7 +505,7 @@ export async function broadcastDigest({ token, chatIds, fetch: fetchImpl = fetch
     const role = isObj ? recipient.role : null;
     const effectiveOpts = role === 'viewer' && opts
       ? { ...opts, addButtonsForTenders: [] }
-      : opts;
+      : (opts ? { ...opts, role } : opts);
     try {
       await sendDigest({ token, chatId, fetch: fetchImpl }, text, effectiveOpts);
     } catch (err) {

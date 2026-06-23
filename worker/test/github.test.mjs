@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers, loadArchivedTenders, fetchAuditLog, fetchLatestDeployCommit } from '../src/github.mjs';
+import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers, loadArchivedTenders, fetchAuditLog, fetchLatestDeployCommit, saveAgentJob, loadAgentPending, saveAgentPending } from '../src/github.mjs';
 
 const ENV = { GITHUB_PAT: 'PAT_VALUE' };
 
@@ -338,6 +338,83 @@ test('fetchAuditLog: throws on non-ok', async () => {
 test('fetchAuditLog: throws on non-array response', async () => {
   const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ message: 'API rate limit exceeded' }) });
   await assert.rejects(() => fetchAuditLog(ENV, { fetch: fakeFetch }), /shape/);
+});
+
+// ── Phase 3 Task 6: agent jobs + pending dialog state ─────────────────────────
+
+test('saveAgentJob: PUTs _state/agent_jobs/<tid>.json with base64 contract job (pending)', async () => {
+  const tid = 'UA-2026-04-30-010542-a';
+  const job = {
+    tender_id: tid,
+    link: `https://prozorro.gov.ua/tender/${tid}`,
+    company: 'МАЙЛАБ',
+    price: '181200',
+    requested_by: '123',
+    status: 'pending',
+    created_at: '2026-06-21T10:00:00.000Z',
+  };
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, opts });
+    // First call is the existence GET; reply 404 so it's a create (no sha).
+    if (!opts || opts.method !== 'PUT') {
+      return { ok: false, status: 404, text: async () => 'Not Found' };
+    }
+    return { ok: true, status: 201, json: async () => ({ content: { sha: 'newSha' } }) };
+  };
+  await saveAgentJob(ENV, job, { fetch: fakeFetch });
+  const put = calls.find(c => c.opts.method === 'PUT');
+  assert.ok(put, 'a PUT must be issued');
+  assert.match(put.url, /_state\/agent_jobs\/UA-2026-04-30-010542-a\.json/);
+  assert.equal(put.opts.headers.Authorization, 'Bearer PAT_VALUE');
+  const body = JSON.parse(put.opts.body);
+  assert.equal(body.message, `agent job ${tid}: pending`);
+  assert.equal(body.branch, 'main');
+  const decoded = Buffer.from(body.content, 'base64').toString('utf8');
+  assert.ok(decoded.endsWith('\n'), 'job JSON ends with newline');
+  assert.deepEqual(JSON.parse(decoded), job);
+  assert.equal(JSON.parse(decoded).status, 'pending');
+});
+
+test('saveAgentJob: includes sha when the job file already exists (update)', async () => {
+  const job = { tender_id: 'UA-X', link: 'l', company: 'МАЙЛАБ', price: 'auto', requested_by: '1', status: 'pending', created_at: 'now' };
+  const existing = Buffer.from('{}', 'utf8').toString('base64');
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push({ url, opts });
+    if (!opts || opts.method !== 'PUT') {
+      return { ok: true, status: 200, json: async () => ({ content: existing, sha: 'oldSha' }) };
+    }
+    return { ok: true, status: 200, json: async () => ({}) };
+  };
+  await saveAgentJob(ENV, job, { fetch: fakeFetch });
+  const put = calls.find(c => c.opts.method === 'PUT');
+  assert.equal(JSON.parse(put.opts.body).sha, 'oldSha');
+});
+
+test('loadAgentPending: 404 → empty object + null sha', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 404, text: async () => '' });
+  const { pending, sha } = await loadAgentPending(ENV, { fetch: fakeFetch });
+  assert.deepEqual(pending, {});
+  assert.equal(sha, null);
+});
+
+test('loadAgentPending: parses keyed-by-chatId object', async () => {
+  const state = { '123': { tid: 'UA-X', company: 'МАЙЛАБ', step: 'await_price' } };
+  const content = Buffer.from(JSON.stringify(state), 'utf8').toString('base64');
+  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ content, sha: 'sha-p' }) });
+  const { pending, sha } = await loadAgentPending(ENV, { fetch: fakeFetch });
+  assert.deepEqual(pending, state);
+  assert.equal(sha, 'sha-p');
+});
+
+test('saveAgentPending: PUTs to _state/agent_pending.json', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 200, json: async () => ({}) }; };
+  await saveAgentPending(ENV, { '123': { tid: 'UA-X', step: 'confirm', price: '1', company: 'МАЙЛАБ' } }, 'sha-p', { fetch: fakeFetch });
+  assert.match(calls[0].url, /_state\/agent_pending\.json/);
+  assert.equal(calls[0].opts.method, 'PUT');
+  assert.equal(JSON.parse(calls[0].opts.body).sha, 'sha-p');
 });
 
 test('fetchLatestDeployCommit: skips audit: commits', async () => {

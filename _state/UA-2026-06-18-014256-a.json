@@ -1,0 +1,113 @@
+{
+  "tender_id": "UA-2026-06-18-014256-a",
+  "saved_at": "2026-06-18T20:25:41.293Z",
+  "snapshot": {
+    "tender_id": "UA-2026-06-18-014256-a",
+    "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії за кодом ДК 021:2015: 72260000-5 Послуги, пов’язані з програмним забезпеченням",
+    "status": "active.tendering",
+    "dateModified": "2026-06-18T22:53:42.230690+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-06-26T08:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ХЕРСОНСЬКИЙ РЕГІОНАЛЬНИЙ ОНКОЛОГІЧНИЙ ЦЕНТР\" ХЕРСОНСЬКОЇ ОБЛАСНОЇ РАДИ ",
+      "edrpou": "02009896"
+    },
+    "value": {
+      "amount": 181200,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": true
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5",
+      "72260000-5",
+      "72261000-2",
+      "72263000-6"
+    ],
+    "contact": {
+      "name": "Вікторія Кожухарь",
+      "email": "vk02009896@ukr.net",
+      "telephone": "+380950462957"
+    },
+    "documents": [
+      {
+        "id": "f7fcc57fe1ff499bbc5874295c272a60",
+        "title": "Додаток 4 до ТД 18.06.2026 Перелік документів Переможця.doc.asice",
+        "documentType": null,
+        "datePublished": "2026-06-18T22:52:50.692801+03:00"
+      },
+      {
+        "id": "bd2393f732134e23baeb83357243e86c",
+        "title": "Додаток 3 до ТД 18.06.2026 Проєкт договору..docx.asice",
+        "documentType": null,
+        "datePublished": "2026-06-18T22:52:50.692801+03:00"
+      },
+      {
+        "id": "8550597111e043a38d50520de2e3383c",
+        "title": "Додаток 2 до ТД18.06.2026 Перелік документів для Учасником.doc.asice",
+        "documentType": null,
+        "datePublished": "2026-06-18T22:52:50.692801+03:00"
+      },
+      {
+        "id": "7957173ce03741b6be0c0e251b26464a",
+        "title": "Додаток 1 до ТД 18.06.2026.docx.asice",
+        "documentType": null,
+        "datePublished": "2026-06-18T22:52:50.692801+03:00"
+      },
+      {
+        "id": "51dca32e34a445df89003b5a05106fc4",
+        "title": "ТД 18.06.2026.doc.asice",
+        "documentType": null,
+        "datePublished": "2026-06-18T22:52:50.692801+03:00"
+      },
+      {
+        "id": "346fe16aba21417a8e8b1da1f2e1e3aa",
+        "title": "Додаток 2 до ТД18.06.2026 Перелік документів для Учасником.doc",
+        "documentType": null,
+        "datePublished": "2026-06-18T22:52:50.692801+03:00"
+      },
+      {
+        "id": "d3d3d1e7b4424536a4f305f4042eb28b",
+        "title": "Додаток 1 до ТД 18.06.2026.docx",
+        "documentType": null,
+        "datePublished": "2026-06-18T22:52:50.692801+03:00"
+      },
+      {
+        "id": "e86f9c433f2f48a583ff2f037f3ff443",
+        "title": "Додаток 3 до ТД 18.06.2026 Проєкт договору..docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-06-18T22:52:50.692801+03:00"
+      },
+      {
+        "id": "ccf23e3db02345dd92a8d949a3df8bb2",
+        "title": "ТД 18.06.2026.doc",
+        "documentType": null,
+        "datePublished": "2026-06-18T22:52:50.692801+03:00"
+      },
+      {
+        "id": "ff1c26ba9ac74d3195393b51e8eb4bfe",
+        "title": "Додаток 4 до ТД 18.06.2026 Перелік документів Переможця.doc",
+        "documentType": null,
+        "datePublished": "2026-06-18T22:52:50.692801+03:00"
+      },
+      {
+        "id": "09373d43959147e296770ce837650c82",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-06-18T22:53:41.820960+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}

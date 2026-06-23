@@ -687,6 +687,60 @@ test('sendDigest: addButtonsForTenders only attaches button to chunks containing
   assert.match(last, /"callback_data":"add:UA-2026-05-14-008910-a"/);
 });
 
+test('sendDigest: role admin adds 🤖 agent button under the add button', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'UA-2026-05-14-008910-a here',
+    { addButtonsForTenders: ['UA-2026-05-14-008910-a'], role: 'admin' },
+  );
+  const body = decodeURIComponent(calls[0].replace(/\+/g, ' '));
+  assert.match(body, /"callback_data":"add:UA-2026-05-14-008910-a"/);
+  assert.match(body, /"callback_data":"agent:start:UA-2026-05-14-008910-a"/);
+  assert.match(body, /Надіслати агенту/);
+});
+
+test('sendDigest: non-admin role keeps add button only (no agent button)', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'UA-2026-05-14-008910-a here',
+    { addButtonsForTenders: ['UA-2026-05-14-008910-a'], role: 'editor' },
+  );
+  const body = decodeURIComponent(calls[0].replace(/\+/g, ' '));
+  assert.match(body, /"callback_data":"add:UA-2026-05-14-008910-a"/);
+  assert.doesNotMatch(body, /agent:start/);
+});
+
+test('broadcastDigest: admin recipient gets agent button, editor does not', async () => {
+  const captured = [];
+  const fakeFetch = async (url, opts) => {
+    const params = new URLSearchParams(opts.body.toString());
+    captured.push({ chat_id: params.get('chat_id'), reply_markup: params.get('reply_markup') });
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: 1 } }) };
+  };
+  await broadcastDigest(
+    { token: 'TOK', chatIds: [
+      { chatId: '111', role: 'editor' },
+      { chatId: '333', role: 'admin' },
+    ], fetch: fakeFetch },
+    '🔔 UA-2026-05-19-002203-a — new',
+    { addButtonsForTenders: ['UA-2026-05-19-002203-a'] },
+  );
+  const byChat = Object.fromEntries(captured.map(c => [c.chat_id, c.reply_markup]));
+  assert.match(byChat['333'], /agent:start:UA-2026-05-19-002203-a/);
+  assert.ok(!/agent:start/.test(byChat['111']), 'editor must not get agent button');
+  assert.match(byChat['111'], /Додати в моніторинг/);
+});
+
 test('sendDigest: no options → no reply_markup (backward compat)', async () => {
   const calls = [];
   const fakeFetch = async (url, opts) => {

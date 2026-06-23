@@ -224,6 +224,53 @@ export async function loadTenderState(env, tenderId, opts = {}) {
   }
 }
 
+const AGENT_PENDING_FILE = '_state/agent_pending.json';
+
+// Pending agent-trigger dialog state, keyed by chatId. Survives between the
+// company-pick button tap and the next text message (Worker is stateless across
+// invocations, so this lives in the repo like the other _state files).
+export async function loadAgentPending(env, opts = {}) {
+  const { content, sha } = await loadFile(env, AGENT_PENDING_FILE, opts);
+  if (content === null) return { pending: {}, sha: null };
+  try {
+    return { pending: JSON.parse(content), sha };
+  } catch {
+    return { pending: {}, sha };
+  }
+}
+
+export async function saveAgentPending(env, pending, sha, opts = {}) {
+  const text = JSON.stringify(pending, null, 2) + '\n';
+  return saveFile(env, AGENT_PENDING_FILE, text, sha, opts);
+}
+
+// Persists a single agent job for the offline poller to pick up. One file per
+// tender at _state/agent_jobs/<tender_id>.json. Mirrors saveWatchlist's PUT
+// shape (base64 body, sha for update, branch main, auth headers).
+export async function saveAgentJob(env, job, { fetch: fetchImpl = fetch } = {}) {
+  const filePath = `_state/agent_jobs/${job.tender_id}.json`;
+  // Look up an existing sha so a re-queued tender updates rather than 409s.
+  const { sha } = await loadFile(env, filePath, { fetch: fetchImpl });
+  const text = JSON.stringify(job, null, 2) + '\n';
+  return saveFile(env, filePath, text, sha, {
+    fetch: fetchImpl,
+    message: `agent job ${job.tender_id}: pending`,
+  });
+}
+
+// Loads a single agent job (_state/agent_jobs/<tid>.json) — the poller writes
+// status/result (incl. result.drive_link) back here on completion. Returns the
+// parsed job, or null if missing/unparseable.
+export async function loadAgentJob(env, tenderId, { fetch: fetchImpl = fetch } = {}) {
+  const { content } = await loadFile(env, `_state/agent_jobs/${tenderId}.json`, { fetch: fetchImpl });
+  if (!content) return null;
+  try {
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
 // Returns the latest non-bot commit on main — skips state-update and cursor-sync
 // commits made by the monitor cron so /status shows when code was last deployed.
 export async function fetchLatestDeployCommit(env, { fetch: fetchImpl = fetch } = {}) {
