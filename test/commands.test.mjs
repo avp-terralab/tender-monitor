@@ -22,6 +22,7 @@ import {
   agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage,
+  handleAgentMenuNav,
   monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
   buildWatchedEntityCard, handleWatchedNav,
 } from '../commands.mjs';
@@ -3542,4 +3543,13 @@ test('buildAgentJobsPage: 6/page nav', () => {
   const jobs = Array.from({ length: 8 }, (_, i) => job(`UA-2026-06-01-00000${i}-a`, 'pending'));
   const nav = buildAgentJobsPage({ jobs, page: 0 }).keyboard.inline_keyboard.find((row) => row.some((b) => b.callback_data === 'agent:noop'));
   assert.ok(nav.some((b) => b.callback_data === 'agent:jobs:1'));
+});
+
+test('handleAgentMenuNav: noop→null; menu/pick/jobs routing; other→null', () => {
+  const args = { tenders: [pickTender('UA-2026-06-01-000002-a', 'КНП')], jobs: [job('UA-2026-06-01-000002-a', 'done')] };
+  assert.equal(handleAgentMenuNav({ ...args, data: 'agent:noop' }), null);
+  assert.match(handleAgentMenuNav({ ...args, data: 'agent:menu' }).text, /Агент/);
+  assert.match(handleAgentMenuNav({ ...args, data: 'agent:pick:0' }).text, /Оберіть тендер/);
+  assert.match(handleAgentMenuNav({ ...args, data: 'agent:jobs:0' }).text, /Останні задачі/);
+  assert.equal(handleAgentMenuNav({ ...args, data: 'agent:start:UA-2026-06-01-000002-a' }), null);
 });

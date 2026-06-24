@@ -1892,3 +1892,15 @@ export function buildAgentJob({ tenderId, link, company, price, requestedBy, cre
     created_at: createdAt,
   };
 }
+
+// Pure router for the agent MENU callbacks (menu/pick/jobs). Returns null for
+// agent:noop AND for the dialog actions (start/co/confirm/cancel) — those stay
+// in the Worker's handleAgentCallback.
+export function handleAgentMenuNav({ tenders, jobs, data }) {
+  if (data === 'agent:noop') return null;
+  const parts = data.split(':'); // agent:<action>[:<arg>]
+  if (parts[1] === 'menu') return buildAgentMenu();
+  if (parts[1] === 'pick') return buildAgentPickView({ tenders, page: Number(parts[2] ?? 0) });
+  if (parts[1] === 'jobs') return buildAgentJobsPage({ jobs, page: Number(parts[2] ?? 0) });
+  return null;
+}
