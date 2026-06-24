@@ -1851,14 +1851,18 @@ export function buildAgentJobsPage({ jobs, page = 0 }) {
   const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
   const body = slice.map((j) => {
     const icon = AGENT_JOB_ICONS[j.status] ?? '•';
+    const mark = j.job_type === 'amend' ? '✏️ ' : '';
     const co = j.company ? ` · ${escapeHtml(j.company)}` : '';
     const tid = escapeHtml(j.tender_id ?? '');
-    return `${icon} <a href="https://prozorro.gov.ua/tender/${tid}">${tid}</a>${co}`;
+    return `${mark}${icon} <a href="https://prozorro.gov.ua/tender/${tid}">${tid}</a>${co}`;
   }).join('\n');
   const rows = [];
   for (const j of slice) {
     if (j.status === 'done' && j.result?.drive_link && j.tender_id) {
-      rows.push([{ text: `📁 ${j.tender_id}`, url: j.result.drive_link }]);
+      rows.push([
+        { text: `📁 ${j.tender_id}`, url: j.result.drive_link },
+        { text: '✏️ Доробити', callback_data: `agent:amend:${j.tender_id}` },
+      ]);
     }
   }
   const nav = buildPageNavRow(p, pages, (x) => `agent:jobs:${x}`, 'agent:noop');
