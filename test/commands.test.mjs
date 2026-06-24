@@ -3415,3 +3415,12 @@ test('applyEntityMutation: set_enabled flips one entity', () => {
   assert.equal(out.find((e) => e.edrpou === '22222222').enabled, false);
   assert.equal(out.find((e) => e.edrpou === '11111111').enabled, true);
 });
+
+test('auditPhrase: watch_pause / watch_resume render readable', () => {
+  const out = formatAuditLog([
+    { action: 'watch_pause', target: '12345678', actor: 'Адмін', date: '2026-06-24T10:00:00Z' },
+    { action: 'watch_resume', target: '12345678', actor: 'Адмін', date: '2026-06-24T10:01:00Z' },
+  ], { limit: 10 });
+  assert.match(out, /призупинив стеження за 12345678/);
+  assert.match(out, /відновив стеження за 12345678/);
+});

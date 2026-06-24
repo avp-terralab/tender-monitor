@@ -230,6 +230,8 @@ function auditPhrase(e) {
     case 'remove':    return `видалив ${tgt}`;
     case 'watch':     return `почав стеження за ${tgt}`;
     case 'unwatch':   return `прибрав стеження за ${tgt}`;
+    case 'watch_pause':  return `призупинив стеження за ${tgt}`;
+    case 'watch_resume': return `відновив стеження за ${tgt}`;
     case 'unarchive': return `повернув з архіву ${tgt}`;
     case 'revoke':    return `прибрав доступ ${tgt}`;
     case 'invite': {
