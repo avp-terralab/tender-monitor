@@ -2,11 +2,12 @@ import {
   parseCommand, handleAdd, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
   buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
+  buildWatchedMenu, buildWatchedEntityCard, handleWatchedNav,
   handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, buildRoleChangeNotice, handleWhoami, handleUsersList, handleInvitesList,
   handleArchive, handleArchiveDetail, handleUnarchive, buildArchiveMenu, handleArchiveNav,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
-  formatInfo, formatInfoPages, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD, mainKeyboard,
+  formatInfo, buildMonitorMenu, handleMonitorNav, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD, mainKeyboard,
   TERMINAL_STATUSES, hydrateContractDocs,
   formatAuditMessage,
   sanitizeActor,
@@ -15,6 +16,7 @@ import {
   companyForSlug, agentTriggerButtonRow, buildAgentTenderListKeyboard,
   buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
+  buildAgentMenu, buildAgentPickView, buildAgentJobsPage, handleAgentMenuNav,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
@@ -28,6 +30,7 @@ import {
   loadPendingDigest, loadTenderState, fetchLatestDeployCommit,
   fetchAuditLog,
   loadAgentPending, saveAgentPending, saveAgentJob, loadAgentJob,
+  listAgentJobs,
   ConflictError,
 } from './github.mjs';
 
@@ -76,6 +79,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const _saveAgentPending = deps.saveAgentPending ?? saveAgentPending;
   const _saveAgentJob = deps.saveAgentJob ?? saveAgentJob;
   const _loadAgentJob = deps.loadAgentJob ?? loadAgentJob;
+  const _listAgentJobs = deps.listAgentJobs ?? listAgentJobs;
   // Tests may inject their own Map to avoid cross-test cache pollution.
   const _statusCache = deps.statusCache ?? STATUS_CACHE;
 
@@ -87,7 +91,7 @@ export async function runHandler({ update, env, deps = {} }) {
       _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
       _loadWatchedEntities, _saveWatchedEntities,
       _fetchTender, _extractSnapshot,
-      _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
+      _loadAgentPending, _saveAgentPending, _saveAgentJob, _loadAgentJob, _listAgentJobs, _now,
     });
   }
 
@@ -147,6 +151,7 @@ export async function runHandler({ update, env, deps = {} }) {
   let watchedReplyMarkup = null;
   let archiveReplyMarkup = null;
   let agentReplyMarkup = null;
+  let monitorReplyMarkup = null;
 
   const MUTATING = new Set(['add', 'remove', 'watch', 'unarchive']);
   if (MUTATING.has(cmd.cmd) && !isEditor) {
@@ -363,32 +368,16 @@ export async function runHandler({ update, env, deps = {} }) {
       if (targets && targets.length === 0) {
         reply = '📭 Немає активних тендерів.';
       } else if (targets) {
-        const results = await Promise.all(targets.map(async r => {
-          try {
-            const raw = await _fetchTender(r.tender_id);
-            const snap = _extractSnapshot(raw);
-            return {
-              tender_id: r.tender_id,
-              prozorro_url: `https://prozorro.gov.ua/tender/${r.tender_id}`,
-              status: snap.status,
-              deadline: snap.tenderPeriod?.endDate ?? null,
-              procuring_entity: snap.procuringEntity,
-              value: snap.value,
-              classification: snap.classification,
-              contact: snap.contact,
-              awards: snap.awards,
-              _snapshot: snap,
-              _row: r,
-            };
-          } catch (err) {
-            return { tender_id: r.tender_id, error: err.message };
-          }
-        }));
-        const groups = results.filter(r => !r.error);
-        const errors = results.filter(r => r.error);
-        reply = cmd.tender_id
-          ? formatInfo({ runIso: new Date().toISOString(), groups, errors })
-          : formatInfoPages({ runIso: new Date().toISOString(), groups, errors });
+        const { groups, errors } = await tenderGroups(targets, {
+          fetchTender: _fetchTender, extractSnapshot: _extractSnapshot,
+        });
+        if (cmd.tender_id) {
+          reply = formatInfo({ runIso: new Date().toISOString(), groups, errors });
+        } else {
+          const menu = buildMonitorMenu({ groups, runIso: new Date().toISOString(), errors });
+          reply = menu.text;
+          monitorReplyMarkup = menu.keyboard ?? undefined;
+        }
         // Admin can fire the agent from a single-tender /info card — but only
         // while proposals are still being accepted (active.tendering).
         if (cmd.tender_id && isAdmin && groups.length === 1
@@ -454,8 +443,9 @@ export async function runHandler({ update, env, deps = {} }) {
   } else if (cmd.cmd === 'watched') {
     try {
       const { entities } = await _loadWatchedEntities(env);
-      reply = handleWatched({ watchedEntities: entities });
-      if (isEditor) watchedReplyMarkup = buildWatchedViewKeyboard(entities);
+      const menu = buildWatchedMenu({ entities, page: 0 });
+      reply = menu.text;
+      watchedReplyMarkup = menu.keyboard ?? undefined;
     } catch (err) {
       console.error('worker: /watched failed:', err.message);
       reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
@@ -635,37 +625,9 @@ export async function runHandler({ update, env, deps = {} }) {
     }
   } else if (cmd.cmd === 'agent') {
     if (!isAdmin) return;
-    try {
-      const { watchlist } = await _loadWatchlist(env);
-      // Agent runs only while proposals are accepted — keep only active.tendering.
-      const checked = await Promise.all(
-        watchlist.filter(r => r.enabled).map(async r => {
-          try {
-            const snap = _extractSnapshot(await _fetchTender(r.tender_id));
-            if (snap.status !== 'active.tendering') return null;
-            // If a proposal was already prepared, attach its Drive folder link.
-            let preparedUrl = null;
-            try {
-              const job = await _loadAgentJob(env, r.tender_id);
-              if (job && job.status === 'done' && job.result?.drive_link) {
-                preparedUrl = job.result.drive_link;
-              }
-            } catch { /* link is optional — ignore lookup failures */ }
-            return { ...r, preparedUrl };
-          } catch { return null; }
-        }),
-      );
-      const kb = buildAgentTenderListKeyboard(checked.filter(Boolean));
-      if (!kb) {
-        reply = '📭 Немає тендерів у статусі «Приймання пропозицій».';
-      } else {
-        reply = '🤖 Оберіть тендер (приймання пропозицій), щоб надіслати агенту:';
-        agentReplyMarkup = kb;
-      }
-    } catch (err) {
-      console.error('worker: /agent failed:', err.message);
-      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
-    }
+    const menu = buildAgentMenu();
+    reply = menu.text;
+    agentReplyMarkup = menu.keyboard;
   } else if (cmd.cmd === 'unknown') {
     reply = '❓ Не розумію. /help';
   } else {
@@ -682,7 +644,7 @@ export async function runHandler({ update, env, deps = {} }) {
         text: pages[i],
         replyToMessageId: i === 0 ? msg.message_id : undefined,
         replyMarkup: isLast
-          ? (archiveReplyMarkup ?? agentReplyMarkup ?? watchedReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
+          ? (archiveReplyMarkup ?? agentReplyMarkup ?? watchedReplyMarkup ?? monitorReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
           : undefined,
       });
     } catch (err) {
@@ -728,13 +690,39 @@ async function renderWatchedView({ _editMessageText, env, chatId, messageId, ent
   }
 }
 
+// Fetch live Prozorro snapshots for the given watchlist rows → grouped result.
+// Shared by the /info menu and the mon: callback (stateless re-fetch).
+async function tenderGroups(rows, { fetchTender, extractSnapshot }) {
+  const results = await Promise.all((rows ?? []).map(async (r) => {
+    try {
+      const snap = extractSnapshot(await fetchTender(r.tender_id));
+      return {
+        tender_id: r.tender_id,
+        prozorro_url: `https://prozorro.gov.ua/tender/${r.tender_id}`,
+        status: snap.status,
+        deadline: snap.tenderPeriod?.endDate ?? null,
+        procuring_entity: snap.procuringEntity,
+        value: snap.value,
+        classification: snap.classification,
+        contact: snap.contact,
+        awards: snap.awards,
+        _snapshot: snap,
+        _row: r,
+      };
+    } catch (err) {
+      return { tender_id: r.tender_id, error: err.message };
+    }
+  }));
+  return { groups: results.filter((r) => !r.error), errors: results.filter((r) => r.error) };
+}
+
 async function handleCallbackQuery({
   cq, env, _editMessageReplyMarkup, _editMessageText, _answerCallbackQuery, _sendReply,
   _loadAllowedUsers, _saveAllowedUsers,
   _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
   _loadWatchedEntities, _saveWatchedEntities,
   _fetchTender, _extractSnapshot,
-  _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
+  _loadAgentPending, _saveAgentPending, _saveAgentJob, _loadAgentJob, _listAgentJobs, _now,
 }) {
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const chatId = String(cq.message?.chat?.id ?? '');
@@ -783,6 +771,36 @@ async function handleCallbackQuery({
       }
     }
     await ack('⚠️ Не зміг зберегти');
+    return;
+  }
+
+  if (data.startsWith('mon:')) {
+    if (data === 'mon:noop') { await ack(); return; }
+    let groups = [];
+    let errors = [];
+    try {
+      const { watchlist } = await _loadWatchlist(env);
+      const enabled = watchlist.filter((r) => r.enabled);
+      ({ groups, errors } = await tenderGroups(enabled, {
+        fetchTender: _fetchTender, extractSnapshot: _extractSnapshot,
+      }));
+    } catch (err) {
+      console.error('worker: monitor nav load failed:', err.message);
+      await ack('⚠️ Prozorro/GitHub тимчасово недоступний', true);
+      return;
+    }
+    const view = handleMonitorNav({ groups, data, runIso: new Date().toISOString(), role, errors });
+    if (view) {
+      try {
+        await _editMessageText({
+          token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+          text: view.text, replyMarkup: view.keyboard ?? undefined,
+        });
+      } catch (err) {
+        console.error('worker: monitor nav edit failed:', err.message);
+      }
+    }
+    await ack();
     return;
   }
 
@@ -841,6 +859,74 @@ async function handleCallbackQuery({
       auditMessage: formatAuditMessage({ action: 'add', target: tenderId, actor: actorName, chatId, role }),
     });
     await onAddResult({ result, tenderId, chatId, messageId, env, _editMessageReplyMarkup, ack });
+    return;
+  }
+
+  if (data.startsWith('wat:')) {
+    if (data === 'wat:noop') { await ack(); return; }
+    const parts = data.split(':'); // wat:menu:<p> | wat:e:<edrpou> | wat:toggle:<edrpou> | wat:rm:<edrpou>
+
+    if (parts[1] === 'toggle' || parts[1] === 'rm') {
+      if (!isEditor) { await ack('🚫 Це команда для редакторів', true); return; }
+      const edrpou = parts[2];
+      if (!/^\d{8}$/.test(edrpou)) { await ack('❌ Невалідний ЄДРПОУ'); return; }
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const { entities, sha } = await _loadWatchedEntities(env);
+          let mutation; let action;
+          if (parts[1] === 'toggle') {
+            const cur = entities.find((e) => e.edrpou === edrpou);
+            const next = !(cur?.enabled);
+            mutation = { type: 'set_enabled', edrpou, enabled: next };
+            action = next ? 'watch_resume' : 'watch_pause';
+          } else {
+            mutation = { type: 'delete_entity', edrpou };
+            action = 'unwatch';
+          }
+          const newEntities = applyEntityMutation(entities, mutation);
+          await _saveWatchedEntities(env, newEntities, sha, {
+            message: formatAuditMessage({ action, target: edrpou, actor: actorName, chatId, role }),
+          });
+          const view = parts[1] === 'toggle'
+            ? buildWatchedEntityCard({ entities: newEntities, edrpou, canManage: true })
+            : buildWatchedMenu({ entities: newEntities, page: 0 });
+          await _editMessageText({
+            token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+            text: view.text, replyMarkup: view.keyboard ?? undefined,
+          });
+          await ack(parts[1] === 'toggle' ? '✅ Оновлено' : '✅ Прибрано');
+          return;
+        } catch (err) {
+          if (err instanceof ConflictError && attempt === 0) continue;
+          console.error('worker: wat mutation failed:', err.message);
+          await ack('⚠️ Помилка, спробуй ще раз', true);
+          return;
+        }
+      }
+      return;
+    }
+
+    // read-only nav: menu / entity card
+    let entities = [];
+    try {
+      ({ entities } = await _loadWatchedEntities(env));
+    } catch (err) {
+      console.error('worker: wat nav load failed:', err.message);
+      await ack('⚠️ GitHub тимчасово недоступний', true);
+      return;
+    }
+    const view = handleWatchedNav({ entities, data, canManage: isEditor });
+    if (view) {
+      try {
+        await _editMessageText({
+          token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+          text: view.text, replyMarkup: view.keyboard ?? undefined,
+        });
+      } catch (err) {
+        console.error('worker: wat nav edit failed:', err.message);
+      }
+    }
+    await ack();
     return;
   }
 
@@ -911,6 +997,7 @@ async function handleCallbackQuery({
       data, env, chatId, messageId, ack, _sendReply, _editMessageText,
       _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
       _fetchTender, _extractSnapshot,
+      _loadWatchlist, _loadAgentJob, _listAgentJobs,
     });
     return;
   }
@@ -932,6 +1019,7 @@ async function handleAgentCallback({
   data, env, chatId, messageId, ack, _sendReply, _editMessageText,
   _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
   _fetchTender, _extractSnapshot,
+  _loadWatchlist, _loadAgentJob, _listAgentJobs,
 }) {
   const parts = data.split(':'); // agent:<action>:<tid>[:<slug>]
   const action = parts[1];
@@ -940,6 +1028,52 @@ async function handleAgentCallback({
   const sendNew = (text, replyMarkup) => _sendReply({
     token: env.TELEGRAM_BOT_TOKEN, chatId: Number(chatId), text, replyMarkup,
   });
+
+  // Menu-level navigation (edit-in-place). Dialog actions fall through below.
+  if (action === 'noop') { await ack(); return; }
+  if (action === 'menu' || action === 'pick' || action === 'jobs') {
+    let tenders = [];
+    let jobs = [];
+    try {
+      if (action === 'pick') {
+        const { watchlist } = await _loadWatchlist(env);
+        const checked = await Promise.all(
+          watchlist.filter((r) => r.enabled).map(async (r) => {
+            try {
+              const snap = _extractSnapshot(await _fetchTender(r.tender_id));
+              if (snap.status !== 'active.tendering') return null;
+              let preparedUrl = null;
+              try {
+                const j = await _loadAgentJob(env, r.tender_id);
+                if (j && j.status === 'done' && j.result?.drive_link) preparedUrl = j.result.drive_link;
+              } catch { /* link optional */ }
+              return { ...r, preparedUrl };
+            } catch { return null; }
+          }),
+        );
+        tenders = checked.filter(Boolean);
+      } else if (action === 'jobs') {
+        jobs = await _listAgentJobs(env);
+      }
+    } catch (err) {
+      console.error('worker: agent menu nav load failed:', err.message);
+      await ack('⚠️ Prozorro/GitHub тимчасово недоступний', true);
+      return;
+    }
+    const view = handleAgentMenuNav({ tenders, jobs, data });
+    if (view) {
+      try {
+        await _editMessageText({
+          token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+          text: view.text, replyMarkup: view.keyboard ?? undefined,
+        });
+      } catch (err) {
+        console.error('worker: agent menu nav edit failed:', err.message);
+      }
+    }
+    await ack();
+    return;
+  }
 
   if (action === 'start') {
     // Authoritative gate (covers /agent, /info and digest buttons): the agent

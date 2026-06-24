@@ -42,6 +42,7 @@ const makeDeps = (overrides = {}) => {
       editMessageText: async () => {},
       answerCallbackQuery: async () => {},
       loadAgentJob: async () => null,
+      listAgentJobs: async () => [],
       ...overrides,
     },
   };
@@ -517,10 +518,11 @@ test('runHandler: /info with active tenders → fetch each + reply', async () =>
   });
   // Disabled UA-C must NOT be fetched
   assert.deepEqual(fetched.sort(), ['UA-A', 'UA-B']);
+  // New behavior: single phase-menu message instead of multi-page dump
   assert.equal(sent.length, 1);
-  assert.match(sent[0].text, /📋 Статус тендерів/);
-  assert.match(sent[0].text, /UA-A/);
-  assert.match(sent[0].text, /UA-B/);
+  assert.match(sent[0].text, /📋.*Моніторинг закупівель/);
+  // Phase buttons in replyMarkup, not inline text ids
+  assert.ok(sent[0].replyMarkup?.inline_keyboard, 'should have inline keyboard');
   assert.doesNotMatch(sent[0].text, /UA-C/);
 });
 
@@ -611,7 +613,7 @@ test('runHandler: /info empty enabled watchlist → friendly reply', async () =>
   assert.match(sent[0].text, /📭 Немає активних тендерів/);
 });
 
-test('runHandler: /info partial Prozorro errors become a final page', async () => {
+test('runHandler: /info partial Prozorro errors → single menu message with error count', async () => {
   const RAW = {
     data: {
       tenderID: 'UA-A', title: 'X', status: 'active.tendering',
@@ -637,13 +639,13 @@ test('runHandler: /info partial Prozorro errors become a final page', async () =
     update: { message: { chat: { id: 123 }, text: '/info', message_id: 1 } },
     env: ENV, deps,
   });
-  assert.equal(sent.length, 2);
-  assert.match(sent[0].text, /UA-A/);
-  assert.match(sent[1].text, /⚠️ Не вдалось перевірити/);
-  assert.match(sent[1].text, /UA-B — Prozorro 503/);
+  // New behavior: single menu message; error count surfaced in header
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /📋.*Моніторинг закупівель/);
+  assert.match(sent[0].text, /⚠️ Не вдалось перевірити: 1/);
 });
 
-test('runHandler: /info sends one message per phase, keyboard on last only', async () => {
+test('runHandler: /info with multiple phases → single menu with phase buttons', async () => {
   const RAW = (id, status) => ({
     data: {
       tenderID: id, title: 'X', status,
@@ -666,13 +668,15 @@ test('runHandler: /info sends one message per phase, keyboard on last only', asy
     update: { message: { chat: { id: 123 }, text: '/info', message_id: 7 } },
     env: ENV, deps,
   });
-  assert.equal(sent.length, 2);
-  assert.match(sent[0].text, /📥 Приймання пропозицій/);
-  assert.match(sent[1].text, /🔍 Розгляд пропозицій/);
+  // New behavior: single menu message with phase buttons (not multi-page dump)
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /📋.*Моніторинг закупівель/);
   assert.equal(sent[0].replyToMessageId, 7);
-  assert.equal(sent[1].replyToMessageId, undefined);
-  assert.ok(sent[1].replyMarkup, 'last page carries the keyboard');
-  assert.equal(sent[0].replyMarkup, undefined);
+  const kb = sent[0].replyMarkup?.inline_keyboard;
+  assert.ok(Array.isArray(kb) && kb.length >= 2, 'should have at least 2 phase buttons');
+  // Phase buttons contain phase identifiers in their callback_data
+  const cbDatas = kb.flat().map(b => b.callback_data);
+  assert.ok(cbDatas.some(d => d?.startsWith('mon:ph:')), 'phase buttons have mon:ph: callback_data');
 });
 
 test('runHandler: /info when loadWatchlist throws → ⚠️ reply', async () => {
@@ -699,7 +703,7 @@ test('runHandler: /watched empty → 📭 reply', async () => {
   assert.match(sent[0].text, /📭/);
 });
 
-test('runHandler: /watched with entities → list reply', async () => {
+test('runHandler: /watched with entities → paginated menu reply', async () => {
   const { deps, sent } = await makeDeps({
     loadWatchedEntities: async () => ({
       entities: [
@@ -714,9 +718,9 @@ test('runHandler: /watched with entities → list reply', async () => {
     env: ENV,
     deps,
   });
-  assert.match(sent[0].text, /02000010/);
-  assert.match(sent[0].text, /11111111/);
-  assert.match(sent[0].text, /Всього: 2/);
+  assert.match(sent[0].text, /Моніторинг замовників/);
+  assert.match(JSON.stringify(sent[0].replyMarkup), /wat:e:02000010/);
+  assert.match(JSON.stringify(sent[0].replyMarkup), /wat:e:11111111/);
 });
 
 test('runHandler: /watched when GitHub fails → ⚠️ reply', async () => {
@@ -736,7 +740,7 @@ const WATCHED_TWO = [
   { edrpou: '01999106', name: 'ТОВ «TERRALAB IT»', enabled: true },
 ];
 
-test('runHandler: /watched VIEW shows single "Прибрати" button for editor', async () => {
+test('runHandler: /watched VIEW shows entity buttons (paginated menu) for editor', async () => {
   const { deps, sent } = makeDeps({
     loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
   });
@@ -745,11 +749,12 @@ test('runHandler: /watched VIEW shows single "Прибрати" button for edito
     env: ENV, deps,
   });
   const kb = sent[0].replyMarkup;
-  assert.equal(kb.inline_keyboard.length, 1);
-  assert.equal(kb.inline_keyboard[0][0].callback_data, 'watched:manage');
+  assert.ok(kb && kb.inline_keyboard, 'should have inline keyboard');
+  assert.match(JSON.stringify(kb), /wat:e:12345678/);
+  assert.match(JSON.stringify(kb), /wat:e:01999106/);
 });
 
-test('runHandler: /watched VIEW for viewer → no inline keyboard', async () => {
+test('runHandler: /watched VIEW for viewer → shows paginated menu keyboard (read-only nav)', async () => {
   const { deps, sent } = makeDeps({
     loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
     loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
@@ -759,7 +764,8 @@ test('runHandler: /watched VIEW for viewer → no inline keyboard', async () => 
     env: ENV, deps,
   });
   const kb = sent[0].replyMarkup;
-  assert.ok(!kb || !kb.inline_keyboard);
+  assert.ok(kb && kb.inline_keyboard, 'viewer gets menu keyboard too');
+  assert.match(JSON.stringify(kb), /wat:e:/);
 });
 
 test('runHandler: /watched empty list → no inline keyboard even for admin', async () => {
@@ -2725,14 +2731,15 @@ test('non-admin text while no pending → normal handling (price step not trigge
 });
 
 
-test('runHandler: /agent (admin) lists watched tenders as agent:start buttons', async () => {
+test('runHandler: /agent (admin) → action menu (pick + jobs)', async () => {
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true, notes: 'Тест' }], sha: 's' }),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
   assert.equal(sent.length, 1);
-  assert.ok(sent[0].replyMarkup.inline_keyboard, 'inline_keyboard expected');
-  assert.equal(sent[0].replyMarkup.inline_keyboard[0][0].callback_data, `agent:start:${ID}`);
+  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.match(cbs, /agent:pick:0/);
+  assert.match(cbs, /agent:jobs:0/);
 });
 
 test('runHandler: /agent for non-admin → no reply', async () => {
@@ -2754,7 +2761,7 @@ test('runHandler: /info <id> (admin) attaches the «Надіслати аген�
 });
 
 
-test('runHandler: /agent keeps only active.tendering tenders', async () => {
+test('runHandler: /agent (admin, multiple watchlist entries) → menu (filtering moves to pick callback)', async () => {
   const OTHER = 'UA-2026-04-30-088888-b';
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [
@@ -2766,19 +2773,20 @@ test('runHandler: /agent keeps only active.tendering tenders', async () => {
       : { data: { ...RAW_OK.data, tenderID: OTHER, status: 'active.qualification' } },
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
-  const kb = sent[0].replyMarkup.inline_keyboard;
-  assert.equal(kb.length, 1, 'only the active.tendering tender');
-  assert.equal(kb[0][0].callback_data, `agent:start:${ID}`);
+  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.match(cbs, /agent:pick:0/);
 });
 
-test('runHandler: /agent with none in tendering → no buttons', async () => {
+test('runHandler: /agent with none in tendering → menu shown (pick button shows empty in T6)', async () => {
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true }], sha: 's' }),
     fetchTender: async () => ({ data: { ...RAW_OK.data, status: 'active.qualification' } }),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
-  assert.match(sent[0].text, /Немає тендерів/);
-  assert.ok(!sent[0].replyMarkup || !sent[0].replyMarkup.inline_keyboard);
+  assert.equal(sent.length, 1);
+  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.match(cbs, /agent:pick:0/);
+  assert.match(cbs, /agent:jobs:0/);
 });
 
 test('runHandler: /info <id> for non-tendering tender → no agent button', async () => {
@@ -2792,14 +2800,219 @@ test('runHandler: /info <id> for non-tendering tender → no agent button', asyn
 });
 
 
-test('runHandler: /agent shows «підготовлена ✅» link for a tender with a done job', async () => {
+test('runHandler: /agent with a done job → menu shown (done-job link moves to pick view in T6)', async () => {
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true, notes: 'КНП «Х»' }], sha: 's' }),
     loadAgentJob: async () => ({ tender_id: ID, status: 'done', result: { drive_link: 'https://drive.google.com/drive/folders/REAL' } }),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
-  const kb = sent[0].replyMarkup.inline_keyboard;
-  assert.equal(kb[0][0].callback_data, `agent:start:${ID}`);
-  assert.match(kb[1][0].text, /Тендерна пропозиція підготовлена ✅/);
-  assert.equal(kb[1][0].url, 'https://drive.google.com/drive/folders/REAL');
+  assert.equal(sent.length, 1);
+  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.match(cbs, /agent:pick:0/);
+  assert.match(cbs, /agent:jobs:0/);
+});
+
+test('runHandler: /agent (admin) → menu with pick + jobs buttons', async () => {
+  const sent = [];
+  await runHandler({
+    update: { message: { chat: { id: 123 }, message_id: 7, text: '🤖 Агент', from: { id: 123 } } },
+    env: ENV,
+    deps: { ...makeDeps().deps, sendReply: async (a) => sent.push(a) },
+  });
+  assert.equal(sent.length, 1);
+  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.match(cbs, /agent:pick:0/);
+  assert.match(cbs, /agent:jobs:0/);
+});
+
+test('runHandler: /info (no id) → single menu message with mon:ph button', async () => {
+  const sent = [];
+  await runHandler({
+    update: { message: { chat: { id: 123 }, message_id: 7, text: '📋 Моніторинг закупівель', from: { id: 123 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [{ tender_id: 'UA-2026-06-01-000002-a', enabled: true }], sha: 's' }),
+        fetchTender: async () => ({ data: { status: 'active.tendering', tenderPeriod: { endDate: '2026-07-01T00:00:00Z' }, procuringEntity: { name: 'КНП' } } }),
+      }).deps,
+      sendReply: async (a) => sent.push(a),
+    },
+  });
+  assert.equal(sent.length, 1, 'one message, not a multi-page dump');
+  assert.match(JSON.stringify(sent[0].replyMarkup), /mon:ph:0:0/);
+});
+
+test('runHandler: /watched → menu message with wat:e button', async () => {
+  const sent = [];
+  await runHandler({
+    update: { message: { chat: { id: 123 }, message_id: 7, text: '👁 Моніторинг замовників', from: { id: 123 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({ loadWatchedEntities: async () => ({ entities: [{ edrpou: '11111111', name: 'КНП', enabled: true }], sha: 's' }) }).deps,
+      sendReply: async (a) => sent.push(a),
+    },
+  });
+  assert.equal(sent.length, 1);
+  assert.match(JSON.stringify(sent[0].replyMarkup), /wat:e:11111111/);
+});
+
+test('runHandler: callback mon:ph:0:0 → edits message in place with cards', async () => {
+  const acks = [];
+  const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'cbq-mon', data: 'mon:ph:0:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [{ tender_id: 'UA-2026-06-01-000002-a', enabled: true }], sha: 's' }),
+        fetchTender: async () => ({ data: { status: 'active.tendering', tenderPeriod: { endDate: '2026-07-01T00:00:00Z' }, procuringEntity: { name: 'КНП' } } }),
+      }).deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageText: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(edits.length, 1, 'callback edits the message in place');
+  assert.match(edits[0].text, /Приймання пропозицій/);
+  assert.match(JSON.stringify(edits[0].replyMarkup), /mon:menu/);
+  assert.equal(acks.length, 1);
+});
+
+test('runHandler: wat:e:<edrpou> → edits to entity card', async () => {
+  const acks = []; const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'cbw1', data: 'wat:e:11111111', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({ loadWatchedEntities: async () => ({ entities: [{ edrpou: '11111111', name: 'КНП', enabled: true }], sha: 's' }) }).deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageText: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(edits.length, 1);
+  assert.match(JSON.stringify(edits[0].replyMarkup), /wat:toggle:11111111/); // chat 123 = admin → canManage
+  assert.equal(acks.length, 1);
+});
+
+test('runHandler: wat:toggle:<edrpou> → saves set_enabled, re-renders card', async () => {
+  const acks = []; const edits = []; let saved = null;
+  await runHandler({
+    update: { callback_query: { id: 'cbw2', data: 'wat:toggle:11111111', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchedEntities: async () => ({ entities: [{ edrpou: '11111111', name: 'КНП', enabled: true }], sha: 's' }),
+        saveWatchedEntities: async (_e, entities) => { saved = entities; },
+      }).deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageText: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(saved.find((e) => e.edrpou === '11111111').enabled, false, 'toggled off');
+  assert.match(JSON.stringify(edits[0].replyMarkup), /🟢 Відновити/);
+});
+
+test('runHandler: wat:rm:<edrpou> → deletes, re-renders menu', async () => {
+  const edits = []; let saved = null;
+  await runHandler({
+    update: { callback_query: { id: 'cbw3', data: 'wat:rm:11111111', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchedEntities: async () => ({ entities: [{ edrpou: '11111111', name: 'КНП', enabled: true }], sha: 's' }),
+        saveWatchedEntities: async (_e, entities) => { saved = entities; },
+      }).deps,
+      answerCallbackQuery: async () => {},
+      editMessageText: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(saved.length, 0, 'entity removed');
+  assert.match(edits[0].text, /Не стежу за жодним|Моніторинг замовників/);
+});
+
+test('runHandler: wat:e for a viewer → card has NO manage buttons', async () => {
+  const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'cbw4', data: 'wat:e:11111111', from: { id: 456 }, message: { chat: { id: 456 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+        loadWatchedEntities: async () => ({ entities: [{ edrpou: '11111111', name: 'КНП', enabled: true }], sha: 's' }),
+      }).deps,
+      answerCallbackQuery: async () => {},
+      editMessageText: async (a) => edits.push(a),
+    },
+  });
+  const cbs = JSON.stringify(edits[0].replyMarkup);
+  assert.ok(!cbs.includes('wat:toggle'));
+  assert.ok(!cbs.includes('wat:rm'));
+  assert.match(cbs, /wat:menu:0/);
+});
+
+test('runHandler: agent:jobs:0 → edits to jobs page', async () => {
+  const edits = []; const acks = [];
+  await runHandler({
+    update: { callback_query: { id: 'ca1', data: 'agent:jobs:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({}).deps,
+      listAgentJobs: async () => ([{ tender_id: 'UA-2026-06-01-000002-a', status: 'done', company: 'ТОВ', created_at: '2026-06-20T10:00:00Z', result: { drive_link: 'https://drive/x' } }]),
+      editMessageText: async (a) => edits.push(a),
+      answerCallbackQuery: async (a) => acks.push(a),
+    },
+  });
+  assert.equal(edits.length, 1);
+  assert.match(edits[0].text, /Останні задачі/);
+  assert.match(JSON.stringify(edits[0].replyMarkup), /drive\/x/);
+});
+
+test('runHandler: agent:pick:0 → tender picker, active.tendering only', async () => {
+  const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'ca2', data: 'agent:pick:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [
+          { tender_id: 'UA-2026-06-01-000002-a', enabled: true, notes: 'КНП' },
+          { tender_id: 'UA-2026-06-01-000003-a', enabled: true, notes: 'Other' },
+        ], sha: 's' }),
+        fetchTender: async (id) => ({ data: { status: id.includes('000002') ? 'active.tendering' : 'complete' } }),
+      }).deps,
+      editMessageText: async (a) => edits.push(a),
+      answerCallbackQuery: async () => {},
+    },
+  });
+  assert.match(edits[0].text, /Оберіть тендер/);
+  const cbs = JSON.stringify(edits[0].replyMarkup);
+  assert.match(cbs, /agent:start:UA-2026-06-01-000002-a/);
+  assert.ok(!cbs.includes('UA-2026-06-01-000003-a'), 'non-tendering tender excluded');
+});
+
+test('runHandler: agent:menu → edits back to menu', async () => {
+  const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'ca3', data: 'agent:menu', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: { ...makeDeps({}).deps, editMessageText: async (a) => edits.push(a), answerCallbackQuery: async () => {} },
+  });
+  assert.match(JSON.stringify(edits[0].replyMarkup), /agent:pick:0/);
+});
+
+test('runHandler: agent:pick:0 → prepared drive_link surfaces as a url button', async () => {
+  const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'ca5', data: 'agent:pick:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [{ tender_id: 'UA-2026-06-01-000002-a', enabled: true, notes: 'КНП' }], sha: 's' }),
+        fetchTender: async () => ({ data: { status: 'active.tendering' } }),
+        loadAgentJob: async () => ({ tender_id: 'UA-2026-06-01-000002-a', status: 'done', result: { drive_link: 'https://drive/prepared' } }),
+      }).deps,
+      editMessageText: async (a) => edits.push(a),
+      answerCallbackQuery: async () => {},
+    },
+  });
+  assert.match(JSON.stringify(edits[0].replyMarkup), /drive\/prepared/);
 });
