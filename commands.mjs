@@ -1881,6 +1881,40 @@ export function buildAgentJob({ tenderId, link, company, price, requestedBy, cre
   };
 }
 
+// Free-text agent instruction (amend dialog). Trim; null when empty/non-string;
+// cap at 4096 = Telegram's text-message max (instruction lives in the job file,
+// not in callback_data, so this is only a defensive ceiling).
+export function validateInstruction(text) {
+  if (typeof text !== 'string') return null;
+  const t = text.trim();
+  if (t === '') return null;
+  return t.slice(0, 4096);
+}
+
+// Amend job: re-work an already-prepared proposal per a free-text instruction.
+// Overwrites _state/agent_jobs/<tid>.json. `target` carries the prior result so
+// the offline agent knows WHERE to amend. No `price` — amend does not reprice.
+export function buildAgentAmendJob({ tenderId, instruction, company, target, requestedBy, createdAt }) {
+  return {
+    tender_id: tenderId,
+    link: `https://prozorro.gov.ua/tender/${tenderId}`,
+    job_type: 'amend',
+    instruction,
+    company,
+    target,
+    requested_by: requestedBy,
+    status: 'pending',
+    created_at: createdAt,
+  };
+}
+
+// Confirm prompt for an amend. Instruction is user free text → HTML-escaped
+// (the send helpers use parse_mode HTML); truncated for the prompt display only.
+export function buildAgentAmendConfirmText({ tenderId, instruction }) {
+  const short = instruction.length > 300 ? `${instruction.slice(0, 300)}…` : instruction;
+  return `✏️ Доробити ${tenderId}:\n«${escapeHtml(short)}»`;
+}
+
 // Pure router for the agent MENU callbacks (menu/pick/jobs). Returns null for
 // agent:noop AND for the dialog actions (start/co/confirm/cancel) — those stay
 // in the Worker's handleAgentCallback.
