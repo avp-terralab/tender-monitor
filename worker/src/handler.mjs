@@ -1170,10 +1170,50 @@ async function handleAgentCallback({
       await ack('⚠️ Помилка, спробуй ще раз', true);
       return;
     }
-    if (!entry || entry.tid !== tid || entry.step !== 'confirm' || !entry.price) {
+    if (!entry || entry.tid !== tid || entry.step !== 'confirm') {
       await ack('⚠️ Немає активного запиту');
       return;
     }
+
+    // Amend: build a job_type:'amend' record, carrying the prior done job's
+    // result as the target folder. No price.
+    if (entry.kind === 'amend') {
+      if (!entry.instruction) { await ack('⚠️ Немає активного запиту'); return; }
+      let prior;
+      try {
+        prior = await _loadAgentJob(env, tid);
+      } catch (err) {
+        console.error('worker: agent amend confirm load job failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+      const job = buildAgentAmendJob({
+        tenderId: tid,
+        instruction: entry.instruction,
+        company: prior?.company ?? null,
+        target: { drive_link: prior?.result?.drive_link ?? null, package_dir: prior?.result?.package_dir ?? null },
+        requestedBy: String(chatId),
+        createdAt: _now().toISOString(),
+      });
+      try {
+        await _saveAgentJob(env, job);
+      } catch (err) {
+        console.error('worker: saveAgentJob (amend) failed:', err.message);
+        await ack('⚠️ Не зміг поставити в чергу, спробуй ще раз', true);
+        return;
+      }
+      await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
+      try {
+        await sendNew('✅ Завдання на доробку поставлено в чергу. Сповіщу, коли буде готово.');
+      } catch (err) {
+        console.error('worker: agent amend confirm reply failed:', err.message);
+      }
+      await ack('✅ В черзі');
+      return;
+    }
+
+    // Prepare (existing): requires a price.
+    if (!entry.price) { await ack('⚠️ Немає активного запиту'); return; }
     const link = `https://prozorro.gov.ua/tender/${tid}`;
     const job = buildAgentJob({
       tenderId: tid, link, company: entry.company, price: entry.price,

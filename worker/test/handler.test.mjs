@@ -2729,6 +2729,29 @@ test('agent:confirm without matching pending → no job, soft ack', async () => 
   assert.match(acks[0].text, /Немає активного|Невідома/i);
 });
 
+test('agent:confirm with kind=amend → amend job saved, target from prior done, pending cleared', async () => {
+  const { deps, store, sent, jobs, acks } = makeAgentDeps({
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'done', company: 'МАЙЛАБ', result: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg' } }),
+  });
+  store.pending['123'] = { tid: AGENT_TID, kind: 'amend', step: 'confirm', instruction: 'додай КВЕД', at: '2026-06-21T10:00:00.000Z' };
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.deepEqual(jobs[0], {
+    tender_id: AGENT_TID,
+    link: `https://prozorro.gov.ua/tender/${AGENT_TID}`,
+    job_type: 'amend',
+    instruction: 'додай КВЕД',
+    company: 'МАЙЛАБ',
+    target: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg' },
+    requested_by: '123',
+    status: 'pending',
+    created_at: '2026-06-21T10:00:00.000Z',
+  });
+  assert.equal(store.pending['123'], undefined, 'pending cleared');
+  assert.match(sent.at(-1).text, /доробку/);
+  assert.equal(acks.length, 1);
+});
+
 test('agent:cancel → pending cleared, Скасовано reply', async () => {
   const { deps, store, sent, acks } = makeAgentDeps();
   store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' };
