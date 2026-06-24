@@ -864,7 +864,7 @@ async function handleCallbackQuery({
 
   if (data.startsWith('wat:')) {
     if (data === 'wat:noop') { await ack(); return; }
-    const parts = data.split(':'); // wat:menu:<p> | wat:e:<edrpou> | wat:toggle:<edrpou> | wat:rm:<edrpou>
+    const parts = data.split(':'); // wat:menu:<p> | wat:e:<edrpou>:<page> | wat:toggle:<edrpou>:<page> | wat:rm:<edrpou>:<page>
 
     if (parts[1] === 'toggle' || parts[1] === 'rm') {
       if (!isEditor) { await ack('🚫 Це команда для редакторів', true); return; }

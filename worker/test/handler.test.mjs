@@ -3033,3 +3033,22 @@ test('runHandler: wat:toggle with page → re-rendered card keeps that page in b
   });
   assert.match(JSON.stringify(edits[0].replyMarkup), /wat:menu:2/);
 });
+
+test('runHandler: wat:rm with page → re-rendered menu, page preserved (clamped if emptied)', async () => {
+  const edits = []; let saved = null;
+  await runHandler({
+    update: { callback_query: { id: 'cbw6', data: 'wat:rm:11111111:1', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchedEntities: async () => ({ entities: [{ edrpou: '11111111', name: 'КНП', enabled: true }], sha: 's' }),
+        saveWatchedEntities: async (_e, entities) => { saved = entities; },
+      }).deps,
+      editMessageText: async (a) => edits.push(a),
+      answerCallbackQuery: async () => {},
+    },
+  });
+  assert.equal(saved.length, 0, 'entity removed');
+  // only entity removed → empty menu; buildWatchedMenu clamps page safely (no crash)
+  assert.match(edits[0].text, /Не стежу за жодним|Моніторинг замовників/);
+});
