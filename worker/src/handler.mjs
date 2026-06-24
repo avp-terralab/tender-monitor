@@ -997,6 +997,7 @@ async function handleCallbackQuery({
       data, env, chatId, messageId, ack, _sendReply, _editMessageText,
       _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
       _fetchTender, _extractSnapshot,
+      _loadWatchlist, _loadAgentJob, _listAgentJobs,
     });
     return;
   }
@@ -1018,6 +1019,7 @@ async function handleAgentCallback({
   data, env, chatId, messageId, ack, _sendReply, _editMessageText,
   _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
   _fetchTender, _extractSnapshot,
+  _loadWatchlist, _loadAgentJob, _listAgentJobs,
 }) {
   const parts = data.split(':'); // agent:<action>:<tid>[:<slug>]
   const action = parts[1];
@@ -1026,6 +1028,52 @@ async function handleAgentCallback({
   const sendNew = (text, replyMarkup) => _sendReply({
     token: env.TELEGRAM_BOT_TOKEN, chatId: Number(chatId), text, replyMarkup,
   });
+
+  // Menu-level navigation (edit-in-place). Dialog actions fall through below.
+  if (action === 'noop') { await ack(); return; }
+  if (action === 'menu' || action === 'pick' || action === 'jobs') {
+    let tenders = [];
+    let jobs = [];
+    try {
+      if (action === 'pick') {
+        const { watchlist } = await _loadWatchlist(env);
+        const checked = await Promise.all(
+          watchlist.filter((r) => r.enabled).map(async (r) => {
+            try {
+              const snap = _extractSnapshot(await _fetchTender(r.tender_id));
+              if (snap.status !== 'active.tendering') return null;
+              let preparedUrl = null;
+              try {
+                const j = await _loadAgentJob(env, r.tender_id);
+                if (j && j.status === 'done' && j.result?.drive_link) preparedUrl = j.result.drive_link;
+              } catch { /* link optional */ }
+              return { ...r, preparedUrl };
+            } catch { return null; }
+          }),
+        );
+        tenders = checked.filter(Boolean);
+      } else if (action === 'jobs') {
+        jobs = await _listAgentJobs(env);
+      }
+    } catch (err) {
+      console.error('worker: agent menu nav load failed:', err.message);
+      await ack('⚠️ Prozorro/GitHub тимчасово недоступний', true);
+      return;
+    }
+    const view = handleAgentMenuNav({ tenders, jobs, data });
+    if (view) {
+      try {
+        await _editMessageText({
+          token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+          text: view.text, replyMarkup: view.keyboard ?? undefined,
+        });
+      } catch (err) {
+        console.error('worker: agent menu nav edit failed:', err.message);
+      }
+    }
+    await ack();
+    return;
+  }
 
   if (action === 'start') {
     // Authoritative gate (covers /agent, /info and digest buttons): the agent

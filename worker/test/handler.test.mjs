@@ -2947,3 +2947,53 @@ test('runHandler: wat:e for a viewer → card has NO manage buttons', async () =
   assert.ok(!cbs.includes('wat:rm'));
   assert.match(cbs, /wat:menu:0/);
 });
+
+test('runHandler: agent:jobs:0 → edits to jobs page', async () => {
+  const edits = []; const acks = [];
+  await runHandler({
+    update: { callback_query: { id: 'ca1', data: 'agent:jobs:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({}).deps,
+      listAgentJobs: async () => ([{ tender_id: 'UA-2026-06-01-000002-a', status: 'done', company: 'ТОВ', created_at: '2026-06-20T10:00:00Z', result: { drive_link: 'https://drive/x' } }]),
+      editMessageText: async (a) => edits.push(a),
+      answerCallbackQuery: async (a) => acks.push(a),
+    },
+  });
+  assert.equal(edits.length, 1);
+  assert.match(edits[0].text, /Останні задачі/);
+  assert.match(JSON.stringify(edits[0].replyMarkup), /drive\/x/);
+});
+
+test('runHandler: agent:pick:0 → tender picker, active.tendering only', async () => {
+  const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'ca2', data: 'agent:pick:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [
+          { tender_id: 'UA-2026-06-01-000002-a', enabled: true, notes: 'КНП' },
+          { tender_id: 'UA-2026-06-01-000003-a', enabled: true, notes: 'Other' },
+        ], sha: 's' }),
+        fetchTender: async (id) => ({ data: { status: id.includes('000002') ? 'active.tendering' : 'complete' } }),
+      }).deps,
+      editMessageText: async (a) => edits.push(a),
+      answerCallbackQuery: async () => {},
+    },
+  });
+  assert.match(edits[0].text, /Оберіть тендер/);
+  const cbs = JSON.stringify(edits[0].replyMarkup);
+  assert.match(cbs, /agent:start:UA-2026-06-01-000002-a/);
+  assert.ok(!cbs.includes('UA-2026-06-01-000003-a'), 'non-tendering tender excluded');
+});
+
+test('runHandler: agent:menu → edits back to menu', async () => {
+  const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'ca3', data: 'agent:menu', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: { ...makeDeps({}).deps, editMessageText: async (a) => edits.push(a), answerCallbackQuery: async () => {} },
+  });
+  assert.match(JSON.stringify(edits[0].replyMarkup), /agent:pick:0/);
+});
