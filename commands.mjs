@@ -664,6 +664,34 @@ export function buildWatchedMenu({ entities, page = 0 }) {
   return { text, keyboard: { inline_keyboard: rows } };
 }
 
+export function buildWatchedEntityCard({ entities, edrpou, canManage = false }) {
+  const e = (entities ?? []).find((x) => x.edrpou === edrpou);
+  if (!e) return buildWatchedMenu({ entities, page: 0 });
+  const name = e.name && e.name !== '(unknown)' ? escapeHtml(abbreviateLegalForm(e.name)) : '(назва невідома)';
+  const state = e.enabled ? '🟢 стежу' : '🔴 призупинено';
+  const text = `👁 <b>${name}</b>\nЄДРПОУ ${e.edrpou}\nСтан: ${state}`;
+  const rows = [];
+  if (canManage) {
+    rows.push([{
+      text: e.enabled ? '🔴 Призупинити' : '🟢 Відновити',
+      callback_data: `wat:toggle:${e.edrpou}`,
+    }]);
+    rows.push([{ text: '🗑 Прибрати', callback_data: `wat:rm:${e.edrpou}` }]);
+  }
+  rows.push([{ text: '⬅ До списку', callback_data: 'wat:menu:0' }]);
+  return { text, keyboard: { inline_keyboard: rows } };
+}
+
+// Pure router for read-only `wat:` navigation (menu / entity card). Mutations
+// (wat:toggle / wat:rm) are handled in the Worker (GitHub save).
+export function handleWatchedNav({ entities, data, canManage = false }) {
+  if (data === 'wat:noop') return null;
+  const parts = data.split(':'); // wat:menu:<page> | wat:e:<edrpou>
+  if (parts[1] === 'e') return buildWatchedEntityCard({ entities, edrpou: parts[2], canManage });
+  if (parts[1] === 'menu') return buildWatchedMenu({ entities, page: Number(parts[2] ?? 0) });
+  return buildWatchedMenu({ entities, page: 0 });
+}
+
 export function handleUnwatch({ watchedEntities }, { edrpou }) {
   const existing = watchedEntities.find(e => e.edrpou === edrpou);
   if (!existing) {

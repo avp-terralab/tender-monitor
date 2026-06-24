@@ -22,6 +22,7 @@ import {
   agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
   monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
+  buildWatchedEntityCard, handleWatchedNav,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -3451,4 +3452,37 @@ test('buildWatchedMenu: 6/page with nav arrows', () => {
   const nav1 = r1.find((row) => row.some((b) => b.callback_data === 'wat:noop'));
   assert.ok(nav1.some((b) => b.text === '◀ Назад'));
   assert.equal(nav1.find((b) => b.callback_data?.startsWith('wat:menu')).callback_data, 'wat:menu:0');
+});
+
+// ── Task 4: buildWatchedEntityCard + handleWatchedNav ─────────────────────────
+test('buildWatchedEntityCard: shows state, manage buttons only when canManage', () => {
+  const ent = [watEnt('11111111', true, 'КНП Лікарня')];
+  const card = buildWatchedEntityCard({ entities: ent, edrpou: '11111111', canManage: true });
+  assert.match(card.text, /КНП Лікарня/);
+  assert.match(card.text, /🟢 стежу/);
+  const cbs = JSON.stringify(card.keyboard.inline_keyboard);
+  assert.match(cbs, /wat:toggle:11111111/);
+  assert.match(cbs, /wat:rm:11111111/);
+  assert.match(cbs, /wat:menu:0/);
+  const viewer = buildWatchedEntityCard({ entities: ent, edrpou: '11111111', canManage: false });
+  const vcbs = JSON.stringify(viewer.keyboard.inline_keyboard);
+  assert.ok(!vcbs.includes('wat:toggle'));
+  assert.ok(!vcbs.includes('wat:rm'));
+  assert.match(vcbs, /wat:menu:0/);
+});
+
+test('buildWatchedEntityCard: paused entity shows Відновити; unknown edrpou → menu', () => {
+  const ent = [watEnt('22222222', false)];
+  const card = buildWatchedEntityCard({ entities: ent, edrpou: '22222222', canManage: true });
+  assert.match(card.text, /🔴 призупинено/);
+  assert.match(JSON.stringify(card.keyboard.inline_keyboard), /🟢 Відновити/);
+  const miss = buildWatchedEntityCard({ entities: ent, edrpou: '99999999', canManage: true });
+  assert.match(miss.text, /Моніторинг замовників/); // fell back to menu
+});
+
+test('handleWatchedNav: noop→null; menu/e routing', () => {
+  const ent = [watEnt('11111111', true)];
+  assert.equal(handleWatchedNav({ entities: ent, data: 'wat:noop', canManage: true }), null);
+  assert.match(handleWatchedNav({ entities: ent, data: 'wat:menu:0', canManage: true }).text, /Моніторинг замовників/);
+  assert.match(handleWatchedNav({ entities: ent, data: 'wat:e:11111111', canManage: true }).text, /Замовник 11111111|11111111/);
 });
