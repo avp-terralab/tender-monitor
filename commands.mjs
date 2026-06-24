@@ -1844,6 +1844,41 @@ export function buildAgentPickView({ tenders, page = 0 }) {
   return { text: '🤖 Оберіть тендер (приймання пропозицій):', keyboard: { inline_keyboard: rows } };
 }
 
+const AGENT_JOB_ICONS = { pending: '📋', running: '⏳', done: '✅', error: '❌' };
+
+export function buildAgentJobsPage({ jobs, page = 0 }) {
+  const list = jobs ?? [];
+  if (list.length === 0) {
+    return {
+      text: '📭 Ще немає задач агента.',
+      keyboard: { inline_keyboard: [[{ text: '⬅ Назад', callback_data: 'agent:menu' }]] },
+    };
+  }
+  const pages = Math.max(1, Math.ceil(list.length / AGENT_PER_PAGE));
+  const p = Math.min(Math.max(0, page | 0), pages - 1);
+  const slice = list.slice(p * AGENT_PER_PAGE, p * AGENT_PER_PAGE + AGENT_PER_PAGE);
+  const body = slice.map((j) => {
+    const icon = AGENT_JOB_ICONS[j.status] ?? '•';
+    const co = j.company ? ` · ${escapeHtml(j.company)}` : '';
+    return `${icon} <a href="https://prozorro.gov.ua/tender/${j.tender_id}">${j.tender_id}</a>${co}`;
+  }).join('\n');
+  const rows = [];
+  for (const j of slice) {
+    if (j.status === 'done' && j.result?.drive_link) {
+      rows.push([{ text: `📁 ${j.tender_id}`, url: j.result.drive_link }]);
+    }
+  }
+  if (pages > 1) {
+    const nav = [];
+    if (p > 0) nav.push({ text: '◀ Назад', callback_data: `agent:jobs:${p - 1}` });
+    nav.push({ text: `${p + 1}/${pages}`, callback_data: 'agent:noop' });
+    if (p < pages - 1) nav.push({ text: 'Далі ▶', callback_data: `agent:jobs:${p + 1}` });
+    rows.push(nav);
+  }
+  rows.push([{ text: '⬅ Назад', callback_data: 'agent:menu' }]);
+  return { text: `📊 <b>Останні задачі агента</b>\n\n${body}`, keyboard: { inline_keyboard: rows } };
+}
+
 // The job record handed to the offline agent. Shape matches the integration
 // contract (snake_case keys, status 'pending'). `company` is the full name.
 export function buildAgentJob({ tenderId, link, company, price, requestedBy, createdAt }) {

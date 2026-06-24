@@ -21,7 +21,7 @@ import {
   AGENT_COMPANIES, companyForSlug, slugForCompany,
   agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
-  buildAgentMenu, buildAgentPickView,
+  buildAgentMenu, buildAgentPickView, buildAgentJobsPage,
   monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
   buildWatchedEntityCard, handleWatchedNav,
 } from '../commands.mjs';
@@ -3515,4 +3515,31 @@ test('buildAgentPickView: 6/page nav arrows', () => {
   const nav0 = r0.find((row) => row.some((b) => b.callback_data === 'agent:noop'));
   assert.ok(nav0.some((b) => b.text === 'Далі ▶' && b.callback_data === 'agent:pick:1'));
   assert.ok(nav0.some((b) => b.text === '1/2'));
+});
+
+const job = (tender_id, status, extra = {}) => ({ tender_id, status, company: 'ТОВ Тест', created_at: '2026-06-20T10:00:00Z', ...extra });
+
+test('buildAgentJobsPage: empty → back only', () => {
+  const v = buildAgentJobsPage({ jobs: [], page: 0 });
+  assert.match(v.text, /Ще немає задач/);
+  assert.equal(v.keyboard.inline_keyboard[0][0].callback_data, 'agent:menu');
+});
+
+test('buildAgentJobsPage: status icons + drive button for done', () => {
+  const v = buildAgentJobsPage({ jobs: [
+    job('UA-2026-06-01-000001-a', 'running'),
+    job('UA-2026-06-01-000002-a', 'done', { result: { drive_link: 'https://drive/x' } }),
+  ], page: 0 });
+  assert.match(v.text, /⏳/);
+  assert.match(v.text, /✅/);
+  assert.match(v.text, /prozorro\.gov\.ua\/tender\/UA-2026-06-01-000002-a/);
+  const urlBtn = v.keyboard.inline_keyboard.flat().find((b) => b.url === 'https://drive/x');
+  assert.ok(urlBtn, 'done job exposes a Drive link button');
+  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'agent:menu');
+});
+
+test('buildAgentJobsPage: 6/page nav', () => {
+  const jobs = Array.from({ length: 8 }, (_, i) => job(`UA-2026-06-01-00000${i}-a`, 'pending'));
+  const nav = buildAgentJobsPage({ jobs, page: 0 }).keyboard.inline_keyboard.find((row) => row.some((b) => b.callback_data === 'agent:noop'));
+  assert.ok(nav.some((b) => b.callback_data === 'agent:jobs:1'));
 });
