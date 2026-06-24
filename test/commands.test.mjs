@@ -3407,3 +3407,11 @@ test('handleMonitorNav: noop→null; menu/ph routing', () => {
     /Не вдалось перевірити: 1/,
   );
 });
+
+test('applyEntityMutation: set_enabled flips one entity', () => {
+  const out = applyEntityMutation(
+    [{ edrpou: '11111111', name: 'A', enabled: true }, { edrpou: '22222222', name: 'B', enabled: true }],
+    { type: 'set_enabled', edrpou: '22222222', enabled: false });
+  assert.equal(out.find((e) => e.edrpou === '22222222').enabled, false);
+  assert.equal(out.find((e) => e.edrpou === '11111111').enabled, true);
+});

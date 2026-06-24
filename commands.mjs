@@ -653,6 +653,10 @@ export function applyEntityMutation(watchedEntities, mutation) {
   if (mutation.type === 'delete_entity') {
     return watchedEntities.filter(e => e.edrpou !== mutation.edrpou);
   }
+  if (mutation.type === 'set_enabled') {
+    return watchedEntities.map((e) =>
+      e.edrpou === mutation.edrpou ? { ...e, enabled: mutation.enabled } : e);
+  }
   return watchedEntities;
 }
 
