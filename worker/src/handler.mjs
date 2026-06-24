@@ -6,7 +6,7 @@ import {
   handleArchive, handleArchiveDetail, handleUnarchive, buildArchiveMenu, handleArchiveNav,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
-  formatInfo, formatInfoPages, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD, mainKeyboard,
+  formatInfo, buildMonitorMenu, handleMonitorNav, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD, mainKeyboard,
   TERMINAL_STATUSES, hydrateContractDocs,
   formatAuditMessage,
   sanitizeActor,
@@ -147,6 +147,7 @@ export async function runHandler({ update, env, deps = {} }) {
   let watchedReplyMarkup = null;
   let archiveReplyMarkup = null;
   let agentReplyMarkup = null;
+  let monitorReplyMarkup = null;
 
   const MUTATING = new Set(['add', 'remove', 'watch', 'unarchive']);
   if (MUTATING.has(cmd.cmd) && !isEditor) {
@@ -363,32 +364,16 @@ export async function runHandler({ update, env, deps = {} }) {
       if (targets && targets.length === 0) {
         reply = '📭 Немає активних тендерів.';
       } else if (targets) {
-        const results = await Promise.all(targets.map(async r => {
-          try {
-            const raw = await _fetchTender(r.tender_id);
-            const snap = _extractSnapshot(raw);
-            return {
-              tender_id: r.tender_id,
-              prozorro_url: `https://prozorro.gov.ua/tender/${r.tender_id}`,
-              status: snap.status,
-              deadline: snap.tenderPeriod?.endDate ?? null,
-              procuring_entity: snap.procuringEntity,
-              value: snap.value,
-              classification: snap.classification,
-              contact: snap.contact,
-              awards: snap.awards,
-              _snapshot: snap,
-              _row: r,
-            };
-          } catch (err) {
-            return { tender_id: r.tender_id, error: err.message };
-          }
-        }));
-        const groups = results.filter(r => !r.error);
-        const errors = results.filter(r => r.error);
-        reply = cmd.tender_id
-          ? formatInfo({ runIso: new Date().toISOString(), groups, errors })
-          : formatInfoPages({ runIso: new Date().toISOString(), groups, errors });
+        const { groups, errors } = await tenderGroups(targets, {
+          fetchTender: _fetchTender, extractSnapshot: _extractSnapshot,
+        });
+        if (cmd.tender_id) {
+          reply = formatInfo({ runIso: new Date().toISOString(), groups, errors });
+        } else {
+          const menu = buildMonitorMenu({ groups, runIso: new Date().toISOString(), errors });
+          reply = menu.text;
+          monitorReplyMarkup = menu.keyboard ?? undefined;
+        }
         // Admin can fire the agent from a single-tender /info card — but only
         // while proposals are still being accepted (active.tendering).
         if (cmd.tender_id && isAdmin && groups.length === 1
@@ -682,7 +667,7 @@ export async function runHandler({ update, env, deps = {} }) {
         text: pages[i],
         replyToMessageId: i === 0 ? msg.message_id : undefined,
         replyMarkup: isLast
-          ? (archiveReplyMarkup ?? agentReplyMarkup ?? watchedReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
+          ? (archiveReplyMarkup ?? agentReplyMarkup ?? watchedReplyMarkup ?? monitorReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
           : undefined,
       });
     } catch (err) {
@@ -726,6 +711,32 @@ async function renderWatchedView({ _editMessageText, env, chatId, messageId, ent
   } catch (err) {
     console.error('worker: watched view edit failed:', err.message);
   }
+}
+
+// Fetch live Prozorro snapshots for the given watchlist rows → grouped result.
+// Shared by the /info menu and the mon: callback (stateless re-fetch).
+async function tenderGroups(rows, { fetchTender, extractSnapshot }) {
+  const results = await Promise.all((rows ?? []).map(async (r) => {
+    try {
+      const snap = extractSnapshot(await fetchTender(r.tender_id));
+      return {
+        tender_id: r.tender_id,
+        prozorro_url: `https://prozorro.gov.ua/tender/${r.tender_id}`,
+        status: snap.status,
+        deadline: snap.tenderPeriod?.endDate ?? null,
+        procuring_entity: snap.procuringEntity,
+        value: snap.value,
+        classification: snap.classification,
+        contact: snap.contact,
+        awards: snap.awards,
+        _snapshot: snap,
+        _row: r,
+      };
+    } catch (err) {
+      return { tender_id: r.tender_id, error: err.message };
+    }
+  }));
+  return { groups: results.filter((r) => !r.error), errors: results.filter((r) => r.error) };
 }
 
 async function handleCallbackQuery({

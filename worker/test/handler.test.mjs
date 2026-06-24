@@ -517,10 +517,11 @@ test('runHandler: /info with active tenders → fetch each + reply', async () =>
   });
   // Disabled UA-C must NOT be fetched
   assert.deepEqual(fetched.sort(), ['UA-A', 'UA-B']);
+  // New behavior: single phase-menu message instead of multi-page dump
   assert.equal(sent.length, 1);
-  assert.match(sent[0].text, /📋 Статус тендерів/);
-  assert.match(sent[0].text, /UA-A/);
-  assert.match(sent[0].text, /UA-B/);
+  assert.match(sent[0].text, /📋.*Моніторинг закупівель/);
+  // Phase buttons in replyMarkup, not inline text ids
+  assert.ok(sent[0].replyMarkup?.inline_keyboard, 'should have inline keyboard');
   assert.doesNotMatch(sent[0].text, /UA-C/);
 });
 
@@ -611,7 +612,7 @@ test('runHandler: /info empty enabled watchlist → friendly reply', async () =>
   assert.match(sent[0].text, /📭 Немає активних тендерів/);
 });
 
-test('runHandler: /info partial Prozorro errors become a final page', async () => {
+test('runHandler: /info partial Prozorro errors → single menu message with error count', async () => {
   const RAW = {
     data: {
       tenderID: 'UA-A', title: 'X', status: 'active.tendering',
@@ -637,13 +638,13 @@ test('runHandler: /info partial Prozorro errors become a final page', async () =
     update: { message: { chat: { id: 123 }, text: '/info', message_id: 1 } },
     env: ENV, deps,
   });
-  assert.equal(sent.length, 2);
-  assert.match(sent[0].text, /UA-A/);
-  assert.match(sent[1].text, /⚠️ Не вдалось перевірити/);
-  assert.match(sent[1].text, /UA-B — Prozorro 503/);
+  // New behavior: single menu message; error count surfaced in header
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /📋.*Моніторинг закупівель/);
+  assert.match(sent[0].text, /⚠️ Не вдалось перевірити: 1/);
 });
 
-test('runHandler: /info sends one message per phase, keyboard on last only', async () => {
+test('runHandler: /info with multiple phases → single menu with phase buttons', async () => {
   const RAW = (id, status) => ({
     data: {
       tenderID: id, title: 'X', status,
@@ -666,13 +667,15 @@ test('runHandler: /info sends one message per phase, keyboard on last only', asy
     update: { message: { chat: { id: 123 }, text: '/info', message_id: 7 } },
     env: ENV, deps,
   });
-  assert.equal(sent.length, 2);
-  assert.match(sent[0].text, /📥 Приймання пропозицій/);
-  assert.match(sent[1].text, /🔍 Розгляд пропозицій/);
+  // New behavior: single menu message with phase buttons (not multi-page dump)
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /📋.*Моніторинг закупівель/);
   assert.equal(sent[0].replyToMessageId, 7);
-  assert.equal(sent[1].replyToMessageId, undefined);
-  assert.ok(sent[1].replyMarkup, 'last page carries the keyboard');
-  assert.equal(sent[0].replyMarkup, undefined);
+  const kb = sent[0].replyMarkup?.inline_keyboard;
+  assert.ok(Array.isArray(kb) && kb.length >= 2, 'should have at least 2 phase buttons');
+  // Phase buttons contain phase identifiers in their callback_data
+  const cbDatas = kb.flat().map(b => b.callback_data);
+  assert.ok(cbDatas.some(d => d?.startsWith('mon:ph:')), 'phase buttons have mon:ph: callback_data');
 });
 
 test('runHandler: /info when loadWatchlist throws → ⚠️ reply', async () => {
@@ -2802,4 +2805,21 @@ test('runHandler: /agent shows «підготовлена ✅» link for a tende
   assert.equal(kb[0][0].callback_data, `agent:start:${ID}`);
   assert.match(kb[1][0].text, /Тендерна пропозиція підготовлена ✅/);
   assert.equal(kb[1][0].url, 'https://drive.google.com/drive/folders/REAL');
+});
+
+test('runHandler: /info (no id) → single menu message with mon:ph button', async () => {
+  const sent = [];
+  await runHandler({
+    update: { message: { chat: { id: 123 }, message_id: 7, text: '📋 Моніторинг закупівель', from: { id: 123 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [{ tender_id: 'UA-2026-06-01-000002-a', enabled: true }], sha: 's' }),
+        fetchTender: async () => ({ data: { status: 'active.tendering', tenderPeriod: { endDate: '2026-07-01T00:00:00Z' }, procuringEntity: { name: 'КНП' } } }),
+      }).deps,
+      sendReply: async (a) => sent.push(a),
+    },
+  });
+  assert.equal(sent.length, 1, 'one message, not a multi-page dump');
+  assert.match(JSON.stringify(sent[0].replyMarkup), /mon:ph:0:0/);
 });
