@@ -42,6 +42,7 @@ const makeDeps = (overrides = {}) => {
       editMessageText: async () => {},
       answerCallbackQuery: async () => {},
       loadAgentJob: async () => null,
+      listAgentJobs: async () => [],
       ...overrides,
     },
   };
@@ -2996,4 +2997,22 @@ test('runHandler: agent:menu → edits back to menu', async () => {
     deps: { ...makeDeps({}).deps, editMessageText: async (a) => edits.push(a), answerCallbackQuery: async () => {} },
   });
   assert.match(JSON.stringify(edits[0].replyMarkup), /agent:pick:0/);
+});
+
+test('runHandler: agent:pick:0 → prepared drive_link surfaces as a url button', async () => {
+  const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'ca5', data: 'agent:pick:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [{ tender_id: 'UA-2026-06-01-000002-a', enabled: true, notes: 'КНП' }], sha: 's' }),
+        fetchTender: async () => ({ data: { status: 'active.tendering' } }),
+        loadAgentJob: async () => ({ tender_id: 'UA-2026-06-01-000002-a', status: 'done', result: { drive_link: 'https://drive/prepared' } }),
+      }).deps,
+      editMessageText: async (a) => edits.push(a),
+      answerCallbackQuery: async () => {},
+    },
+  });
+  assert.match(JSON.stringify(edits[0].replyMarkup), /drive\/prepared/);
 });
