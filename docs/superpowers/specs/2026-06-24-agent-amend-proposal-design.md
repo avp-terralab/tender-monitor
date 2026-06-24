@@ -109,7 +109,9 @@ Prepare-діалог лишається без `kind` (`{ tid, company, step:'aw
 - `buildAgentAmendConfirmText({ tenderId, instruction })` → однорядковий промпт підтвердження
   (напр. `✏️ Доробити <tid>:\n«<instruction (обрізана для показу)>»`).
 - `validateInstruction(text)` → `string | null`: trim; `null` якщо порожнє; обрізати до
-  розумного ліміту (**2000** символів — instruction живе у файлі, не в callback).
+  **4096** символів — це максимум одного текстового повідомлення Telegram, тобто практично
+  «усе повідомлення повністю». Instruction живе у job-файлі (не в callback), тож обмежень
+  64 байт немає; 4096 — лише захисна стеля.
 - `buildAgentJobsPage` — додати кнопку `✏️ Доробити` (done+drive_link) і маркер `✏️` для
   amend-job-ів.
 
@@ -151,7 +153,7 @@ Prepare-діалог лишається без `kind` (`{ tid, company, step:'aw
 ## Тестування
 - **`test/commands.test.mjs`:** форма `buildAgentAmendJob` (`job_type:'amend'`, `instruction`,
   `target` із переданого, без `price`); `buildAgentAmendConfirmText`; `validateInstruction`
-  (порожнє→null, trim, обрізання >2000); `buildAgentJobsPage` показує `✏️ Доробити` **лише**
+  (порожнє→null, trim, обрізання >4096); `buildAgentJobsPage` показує `✏️ Доробити` **лише**
   для done+drive_link (не для pending/running/error) і маркер `✏️` для amend-job-ів.
 - **`worker/test/handler.test.mjs`:** `agent:amend:<tid>` стартує діалог (pending записано,
   промпт надіслано) і відхиляє не-done тендер; текст при `step:'await_instruction'` зберігає
