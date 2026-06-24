@@ -1193,9 +1193,11 @@ async function clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPen
   }
 }
 
-// Handles a plain text message from an admin who is mid-agent-dialog at the
-// price step. Returns true if it consumed the message (so the caller stops),
-// false if there was no pending price step (caller continues normal parsing).
+// Handles a plain text message from an admin who is mid-agent-dialog awaiting a
+// free-text reply — the price (await_price) or the amend instruction
+// (await_instruction). Returns true if it consumed the message (so the caller
+// stops), false if there was no matching pending step (caller continues normal
+// parsing).
 async function handleAgentTextReply({
   env, chatId, msg, _sendReply, _loadAgentPending, _saveAgentPending, _now,
 }) {
@@ -1204,7 +1206,7 @@ async function handleAgentTextReply({
     ({ pending, sha } = await _loadAgentPending(env));
     entry = pending?.[chatId];
   } catch (err) {
-    console.error('worker: agent price load pending failed:', err.message);
+    console.error('worker: agent text-reply load pending failed:', err.message);
     return false; // can't verify state → let normal handling proceed
   }
   if (!entry || (entry.step !== 'await_price' && entry.step !== 'await_instruction')) return false;
