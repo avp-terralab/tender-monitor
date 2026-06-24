@@ -3438,7 +3438,7 @@ test('buildWatchedMenu: empty → keyboard null', () => {
 test('buildWatchedMenu: one button per entity, callback wat:e:<edrpou>, icon by enabled', () => {
   const m = buildWatchedMenu({ entities: [watEnt('11111111', true), watEnt('22222222', false)], page: 0 });
   const rows = m.keyboard.inline_keyboard;
-  assert.equal(rows[0][0].callback_data, 'wat:e:11111111');
+  assert.equal(rows[0][0].callback_data, 'wat:e:11111111:0');
   assert.match(rows[0][0].text, /^🟢/);
   assert.match(rows[1][0].text, /^🔴/);
   assert.match(m.text, /Моніторинг замовників/);
@@ -3487,6 +3487,29 @@ test('handleWatchedNav: noop→null; menu/e routing', () => {
   assert.equal(handleWatchedNav({ entities: ent, data: 'wat:noop', canManage: true }), null);
   assert.match(handleWatchedNav({ entities: ent, data: 'wat:menu:0', canManage: true }).text, /Моніторинг замовників/);
   assert.match(handleWatchedNav({ entities: ent, data: 'wat:e:11111111', canManage: true }).text, /Замовник 11111111|11111111/);
+});
+
+test('buildWatchedMenu: buyer button carries the current page', () => {
+  const entities = Array.from({ length: 8 }, (_, i) => watEnt(String(10000000 + i)));
+  const r1 = buildWatchedMenu({ entities, page: 1 }).keyboard.inline_keyboard;
+  // first button on page 1 (entities[6]) → callback ends with :1
+  assert.match(r1[0][0].callback_data, /^wat:e:10000006:1$/);
+});
+
+test('buildWatchedEntityCard: page threads into back/toggle/rm callbacks', () => {
+  const ent = [watEnt('11111111', true, 'КНП')];
+  const card = buildWatchedEntityCard({ entities: ent, edrpou: '11111111', canManage: true, page: 2 });
+  const cbs = JSON.stringify(card.keyboard.inline_keyboard);
+  assert.match(cbs, /wat:toggle:11111111:2/);
+  assert.match(cbs, /wat:rm:11111111:2/);
+  assert.match(cbs, /wat:menu:2/);
+});
+
+test('handleWatchedNav: wat:e with page → card back button returns to that page', () => {
+  const ent = [watEnt('11111111', true)];
+  const card = handleWatchedNav({ entities: ent, data: 'wat:e:11111111:2', canManage: false });
+  const back = card.keyboard.inline_keyboard.find((row) => row.some((b) => b.callback_data?.startsWith('wat:menu')));
+  assert.equal(back.find((b) => b.callback_data.startsWith('wat:menu')).callback_data, 'wat:menu:2');
 });
 
 const pickTender = (id, notes, preparedUrl) => ({ tender_id: id, enabled: true, notes, preparedUrl });

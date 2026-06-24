@@ -400,7 +400,20 @@ function deadlineKey(g) {
 }
 
 
-const MON_PER_PAGE = 6;
+const PAGE_SIZE = 6;
+
+// Shared pagination nav row [◀ Назад | <p+1>/<pages> | Далі ▶]. Returns the row
+// array, or null when there is only one page. pageCb(x) builds the prev/next
+// callback_data; noopCb is the (inert) page-counter callback_data.
+function buildPageNavRow(page, pages, pageCb, noopCb) {
+  if (pages <= 1) return null;
+  const row = [];
+  if (page > 0) row.push({ text: '◀ Назад', callback_data: pageCb(page - 1) });
+  row.push({ text: `${page + 1}/${pages}`, callback_data: noopCb });
+  if (page < pages - 1) row.push({ text: 'Далі ▶', callback_data: pageCb(page + 1) });
+  return row;
+}
+
 // Stable phase index = position here. OTHER_PHASE last (its statuses: []).
 const MON_PHASES = [...PHASES, OTHER_PHASE];
 
@@ -443,10 +456,10 @@ export function renderMonitorPage({ groups, phaseIdx, page = 0, runIso, role }) 
   const bucket = monitorPhaseBuckets(groups).find((b) => b.idx === phaseIdx);
   if (!bucket) return buildMonitorMenu({ groups, runIso });
   const { items } = bucket;
-  const pages = Math.max(1, Math.ceil(items.length / MON_PER_PAGE));
+  const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const p = Math.min(Math.max(0, page | 0), pages - 1);
-  const start = p * MON_PER_PAGE;
-  const slice = items.slice(start, start + MON_PER_PAGE);
+  const start = p * PAGE_SIZE;
+  const slice = items.slice(start, start + PAGE_SIZE);
   const header = `${bucket.emoji} <b>${bucket.label}</b> (${items.length})`;
   const body = slice
     .map((g, i) => `━━━━━━ ${start + i + 1} ━━━━━━\n${formatInfoEntry(g, runIso)}`)
@@ -457,13 +470,8 @@ export function renderMonitorPage({ groups, phaseIdx, page = 0, runIso, role }) 
       text: `🤖 ${start + i + 1}`, callback_data: `agent:start:${g.tender_id}`,
     })));
   }
-  if (pages > 1) {
-    const nav = [];
-    if (p > 0) nav.push({ text: '◀ Назад', callback_data: `mon:ph:${phaseIdx}:${p - 1}` });
-    nav.push({ text: `${p + 1}/${pages}`, callback_data: 'mon:noop' });
-    if (p < pages - 1) nav.push({ text: 'Далі ▶', callback_data: `mon:ph:${phaseIdx}:${p + 1}` });
-    rows.push(nav);
-  }
+  const nav = buildPageNavRow(p, pages, (x) => `mon:ph:${phaseIdx}:${x}`, 'mon:noop');
+  if (nav) rows.push(nav);
   rows.push([{ text: '⬅ Меню', callback_data: 'mon:menu' }]);
   return { text: `${header}\n\n${body}`, keyboard: { inline_keyboard: rows } };
 }
@@ -636,37 +644,31 @@ export function buildWatchedManageKeyboard(watchedEntities) {
   return { inline_keyboard: [...base.inline_keyboard, [{ text: '← Готово', callback_data: 'watched:done' }]] };
 }
 
-const WAT_PER_PAGE = 6;
 
 export function buildWatchedMenu({ entities, page = 0 }) {
   if (!entities || entities.length === 0) {
     return { text: '📭 Не стежу за жодним замовником. Додай: /watch ЄДРПОУ', keyboard: null };
   }
-  const pages = Math.max(1, Math.ceil(entities.length / WAT_PER_PAGE));
+  const pages = Math.max(1, Math.ceil(entities.length / PAGE_SIZE));
   const p = Math.min(Math.max(0, page | 0), pages - 1);
-  const start = p * WAT_PER_PAGE;
-  const slice = entities.slice(start, start + WAT_PER_PAGE);
+  const start = p * PAGE_SIZE;
+  const slice = entities.slice(start, start + PAGE_SIZE);
   const text = `👁 <b>Моніторинг замовників</b> — ${entities.length}\n🟢 активні · 🔴 призупинені`;
   const rows = slice.map((e) => {
     const icon = e.enabled ? '🟢' : '🔴';
     const name = e.name && e.name !== '(unknown)'
       ? truncate(abbreviateLegalForm(e.name), 48) : '';
     const label = name ? `${icon} ${name} · ${e.edrpou}` : `${icon} ${e.edrpou}`;
-    return [{ text: label, callback_data: `wat:e:${e.edrpou}` }];
+    return [{ text: label, callback_data: `wat:e:${e.edrpou}:${p}` }];
   });
-  if (pages > 1) {
-    const nav = [];
-    if (p > 0) nav.push({ text: '◀ Назад', callback_data: `wat:menu:${p - 1}` });
-    nav.push({ text: `${p + 1}/${pages}`, callback_data: 'wat:noop' });
-    if (p < pages - 1) nav.push({ text: 'Далі ▶', callback_data: `wat:menu:${p + 1}` });
-    rows.push(nav);
-  }
+  const nav = buildPageNavRow(p, pages, (x) => `wat:menu:${x}`, 'wat:noop');
+  if (nav) rows.push(nav);
   return { text, keyboard: { inline_keyboard: rows } };
 }
 
-export function buildWatchedEntityCard({ entities, edrpou, canManage = false }) {
+export function buildWatchedEntityCard({ entities, edrpou, canManage = false, page = 0 }) {
   const e = (entities ?? []).find((x) => x.edrpou === edrpou);
-  if (!e) return buildWatchedMenu({ entities, page: 0 });
+  if (!e) return buildWatchedMenu({ entities, page });
   const name = e.name && e.name !== '(unknown)' ? escapeHtml(abbreviateLegalForm(e.name)) : '(назва невідома)';
   const state = e.enabled ? '🟢 стежу' : '🔴 призупинено';
   const text = `👁 <b>${name}</b>\nЄДРПОУ ${e.edrpou}\nСтан: ${state}`;
@@ -674,20 +676,22 @@ export function buildWatchedEntityCard({ entities, edrpou, canManage = false }) 
   if (canManage) {
     rows.push([{
       text: e.enabled ? '🔴 Призупинити' : '🟢 Відновити',
-      callback_data: `wat:toggle:${e.edrpou}`,
+      callback_data: `wat:toggle:${e.edrpou}:${page}`,
     }]);
-    rows.push([{ text: '🗑 Прибрати', callback_data: `wat:rm:${e.edrpou}` }]);
+    rows.push([{ text: '🗑 Прибрати', callback_data: `wat:rm:${e.edrpou}:${page}` }]);
   }
-  rows.push([{ text: '⬅ До списку', callback_data: 'wat:menu:0' }]);
+  rows.push([{ text: '⬅ До списку', callback_data: `wat:menu:${page}` }]);
   return { text, keyboard: { inline_keyboard: rows } };
 }
 
 // Pure router for read-only `wat:` navigation (menu / entity card). Mutations
-// (wat:toggle / wat:rm) are handled in the Worker (GitHub save).
+// (wat:toggle / wat:rm) are handled in the Worker (GitHub save). The list page
+// is carried through callbacks (wat:e:<edrpou>:<page>) so the card's back button
+// returns to the page the user came from.
 export function handleWatchedNav({ entities, data, canManage = false }) {
   if (data === 'wat:noop') return null;
-  const parts = data.split(':'); // wat:menu:<page> | wat:e:<edrpou>
-  if (parts[1] === 'e') return buildWatchedEntityCard({ entities, edrpou: parts[2], canManage });
+  const parts = data.split(':'); // wat:menu:<page> | wat:e:<edrpou>:<page>
+  if (parts[1] === 'e') return buildWatchedEntityCard({ entities, edrpou: parts[2], canManage, page: Number(parts[3] ?? 0) });
   if (parts[1] === 'menu') return buildWatchedMenu({ entities, page: Number(parts[2] ?? 0) });
   return buildWatchedMenu({ entities, page: 0 });
 }
@@ -1068,7 +1072,6 @@ export function findContractDate(entry) {
   return entry.archived_at ?? null;
 }
 
-const ARCH_PER_PAGE = 6;
 const MONTHS_UK = ['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень',
   'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'];
 
@@ -1202,20 +1205,15 @@ export function renderArchivePage({ archive, filter, page = 0 }) {
     };
   }
   const { entries, header, back, cbBase } = resolved;
-  const pages = Math.max(1, Math.ceil(entries.length / ARCH_PER_PAGE));
+  const pages = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
   const p = Math.min(Math.max(0, page | 0), pages - 1);
-  const start = p * ARCH_PER_PAGE;
-  const body = entries.slice(start, start + ARCH_PER_PAGE)
+  const start = p * PAGE_SIZE;
+  const body = entries.slice(start, start + PAGE_SIZE)
     .map((a, i) => renderArchiveItem(a, start + i, findContractDate(a)))
     .join('\n\n');
   const rows = [];
-  if (pages > 1) {
-    const nav = [];
-    if (p > 0) nav.push({ text: '◀ Назад', callback_data: `${cbBase}:${p - 1}` });
-    nav.push({ text: `${p + 1}/${pages}`, callback_data: 'arch:noop' });
-    if (p < pages - 1) nav.push({ text: 'Далі ▶', callback_data: `${cbBase}:${p + 1}` });
-    rows.push(nav);
-  }
+  const nav = buildPageNavRow(p, pages, (x) => `${cbBase}:${x}`, 'arch:noop');
+  if (nav) rows.push(nav);
   rows.push(back);
   return { text: `${header}\n\n${body}`, keyboard: { inline_keyboard: rows } };
 }
@@ -1806,7 +1804,6 @@ export function buildAgentConfirmText({ company, price, tenderId, entityName }) 
   return `🤖 Компанія: ${company} · Ціна: ${price} · Тендер: ${tenderId}${ent}`;
 }
 
-const AGENT_PER_PAGE = 6;
 
 export function buildAgentMenu() {
   return {
@@ -1828,18 +1825,13 @@ export function buildAgentPickView({ tenders, page = 0 }) {
       keyboard: { inline_keyboard: [[{ text: '⬅ Назад', callback_data: 'agent:menu' }]] },
     };
   }
-  const pages = Math.max(1, Math.ceil(list.length / AGENT_PER_PAGE));
+  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
   const p = Math.min(Math.max(0, page | 0), pages - 1);
-  const slice = list.slice(p * AGENT_PER_PAGE, p * AGENT_PER_PAGE + AGENT_PER_PAGE);
+  const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
   const kb = buildAgentTenderListKeyboard(slice);
   const rows = kb ? [...kb.inline_keyboard] : [];
-  if (pages > 1) {
-    const nav = [];
-    if (p > 0) nav.push({ text: '◀ Назад', callback_data: `agent:pick:${p - 1}` });
-    nav.push({ text: `${p + 1}/${pages}`, callback_data: 'agent:noop' });
-    if (p < pages - 1) nav.push({ text: 'Далі ▶', callback_data: `agent:pick:${p + 1}` });
-    rows.push(nav);
-  }
+  const nav = buildPageNavRow(p, pages, (x) => `agent:pick:${x}`, 'agent:noop');
+  if (nav) rows.push(nav);
   rows.push([{ text: '⬅ Назад', callback_data: 'agent:menu' }]);
   return { text: '🤖 Оберіть тендер (приймання пропозицій):', keyboard: { inline_keyboard: rows } };
 }
@@ -1854,9 +1846,9 @@ export function buildAgentJobsPage({ jobs, page = 0 }) {
       keyboard: { inline_keyboard: [[{ text: '⬅ Назад', callback_data: 'agent:menu' }]] },
     };
   }
-  const pages = Math.max(1, Math.ceil(list.length / AGENT_PER_PAGE));
+  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
   const p = Math.min(Math.max(0, page | 0), pages - 1);
-  const slice = list.slice(p * AGENT_PER_PAGE, p * AGENT_PER_PAGE + AGENT_PER_PAGE);
+  const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
   const body = slice.map((j) => {
     const icon = AGENT_JOB_ICONS[j.status] ?? '•';
     const co = j.company ? ` · ${escapeHtml(j.company)}` : '';
@@ -1869,13 +1861,8 @@ export function buildAgentJobsPage({ jobs, page = 0 }) {
       rows.push([{ text: `📁 ${j.tender_id}`, url: j.result.drive_link }]);
     }
   }
-  if (pages > 1) {
-    const nav = [];
-    if (p > 0) nav.push({ text: '◀ Назад', callback_data: `agent:jobs:${p - 1}` });
-    nav.push({ text: `${p + 1}/${pages}`, callback_data: 'agent:noop' });
-    if (p < pages - 1) nav.push({ text: 'Далі ▶', callback_data: `agent:jobs:${p + 1}` });
-    rows.push(nav);
-  }
+  const nav = buildPageNavRow(p, pages, (x) => `agent:jobs:${x}`, 'agent:noop');
+  if (nav) rows.push(nav);
   rows.push([{ text: '⬅ Назад', callback_data: 'agent:menu' }]);
   return { text: `📊 <b>Останні задачі агента</b>\n\n${body}`, keyboard: { inline_keyboard: rows } };
 }
