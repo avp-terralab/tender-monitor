@@ -271,6 +271,33 @@ export async function loadAgentJob(env, tenderId, { fetch: fetchImpl = fetch } =
   }
 }
 
+// Lists _state/agent_jobs/, reads each <tid>.json, returns the 20 newest jobs
+// (by created_at desc). Missing dir → []. Used by the agent «Останні задачі» view.
+export async function listAgentJobs(env, { fetch: fetchImpl = fetch } = {}) {
+  const res = await fetchImpl(
+    `${API_BASE}/repos/${REPO}/contents/_state/agent_jobs?ref=main`,
+    {
+      headers: {
+        Authorization: `Bearer ${env.GITHUB_PAT}`,
+        'User-Agent': 'tender-monitor-worker',
+        Accept: 'application/vnd.github+json',
+      },
+    },
+  );
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`GitHub GET ${res.status}: list agent_jobs`);
+  const items = await res.json();
+  if (!Array.isArray(items)) return [];
+  const tids = items
+    .filter((it) => it.type === 'file' && it.name.endsWith('.json'))
+    .map((it) => it.name.replace(/\.json$/, ''));
+  const jobs = await Promise.all(tids.map((tid) => loadAgentJob(env, tid, { fetch: fetchImpl })));
+  return jobs
+    .filter(Boolean)
+    .sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')))
+    .slice(0, 20);
+}
+
 // Returns the latest non-bot commit on main — skips state-update and cursor-sync
 // commits made by the monitor cron so /status shows when code was last deployed.
 export async function fetchLatestDeployCommit(env, { fetch: fetchImpl = fetch } = {}) {
