@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseCommand, mainKeyboard, buildAutoNotes, formatAddReply,
-  applyMutation, handleAdd, handleStatus, handleRemove, formatInfo, formatInfoPages,
+  applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, handleWhoami, handleUsersList, handleInvitesList, HELP_TEXT,
@@ -2770,103 +2770,6 @@ test('handleStatus: rich + non-empty buffer renders item count and oldest time',
   // "найстаріша подія HH:MM" — time formatted in Kyiv tz from 02:14 UTC = 05:14 EEST
   assert.match(text, /🌙 Нічний буфер: 3 тендер.*найстаріша подія 05:14/);
   assert.doesNotMatch(text, /🚀 Деплой/);  // omitted when null
-});
-
-// ── formatInfoPages tests ─────────────────────────────────────────────────────
-
-const PE = { name: 'КНП Тест', edrpou: '11111111' };
-const mkGroup = (id, status, deadline = null) => ({
-  tender_id: id,
-  prozorro_url: `https://prozorro.gov.ua/tender/${id}`,
-  status,
-  deadline,
-  procuring_entity: PE,
-  value: null, classification: null, contact: null, awards: [],
-});
-const RUN = '2026-05-26T20:45:00+03:00';
-
-test('formatInfoPages: empty → single friendly message', () => {
-  assert.deepEqual(formatInfoPages({ runIso: RUN, groups: [], errors: [] }),
-    ['📭 Немає активних тендерів.']);
-});
-
-test('formatInfoPages: one tender per phase → one page each, in pipeline order', () => {
-  const groups = [
-    mkGroup('UA-Q', 'active.qualification'),
-    mkGroup('UA-T', 'active.tendering', '2026-06-01T10:00:00+03:00'),
-    mkGroup('UA-AW', 'active.awarded'),
-  ];
-  const pages = formatInfoPages({ runIso: RUN, groups, errors: [] });
-  assert.equal(pages.length, 3);
-  assert.match(pages[0], /📥 Приймання пропозицій \(1\)/);
-  assert.match(pages[1], /🔍 Розгляд пропозицій \(1\)/);
-  assert.match(pages[2], /✍️ Очікування підписання договору \(1\)/);
-});
-
-test('formatInfoPages: global header only on the first page', () => {
-  const groups = [
-    mkGroup('UA-T', 'active.tendering', '2026-06-01T10:00:00+03:00'),
-    mkGroup('UA-Q', 'active.qualification'),
-  ];
-  const pages = formatInfoPages({ runIso: RUN, groups, errors: [] });
-  assert.match(pages[0], /📋 Статус тендерів \(/);
-  assert.doesNotMatch(pages[1], /📋 Статус тендерів/);
-});
-
-test('formatInfoPages: tendering sorted by deadline ascending, null deadline last', () => {
-  const groups = [
-    mkGroup('UA-LATE', 'active.tendering', '2026-06-10T10:00:00+03:00'),
-    mkGroup('UA-NONE', 'active.tendering', null),
-    mkGroup('UA-SOON', 'active.tendering', '2026-06-01T10:00:00+03:00'),
-  ];
-  const [page] = formatInfoPages({ runIso: RUN, groups, errors: [] });
-  const order = ['UA-SOON', 'UA-LATE', 'UA-NONE'].map(id => page.indexOf(id));
-  assert.ok(order[0] < order[1] && order[1] < order[2], `unexpected order: ${order}`);
-});
-
-test('formatInfoPages: non-tendering phase sorted by tender_id', () => {
-  const groups = [
-    mkGroup('UA-Z', 'active.qualification'),
-    mkGroup('UA-A', 'active.qualification'),
-  ];
-  const [page] = formatInfoPages({ runIso: RUN, groups, errors: [] });
-  assert.ok(page.indexOf('UA-A') < page.indexOf('UA-Z'));
-});
-
-test('formatInfoPages: unknown status falls into 📦 Інші статуси', () => {
-  const pages = formatInfoPages({
-    runIso: RUN, groups: [mkGroup('UA-X', 'active.weird')], errors: [],
-  });
-  assert.equal(pages.length, 1);
-  assert.match(pages[0], /📦 Інші статуси \(1\)/);
-});
-
-test('formatInfoPages: errors become a final page', () => {
-  const pages = formatInfoPages({
-    runIso: RUN,
-    groups: [mkGroup('UA-T', 'active.tendering', '2026-06-01T10:00:00+03:00')],
-    errors: [{ tender_id: 'UA-ERR', error: 'Prozorro 503' }],
-  });
-  assert.equal(pages.length, 2);
-  assert.match(pages[1], /⚠️ Не вдалось перевірити \(1\)/);
-  assert.match(pages[1], /UA-ERR — Prozorro 503/);
-});
-
-test('formatInfoPages: entry body equals formatInfoEntry output', () => {
-  const g = mkGroup('UA-T', 'active.tendering', '2026-06-01T10:00:00+03:00');
-  const [page] = formatInfoPages({ runIso: RUN, groups: [g], errors: [] });
-  assert.ok(page.includes(`🆔 Ідентифікатор закупівлі`));
-  assert.ok(page.includes('UA-T'));
-});
-
-test('formatInfoPages: errors-only (no groups) still produces an errors page with header', () => {
-  const pages = formatInfoPages({
-    runIso: RUN, groups: [], errors: [{ tender_id: 'UA-ERR', error: 'Prozorro 503' }],
-  });
-  assert.equal(pages.length, 1);
-  assert.match(pages[0], /📋 Статус тендерів \(/);          // global header still prepended
-  assert.match(pages[0], /⚠️ Не вдалось перевірити \(1\)/);
-  assert.match(pages[0], /UA-ERR — Prozorro 503/);
 });
 
 // ── Task 1: sanitizeActor + formatAuditMessage ────────────────────────────
