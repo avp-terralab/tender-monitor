@@ -155,7 +155,7 @@ worker шле **до 6 окремих повідомлень** (одне на ф
   (тільки для `menu`/`pick`/`jobs`/`noop`; `start/co/confirm/cancel` лишаються в worker).
 - `worker/src/github.mjs`: **нова** `listAgentJobs(env)` — лістинг директорії
   `_state/agent_jobs/` (GitHub contents API) + читання кожного `<tid>.json`. Сортувати
-  за `created_at` desc, обрізати до розумного N (напр. 20) перед пагінацією.
+  за `created_at` desc, обрізати до останніх **20** перед пагінацією (6/стор).
 - Job-shape (наявний): `{ tender_id, company, price, status, created_at, result?.drive_link }`.
 
 ### Worker
