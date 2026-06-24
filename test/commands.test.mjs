@@ -14,7 +14,7 @@ import {
   parseAuditCommit,
   formatAuditLog,
   buildWatchedKeyboard,
-  buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
+  buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT, buildWatchedMenu,
   paginateArchiveGroup, ARCHIVE_PAGE_LIMIT,
   findContractDate, buildArchiveMenu, groupArchiveByProvider, buildArchiveCompanyList,
   groupArchiveByYear, buildArchiveYearList, buildArchiveMonthList, renderArchivePage, handleArchiveNav,
@@ -3423,4 +3423,32 @@ test('auditPhrase: watch_pause / watch_resume render readable', () => {
   ], { limit: 10 });
   assert.match(out, /призупинив стеження за 12345678/);
   assert.match(out, /відновив стеження за 12345678/);
+});
+
+// ── Task 3: buildWatchedMenu ──────────────────────────────────────────────────
+const watEnt = (edrpou, enabled = true, name = `Замовник ${edrpou}`) => ({ edrpou, name, enabled });
+
+test('buildWatchedMenu: empty → keyboard null', () => {
+  assert.equal(buildWatchedMenu({ entities: [], page: 0 }).keyboard, null);
+});
+
+test('buildWatchedMenu: one button per entity, callback wat:e:<edrpou>, icon by enabled', () => {
+  const m = buildWatchedMenu({ entities: [watEnt('11111111', true), watEnt('22222222', false)], page: 0 });
+  const rows = m.keyboard.inline_keyboard;
+  assert.equal(rows[0][0].callback_data, 'wat:e:11111111');
+  assert.match(rows[0][0].text, /^🟢/);
+  assert.match(rows[1][0].text, /^🔴/);
+  assert.match(m.text, /Моніторинг замовників/);
+});
+
+test('buildWatchedMenu: 6/page with nav arrows', () => {
+  const entities = Array.from({ length: 8 }, (_, i) => watEnt(String(10000000 + i)));
+  const r0 = buildWatchedMenu({ entities, page: 0 }).keyboard.inline_keyboard;
+  const nav0 = r0.find((row) => row.some((b) => b.callback_data === 'wat:noop'));
+  assert.ok(nav0.some((b) => b.text === 'Далі ▶'));
+  assert.ok(nav0.some((b) => b.text === '1/2'));
+  const r1 = buildWatchedMenu({ entities, page: 1 }).keyboard.inline_keyboard;
+  const nav1 = r1.find((row) => row.some((b) => b.callback_data === 'wat:noop'));
+  assert.ok(nav1.some((b) => b.text === '◀ Назад'));
+  assert.equal(nav1.find((b) => b.callback_data?.startsWith('wat:menu')).callback_data, 'wat:menu:0');
 });

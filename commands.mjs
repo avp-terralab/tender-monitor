@@ -636,6 +636,34 @@ export function buildWatchedManageKeyboard(watchedEntities) {
   return { inline_keyboard: [...base.inline_keyboard, [{ text: '← Готово', callback_data: 'watched:done' }]] };
 }
 
+const WAT_PER_PAGE = 6;
+
+export function buildWatchedMenu({ entities, page = 0 }) {
+  if (!entities || entities.length === 0) {
+    return { text: '📭 Не стежу за жодним замовником. Додай: /watch ЄДРПОУ', keyboard: null };
+  }
+  const pages = Math.max(1, Math.ceil(entities.length / WAT_PER_PAGE));
+  const p = Math.min(Math.max(0, page | 0), pages - 1);
+  const start = p * WAT_PER_PAGE;
+  const slice = entities.slice(start, start + WAT_PER_PAGE);
+  const text = `👁 <b>Моніторинг замовників</b> — ${entities.length}\n🟢 активні · 🔴 призупинені`;
+  const rows = slice.map((e) => {
+    const icon = e.enabled ? '🟢' : '🔴';
+    const name = e.name && e.name !== '(unknown)'
+      ? truncate(abbreviateLegalForm(e.name), 48) : '';
+    const label = name ? `${icon} ${name} · ${e.edrpou}` : `${icon} ${e.edrpou}`;
+    return [{ text: label, callback_data: `wat:e:${e.edrpou}` }];
+  });
+  if (pages > 1) {
+    const nav = [];
+    if (p > 0) nav.push({ text: '◀ Назад', callback_data: `wat:menu:${p - 1}` });
+    nav.push({ text: `${p + 1}/${pages}`, callback_data: 'wat:noop' });
+    if (p < pages - 1) nav.push({ text: 'Далі ▶', callback_data: `wat:menu:${p + 1}` });
+    rows.push(nav);
+  }
+  return { text, keyboard: { inline_keyboard: rows } };
+}
+
 export function handleUnwatch({ watchedEntities }, { edrpou }) {
   const existing = watchedEntities.find(e => e.edrpou === edrpou);
   if (!existing) {
