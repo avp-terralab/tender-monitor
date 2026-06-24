@@ -1806,6 +1806,44 @@ export function buildAgentConfirmText({ company, price, tenderId, entityName }) 
   return `🤖 Компанія: ${company} · Ціна: ${price} · Тендер: ${tenderId}${ent}`;
 }
 
+const AGENT_PER_PAGE = 6;
+
+export function buildAgentMenu() {
+  return {
+    text: '🤖 <b>Агент</b>',
+    keyboard: { inline_keyboard: [
+      [{ text: '🚀 Надіслати тендер агенту', callback_data: 'agent:pick:0' }],
+      [{ text: '📊 Останні задачі', callback_data: 'agent:jobs:0' }],
+    ] },
+  };
+}
+
+// Paginated tender picker. Reuses buildAgentTenderListKeyboard for the per-page
+// slice (keeps the 🤖 + prepared-link rows), adds nav + ⬅ back to the agent menu.
+export function buildAgentPickView({ tenders, page = 0 }) {
+  const list = tenders ?? [];
+  if (list.length === 0) {
+    return {
+      text: '📭 Немає тендерів у статусі «Приймання пропозицій».',
+      keyboard: { inline_keyboard: [[{ text: '⬅ Назад', callback_data: 'agent:menu' }]] },
+    };
+  }
+  const pages = Math.max(1, Math.ceil(list.length / AGENT_PER_PAGE));
+  const p = Math.min(Math.max(0, page | 0), pages - 1);
+  const slice = list.slice(p * AGENT_PER_PAGE, p * AGENT_PER_PAGE + AGENT_PER_PAGE);
+  const kb = buildAgentTenderListKeyboard(slice);
+  const rows = kb ? [...kb.inline_keyboard] : [];
+  if (pages > 1) {
+    const nav = [];
+    if (p > 0) nav.push({ text: '◀ Назад', callback_data: `agent:pick:${p - 1}` });
+    nav.push({ text: `${p + 1}/${pages}`, callback_data: 'agent:noop' });
+    if (p < pages - 1) nav.push({ text: 'Далі ▶', callback_data: `agent:pick:${p + 1}` });
+    rows.push(nav);
+  }
+  rows.push([{ text: '⬅ Назад', callback_data: 'agent:menu' }]);
+  return { text: '🤖 Оберіть тендер (приймання пропозицій):', keyboard: { inline_keyboard: rows } };
+}
+
 // The job record handed to the offline agent. Shape matches the integration
 // contract (snake_case keys, status 'pending'). `company` is the full name.
 export function buildAgentJob({ tenderId, link, company, price, requestedBy, createdAt }) {

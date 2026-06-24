@@ -21,6 +21,7 @@ import {
   AGENT_COMPANIES, companyForSlug, slugForCompany,
   agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
+  buildAgentMenu, buildAgentPickView,
   monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
   buildWatchedEntityCard, handleWatchedNav,
 } from '../commands.mjs';
@@ -3485,4 +3486,33 @@ test('handleWatchedNav: noop→null; menu/e routing', () => {
   assert.equal(handleWatchedNav({ entities: ent, data: 'wat:noop', canManage: true }), null);
   assert.match(handleWatchedNav({ entities: ent, data: 'wat:menu:0', canManage: true }).text, /Моніторинг замовників/);
   assert.match(handleWatchedNav({ entities: ent, data: 'wat:e:11111111', canManage: true }).text, /Замовник 11111111|11111111/);
+});
+
+const pickTender = (id, notes, preparedUrl) => ({ tender_id: id, enabled: true, notes, preparedUrl });
+
+test('buildAgentMenu: two action buttons', () => {
+  const m = buildAgentMenu();
+  const cbs = m.keyboard.inline_keyboard.flat().map((b) => b.callback_data);
+  assert.deepEqual(cbs, ['agent:pick:0', 'agent:jobs:0']);
+});
+
+test('buildAgentPickView: empty → back to menu only', () => {
+  const v = buildAgentPickView({ tenders: [], page: 0 });
+  assert.match(v.text, /Немає тендерів/);
+  assert.equal(v.keyboard.inline_keyboard[0][0].callback_data, 'agent:menu');
+});
+
+test('buildAgentPickView: tender buttons + back row', () => {
+  const v = buildAgentPickView({ tenders: [pickTender('UA-2026-06-01-000002-a', 'КНП')], page: 0 });
+  const cbs = JSON.stringify(v.keyboard.inline_keyboard);
+  assert.match(cbs, /agent:start:UA-2026-06-01-000002-a/);
+  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'agent:menu');
+});
+
+test('buildAgentPickView: 6/page nav arrows', () => {
+  const tenders = Array.from({ length: 8 }, (_, i) => pickTender(`UA-2026-06-01-00000${i}-a`, `n${i}`));
+  const r0 = buildAgentPickView({ tenders, page: 0 }).keyboard.inline_keyboard;
+  const nav0 = r0.find((row) => row.some((b) => b.callback_data === 'agent:noop'));
+  assert.ok(nav0.some((b) => b.text === 'Далі ▶' && b.callback_data === 'agent:pick:1'));
+  assert.ok(nav0.some((b) => b.text === '1/2'));
 });
