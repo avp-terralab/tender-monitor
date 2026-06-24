@@ -1077,6 +1077,37 @@ async function handleAgentCallback({
     return;
   }
 
+  if (action === 'amend') {
+    let prior;
+    try {
+      prior = await _loadAgentJob(env, tid);
+    } catch (err) {
+      console.error('worker: agent amend load job failed:', err.message);
+      await ack('⚠️ GitHub тимчасово недоступний', true);
+      return;
+    }
+    if (!prior || prior.status !== 'done' || !prior.result?.drive_link) {
+      await ack('🚫 Пропозиція ще не готова', true);
+      return;
+    }
+    try {
+      const { pending, sha } = await _loadAgentPending(env);
+      pending[chatId] = { tid, kind: 'amend', step: 'await_instruction', at: _now().toISOString() };
+      await _saveAgentPending(env, pending, sha);
+    } catch (err) {
+      console.error('worker: agent amend save pending failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
+    }
+    try {
+      await sendNew(`✏️ Напиши, що доробити в пропозиції ${tid} (одним повідомленням):`);
+    } catch (err) {
+      console.error('worker: agent amend prompt send failed:', err.message);
+    }
+    await ack();
+    return;
+  }
+
   if (action === 'start') {
     // Authoritative gate (covers /agent, /info and digest buttons): the agent
     // runs only while the tender is accepting proposals (active.tendering).

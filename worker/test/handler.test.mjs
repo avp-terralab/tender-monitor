@@ -2738,6 +2738,26 @@ test('agent:cancel → pending cleared, Скасовано reply', async () => {
   assert.equal(acks.length, 1);
 });
 
+test('agent:amend on prepared tender → instruction dialog started', async () => {
+  const { deps, store, sent, acks } = makeAgentDeps({
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'done', company: 'МАЙЛАБ', result: { drive_link: 'https://drive/x' } }),
+  });
+  await runHandler({ update: CB(`agent:amend:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(store.pending['123'].step, 'await_instruction');
+  assert.equal(store.pending['123'].kind, 'amend');
+  assert.match(sent.at(-1).text, /що доробити/);
+  assert.equal(acks.length, 1);
+});
+
+test('agent:amend on not-prepared tender → rejected, no dialog', async () => {
+  const { deps, store, acks } = makeAgentDeps({
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'pending' }),
+  });
+  await runHandler({ update: CB(`agent:amend:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(store.pending['123'], undefined);
+  assert.match(acks[0].text, /не готова/);
+});
+
 test('non-admin text while no pending → normal handling (price step not triggered)', async () => {
   // A viewer typing a number must not be swallowed by the agent price step.
   const { deps, sent } = makeAgentDeps({
