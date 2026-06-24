@@ -2730,14 +2730,15 @@ test('non-admin text while no pending → normal handling (price step not trigge
 });
 
 
-test('runHandler: /agent (admin) lists watched tenders as agent:start buttons', async () => {
+test('runHandler: /agent (admin) → action menu (pick + jobs)', async () => {
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true, notes: 'Тест' }], sha: 's' }),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
   assert.equal(sent.length, 1);
-  assert.ok(sent[0].replyMarkup.inline_keyboard, 'inline_keyboard expected');
-  assert.equal(sent[0].replyMarkup.inline_keyboard[0][0].callback_data, `agent:start:${ID}`);
+  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.match(cbs, /agent:pick:0/);
+  assert.match(cbs, /agent:jobs:0/);
 });
 
 test('runHandler: /agent for non-admin → no reply', async () => {
@@ -2759,7 +2760,7 @@ test('runHandler: /info <id> (admin) attaches the «Надіслати аген�
 });
 
 
-test('runHandler: /agent keeps only active.tendering tenders', async () => {
+test('runHandler: /agent (admin, multiple watchlist entries) → menu (filtering moves to pick callback)', async () => {
   const OTHER = 'UA-2026-04-30-088888-b';
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [
@@ -2771,19 +2772,20 @@ test('runHandler: /agent keeps only active.tendering tenders', async () => {
       : { data: { ...RAW_OK.data, tenderID: OTHER, status: 'active.qualification' } },
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
-  const kb = sent[0].replyMarkup.inline_keyboard;
-  assert.equal(kb.length, 1, 'only the active.tendering tender');
-  assert.equal(kb[0][0].callback_data, `agent:start:${ID}`);
+  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.match(cbs, /agent:pick:0/);
 });
 
-test('runHandler: /agent with none in tendering → no buttons', async () => {
+test('runHandler: /agent with none in tendering → menu shown (pick button shows empty in T6)', async () => {
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true }], sha: 's' }),
     fetchTender: async () => ({ data: { ...RAW_OK.data, status: 'active.qualification' } }),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
-  assert.match(sent[0].text, /Немає тендерів/);
-  assert.ok(!sent[0].replyMarkup || !sent[0].replyMarkup.inline_keyboard);
+  assert.equal(sent.length, 1);
+  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.match(cbs, /agent:pick:0/);
+  assert.match(cbs, /agent:jobs:0/);
 });
 
 test('runHandler: /info <id> for non-tendering tender → no agent button', async () => {
@@ -2797,16 +2799,29 @@ test('runHandler: /info <id> for non-tendering tender → no agent button', asyn
 });
 
 
-test('runHandler: /agent shows «підготовлена ✅» link for a tender with a done job', async () => {
+test('runHandler: /agent with a done job → menu shown (done-job link moves to pick view in T6)', async () => {
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true, notes: 'КНП «Х»' }], sha: 's' }),
     loadAgentJob: async () => ({ tender_id: ID, status: 'done', result: { drive_link: 'https://drive.google.com/drive/folders/REAL' } }),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
-  const kb = sent[0].replyMarkup.inline_keyboard;
-  assert.equal(kb[0][0].callback_data, `agent:start:${ID}`);
-  assert.match(kb[1][0].text, /Тендерна пропозиція підготовлена ✅/);
-  assert.equal(kb[1][0].url, 'https://drive.google.com/drive/folders/REAL');
+  assert.equal(sent.length, 1);
+  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.match(cbs, /agent:pick:0/);
+  assert.match(cbs, /agent:jobs:0/);
+});
+
+test('runHandler: /agent (admin) → menu with pick + jobs buttons', async () => {
+  const sent = [];
+  await runHandler({
+    update: { message: { chat: { id: 123 }, message_id: 7, text: '🤖 Агент', from: { id: 123 } } },
+    env: ENV,
+    deps: { ...makeDeps().deps, sendReply: async (a) => sent.push(a) },
+  });
+  assert.equal(sent.length, 1);
+  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.match(cbs, /agent:pick:0/);
+  assert.match(cbs, /agent:jobs:0/);
 });
 
 test('runHandler: /info (no id) → single menu message with mon:ph button', async () => {

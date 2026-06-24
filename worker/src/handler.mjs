@@ -16,6 +16,7 @@ import {
   companyForSlug, agentTriggerButtonRow, buildAgentTenderListKeyboard,
   buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
+  buildAgentMenu, buildAgentPickView, buildAgentJobsPage, handleAgentMenuNav,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
@@ -29,6 +30,7 @@ import {
   loadPendingDigest, loadTenderState, fetchLatestDeployCommit,
   fetchAuditLog,
   loadAgentPending, saveAgentPending, saveAgentJob, loadAgentJob,
+  listAgentJobs,
   ConflictError,
 } from './github.mjs';
 
@@ -77,6 +79,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const _saveAgentPending = deps.saveAgentPending ?? saveAgentPending;
   const _saveAgentJob = deps.saveAgentJob ?? saveAgentJob;
   const _loadAgentJob = deps.loadAgentJob ?? loadAgentJob;
+  const _listAgentJobs = deps.listAgentJobs ?? listAgentJobs;
   // Tests may inject their own Map to avoid cross-test cache pollution.
   const _statusCache = deps.statusCache ?? STATUS_CACHE;
 
@@ -88,7 +91,7 @@ export async function runHandler({ update, env, deps = {} }) {
       _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
       _loadWatchedEntities, _saveWatchedEntities,
       _fetchTender, _extractSnapshot,
-      _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
+      _loadAgentPending, _saveAgentPending, _saveAgentJob, _loadAgentJob, _listAgentJobs, _now,
     });
   }
 
@@ -622,37 +625,9 @@ export async function runHandler({ update, env, deps = {} }) {
     }
   } else if (cmd.cmd === 'agent') {
     if (!isAdmin) return;
-    try {
-      const { watchlist } = await _loadWatchlist(env);
-      // Agent runs only while proposals are accepted — keep only active.tendering.
-      const checked = await Promise.all(
-        watchlist.filter(r => r.enabled).map(async r => {
-          try {
-            const snap = _extractSnapshot(await _fetchTender(r.tender_id));
-            if (snap.status !== 'active.tendering') return null;
-            // If a proposal was already prepared, attach its Drive folder link.
-            let preparedUrl = null;
-            try {
-              const job = await _loadAgentJob(env, r.tender_id);
-              if (job && job.status === 'done' && job.result?.drive_link) {
-                preparedUrl = job.result.drive_link;
-              }
-            } catch { /* link is optional — ignore lookup failures */ }
-            return { ...r, preparedUrl };
-          } catch { return null; }
-        }),
-      );
-      const kb = buildAgentTenderListKeyboard(checked.filter(Boolean));
-      if (!kb) {
-        reply = '📭 Немає тендерів у статусі «Приймання пропозицій».';
-      } else {
-        reply = '🤖 Оберіть тендер (приймання пропозицій), щоб надіслати агенту:';
-        agentReplyMarkup = kb;
-      }
-    } catch (err) {
-      console.error('worker: /agent failed:', err.message);
-      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
-    }
+    const menu = buildAgentMenu();
+    reply = menu.text;
+    agentReplyMarkup = menu.keyboard;
   } else if (cmd.cmd === 'unknown') {
     reply = '❓ Не розумію. /help';
   } else {
@@ -747,7 +722,7 @@ async function handleCallbackQuery({
   _loadWatchlist, _saveWatchlist, _loadArchivedTenders,
   _loadWatchedEntities, _saveWatchedEntities,
   _fetchTender, _extractSnapshot,
-  _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
+  _loadAgentPending, _saveAgentPending, _saveAgentJob, _loadAgentJob, _listAgentJobs, _now,
 }) {
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const chatId = String(cq.message?.chat?.id ?? '');
