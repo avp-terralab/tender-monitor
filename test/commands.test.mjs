@@ -21,7 +21,7 @@ import {
   AGENT_COMPANIES, companyForSlug, slugForCompany,
   agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
-  monitorPhaseBuckets, buildMonitorMenu,
+  monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -3457,4 +3457,35 @@ test('buildMonitorMenu: errors footer line', () => {
     errors: [{ tender_id: 'UA-2026-06-01-000009-a', error: '404' }],
   });
   assert.match(m.text, /Не вдалось перевірити: 1/);
+});
+
+test('renderMonitorPage: 6/page nav arrows, header, card content', () => {
+  const groups = Array.from({ length: 8 }, (_, i) =>
+    monGroup('active.qualification', `UA-2026-06-01-00000${i}-a`));
+  const pg0 = renderMonitorPage({ groups, phaseIdx: 3, page: 0, runIso: '2026-06-24T13:00:00Z', role: 'viewer' });
+  const nav0 = pg0.keyboard.inline_keyboard.find((r) => r.some((b) => b.callback_data === 'mon:noop'));
+  assert.ok(nav0.some((b) => b.text === 'Далі ▶'));
+  assert.ok(nav0.some((b) => b.text === '1/2'));
+  assert.ok(!nav0.some((b) => b.text === '◀ Назад'));
+  assert.match(pg0.text, /Розгляд пропозицій/);
+  assert.match(pg0.text, /prozorro\.gov\.ua\/tender\//);
+  const back = pg0.keyboard.inline_keyboard.at(-1)[0];
+  assert.equal(back.callback_data, 'mon:menu');
+  const pg1 = renderMonitorPage({ groups, phaseIdx: 3, page: 1, runIso: '2026-06-24T13:00:00Z', role: 'viewer' });
+  const nav1 = pg1.keyboard.inline_keyboard.find((r) => r.some((b) => b.callback_data === 'mon:noop'));
+  assert.ok(nav1.some((b) => b.text === '◀ Назад'));
+  assert.ok(!nav1.some((b) => b.text === 'Далі ▶'));
+});
+
+test('renderMonitorPage: admin gets 🤖 buttons only on tendering phase', () => {
+  const groups = [monGroup('active.tendering', 'UA-2026-06-01-000002-a')];
+  const asAdmin = renderMonitorPage({ groups, phaseIdx: 0, page: 0, runIso: '2026-06-24T13:00:00Z', role: 'admin' });
+  assert.match(JSON.stringify(asAdmin.keyboard.inline_keyboard), /agent:start:UA-2026-06-01-000002-a/);
+  const asViewer = renderMonitorPage({ groups, phaseIdx: 0, page: 0, runIso: '2026-06-24T13:00:00Z', role: 'viewer' });
+  assert.ok(!JSON.stringify(asViewer.keyboard.inline_keyboard).includes('agent:start'));
+});
+
+test('renderMonitorPage: unknown phaseIdx → falls back to menu', () => {
+  const pg = renderMonitorPage({ groups: [monGroup('active.tendering')], phaseIdx: 99, page: 0, runIso: '2026-06-24T13:00:00Z', role: 'viewer' });
+  assert.match(pg.text, /Моніторинг закупівель/);
 });

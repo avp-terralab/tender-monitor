@@ -480,6 +480,35 @@ export function buildMonitorMenu({ groups, runIso, errors = [] }) {
   return { text, keyboard: { inline_keyboard: rows } };
 }
 
+export function renderMonitorPage({ groups, phaseIdx, page = 0, runIso, role }) {
+  const bucket = monitorPhaseBuckets(groups).find((b) => b.idx === phaseIdx);
+  if (!bucket) return buildMonitorMenu({ groups, runIso });
+  const { items } = bucket;
+  const pages = Math.max(1, Math.ceil(items.length / MON_PER_PAGE));
+  const p = Math.min(Math.max(0, page | 0), pages - 1);
+  const start = p * MON_PER_PAGE;
+  const slice = items.slice(start, start + MON_PER_PAGE);
+  const header = `${bucket.emoji} <b>${bucket.label}</b> (${items.length})`;
+  const body = slice
+    .map((g, i) => `━━━━━━ ${start + i + 1} ━━━━━━\n${formatInfoEntry(g, runIso)}`)
+    .join('\n\n');
+  const rows = [];
+  if (role === 'admin' && MON_PHASES[phaseIdx].statuses.includes('active.tendering')) {
+    rows.push(slice.map((g, i) => ({
+      text: `🤖 ${start + i + 1}`, callback_data: `agent:start:${g.tender_id}`,
+    })));
+  }
+  if (pages > 1) {
+    const nav = [];
+    if (p > 0) nav.push({ text: '◀ Назад', callback_data: `mon:ph:${phaseIdx}:${p - 1}` });
+    nav.push({ text: `${p + 1}/${pages}`, callback_data: 'mon:noop' });
+    if (p < pages - 1) nav.push({ text: 'Далі ▶', callback_data: `mon:ph:${phaseIdx}:${p + 1}` });
+    rows.push(nav);
+  }
+  rows.push([{ text: '⬅ Меню', callback_data: 'mon:menu' }]);
+  return { text: `${header}\n\n${body}`, keyboard: { inline_keyboard: rows } };
+}
+
 const KYIV_HM_FMT = new Intl.DateTimeFormat('uk-UA', {
   timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
 });
