@@ -16,6 +16,7 @@ import {
   companyForSlug, agentTriggerButtonRow, buildAgentTenderListKeyboard,
   buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
+  validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage, handleAgentMenuNav,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
@@ -109,7 +110,7 @@ export async function runHandler({ update, env, deps = {} }) {
   // the next plain text message is the price — intercept it before command parsing.
   // Admin-only (the dialog can only be opened by an admin in the first place).
   if (isAdmin && typeof msg.text === 'string' && !msg.text.startsWith('/')) {
-    const handled = await handleAgentPriceReply({
+    const handled = await handleAgentTextReply({
       env, chatId, msg, _sendReply,
       _loadAgentPending, _saveAgentPending, _now,
     });
@@ -1195,7 +1196,7 @@ async function clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPen
 // Handles a plain text message from an admin who is mid-agent-dialog at the
 // price step. Returns true if it consumed the message (so the caller stops),
 // false if there was no pending price step (caller continues normal parsing).
-async function handleAgentPriceReply({
+async function handleAgentTextReply({
   env, chatId, msg, _sendReply, _loadAgentPending, _saveAgentPending, _now,
 }) {
   let pending, sha, entry;
@@ -1206,7 +1207,7 @@ async function handleAgentPriceReply({
     console.error('worker: agent price load pending failed:', err.message);
     return false; // can't verify state → let normal handling proceed
   }
-  if (!entry || entry.step !== 'await_price') return false;
+  if (!entry || (entry.step !== 'await_price' && entry.step !== 'await_instruction')) return false;
 
   // Expire an abandoned dialog: if the price step was opened long ago and never
   // finished, do not consume an unrelated number as the stale tender's price.
@@ -1225,6 +1226,30 @@ async function handleAgentPriceReply({
     token: env.TELEGRAM_BOT_TOKEN, chatId: msg.chat.id, text,
     replyToMessageId: msg.message_id, replyMarkup,
   });
+
+  if (entry.step === 'await_instruction') {
+    const instruction = validateInstruction(msg.text);
+    if (instruction === null) {
+      try { await send('Порожня інструкція. Напиши текстом, що доробити.'); }
+      catch (err) { console.error('worker: agent empty-instruction reply failed:', err.message); }
+      return true; // consumed; stay at await_instruction
+    }
+    try {
+      pending[chatId] = { ...entry, instruction, step: 'confirm' };
+      await _saveAgentPending(env, pending, sha);
+    } catch (err) {
+      console.error('worker: agent instruction save pending failed:', err.message);
+      try { await send('⚠️ Помилка, спробуй ще раз.'); } catch {}
+      return true;
+    }
+    try {
+      await send(
+        buildAgentAmendConfirmText({ tenderId: entry.tid, instruction }),
+        buildAgentConfirmKeyboard(entry.tid),
+      );
+    } catch (err) { console.error('worker: agent amend confirm prompt failed:', err.message); }
+    return true;
+  }
 
   const price = validateAgentPrice(msg.text);
   // Reject null AND a zero price ('0', '0,00', etc.) — validateAgentPrice allows

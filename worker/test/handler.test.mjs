@@ -2685,6 +2685,24 @@ test('agent price reply on stale pending (>15 min) → not consumed, pending dro
   assert.ok(!sent.some(s => /Підтвердити/.test(JSON.stringify(s))), 'no confirm prompt for stale tid');
 });
 
+test('agent instruction reply → stored, amend confirm shown', async () => {
+  const { deps, store, sent } = makeAgentDeps();
+  store.pending['123'] = { tid: AGENT_TID, kind: 'amend', step: 'await_instruction', at: '2026-06-21T10:00:00.000Z' };
+  await runHandler({ update: agentMsg('додай довідку КВЕД'), env: ENV, deps });
+  assert.equal(store.pending['123'].step, 'confirm');
+  assert.equal(store.pending['123'].instruction, 'додай довідку КВЕД');
+  assert.match(sent.at(-1).text, /Доробити/);
+  assert.match(JSON.stringify(sent.at(-1).replyMarkup), new RegExp(`agent:confirm:${AGENT_TID}`));
+});
+
+test('agent empty instruction → stays at await_instruction, no advance', async () => {
+  const { deps, store, sent } = makeAgentDeps();
+  store.pending['123'] = { tid: AGENT_TID, kind: 'amend', step: 'await_instruction', at: '2026-06-21T10:00:00.000Z' };
+  await runHandler({ update: agentMsg('   '), env: ENV, deps });
+  assert.equal(store.pending['123'].step, 'await_instruction');
+  assert.match(sent.at(-1).text, /Порожня інструкція/);
+});
+
 test('agent:confirm → saveAgentJob with contract-valid job, pending cleared, queued reply', async () => {
   const { deps, store, sent, jobs, acks } = makeAgentDeps();
   store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', price: '181200', step: 'confirm' };
