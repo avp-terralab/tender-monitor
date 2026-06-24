@@ -702,7 +702,7 @@ test('runHandler: /watched empty → 📭 reply', async () => {
   assert.match(sent[0].text, /📭/);
 });
 
-test('runHandler: /watched with entities → list reply', async () => {
+test('runHandler: /watched with entities → paginated menu reply', async () => {
   const { deps, sent } = await makeDeps({
     loadWatchedEntities: async () => ({
       entities: [
@@ -717,9 +717,9 @@ test('runHandler: /watched with entities → list reply', async () => {
     env: ENV,
     deps,
   });
-  assert.match(sent[0].text, /02000010/);
-  assert.match(sent[0].text, /11111111/);
-  assert.match(sent[0].text, /Всього: 2/);
+  assert.match(sent[0].text, /Моніторинг замовників/);
+  assert.match(JSON.stringify(sent[0].replyMarkup), /wat:e:02000010/);
+  assert.match(JSON.stringify(sent[0].replyMarkup), /wat:e:11111111/);
 });
 
 test('runHandler: /watched when GitHub fails → ⚠️ reply', async () => {
@@ -739,7 +739,7 @@ const WATCHED_TWO = [
   { edrpou: '01999106', name: 'ТОВ «TERRALAB IT»', enabled: true },
 ];
 
-test('runHandler: /watched VIEW shows single "Прибрати" button for editor', async () => {
+test('runHandler: /watched VIEW shows entity buttons (paginated menu) for editor', async () => {
   const { deps, sent } = makeDeps({
     loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
   });
@@ -748,11 +748,12 @@ test('runHandler: /watched VIEW shows single "Прибрати" button for edito
     env: ENV, deps,
   });
   const kb = sent[0].replyMarkup;
-  assert.equal(kb.inline_keyboard.length, 1);
-  assert.equal(kb.inline_keyboard[0][0].callback_data, 'watched:manage');
+  assert.ok(kb && kb.inline_keyboard, 'should have inline keyboard');
+  assert.match(JSON.stringify(kb), /wat:e:12345678/);
+  assert.match(JSON.stringify(kb), /wat:e:01999106/);
 });
 
-test('runHandler: /watched VIEW for viewer → no inline keyboard', async () => {
+test('runHandler: /watched VIEW for viewer → shows paginated menu keyboard (read-only nav)', async () => {
   const { deps, sent } = makeDeps({
     loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
     loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
@@ -762,7 +763,8 @@ test('runHandler: /watched VIEW for viewer → no inline keyboard', async () => 
     env: ENV, deps,
   });
   const kb = sent[0].replyMarkup;
-  assert.ok(!kb || !kb.inline_keyboard);
+  assert.ok(kb && kb.inline_keyboard, 'viewer gets menu keyboard too');
+  assert.match(JSON.stringify(kb), /wat:e:/);
 });
 
 test('runHandler: /watched empty list → no inline keyboard even for admin', async () => {
@@ -2822,6 +2824,20 @@ test('runHandler: /info (no id) → single menu message with mon:ph button', asy
   });
   assert.equal(sent.length, 1, 'one message, not a multi-page dump');
   assert.match(JSON.stringify(sent[0].replyMarkup), /mon:ph:0:0/);
+});
+
+test('runHandler: /watched → menu message with wat:e button', async () => {
+  const sent = [];
+  await runHandler({
+    update: { message: { chat: { id: 123 }, message_id: 7, text: '👁 Моніторинг замовників', from: { id: 123 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({ loadWatchedEntities: async () => ({ entities: [{ edrpou: '11111111', name: 'КНП', enabled: true }], sha: 's' }) }).deps,
+      sendReply: async (a) => sent.push(a),
+    },
+  });
+  assert.equal(sent.length, 1);
+  assert.match(JSON.stringify(sent[0].replyMarkup), /wat:e:11111111/);
 });
 
 test('runHandler: callback mon:ph:0:0 → edits message in place with cards', async () => {

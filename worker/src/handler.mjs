@@ -2,6 +2,7 @@ import {
   parseCommand, handleAdd, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
   buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
+  buildWatchedMenu, buildWatchedEntityCard, handleWatchedNav,
   handleInvite, handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, buildRoleChangeNotice, handleWhoami, handleUsersList, handleInvitesList,
   handleArchive, handleArchiveDetail, handleUnarchive, buildArchiveMenu, handleArchiveNav,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
@@ -439,8 +440,9 @@ export async function runHandler({ update, env, deps = {} }) {
   } else if (cmd.cmd === 'watched') {
     try {
       const { entities } = await _loadWatchedEntities(env);
-      reply = handleWatched({ watchedEntities: entities });
-      if (isEditor) watchedReplyMarkup = buildWatchedViewKeyboard(entities);
+      const menu = buildWatchedMenu({ entities, page: 0 });
+      reply = menu.text;
+      watchedReplyMarkup = menu.keyboard ?? undefined;
     } catch (err) {
       console.error('worker: /watched failed:', err.message);
       reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
