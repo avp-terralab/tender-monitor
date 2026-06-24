@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers, loadArchivedTenders, fetchAuditLog, fetchLatestDeployCommit, saveAgentJob, loadAgentPending, saveAgentPending } from '../src/github.mjs';
+import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers, loadArchivedTenders, fetchAuditLog, fetchLatestDeployCommit, saveAgentJob, loadAgentPending, saveAgentPending, listAgentJobs } from '../src/github.mjs';
 
 const ENV = { GITHUB_PAT: 'PAT_VALUE' };
 
@@ -424,4 +424,28 @@ test('fetchLatestDeployCommit: skips audit: commits', async () => {
   ]) });
   const out = await fetchLatestDeployCommit(ENV, { fetch: fakeFetch });
   assert.equal(out.message, 'telegram: ship feature');
+});
+
+test('listAgentJobs: lists dir, reads each, sorts desc by created_at, caps 20', async () => {
+  const jobA = { tender_id: 'UA-2026-06-01-000001-a', status: 'done', created_at: '2026-06-20T10:00:00Z' };
+  const jobB = { tender_id: 'UA-2026-06-02-000002-a', status: 'pending', created_at: '2026-06-22T10:00:00Z' };
+  const fakeFetch = async (url) => {
+    if (/contents\/_state\/agent_jobs\?ref=main/.test(url)) {
+      return { ok: true, status: 200, json: async () => ([
+        { type: 'file', name: 'UA-2026-06-01-000001-a.json' },
+        { type: 'file', name: 'UA-2026-06-02-000002-a.json' },
+        { type: 'file', name: 'README.md' },
+      ]) };
+    }
+    const job = /000001/.test(url) ? jobA : jobB;
+    return { ok: true, status: 200, json: async () => ({ content: Buffer.from(JSON.stringify(job)).toString('base64'), sha: 's' }) };
+  };
+  const jobs = await listAgentJobs(ENV, { fetch: fakeFetch });
+  assert.equal(jobs.length, 2);
+  assert.equal(jobs[0].tender_id, 'UA-2026-06-02-000002-a'); // newest first
+});
+
+test('listAgentJobs: 404 dir → empty array', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 404, text: async () => 'Not Found' });
+  assert.deepEqual(await listAgentJobs(ENV, { fetch: fakeFetch }), []);
 });

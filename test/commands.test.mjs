@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseCommand, mainKeyboard, buildAutoNotes, formatAddReply,
-  applyMutation, handleAdd, handleStatus, handleRemove, formatInfo, formatInfoPages,
+  applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, handleWhoami, handleUsersList, handleInvitesList, HELP_TEXT,
@@ -14,13 +14,17 @@ import {
   parseAuditCommit,
   formatAuditLog,
   buildWatchedKeyboard,
-  buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
+  buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT, buildWatchedMenu,
   paginateArchiveGroup, ARCHIVE_PAGE_LIMIT,
   findContractDate, buildArchiveMenu, groupArchiveByProvider, buildArchiveCompanyList,
   groupArchiveByYear, buildArchiveYearList, buildArchiveMonthList, renderArchivePage, handleArchiveNav,
   AGENT_COMPANIES, companyForSlug, slugForCompany,
   agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
+  buildAgentMenu, buildAgentPickView, buildAgentJobsPage,
+  handleAgentMenuNav,
+  monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
+  buildWatchedEntityCard, handleWatchedNav,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -2771,103 +2775,6 @@ test('handleStatus: rich + non-empty buffer renders item count and oldest time',
   assert.doesNotMatch(text, /🚀 Деплой/);  // omitted when null
 });
 
-// ── formatInfoPages tests ─────────────────────────────────────────────────────
-
-const PE = { name: 'КНП Тест', edrpou: '11111111' };
-const mkGroup = (id, status, deadline = null) => ({
-  tender_id: id,
-  prozorro_url: `https://prozorro.gov.ua/tender/${id}`,
-  status,
-  deadline,
-  procuring_entity: PE,
-  value: null, classification: null, contact: null, awards: [],
-});
-const RUN = '2026-05-26T20:45:00+03:00';
-
-test('formatInfoPages: empty → single friendly message', () => {
-  assert.deepEqual(formatInfoPages({ runIso: RUN, groups: [], errors: [] }),
-    ['📭 Немає активних тендерів.']);
-});
-
-test('formatInfoPages: one tender per phase → one page each, in pipeline order', () => {
-  const groups = [
-    mkGroup('UA-Q', 'active.qualification'),
-    mkGroup('UA-T', 'active.tendering', '2026-06-01T10:00:00+03:00'),
-    mkGroup('UA-AW', 'active.awarded'),
-  ];
-  const pages = formatInfoPages({ runIso: RUN, groups, errors: [] });
-  assert.equal(pages.length, 3);
-  assert.match(pages[0], /📥 Приймання пропозицій \(1\)/);
-  assert.match(pages[1], /🔍 Розгляд пропозицій \(1\)/);
-  assert.match(pages[2], /✍️ Очікування підписання договору \(1\)/);
-});
-
-test('formatInfoPages: global header only on the first page', () => {
-  const groups = [
-    mkGroup('UA-T', 'active.tendering', '2026-06-01T10:00:00+03:00'),
-    mkGroup('UA-Q', 'active.qualification'),
-  ];
-  const pages = formatInfoPages({ runIso: RUN, groups, errors: [] });
-  assert.match(pages[0], /📋 Статус тендерів \(/);
-  assert.doesNotMatch(pages[1], /📋 Статус тендерів/);
-});
-
-test('formatInfoPages: tendering sorted by deadline ascending, null deadline last', () => {
-  const groups = [
-    mkGroup('UA-LATE', 'active.tendering', '2026-06-10T10:00:00+03:00'),
-    mkGroup('UA-NONE', 'active.tendering', null),
-    mkGroup('UA-SOON', 'active.tendering', '2026-06-01T10:00:00+03:00'),
-  ];
-  const [page] = formatInfoPages({ runIso: RUN, groups, errors: [] });
-  const order = ['UA-SOON', 'UA-LATE', 'UA-NONE'].map(id => page.indexOf(id));
-  assert.ok(order[0] < order[1] && order[1] < order[2], `unexpected order: ${order}`);
-});
-
-test('formatInfoPages: non-tendering phase sorted by tender_id', () => {
-  const groups = [
-    mkGroup('UA-Z', 'active.qualification'),
-    mkGroup('UA-A', 'active.qualification'),
-  ];
-  const [page] = formatInfoPages({ runIso: RUN, groups, errors: [] });
-  assert.ok(page.indexOf('UA-A') < page.indexOf('UA-Z'));
-});
-
-test('formatInfoPages: unknown status falls into 📦 Інші статуси', () => {
-  const pages = formatInfoPages({
-    runIso: RUN, groups: [mkGroup('UA-X', 'active.weird')], errors: [],
-  });
-  assert.equal(pages.length, 1);
-  assert.match(pages[0], /📦 Інші статуси \(1\)/);
-});
-
-test('formatInfoPages: errors become a final page', () => {
-  const pages = formatInfoPages({
-    runIso: RUN,
-    groups: [mkGroup('UA-T', 'active.tendering', '2026-06-01T10:00:00+03:00')],
-    errors: [{ tender_id: 'UA-ERR', error: 'Prozorro 503' }],
-  });
-  assert.equal(pages.length, 2);
-  assert.match(pages[1], /⚠️ Не вдалось перевірити \(1\)/);
-  assert.match(pages[1], /UA-ERR — Prozorro 503/);
-});
-
-test('formatInfoPages: entry body equals formatInfoEntry output', () => {
-  const g = mkGroup('UA-T', 'active.tendering', '2026-06-01T10:00:00+03:00');
-  const [page] = formatInfoPages({ runIso: RUN, groups: [g], errors: [] });
-  assert.ok(page.includes(`🆔 Ідентифікатор закупівлі`));
-  assert.ok(page.includes('UA-T'));
-});
-
-test('formatInfoPages: errors-only (no groups) still produces an errors page with header', () => {
-  const pages = formatInfoPages({
-    runIso: RUN, groups: [], errors: [{ tender_id: 'UA-ERR', error: 'Prozorro 503' }],
-  });
-  assert.equal(pages.length, 1);
-  assert.match(pages[0], /📋 Статус тендерів \(/);          // global header still prepended
-  assert.match(pages[0], /⚠️ Не вдалось перевірити \(1\)/);
-  assert.match(pages[0], /UA-ERR — Prozorro 503/);
-});
-
 // ── Task 1: sanitizeActor + formatAuditMessage ────────────────────────────
 
 test('sanitizeActor: strips separators and newlines, collapses spaces', () => {
@@ -3411,4 +3318,238 @@ test('handleArchiveNav: noop → null; menu/co/pe/month routing', () => {
   assert.match(handleArchiveNav({ archive, data: 'arch:pe:2026' }).text, /оберіть місяць/);
   assert.match(handleArchiveNav({ archive, data: 'arch:co:0:0' }).text, /Завантажити договір/);
   assert.match(handleArchiveNav({ archive, data: 'arch:pe:2026:04:0' }).text, /Квітень 2026/);
+});
+
+// --- Моніторинг закупівель: меню фаз ---
+const monGroup = (status, id = 'UA-2026-06-01-000001-a', extra = {}) => ({
+  tender_id: id,
+  prozorro_url: `https://prozorro.gov.ua/tender/${id}`,
+  status,
+  deadline: null,
+  procuring_entity: { name: 'КНП Лікарня', edrpou: '111' },
+  ...extra,
+});
+
+test('monitorPhaseBuckets: only non-empty phases, lifecycle order, stable idx', () => {
+  const buckets = monitorPhaseBuckets([
+    monGroup('active.qualification', 'UA-2026-06-01-000001-a'),
+    monGroup('active.tendering', 'UA-2026-06-01-000002-a'),
+    monGroup('some.weird.status', 'UA-2026-06-01-000003-a'),
+  ]);
+  // tendering(idx0) before qualification(idx3) before OTHER(idx5)
+  assert.deepEqual(buckets.map((b) => b.idx), [0, 3, 5]);
+  assert.equal(buckets.find((b) => b.idx === 5).items.length, 1); // weird → OTHER
+});
+
+test('buildMonitorMenu: empty groups → keyboard null', () => {
+  assert.equal(buildMonitorMenu({ groups: [], runIso: '2026-06-24T13:00:00Z' }).keyboard, null);
+});
+
+test('buildMonitorMenu: one row per non-empty phase, callback mon:ph:<idx>:0, counts', () => {
+  const m = buildMonitorMenu({
+    groups: [monGroup('active.tendering', 'UA-2026-06-01-000002-a'), monGroup('active.tendering', 'UA-2026-06-01-000004-a')],
+    runIso: '2026-06-24T13:00:00Z',
+  });
+  assert.equal(m.keyboard.inline_keyboard.length, 1);
+  assert.equal(m.keyboard.inline_keyboard[0][0].callback_data, 'mon:ph:0:0');
+  assert.match(m.keyboard.inline_keyboard[0][0].text, /\(2\)/);
+  assert.match(m.text, /Моніторинг закупівель/);
+});
+
+test('buildMonitorMenu: errors footer line', () => {
+  const m = buildMonitorMenu({
+    groups: [monGroup('active.tendering')],
+    runIso: '2026-06-24T13:00:00Z',
+    errors: [{ tender_id: 'UA-2026-06-01-000009-a', error: '404' }],
+  });
+  assert.match(m.text, /Не вдалось перевірити: 1/);
+});
+
+test('renderMonitorPage: 6/page nav arrows, header, card content', () => {
+  const groups = Array.from({ length: 8 }, (_, i) =>
+    monGroup('active.qualification', `UA-2026-06-01-00000${i}-a`));
+  const pg0 = renderMonitorPage({ groups, phaseIdx: 3, page: 0, runIso: '2026-06-24T13:00:00Z', role: 'viewer' });
+  const nav0 = pg0.keyboard.inline_keyboard.find((r) => r.some((b) => b.callback_data === 'mon:noop'));
+  assert.ok(nav0.some((b) => b.text === 'Далі ▶'));
+  assert.ok(nav0.some((b) => b.text === '1/2'));
+  assert.ok(!nav0.some((b) => b.text === '◀ Назад'));
+  assert.match(pg0.text, /Розгляд пропозицій/);
+  assert.match(pg0.text, /prozorro\.gov\.ua\/tender\//);
+  const back = pg0.keyboard.inline_keyboard.at(-1)[0];
+  assert.equal(back.callback_data, 'mon:menu');
+  const pg1 = renderMonitorPage({ groups, phaseIdx: 3, page: 1, runIso: '2026-06-24T13:00:00Z', role: 'viewer' });
+  const nav1 = pg1.keyboard.inline_keyboard.find((r) => r.some((b) => b.callback_data === 'mon:noop'));
+  assert.ok(nav1.some((b) => b.text === '◀ Назад'));
+  assert.ok(!nav1.some((b) => b.text === 'Далі ▶'));
+});
+
+test('renderMonitorPage: admin gets 🤖 buttons only on tendering phase', () => {
+  const groups = [monGroup('active.tendering', 'UA-2026-06-01-000002-a')];
+  const asAdmin = renderMonitorPage({ groups, phaseIdx: 0, page: 0, runIso: '2026-06-24T13:00:00Z', role: 'admin' });
+  assert.match(JSON.stringify(asAdmin.keyboard.inline_keyboard), /agent:start:UA-2026-06-01-000002-a/);
+  const asViewer = renderMonitorPage({ groups, phaseIdx: 0, page: 0, runIso: '2026-06-24T13:00:00Z', role: 'viewer' });
+  assert.ok(!JSON.stringify(asViewer.keyboard.inline_keyboard).includes('agent:start'));
+});
+
+test('renderMonitorPage: unknown phaseIdx → falls back to menu', () => {
+  const pg = renderMonitorPage({ groups: [monGroup('active.tendering')], phaseIdx: 99, page: 0, runIso: '2026-06-24T13:00:00Z', role: 'viewer' });
+  assert.match(pg.text, /Моніторинг закупівель/);
+});
+
+test('handleMonitorNav: noop→null; menu/ph routing', () => {
+  const groups = [monGroup('active.tendering', 'UA-2026-06-01-000002-a')];
+  const args = { groups, runIso: '2026-06-24T13:00:00Z', role: 'viewer' };
+  assert.equal(handleMonitorNav({ ...args, data: 'mon:noop' }), null);
+  assert.match(handleMonitorNav({ ...args, data: 'mon:menu' }).text, /Моніторинг закупівель/);
+  assert.match(handleMonitorNav({ ...args, data: 'mon:ph:0:0' }).text, /Приймання пропозицій/);
+  // unknown → menu
+  assert.match(handleMonitorNav({ ...args, data: 'mon:garbage' }).text, /Моніторинг закупівель/);
+  // errors propagate to the menu footer
+  assert.match(
+    handleMonitorNav({ ...args, data: 'mon:menu', errors: [{ tender_id: 'UA-2026-06-01-000009-a', error: '404' }] }).text,
+    /Не вдалось перевірити: 1/,
+  );
+});
+
+test('applyEntityMutation: set_enabled flips one entity', () => {
+  const out = applyEntityMutation(
+    [{ edrpou: '11111111', name: 'A', enabled: true }, { edrpou: '22222222', name: 'B', enabled: true }],
+    { type: 'set_enabled', edrpou: '22222222', enabled: false });
+  assert.equal(out.find((e) => e.edrpou === '22222222').enabled, false);
+  assert.equal(out.find((e) => e.edrpou === '11111111').enabled, true);
+});
+
+test('auditPhrase: watch_pause / watch_resume render readable', () => {
+  const out = formatAuditLog([
+    { action: 'watch_pause', target: '12345678', actor: 'Адмін', date: '2026-06-24T10:00:00Z' },
+    { action: 'watch_resume', target: '12345678', actor: 'Адмін', date: '2026-06-24T10:01:00Z' },
+  ], { limit: 10 });
+  assert.match(out, /призупинив стеження за 12345678/);
+  assert.match(out, /відновив стеження за 12345678/);
+});
+
+// ── Task 3: buildWatchedMenu ──────────────────────────────────────────────────
+const watEnt = (edrpou, enabled = true, name = `Замовник ${edrpou}`) => ({ edrpou, name, enabled });
+
+test('buildWatchedMenu: empty → keyboard null', () => {
+  assert.equal(buildWatchedMenu({ entities: [], page: 0 }).keyboard, null);
+});
+
+test('buildWatchedMenu: one button per entity, callback wat:e:<edrpou>, icon by enabled', () => {
+  const m = buildWatchedMenu({ entities: [watEnt('11111111', true), watEnt('22222222', false)], page: 0 });
+  const rows = m.keyboard.inline_keyboard;
+  assert.equal(rows[0][0].callback_data, 'wat:e:11111111');
+  assert.match(rows[0][0].text, /^🟢/);
+  assert.match(rows[1][0].text, /^🔴/);
+  assert.match(m.text, /Моніторинг замовників/);
+});
+
+test('buildWatchedMenu: 6/page with nav arrows', () => {
+  const entities = Array.from({ length: 8 }, (_, i) => watEnt(String(10000000 + i)));
+  const r0 = buildWatchedMenu({ entities, page: 0 }).keyboard.inline_keyboard;
+  const nav0 = r0.find((row) => row.some((b) => b.callback_data === 'wat:noop'));
+  assert.ok(nav0.some((b) => b.text === 'Далі ▶'));
+  assert.ok(nav0.some((b) => b.text === '1/2'));
+  const r1 = buildWatchedMenu({ entities, page: 1 }).keyboard.inline_keyboard;
+  const nav1 = r1.find((row) => row.some((b) => b.callback_data === 'wat:noop'));
+  assert.ok(nav1.some((b) => b.text === '◀ Назад'));
+  assert.equal(nav1.find((b) => b.callback_data?.startsWith('wat:menu')).callback_data, 'wat:menu:0');
+});
+
+// ── Task 4: buildWatchedEntityCard + handleWatchedNav ─────────────────────────
+test('buildWatchedEntityCard: shows state, manage buttons only when canManage', () => {
+  const ent = [watEnt('11111111', true, 'КНП Лікарня')];
+  const card = buildWatchedEntityCard({ entities: ent, edrpou: '11111111', canManage: true });
+  assert.match(card.text, /КНП Лікарня/);
+  assert.match(card.text, /🟢 стежу/);
+  const cbs = JSON.stringify(card.keyboard.inline_keyboard);
+  assert.match(cbs, /wat:toggle:11111111/);
+  assert.match(cbs, /wat:rm:11111111/);
+  assert.match(cbs, /wat:menu:0/);
+  const viewer = buildWatchedEntityCard({ entities: ent, edrpou: '11111111', canManage: false });
+  const vcbs = JSON.stringify(viewer.keyboard.inline_keyboard);
+  assert.ok(!vcbs.includes('wat:toggle'));
+  assert.ok(!vcbs.includes('wat:rm'));
+  assert.match(vcbs, /wat:menu:0/);
+});
+
+test('buildWatchedEntityCard: paused entity shows Відновити; unknown edrpou → menu', () => {
+  const ent = [watEnt('22222222', false)];
+  const card = buildWatchedEntityCard({ entities: ent, edrpou: '22222222', canManage: true });
+  assert.match(card.text, /🔴 призупинено/);
+  assert.match(JSON.stringify(card.keyboard.inline_keyboard), /🟢 Відновити/);
+  const miss = buildWatchedEntityCard({ entities: ent, edrpou: '99999999', canManage: true });
+  assert.match(miss.text, /Моніторинг замовників/); // fell back to menu
+});
+
+test('handleWatchedNav: noop→null; menu/e routing', () => {
+  const ent = [watEnt('11111111', true)];
+  assert.equal(handleWatchedNav({ entities: ent, data: 'wat:noop', canManage: true }), null);
+  assert.match(handleWatchedNav({ entities: ent, data: 'wat:menu:0', canManage: true }).text, /Моніторинг замовників/);
+  assert.match(handleWatchedNav({ entities: ent, data: 'wat:e:11111111', canManage: true }).text, /Замовник 11111111|11111111/);
+});
+
+const pickTender = (id, notes, preparedUrl) => ({ tender_id: id, enabled: true, notes, preparedUrl });
+
+test('buildAgentMenu: two action buttons', () => {
+  const m = buildAgentMenu();
+  const cbs = m.keyboard.inline_keyboard.flat().map((b) => b.callback_data);
+  assert.deepEqual(cbs, ['agent:pick:0', 'agent:jobs:0']);
+});
+
+test('buildAgentPickView: empty → back to menu only', () => {
+  const v = buildAgentPickView({ tenders: [], page: 0 });
+  assert.match(v.text, /Немає тендерів/);
+  assert.equal(v.keyboard.inline_keyboard[0][0].callback_data, 'agent:menu');
+});
+
+test('buildAgentPickView: tender buttons + back row', () => {
+  const v = buildAgentPickView({ tenders: [pickTender('UA-2026-06-01-000002-a', 'КНП')], page: 0 });
+  const cbs = JSON.stringify(v.keyboard.inline_keyboard);
+  assert.match(cbs, /agent:start:UA-2026-06-01-000002-a/);
+  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'agent:menu');
+});
+
+test('buildAgentPickView: 6/page nav arrows', () => {
+  const tenders = Array.from({ length: 8 }, (_, i) => pickTender(`UA-2026-06-01-00000${i}-a`, `n${i}`));
+  const r0 = buildAgentPickView({ tenders, page: 0 }).keyboard.inline_keyboard;
+  const nav0 = r0.find((row) => row.some((b) => b.callback_data === 'agent:noop'));
+  assert.ok(nav0.some((b) => b.text === 'Далі ▶' && b.callback_data === 'agent:pick:1'));
+  assert.ok(nav0.some((b) => b.text === '1/2'));
+});
+
+const job = (tender_id, status, extra = {}) => ({ tender_id, status, company: 'ТОВ Тест', created_at: '2026-06-20T10:00:00Z', ...extra });
+
+test('buildAgentJobsPage: empty → back only', () => {
+  const v = buildAgentJobsPage({ jobs: [], page: 0 });
+  assert.match(v.text, /Ще немає задач/);
+  assert.equal(v.keyboard.inline_keyboard[0][0].callback_data, 'agent:menu');
+});
+
+test('buildAgentJobsPage: status icons + drive button for done', () => {
+  const v = buildAgentJobsPage({ jobs: [
+    job('UA-2026-06-01-000001-a', 'running'),
+    job('UA-2026-06-01-000002-a', 'done', { result: { drive_link: 'https://drive/x' } }),
+  ], page: 0 });
+  assert.match(v.text, /⏳/);
+  assert.match(v.text, /✅/);
+  assert.match(v.text, /prozorro\.gov\.ua\/tender\/UA-2026-06-01-000002-a/);
+  const urlBtn = v.keyboard.inline_keyboard.flat().find((b) => b.url === 'https://drive/x');
+  assert.ok(urlBtn, 'done job exposes a Drive link button');
+  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'agent:menu');
+});
+
+test('buildAgentJobsPage: 6/page nav', () => {
+  const jobs = Array.from({ length: 8 }, (_, i) => job(`UA-2026-06-01-00000${i}-a`, 'pending'));
+  const nav = buildAgentJobsPage({ jobs, page: 0 }).keyboard.inline_keyboard.find((row) => row.some((b) => b.callback_data === 'agent:noop'));
+  assert.ok(nav.some((b) => b.callback_data === 'agent:jobs:1'));
+});
+
+test('handleAgentMenuNav: noop→null; menu/pick/jobs routing; other→null', () => {
+  const args = { tenders: [pickTender('UA-2026-06-01-000002-a', 'КНП')], jobs: [job('UA-2026-06-01-000002-a', 'done')] };
+  assert.equal(handleAgentMenuNav({ ...args, data: 'agent:noop' }), null);
+  assert.match(handleAgentMenuNav({ ...args, data: 'agent:menu' }).text, /Агент/);
+  assert.match(handleAgentMenuNav({ ...args, data: 'agent:pick:0' }).text, /Оберіть тендер/);
+  assert.match(handleAgentMenuNav({ ...args, data: 'agent:jobs:0' }).text, /Останні задачі/);
+  assert.equal(handleAgentMenuNav({ ...args, data: 'agent:start:UA-2026-06-01-000002-a' }), null);
 });
