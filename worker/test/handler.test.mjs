@@ -2860,3 +2860,75 @@ test('runHandler: callback mon:ph:0:0 → edits message in place with cards', as
   assert.match(JSON.stringify(edits[0].replyMarkup), /mon:menu/);
   assert.equal(acks.length, 1);
 });
+
+test('runHandler: wat:e:<edrpou> → edits to entity card', async () => {
+  const acks = []; const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'cbw1', data: 'wat:e:11111111', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({ loadWatchedEntities: async () => ({ entities: [{ edrpou: '11111111', name: 'КНП', enabled: true }], sha: 's' }) }).deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageText: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(edits.length, 1);
+  assert.match(JSON.stringify(edits[0].replyMarkup), /wat:toggle:11111111/); // chat 123 = admin → canManage
+  assert.equal(acks.length, 1);
+});
+
+test('runHandler: wat:toggle:<edrpou> → saves set_enabled, re-renders card', async () => {
+  const acks = []; const edits = []; let saved = null;
+  await runHandler({
+    update: { callback_query: { id: 'cbw2', data: 'wat:toggle:11111111', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchedEntities: async () => ({ entities: [{ edrpou: '11111111', name: 'КНП', enabled: true }], sha: 's' }),
+        saveWatchedEntities: async (_e, entities) => { saved = entities; },
+      }).deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageText: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(saved.find((e) => e.edrpou === '11111111').enabled, false, 'toggled off');
+  assert.match(JSON.stringify(edits[0].replyMarkup), /🟢 Відновити/);
+});
+
+test('runHandler: wat:rm:<edrpou> → deletes, re-renders menu', async () => {
+  const edits = []; let saved = null;
+  await runHandler({
+    update: { callback_query: { id: 'cbw3', data: 'wat:rm:11111111', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchedEntities: async () => ({ entities: [{ edrpou: '11111111', name: 'КНП', enabled: true }], sha: 's' }),
+        saveWatchedEntities: async (_e, entities) => { saved = entities; },
+      }).deps,
+      answerCallbackQuery: async () => {},
+      editMessageText: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(saved.length, 0, 'entity removed');
+  assert.match(edits[0].text, /Не стежу за жодним|Моніторинг замовників/);
+});
+
+test('runHandler: wat:e for a viewer → card has NO manage buttons', async () => {
+  const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'cbw4', data: 'wat:e:11111111', from: { id: 456 }, message: { chat: { id: 456 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+        loadWatchedEntities: async () => ({ entities: [{ edrpou: '11111111', name: 'КНП', enabled: true }], sha: 's' }),
+      }).deps,
+      answerCallbackQuery: async () => {},
+      editMessageText: async (a) => edits.push(a),
+    },
+  });
+  const cbs = JSON.stringify(edits[0].replyMarkup);
+  assert.ok(!cbs.includes('wat:toggle'));
+  assert.ok(!cbs.includes('wat:rm'));
+  assert.match(cbs, /wat:menu:0/);
+});

@@ -887,6 +887,74 @@ async function handleCallbackQuery({
     return;
   }
 
+  if (data.startsWith('wat:')) {
+    if (data === 'wat:noop') { await ack(); return; }
+    const parts = data.split(':'); // wat:menu:<p> | wat:e:<edrpou> | wat:toggle:<edrpou> | wat:rm:<edrpou>
+
+    if (parts[1] === 'toggle' || parts[1] === 'rm') {
+      if (!isEditor) { await ack('🚫 Це команда для редакторів', true); return; }
+      const edrpou = parts[2];
+      if (!/^\d{8}$/.test(edrpou)) { await ack('❌ Невалідний ЄДРПОУ'); return; }
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const { entities, sha } = await _loadWatchedEntities(env);
+          let mutation; let action;
+          if (parts[1] === 'toggle') {
+            const cur = entities.find((e) => e.edrpou === edrpou);
+            const next = !(cur?.enabled);
+            mutation = { type: 'set_enabled', edrpou, enabled: next };
+            action = next ? 'watch_resume' : 'watch_pause';
+          } else {
+            mutation = { type: 'delete_entity', edrpou };
+            action = 'unwatch';
+          }
+          const newEntities = applyEntityMutation(entities, mutation);
+          await _saveWatchedEntities(env, newEntities, sha, {
+            message: formatAuditMessage({ action, target: edrpou, actor: actorName, chatId, role }),
+          });
+          const view = parts[1] === 'toggle'
+            ? buildWatchedEntityCard({ entities: newEntities, edrpou, canManage: true })
+            : buildWatchedMenu({ entities: newEntities, page: 0 });
+          await _editMessageText({
+            token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+            text: view.text, replyMarkup: view.keyboard ?? undefined,
+          });
+          await ack(parts[1] === 'toggle' ? '✅ Оновлено' : '✅ Прибрано');
+          return;
+        } catch (err) {
+          if (err instanceof ConflictError && attempt === 0) continue;
+          console.error('worker: wat mutation failed:', err.message);
+          await ack('⚠️ Помилка, спробуй ще раз', true);
+          return;
+        }
+      }
+      return;
+    }
+
+    // read-only nav: menu / entity card
+    let entities = [];
+    try {
+      ({ entities } = await _loadWatchedEntities(env));
+    } catch (err) {
+      console.error('worker: wat nav load failed:', err.message);
+      await ack('⚠️ GitHub тимчасово недоступний', true);
+      return;
+    }
+    const view = handleWatchedNav({ entities, data, canManage: isEditor });
+    if (view) {
+      try {
+        await _editMessageText({
+          token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+          text: view.text, replyMarkup: view.keyboard ?? undefined,
+        });
+      } catch (err) {
+        console.error('worker: wat nav edit failed:', err.message);
+      }
+    }
+    await ack();
+    return;
+  }
+
   if (data === 'watched:manage' || data === 'watched:done') {
     if (!isEditor) {
       await ack('🚫 Це команда для редакторів', true);
