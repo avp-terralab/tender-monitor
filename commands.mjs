@@ -509,6 +509,20 @@ export function renderMonitorPage({ groups, phaseIdx, page = 0, runIso, role }) 
   return { text: `${header}\n\n${body}`, keyboard: { inline_keyboard: rows } };
 }
 
+// Single entry point for any `mon:` callback. Pure: { text, keyboard } or
+// null for `mon:noop` (caller just acks).
+export function handleMonitorNav({ groups, data, runIso, role }) {
+  if (data === 'mon:noop') return null;
+  if (data === 'mon:menu' || data === 'mon') return buildMonitorMenu({ groups, runIso });
+  const parts = data.split(':'); // mon:ph:<idx>:<page>
+  if (parts[1] === 'ph') {
+    return renderMonitorPage({
+      groups, phaseIdx: Number(parts[2]), page: Number(parts[3] ?? 0), runIso, role,
+    });
+  }
+  return buildMonitorMenu({ groups, runIso });
+}
+
 const KYIV_HM_FMT = new Intl.DateTimeFormat('uk-UA', {
   timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
 });

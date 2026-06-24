@@ -21,7 +21,7 @@ import {
   AGENT_COMPANIES, companyForSlug, slugForCompany,
   agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
-  monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage,
+  monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -3488,4 +3488,14 @@ test('renderMonitorPage: admin gets 🤖 buttons only on tendering phase', () =>
 test('renderMonitorPage: unknown phaseIdx → falls back to menu', () => {
   const pg = renderMonitorPage({ groups: [monGroup('active.tendering')], phaseIdx: 99, page: 0, runIso: '2026-06-24T13:00:00Z', role: 'viewer' });
   assert.match(pg.text, /Моніторинг закупівель/);
+});
+
+test('handleMonitorNav: noop→null; menu/ph routing', () => {
+  const groups = [monGroup('active.tendering', 'UA-2026-06-01-000002-a')];
+  const args = { groups, runIso: '2026-06-24T13:00:00Z', role: 'viewer' };
+  assert.equal(handleMonitorNav({ ...args, data: 'mon:noop' }), null);
+  assert.match(handleMonitorNav({ ...args, data: 'mon:menu' }).text, /Моніторинг закупівель/);
+  assert.match(handleMonitorNav({ ...args, data: 'mon:ph:0:0' }).text, /Приймання пропозицій/);
+  // unknown → menu
+  assert.match(handleMonitorNav({ ...args, data: 'mon:garbage' }).text, /Моніторинг закупівель/);
 });
