@@ -2823,3 +2823,24 @@ test('runHandler: /info (no id) → single menu message with mon:ph button', asy
   assert.equal(sent.length, 1, 'one message, not a multi-page dump');
   assert.match(JSON.stringify(sent[0].replyMarkup), /mon:ph:0:0/);
 });
+
+test('runHandler: callback mon:ph:0:0 → edits message in place with cards', async () => {
+  const acks = [];
+  const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'cbq-mon', data: 'mon:ph:0:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [{ tender_id: 'UA-2026-06-01-000002-a', enabled: true }], sha: 's' }),
+        fetchTender: async () => ({ data: { status: 'active.tendering', tenderPeriod: { endDate: '2026-07-01T00:00:00Z' }, procuringEntity: { name: 'КНП' } } }),
+      }).deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+      editMessageText: async (a) => edits.push(a),
+    },
+  });
+  assert.equal(edits.length, 1, 'callback edits the message in place');
+  assert.match(edits[0].text, /Приймання пропозицій/);
+  assert.match(JSON.stringify(edits[0].replyMarkup), /mon:menu/);
+  assert.equal(acks.length, 1);
+});

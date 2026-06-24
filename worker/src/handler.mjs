@@ -797,6 +797,35 @@ async function handleCallbackQuery({
     return;
   }
 
+  if (data.startsWith('mon:')) {
+    if (data === 'mon:noop') { await ack(); return; }
+    let groups = [];
+    try {
+      const { watchlist } = await _loadWatchlist(env);
+      const enabled = watchlist.filter((r) => r.enabled);
+      ({ groups } = await tenderGroups(enabled, {
+        fetchTender: _fetchTender, extractSnapshot: _extractSnapshot,
+      }));
+    } catch (err) {
+      console.error('worker: monitor nav load failed:', err.message);
+      await ack('⚠️ Prozorro/GitHub тимчасово недоступний', true);
+      return;
+    }
+    const view = handleMonitorNav({ groups, data, runIso: new Date().toISOString(), role });
+    if (view) {
+      try {
+        await _editMessageText({
+          token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+          text: view.text, replyMarkup: view.keyboard ?? undefined,
+        });
+      } catch (err) {
+        console.error('worker: monitor nav edit failed:', err.message);
+      }
+    }
+    await ack();
+    return;
+  }
+
   if (data.startsWith('arch:')) {
     if (!isAllowed) { await ack('🚫 Немає доступу', true); return; }
     if (data === 'arch:noop') { await ack(); return; }
