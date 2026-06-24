@@ -1860,11 +1860,12 @@ export function buildAgentJobsPage({ jobs, page = 0 }) {
   const body = slice.map((j) => {
     const icon = AGENT_JOB_ICONS[j.status] ?? '•';
     const co = j.company ? ` · ${escapeHtml(j.company)}` : '';
-    return `${icon} <a href="https://prozorro.gov.ua/tender/${j.tender_id}">${j.tender_id}</a>${co}`;
+    const tid = escapeHtml(j.tender_id ?? '');
+    return `${icon} <a href="https://prozorro.gov.ua/tender/${tid}">${tid}</a>${co}`;
   }).join('\n');
   const rows = [];
   for (const j of slice) {
-    if (j.status === 'done' && j.result?.drive_link) {
+    if (j.status === 'done' && j.result?.drive_link && j.tender_id) {
       rows.push([{ text: `📁 ${j.tender_id}`, url: j.result.drive_link }]);
     }
   }
