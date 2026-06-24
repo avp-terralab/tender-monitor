@@ -511,16 +511,16 @@ export function renderMonitorPage({ groups, phaseIdx, page = 0, runIso, role }) 
 
 // Single entry point for any `mon:` callback. Pure: { text, keyboard } or
 // null for `mon:noop` (caller just acks).
-export function handleMonitorNav({ groups, data, runIso, role }) {
+export function handleMonitorNav({ groups, data, runIso, role, errors = [] }) {
   if (data === 'mon:noop') return null;
-  if (data === 'mon:menu' || data === 'mon') return buildMonitorMenu({ groups, runIso });
+  if (data === 'mon:menu' || data === 'mon') return buildMonitorMenu({ groups, runIso, errors });
   const parts = data.split(':'); // mon:ph:<idx>:<page>
   if (parts[1] === 'ph') {
     return renderMonitorPage({
       groups, phaseIdx: Number(parts[2]), page: Number(parts[3] ?? 0), runIso, role,
     });
   }
-  return buildMonitorMenu({ groups, runIso });
+  return buildMonitorMenu({ groups, runIso, errors });
 }
 
 const KYIV_HM_FMT = new Intl.DateTimeFormat('uk-UA', {

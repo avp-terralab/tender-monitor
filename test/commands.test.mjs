@@ -3498,4 +3498,9 @@ test('handleMonitorNav: noop→null; menu/ph routing', () => {
   assert.match(handleMonitorNav({ ...args, data: 'mon:ph:0:0' }).text, /Приймання пропозицій/);
   // unknown → menu
   assert.match(handleMonitorNav({ ...args, data: 'mon:garbage' }).text, /Моніторинг закупівель/);
+  // errors propagate to the menu footer
+  assert.match(
+    handleMonitorNav({ ...args, data: 'mon:menu', errors: [{ tender_id: 'UA-2026-06-01-000009-a', error: '404' }] }).text,
+    /Не вдалось перевірити: 1/,
+  );
 });

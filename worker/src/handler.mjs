@@ -800,10 +800,11 @@ async function handleCallbackQuery({
   if (data.startsWith('mon:')) {
     if (data === 'mon:noop') { await ack(); return; }
     let groups = [];
+    let errors = [];
     try {
       const { watchlist } = await _loadWatchlist(env);
       const enabled = watchlist.filter((r) => r.enabled);
-      ({ groups } = await tenderGroups(enabled, {
+      ({ groups, errors } = await tenderGroups(enabled, {
         fetchTender: _fetchTender, extractSnapshot: _extractSnapshot,
       }));
     } catch (err) {
@@ -811,7 +812,7 @@ async function handleCallbackQuery({
       await ack('⚠️ Prozorro/GitHub тимчасово недоступний', true);
       return;
     }
-    const view = handleMonitorNav({ groups, data, runIso: new Date().toISOString(), role });
+    const view = handleMonitorNav({ groups, data, runIso: new Date().toISOString(), role, errors });
     if (view) {
       try {
         await _editMessageText({
