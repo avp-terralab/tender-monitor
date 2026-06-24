@@ -869,6 +869,7 @@ async function handleCallbackQuery({
     if (parts[1] === 'toggle' || parts[1] === 'rm') {
       if (!isEditor) { await ack('🚫 Це команда для редакторів', true); return; }
       const edrpou = parts[2];
+      const page = Number(parts[3] ?? 0); // originating list page, preserved across the mutation
       if (!/^\d{8}$/.test(edrpou)) { await ack('❌ Невалідний ЄДРПОУ'); return; }
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
@@ -888,8 +889,8 @@ async function handleCallbackQuery({
             message: formatAuditMessage({ action, target: edrpou, actor: actorName, chatId, role }),
           });
           const view = parts[1] === 'toggle'
-            ? buildWatchedEntityCard({ entities: newEntities, edrpou, canManage: true })
-            : buildWatchedMenu({ entities: newEntities, page: 0 });
+            ? buildWatchedEntityCard({ entities: newEntities, edrpou, canManage: true, page })
+            : buildWatchedMenu({ entities: newEntities, page });
           await _editMessageText({
             token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
             text: view.text, replyMarkup: view.keyboard ?? undefined,

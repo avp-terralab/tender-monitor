@@ -3016,3 +3016,20 @@ test('runHandler: agent:pick:0 → prepared drive_link surfaces as a url button'
   });
   assert.match(JSON.stringify(edits[0].replyMarkup), /drive\/prepared/);
 });
+
+test('runHandler: wat:toggle with page → re-rendered card keeps that page in back button', async () => {
+  const edits = [];
+  await runHandler({
+    update: { callback_query: { id: 'cbw5', data: 'wat:toggle:11111111:2', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({
+        loadWatchedEntities: async () => ({ entities: [{ edrpou: '11111111', name: 'КНП', enabled: true }], sha: 's' }),
+        saveWatchedEntities: async () => {},
+      }).deps,
+      editMessageText: async (a) => edits.push(a),
+      answerCallbackQuery: async () => {},
+    },
+  });
+  assert.match(JSON.stringify(edits[0].replyMarkup), /wat:menu:2/);
+});

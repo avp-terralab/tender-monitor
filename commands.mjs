@@ -659,16 +659,16 @@ export function buildWatchedMenu({ entities, page = 0 }) {
     const name = e.name && e.name !== '(unknown)'
       ? truncate(abbreviateLegalForm(e.name), 48) : '';
     const label = name ? `${icon} ${name} · ${e.edrpou}` : `${icon} ${e.edrpou}`;
-    return [{ text: label, callback_data: `wat:e:${e.edrpou}` }];
+    return [{ text: label, callback_data: `wat:e:${e.edrpou}:${p}` }];
   });
   const nav = buildPageNavRow(p, pages, (x) => `wat:menu:${x}`, 'wat:noop');
   if (nav) rows.push(nav);
   return { text, keyboard: { inline_keyboard: rows } };
 }
 
-export function buildWatchedEntityCard({ entities, edrpou, canManage = false }) {
+export function buildWatchedEntityCard({ entities, edrpou, canManage = false, page = 0 }) {
   const e = (entities ?? []).find((x) => x.edrpou === edrpou);
-  if (!e) return buildWatchedMenu({ entities, page: 0 });
+  if (!e) return buildWatchedMenu({ entities, page });
   const name = e.name && e.name !== '(unknown)' ? escapeHtml(abbreviateLegalForm(e.name)) : '(назва невідома)';
   const state = e.enabled ? '🟢 стежу' : '🔴 призупинено';
   const text = `👁 <b>${name}</b>\nЄДРПОУ ${e.edrpou}\nСтан: ${state}`;
@@ -676,20 +676,22 @@ export function buildWatchedEntityCard({ entities, edrpou, canManage = false }) 
   if (canManage) {
     rows.push([{
       text: e.enabled ? '🔴 Призупинити' : '🟢 Відновити',
-      callback_data: `wat:toggle:${e.edrpou}`,
+      callback_data: `wat:toggle:${e.edrpou}:${page}`,
     }]);
-    rows.push([{ text: '🗑 Прибрати', callback_data: `wat:rm:${e.edrpou}` }]);
+    rows.push([{ text: '🗑 Прибрати', callback_data: `wat:rm:${e.edrpou}:${page}` }]);
   }
-  rows.push([{ text: '⬅ До списку', callback_data: 'wat:menu:0' }]);
+  rows.push([{ text: '⬅ До списку', callback_data: `wat:menu:${page}` }]);
   return { text, keyboard: { inline_keyboard: rows } };
 }
 
 // Pure router for read-only `wat:` navigation (menu / entity card). Mutations
-// (wat:toggle / wat:rm) are handled in the Worker (GitHub save).
+// (wat:toggle / wat:rm) are handled in the Worker (GitHub save). The list page
+// is carried through callbacks (wat:e:<edrpou>:<page>) so the card's back button
+// returns to the page the user came from.
 export function handleWatchedNav({ entities, data, canManage = false }) {
   if (data === 'wat:noop') return null;
-  const parts = data.split(':'); // wat:menu:<page> | wat:e:<edrpou>
-  if (parts[1] === 'e') return buildWatchedEntityCard({ entities, edrpou: parts[2], canManage });
+  const parts = data.split(':'); // wat:menu:<page> | wat:e:<edrpou>:<page>
+  if (parts[1] === 'e') return buildWatchedEntityCard({ entities, edrpou: parts[2], canManage, page: Number(parts[3] ?? 0) });
   if (parts[1] === 'menu') return buildWatchedMenu({ entities, page: Number(parts[2] ?? 0) });
   return buildWatchedMenu({ entities, page: 0 });
 }
