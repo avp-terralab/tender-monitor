@@ -1851,14 +1851,18 @@ export function buildAgentJobsPage({ jobs, page = 0 }) {
   const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
   const body = slice.map((j) => {
     const icon = AGENT_JOB_ICONS[j.status] ?? '•';
+    const mark = j.job_type === 'amend' ? '✏️ ' : '';
     const co = j.company ? ` · ${escapeHtml(j.company)}` : '';
     const tid = escapeHtml(j.tender_id ?? '');
-    return `${icon} <a href="https://prozorro.gov.ua/tender/${tid}">${tid}</a>${co}`;
+    return `${mark}${icon} <a href="https://prozorro.gov.ua/tender/${tid}">${tid}</a>${co}`;
   }).join('\n');
   const rows = [];
   for (const j of slice) {
     if (j.status === 'done' && j.result?.drive_link && j.tender_id) {
-      rows.push([{ text: `📁 ${j.tender_id}`, url: j.result.drive_link }]);
+      rows.push([
+        { text: `📁 ${j.tender_id}`, url: j.result.drive_link },
+        { text: '✏️ Доробити', callback_data: `agent:amend:${j.tender_id}` },
+      ]);
     }
   }
   const nav = buildPageNavRow(p, pages, (x) => `agent:jobs:${x}`, 'agent:noop');
@@ -1879,6 +1883,40 @@ export function buildAgentJob({ tenderId, link, company, price, requestedBy, cre
     status: 'pending',
     created_at: createdAt,
   };
+}
+
+// Free-text agent instruction (amend dialog). Trim; null when empty/non-string;
+// cap at 4096 = Telegram's text-message max (instruction lives in the job file,
+// not in callback_data, so this is only a defensive ceiling).
+export function validateInstruction(text) {
+  if (typeof text !== 'string') return null;
+  const t = text.trim();
+  if (t === '') return null;
+  return t.slice(0, 4096);
+}
+
+// Amend job: re-work an already-prepared proposal per a free-text instruction.
+// Overwrites _state/agent_jobs/<tid>.json. `target` carries the prior result so
+// the offline agent knows WHERE to amend. No `price` — amend does not reprice.
+export function buildAgentAmendJob({ tenderId, instruction, company, target, requestedBy, createdAt }) {
+  return {
+    tender_id: tenderId,
+    link: `https://prozorro.gov.ua/tender/${tenderId}`,
+    job_type: 'amend',
+    instruction,
+    company,
+    target,
+    requested_by: requestedBy,
+    status: 'pending',
+    created_at: createdAt,
+  };
+}
+
+// Confirm prompt for an amend. Instruction is user free text → HTML-escaped
+// (the send helpers use parse_mode HTML); truncated for the prompt display only.
+export function buildAgentAmendConfirmText({ tenderId, instruction }) {
+  const short = instruction.length > 300 ? `${instruction.slice(0, 300)}…` : instruction;
+  return `✏️ Доробити ${tenderId}:\n«${escapeHtml(short)}»`;
 }
 
 // Pure router for the agent MENU callbacks (menu/pick/jobs). Returns null for

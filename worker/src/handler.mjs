@@ -16,6 +16,7 @@ import {
   companyForSlug, agentTriggerButtonRow, buildAgentTenderListKeyboard,
   buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
+  validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage, handleAgentMenuNav,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
@@ -109,7 +110,7 @@ export async function runHandler({ update, env, deps = {} }) {
   // the next plain text message is the price — intercept it before command parsing.
   // Admin-only (the dialog can only be opened by an admin in the first place).
   if (isAdmin && typeof msg.text === 'string' && !msg.text.startsWith('/')) {
-    const handled = await handleAgentPriceReply({
+    const handled = await handleAgentTextReply({
       env, chatId, msg, _sendReply,
       _loadAgentPending, _saveAgentPending, _now,
     });
@@ -1076,6 +1077,37 @@ async function handleAgentCallback({
     return;
   }
 
+  if (action === 'amend') {
+    let prior;
+    try {
+      prior = await _loadAgentJob(env, tid);
+    } catch (err) {
+      console.error('worker: agent amend load job failed:', err.message);
+      await ack('⚠️ GitHub тимчасово недоступний', true);
+      return;
+    }
+    if (!prior || prior.status !== 'done' || !prior.result?.drive_link) {
+      await ack('🚫 Пропозиція ще не готова', true);
+      return;
+    }
+    try {
+      const { pending, sha } = await _loadAgentPending(env);
+      pending[chatId] = { tid, kind: 'amend', step: 'await_instruction', at: _now().toISOString() };
+      await _saveAgentPending(env, pending, sha);
+    } catch (err) {
+      console.error('worker: agent amend save pending failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
+    }
+    try {
+      await sendNew(`✏️ Напиши, що доробити в пропозиції ${tid} (одним повідомленням):`);
+    } catch (err) {
+      console.error('worker: agent amend prompt send failed:', err.message);
+    }
+    await ack();
+    return;
+  }
+
   if (action === 'start') {
     // Authoritative gate (covers /agent, /info and digest buttons): the agent
     // runs only while the tender is accepting proposals (active.tendering).
@@ -1138,10 +1170,50 @@ async function handleAgentCallback({
       await ack('⚠️ Помилка, спробуй ще раз', true);
       return;
     }
-    if (!entry || entry.tid !== tid || entry.step !== 'confirm' || !entry.price) {
+    if (!entry || entry.tid !== tid || entry.step !== 'confirm') {
       await ack('⚠️ Немає активного запиту');
       return;
     }
+
+    // Amend: build a job_type:'amend' record, carrying the prior done job's
+    // result as the target folder. No price.
+    if (entry.kind === 'amend') {
+      if (!entry.instruction) { await ack('⚠️ Немає активного запиту'); return; }
+      let prior;
+      try {
+        prior = await _loadAgentJob(env, tid);
+      } catch (err) {
+        console.error('worker: agent amend confirm load job failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+      const job = buildAgentAmendJob({
+        tenderId: tid,
+        instruction: entry.instruction,
+        company: prior?.company ?? null,
+        target: { drive_link: prior?.result?.drive_link ?? null, package_dir: prior?.result?.package_dir ?? null },
+        requestedBy: String(chatId),
+        createdAt: _now().toISOString(),
+      });
+      try {
+        await _saveAgentJob(env, job);
+      } catch (err) {
+        console.error('worker: saveAgentJob (amend) failed:', err.message);
+        await ack('⚠️ Не зміг поставити в чергу, спробуй ще раз', true);
+        return;
+      }
+      await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
+      try {
+        await sendNew('✅ Завдання на доробку поставлено в чергу. Сповіщу, коли буде готово.');
+      } catch (err) {
+        console.error('worker: agent amend confirm reply failed:', err.message);
+      }
+      await ack('✅ В черзі');
+      return;
+    }
+
+    // Prepare (existing): requires a price.
+    if (!entry.price) { await ack('⚠️ Немає активного запиту'); return; }
     const link = `https://prozorro.gov.ua/tender/${tid}`;
     const job = buildAgentJob({
       tenderId: tid, link, company: entry.company, price: entry.price,
@@ -1192,10 +1264,12 @@ async function clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPen
   }
 }
 
-// Handles a plain text message from an admin who is mid-agent-dialog at the
-// price step. Returns true if it consumed the message (so the caller stops),
-// false if there was no pending price step (caller continues normal parsing).
-async function handleAgentPriceReply({
+// Handles a plain text message from an admin who is mid-agent-dialog awaiting a
+// free-text reply — the price (await_price) or the amend instruction
+// (await_instruction). Returns true if it consumed the message (so the caller
+// stops), false if there was no matching pending step (caller continues normal
+// parsing).
+async function handleAgentTextReply({
   env, chatId, msg, _sendReply, _loadAgentPending, _saveAgentPending, _now,
 }) {
   let pending, sha, entry;
@@ -1203,10 +1277,10 @@ async function handleAgentPriceReply({
     ({ pending, sha } = await _loadAgentPending(env));
     entry = pending?.[chatId];
   } catch (err) {
-    console.error('worker: agent price load pending failed:', err.message);
+    console.error('worker: agent text-reply load pending failed:', err.message);
     return false; // can't verify state → let normal handling proceed
   }
-  if (!entry || entry.step !== 'await_price') return false;
+  if (!entry || (entry.step !== 'await_price' && entry.step !== 'await_instruction')) return false;
 
   // Expire an abandoned dialog: if the price step was opened long ago and never
   // finished, do not consume an unrelated number as the stale tender's price.
@@ -1225,6 +1299,30 @@ async function handleAgentPriceReply({
     token: env.TELEGRAM_BOT_TOKEN, chatId: msg.chat.id, text,
     replyToMessageId: msg.message_id, replyMarkup,
   });
+
+  if (entry.step === 'await_instruction') {
+    const instruction = validateInstruction(msg.text);
+    if (instruction === null) {
+      try { await send('Порожня інструкція. Напиши текстом, що доробити.'); }
+      catch (err) { console.error('worker: agent empty-instruction reply failed:', err.message); }
+      return true; // consumed; stay at await_instruction
+    }
+    try {
+      pending[chatId] = { ...entry, instruction, step: 'confirm' };
+      await _saveAgentPending(env, pending, sha);
+    } catch (err) {
+      console.error('worker: agent instruction save pending failed:', err.message);
+      try { await send('⚠️ Помилка, спробуй ще раз.'); } catch {}
+      return true;
+    }
+    try {
+      await send(
+        buildAgentAmendConfirmText({ tenderId: entry.tid, instruction }),
+        buildAgentConfirmKeyboard(entry.tid),
+      );
+    } catch (err) { console.error('worker: agent amend confirm prompt failed:', err.message); }
+    return true;
+  }
 
   const price = validateAgentPrice(msg.text);
   // Reject null AND a zero price ('0', '0,00', etc.) — validateAgentPrice allows

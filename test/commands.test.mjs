@@ -23,6 +23,7 @@ import {
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage,
   handleAgentMenuNav,
+  validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
   buildWatchedEntityCard, handleWatchedNav,
 } from '../commands.mjs';
@@ -3575,4 +3576,56 @@ test('handleAgentMenuNav: noop→null; menu/pick/jobs routing; other→null', ()
   assert.match(handleAgentMenuNav({ ...args, data: 'agent:pick:0' }).text, /Оберіть тендер/);
   assert.match(handleAgentMenuNav({ ...args, data: 'agent:jobs:0' }).text, /Останні задачі/);
   assert.equal(handleAgentMenuNav({ ...args, data: 'agent:start:UA-2026-06-01-000002-a' }), null);
+});
+
+test('validateInstruction: trims, empty→null, non-string→null, caps 4096', () => {
+  assert.equal(validateInstruction('   '), null);
+  assert.equal(validateInstruction(123), null);
+  assert.equal(validateInstruction('  додай довідку  '), 'додай довідку');
+  assert.equal(validateInstruction('x'.repeat(5000)).length, 4096);
+});
+
+test('buildAgentAmendJob: amend record shape, no price, target carried', () => {
+  const j = buildAgentAmendJob({
+    tenderId: 'UA-2026-06-01-000002-a', instruction: 'додай КВЕД', company: 'ТОВ',
+    target: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg' },
+    requestedBy: '123', createdAt: '2026-06-21T10:00:00.000Z',
+  });
+  assert.deepEqual(j, {
+    tender_id: 'UA-2026-06-01-000002-a',
+    link: 'https://prozorro.gov.ua/tender/UA-2026-06-01-000002-a',
+    job_type: 'amend',
+    instruction: 'додай КВЕД',
+    company: 'ТОВ',
+    target: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg' },
+    requested_by: '123',
+    status: 'pending',
+    created_at: '2026-06-21T10:00:00.000Z',
+  });
+  assert.ok(!('price' in j));
+});
+
+test('buildAgentAmendConfirmText: shows tid + HTML-escaped instruction', () => {
+  const t = buildAgentAmendConfirmText({ tenderId: 'UA-2026-06-01-000002-a', instruction: 'ціна < 5 & більше' });
+  assert.match(t, /UA-2026-06-01-000002-a/);
+  assert.match(t, /&lt; 5 &amp; більше/);
+});
+
+test('buildAgentJobsPage: done+drive_link row gets 📁 + ✏️ Доробити; others do not', () => {
+  const v = buildAgentJobsPage({ jobs: [
+    job('UA-2026-06-01-000002-a', 'done', { result: { drive_link: 'https://drive/x' } }),
+    job('UA-2026-06-01-000003-a', 'pending'),
+    job('UA-2026-06-01-000004-a', 'error'),
+  ], page: 0 });
+  const cbs = JSON.stringify(v.keyboard.inline_keyboard);
+  assert.match(cbs, /agent:amend:UA-2026-06-01-000002-a/);
+  assert.ok(!cbs.includes('agent:amend:UA-2026-06-01-000003-a'));
+  assert.ok(!cbs.includes('agent:amend:UA-2026-06-01-000004-a'));
+});
+
+test('buildAgentJobsPage: amend job shows ✏️ marker in its line', () => {
+  const v = buildAgentJobsPage({ jobs: [
+    job('UA-2026-06-01-000002-a', 'running', { job_type: 'amend' }),
+  ], page: 0 });
+  assert.match(v.text, /✏️/);
 });

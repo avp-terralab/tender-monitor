@@ -2685,6 +2685,24 @@ test('agent price reply on stale pending (>15 min) → not consumed, pending dro
   assert.ok(!sent.some(s => /Підтвердити/.test(JSON.stringify(s))), 'no confirm prompt for stale tid');
 });
 
+test('agent instruction reply → stored, amend confirm shown', async () => {
+  const { deps, store, sent } = makeAgentDeps();
+  store.pending['123'] = { tid: AGENT_TID, kind: 'amend', step: 'await_instruction', at: '2026-06-21T10:00:00.000Z' };
+  await runHandler({ update: agentMsg('додай довідку КВЕД'), env: ENV, deps });
+  assert.equal(store.pending['123'].step, 'confirm');
+  assert.equal(store.pending['123'].instruction, 'додай довідку КВЕД');
+  assert.match(sent.at(-1).text, /Доробити/);
+  assert.match(JSON.stringify(sent.at(-1).replyMarkup), new RegExp(`agent:confirm:${AGENT_TID}`));
+});
+
+test('agent empty instruction → stays at await_instruction, no advance', async () => {
+  const { deps, store, sent } = makeAgentDeps();
+  store.pending['123'] = { tid: AGENT_TID, kind: 'amend', step: 'await_instruction', at: '2026-06-21T10:00:00.000Z' };
+  await runHandler({ update: agentMsg('   '), env: ENV, deps });
+  assert.equal(store.pending['123'].step, 'await_instruction');
+  assert.match(sent.at(-1).text, /Порожня інструкція/);
+});
+
 test('agent:confirm → saveAgentJob with contract-valid job, pending cleared, queued reply', async () => {
   const { deps, store, sent, jobs, acks } = makeAgentDeps();
   store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', price: '181200', step: 'confirm' };
@@ -2711,6 +2729,29 @@ test('agent:confirm without matching pending → no job, soft ack', async () => 
   assert.match(acks[0].text, /Немає активного|Невідома/i);
 });
 
+test('agent:confirm with kind=amend → amend job saved, target from prior done, pending cleared', async () => {
+  const { deps, store, sent, jobs, acks } = makeAgentDeps({
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'done', company: 'МАЙЛАБ', result: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg' } }),
+  });
+  store.pending['123'] = { tid: AGENT_TID, kind: 'amend', step: 'confirm', instruction: 'додай КВЕД', at: '2026-06-21T10:00:00.000Z' };
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.deepEqual(jobs[0], {
+    tender_id: AGENT_TID,
+    link: `https://prozorro.gov.ua/tender/${AGENT_TID}`,
+    job_type: 'amend',
+    instruction: 'додай КВЕД',
+    company: 'МАЙЛАБ',
+    target: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg' },
+    requested_by: '123',
+    status: 'pending',
+    created_at: '2026-06-21T10:00:00.000Z',
+  });
+  assert.equal(store.pending['123'], undefined, 'pending cleared');
+  assert.match(sent.at(-1).text, /доробку/);
+  assert.equal(acks.length, 1);
+});
+
 test('agent:cancel → pending cleared, Скасовано reply', async () => {
   const { deps, store, sent, acks } = makeAgentDeps();
   store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' };
@@ -2718,6 +2759,26 @@ test('agent:cancel → pending cleared, Скасовано reply', async () => {
   assert.equal(store.pending['123'], undefined);
   assert.match(sent.at(-1).text, /Скасовано/);
   assert.equal(acks.length, 1);
+});
+
+test('agent:amend on prepared tender → instruction dialog started', async () => {
+  const { deps, store, sent, acks } = makeAgentDeps({
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'done', company: 'МАЙЛАБ', result: { drive_link: 'https://drive/x' } }),
+  });
+  await runHandler({ update: CB(`agent:amend:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(store.pending['123'].step, 'await_instruction');
+  assert.equal(store.pending['123'].kind, 'amend');
+  assert.match(sent.at(-1).text, /що доробити/);
+  assert.equal(acks.length, 1);
+});
+
+test('agent:amend on not-prepared tender → rejected, no dialog', async () => {
+  const { deps, store, acks } = makeAgentDeps({
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'pending' }),
+  });
+  await runHandler({ update: CB(`agent:amend:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(store.pending['123'], undefined);
+  assert.match(acks[0].text, /не готова/);
 });
 
 test('non-admin text while no pending → normal handling (price step not triggered)', async () => {
