@@ -21,6 +21,7 @@ import {
   AGENT_COMPANIES, companyForSlug, slugForCompany,
   agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
+  monitorPhaseBuckets, buildMonitorMenu,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -3411,4 +3412,49 @@ test('handleArchiveNav: noop → null; menu/co/pe/month routing', () => {
   assert.match(handleArchiveNav({ archive, data: 'arch:pe:2026' }).text, /оберіть місяць/);
   assert.match(handleArchiveNav({ archive, data: 'arch:co:0:0' }).text, /Завантажити договір/);
   assert.match(handleArchiveNav({ archive, data: 'arch:pe:2026:04:0' }).text, /Квітень 2026/);
+});
+
+// --- Моніторинг закупівель: меню фаз ---
+const monGroup = (status, id = 'UA-2026-06-01-000001-a', extra = {}) => ({
+  tender_id: id,
+  prozorro_url: `https://prozorro.gov.ua/tender/${id}`,
+  status,
+  deadline: null,
+  procuring_entity: { name: 'КНП Лікарня', edrpou: '111' },
+  ...extra,
+});
+
+test('monitorPhaseBuckets: only non-empty phases, lifecycle order, stable idx', () => {
+  const buckets = monitorPhaseBuckets([
+    monGroup('active.qualification', 'UA-2026-06-01-000001-a'),
+    monGroup('active.tendering', 'UA-2026-06-01-000002-a'),
+    monGroup('some.weird.status', 'UA-2026-06-01-000003-a'),
+  ]);
+  // tendering(idx0) before qualification(idx3) before OTHER(idx5)
+  assert.deepEqual(buckets.map((b) => b.idx), [0, 3, 5]);
+  assert.equal(buckets.find((b) => b.idx === 5).items.length, 1); // weird → OTHER
+});
+
+test('buildMonitorMenu: empty groups → keyboard null', () => {
+  assert.equal(buildMonitorMenu({ groups: [], runIso: '2026-06-24T13:00:00Z' }).keyboard, null);
+});
+
+test('buildMonitorMenu: one row per non-empty phase, callback mon:ph:<idx>:0, counts', () => {
+  const m = buildMonitorMenu({
+    groups: [monGroup('active.tendering', 'UA-2026-06-01-000002-a'), monGroup('active.tendering', 'UA-2026-06-01-000004-a')],
+    runIso: '2026-06-24T13:00:00Z',
+  });
+  assert.equal(m.keyboard.inline_keyboard.length, 1);
+  assert.equal(m.keyboard.inline_keyboard[0][0].callback_data, 'mon:ph:0:0');
+  assert.match(m.keyboard.inline_keyboard[0][0].text, /\(2\)/);
+  assert.match(m.text, /Моніторинг закупівель/);
+});
+
+test('buildMonitorMenu: errors footer line', () => {
+  const m = buildMonitorMenu({
+    groups: [monGroup('active.tendering')],
+    runIso: '2026-06-24T13:00:00Z',
+    errors: [{ tender_id: 'UA-2026-06-01-000009-a', error: '404' }],
+  });
+  assert.match(m.text, /Не вдалось перевірити: 1/);
 });

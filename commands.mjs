@@ -441,6 +441,45 @@ export function formatInfoPages({ runIso, groups, errors = [] }) {
   return pages;
 }
 
+const MON_PER_PAGE = 6;
+// Stable phase index = position here. OTHER_PHASE last (its statuses: []).
+const MON_PHASES = [...PHASES, OTHER_PHASE];
+
+// Non-empty lifecycle buckets, sorted within: active.tendering by deadline,
+// others by tender_id. { idx, emoji, label, items }.
+export function monitorPhaseBuckets(groups) {
+  const known = new Set(PHASES.flatMap((p) => p.statuses));
+  return MON_PHASES
+    .map((p, idx) => {
+      const items = p.statuses.length === 0
+        ? (groups ?? []).filter((g) => !known.has(g.status))
+        : (groups ?? []).filter((g) => p.statuses.includes(g.status));
+      return { idx, emoji: p.emoji, label: p.label, items };
+    })
+    .filter((b) => b.items.length > 0)
+    .map((b) => {
+      const tendering = MON_PHASES[b.idx].statuses.includes('active.tendering');
+      b.items = [...b.items].sort((a, c) =>
+        tendering ? deadlineKey(a) - deadlineKey(c) : a.tender_id.localeCompare(c.tender_id));
+      return b;
+    });
+}
+
+export function buildMonitorMenu({ groups, runIso, errors = [] }) {
+  if (!groups || groups.length === 0) {
+    return { text: '📭 Немає активних тендерів.', keyboard: null };
+  }
+  const time = INFO_TIME_FMT.format(new Date(runIso));
+  const date = INFO_DATE_FMT.format(new Date(runIso));
+  let text = `📋 <b>Моніторинг закупівель</b> — ${groups.length} активних\nоновлено ${time}, ${date}`;
+  if (errors.length > 0) text += `\n⚠️ Не вдалось перевірити: ${errors.length}`;
+  const rows = monitorPhaseBuckets(groups).map((b) => [{
+    text: `${b.emoji} ${b.label} (${b.items.length})`,
+    callback_data: `mon:ph:${b.idx}:0`,
+  }]);
+  return { text, keyboard: { inline_keyboard: rows } };
+}
+
 const KYIV_HM_FMT = new Intl.DateTimeFormat('uk-UA', {
   timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
 });
