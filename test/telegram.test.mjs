@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat, formatNightDigest, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, broadcastDigest, deleteMessage } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, formatNightDigest, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, broadcastDigest, deleteMessage, formatDeadlineReminder, summarizeDigest } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -1074,4 +1074,42 @@ test('deleteMessage: non-ok HTTP → false, no throw', async () => {
 test('deleteMessage: fetch throws → false, no throw', async () => {
   const fakeFetch = async () => { throw new Error('network'); };
   assert.equal(await deleteMessage({ token: 'T', chatId: 1, messageId: 2, fetch: fakeFetch }), false);
+});
+
+test('broadcastDigest: returns [{chat_id, message_id}] from each sent message', async () => {
+  let mid = 500;
+  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: mid++ } }) });
+  const r = await broadcastDigest({ token: 'T', chatIds: ['11', { chatId: '22', role: 'viewer' }], fetch: fakeFetch }, 'hi');
+  assert.deepEqual(r, [{ chat_id: '11', message_id: 500 }, { chat_id: '22', message_id: 501 }]);
+});
+
+test('broadcastDigest: a failing chat is skipped (not in result)', async () => {
+  // sendOne retries once, so chat '11' makes 2 fetch calls — both must throw for
+  // broadcastDigest to catch and skip it.  Chat '22' then succeeds on call 3.
+  let calls = 0;
+  const fakeFetch = async () => {
+    calls++;
+    if (calls <= 2) throw new Error('blocked');
+    return { ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: 9 } }) };
+  };
+  const r = await broadcastDigest({ token: 'T', chatIds: ['11', '22'], fetch: fakeFetch }, 'hi');
+  assert.deepEqual(r, [{ chat_id: '22', message_id: 9 }]);
+});
+
+test('formatDeadlineReminder: header + a line per tender', () => {
+  const t = formatDeadlineReminder([
+    { tender_id: 'UA-2026-06-19-008800-a', entity: 'КНП МКЛ №1', deadline: '27.06 17:00' },
+  ]);
+  assert.match(t, /24 год/);
+  assert.match(t, /UA-2026-06-19-008800-a/);
+  assert.match(t, /КНП МКЛ №1/);
+});
+
+test('summarizeDigest: compact emoji·count per headline type', () => {
+  const groups = [
+    { events: [{ type: 'new_tender_announced' }] },
+    { events: [{ type: 'new_tender_announced' }, { type: 'status_changed' }] },
+  ];
+  assert.equal(summarizeDigest(groups), '📥 2 · 🔄 1');
+  assert.equal(summarizeDigest([]), '🔔 оновлення');
 });

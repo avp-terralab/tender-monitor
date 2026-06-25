@@ -331,6 +331,34 @@ export function formatDigest(runIso, groups) {
   return lines.join('\n').trimEnd();
 }
 
+// Separate "24h to submission deadline" reminder — sent on its own (NOT in the
+// digest) so it can be deleted after 24h without archiving it to history.
+export function formatDeadlineReminder(tenders) {
+  const lines = ['⏰ Залишилось 24 год до завершення приймання пропозицій:'];
+  for (const t of tenders ?? []) {
+    const ent = t.entity ? ` · ${escapeHtml(t.entity)}` : '';
+    const dl = t.deadline ? ` · до ${escapeHtml(t.deadline)}` : '';
+    lines.push(`🆔 ${escapeHtml(t.tender_id)}${ent}${dl}`);
+  }
+  return lines.join('\n');
+}
+
+// One-line summary of a digest's events for the history list row.
+const SUMMARY_TYPES = [
+  ['new_tender_announced', '📥'],
+  ['status_changed', '🔄'],
+  ['award_qualified', '🏆'],
+  ['contract_signed', '✍️'],
+];
+export function summarizeDigest(groups) {
+  const counts = new Map();
+  for (const g of groups ?? []) for (const e of (g.events ?? [])) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
+  const parts = SUMMARY_TYPES.filter(([t]) => counts.get(t)).map(([t, emoji]) => `${emoji} ${counts.get(t)}`);
+  if (parts.length) return parts.join(' · ');
+  const total = [...counts.values()].reduce((a, b) => a + b, 0);
+  return total ? `📌 ${total}` : '🔔 оновлення';
+}
+
 export function formatMoney(amount) {
   return Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
@@ -499,6 +527,7 @@ export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, te
 // the callback handler rejects their clicks anyway, so showing the button
 // would just mislead them.
 export async function broadcastDigest({ token, chatIds, fetch: fetchImpl = fetch }, text, opts) {
+  const recipients = [];
   for (const recipient of chatIds) {
     const isObj = typeof recipient === 'object' && recipient !== null;
     const chatId = isObj ? recipient.chatId : recipient;
@@ -507,11 +536,14 @@ export async function broadcastDigest({ token, chatIds, fetch: fetchImpl = fetch
       ? { ...opts, addButtonsForTenders: [] }
       : (opts ? { ...opts, role } : opts);
     try {
-      await sendDigest({ token, chatId, fetch: fetchImpl }, text, effectiveOpts);
+      const res = await sendDigest({ token, chatId, fetch: fetchImpl }, text, effectiveOpts);
+      const mid = res?.result?.message_id;
+      if (mid != null) recipients.push({ chat_id: String(chatId), message_id: mid });
     } catch (err) {
       console.error(`broadcastDigest to ${chatId} failed:`, err.message);
     }
   }
+  return recipients;
 }
 
 export async function getUpdates({ token, offset, fetch: fetchImpl = fetch }) {
