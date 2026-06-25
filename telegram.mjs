@@ -598,6 +598,25 @@ export async function editMessageReplyMarkup({ token, chatId, messageId, replyMa
   return json;
 }
 
+// Best-effort delete: returns true on success, false on any failure (message
+// already gone, older than 48h, network) — never throws, so cleanup of stale
+// messages can't break a command.
+export async function deleteMessage({ token, chatId, messageId, fetch: fetchImpl = fetch }) {
+  const url = `https://api.telegram.org/bot${token}/deleteMessage`;
+  const params = new URLSearchParams({
+    chat_id: String(chatId),
+    message_id: String(messageId),
+  });
+  try {
+    const res = await fetchImpl(url, { method: 'POST', body: params });
+    if (!res.ok) return false;
+    const json = await res.json();
+    return json.ok === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function editMessageText({ token, chatId, messageId, text, replyMarkup, fetch: fetchImpl = fetch }) {
   const url = `https://api.telegram.org/bot${token}/editMessageText`;
   const params = new URLSearchParams({

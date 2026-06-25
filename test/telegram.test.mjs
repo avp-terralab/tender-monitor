@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat, formatNightDigest, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, broadcastDigest } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, formatNightDigest, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, broadcastDigest, deleteMessage } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -1051,4 +1051,27 @@ test('editMessageText: disables web page preview (no misleading link-preview car
   };
   await editMessageText({ token: 'TOK', chatId: '1', messageId: 2, text: 'hi', fetch: fakeFetch });
   assert.equal(params.get('disable_web_page_preview'), 'true');
+});
+
+test('deleteMessage: POST /deleteMessage with chat_id+message_id, true on ok', async () => {
+  let captured;
+  const fakeFetch = async (url, opts) => {
+    captured = { url, body: opts.body };
+    return { ok: true, status: 200, json: async () => ({ ok: true, result: true }) };
+  };
+  const ok = await deleteMessage({ token: 'TOK', chatId: 123, messageId: 55, fetch: fakeFetch });
+  assert.equal(ok, true);
+  assert.match(captured.url, /botTOK\/deleteMessage$/);
+  assert.equal(captured.body.get('chat_id'), '123');
+  assert.equal(captured.body.get('message_id'), '55');
+});
+
+test('deleteMessage: non-ok HTTP → false, no throw', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 400, text: async () => 'message to delete not found' });
+  assert.equal(await deleteMessage({ token: 'T', chatId: 1, messageId: 2, fetch: fakeFetch }), false);
+});
+
+test('deleteMessage: fetch throws → false, no throw', async () => {
+  const fakeFetch = async () => { throw new Error('network'); };
+  assert.equal(await deleteMessage({ token: 'T', chatId: 1, messageId: 2, fetch: fakeFetch }), false);
 });
