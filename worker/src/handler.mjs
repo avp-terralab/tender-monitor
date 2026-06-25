@@ -20,7 +20,8 @@ import {
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage, handleAgentMenuNav,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
-import { sendReply, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands } from '../../telegram.mjs';
+import { sendReply, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, deleteMessage } from '../../telegram.mjs';
+import { loadEphemeral, saveEphemeral } from './ephemeral.mjs';
 import {
   loadWatchlist, saveWatchlist,
   loadWatchedEntities, saveWatchedEntities,
@@ -41,6 +42,10 @@ const STATUS_CACHE = new Map(); // chatId → { text, builtAt: number }
 const STATUS_CACHE_TTL_MS = 60_000;
 
 const BOT_USERNAME = 'terralab_tenders_bot';
+
+// Commands whose reply is an on-demand "view": the bot keeps only the latest one
+// in the chat (deletes the previous view + its trigger on the next view command).
+const EPHEMERAL_VIEW_CMDS = new Set(['info', 'watched', 'archive', 'agent', 'help', 'status', 'whoami']);
 
 export async function runHandler({ update, env, deps = {} }) {
   const _loadWatchlist = deps.loadWatchlist ?? loadWatchlist;
@@ -71,6 +76,8 @@ export async function runHandler({ update, env, deps = {} }) {
   const _editMessageText = deps.editMessageText ?? editMessageText;
   const _answerCallbackQuery = deps.answerCallbackQuery ?? answerCallbackQuery;
   const _setMyCommands = deps.setMyCommands ?? setMyCommands;
+  const _deleteMessage = deps.deleteMessage ?? deleteMessage;
+  const _ephemeralKV = deps.ephemeralKV ?? env.EPHEMERAL_KV;
   const _fetchLastCommit = deps.fetchLastCommit ?? fetchLastCommit;
   const _loadPendingDigest = deps.loadPendingDigest ?? loadPendingDigest;
   const _loadTenderState = deps.loadTenderState ?? loadTenderState;
@@ -635,11 +642,26 @@ export async function runHandler({ update, env, deps = {} }) {
     return; // free text or other unhandled — no reply
   }
 
+  // Ephemeral views: before showing a new on-demand view, delete the previous
+  // one (its bot reply + the user's trigger). Best-effort; never blocks the reply.
+  const isView = EPHEMERAL_VIEW_CMDS.has(cmd.cmd);
+  if (isView && _ephemeralKV) {
+    try {
+      const prevIds = await loadEphemeral(_ephemeralKV, chatId);
+      for (const id of prevIds) {
+        await _deleteMessage({ token: env.TELEGRAM_BOT_TOKEN, chatId, messageId: id });
+      }
+    } catch (err) {
+      console.error('worker: ephemeral cleanup failed:', err.message);
+    }
+  }
+
   const pages = Array.isArray(reply) ? reply : [reply];
+  const botReplyIds = [];
   for (let i = 0; i < pages.length; i++) {
     const isLast = i === pages.length - 1;
     try {
-      await _sendReply({
+      const resp = await _sendReply({
         token: env.TELEGRAM_BOT_TOKEN,
         chatId: msg.chat.id,
         text: pages[i],
@@ -648,8 +670,20 @@ export async function runHandler({ update, env, deps = {} }) {
           ? (archiveReplyMarkup ?? agentReplyMarkup ?? watchedReplyMarkup ?? monitorReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
           : undefined,
       });
+      const mid = resp?.result?.message_id;
+      if (mid != null) botReplyIds.push(mid);
     } catch (err) {
       console.error('worker: sendReply failed:', err.message);
+    }
+  }
+
+  // Record this view (trigger + bot reply) so the NEXT view command can clear it.
+  if (isView && _ephemeralKV) {
+    try {
+      const ids = [msg.message_id, ...botReplyIds].filter((x) => x != null);
+      await saveEphemeral(_ephemeralKV, chatId, ids);
+    } catch (err) {
+      console.error('worker: ephemeral save failed:', err.message);
     }
   }
 

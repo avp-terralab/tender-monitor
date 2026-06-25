@@ -3113,3 +3113,45 @@ test('runHandler: wat:rm with page → re-rendered menu, page preserved (clamped
   // only entity removed → empty menu; buildWatchedMenu clamps page safely (no crash)
   assert.match(edits[0].text, /Не стежу за жодним|Моніторинг замовників/);
 });
+
+test('runHandler: a VIEW command deletes the previous view + records the new one', async () => {
+  const deleted = [];
+  const kvStore = { 'eph:123': JSON.stringify([100, 101]) };
+  const kv = {
+    get: async (k) => (k in kvStore ? kvStore[k] : null),
+    put: async (k, v) => { kvStore[k] = v; },
+    delete: async (k) => { delete kvStore[k]; },
+  };
+  await runHandler({
+    update: { message: { chat: { id: 123 }, message_id: 7, text: '/help', from: { id: 123 } } },
+    env: { ...ENV, EPHEMERAL_KV: kv },
+    deps: {
+      ...makeDeps().deps,
+      deleteMessage: async ({ messageId }) => { deleted.push(messageId); return true; },
+      sendReply: async () => ({ ok: true, result: { message_id: 555 } }),
+    },
+  });
+  assert.deepEqual(deleted.sort((a, b) => a - b), [100, 101], 'previous view messages deleted');
+  assert.equal(kvStore['eph:123'], JSON.stringify([7, 555]), 'new ids = [trigger, reply]');
+});
+
+test('runHandler: a non-VIEW (action) command does NOT delete or record', async () => {
+  const deleted = [];
+  const kvStore = { 'eph:123': JSON.stringify([100]) };
+  const kv = {
+    get: async (k) => (k in kvStore ? kvStore[k] : null),
+    put: async (k, v) => { kvStore[k] = v; },
+    delete: async (k) => { delete kvStore[k]; },
+  };
+  await runHandler({
+    update: { message: { chat: { id: 123 }, message_id: 8, text: '/notify', from: { id: 123 } } },
+    env: { ...ENV, EPHEMERAL_KV: kv },
+    deps: {
+      ...makeDeps().deps,
+      deleteMessage: async ({ messageId }) => { deleted.push(messageId); return true; },
+      sendReply: async () => ({ ok: true, result: { message_id: 999 } }),
+    },
+  });
+  assert.equal(deleted.length, 0, 'no deletions for an action command');
+  assert.equal(kvStore['eph:123'], JSON.stringify([100]), 'ephemeral state unchanged');
+});

@@ -1,3 +1,7 @@
 name = "tender-monitor-bot"
 main = "src/index.mjs"
 compatibility_date = "2026-05-01"
+
+[[kv_namespaces]]
+binding = "EPHEMERAL_KV"
+id = "f9c6d80922f24615ab394d3cc1aa7251"   # KV namespace "tender-monitor-ephemeral"
