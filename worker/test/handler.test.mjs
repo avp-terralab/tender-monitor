@@ -108,6 +108,7 @@ test('runHandler: allowed user reply carries reply_markup keyboard', async () =>
     '📋 Моніторинг закупівель',
     '📦 Архів закупівель',
     '🤖 Агент',
+    '📜 Історія',
     '❓ Допомога (список команд)',
   ]);
 });
