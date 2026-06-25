@@ -26,6 +26,7 @@ import {
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
   buildWatchedEntityCard, handleWatchedNav,
+  buildArgPrompt, commandFromReplyPrompt,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -3628,4 +3629,38 @@ test('buildAgentJobsPage: amend job shows ✏️ marker in its line', () => {
     job('UA-2026-06-01-000002-a', 'running', { job_type: 'amend' }),
   ], page: 0 });
   assert.match(v.text, /✏️/);
+});
+
+test('buildArgPrompt: add → force_reply prompt + UA placeholder', () => {
+  const p = buildArgPrompt('add');
+  assert.match(p.text, /додати в моніторинг/);
+  assert.equal(p.replyMarkup.force_reply, true);
+  assert.match(p.replyMarkup.input_field_placeholder, /^UA-/);
+  assert.ok(!p.text.startsWith('❌'));
+});
+
+test('buildArgPrompt: watch → ЄДРПОУ prompt + 8-digit placeholder', () => {
+  const p = buildArgPrompt('watch');
+  assert.match(p.text, /ЄДРПОУ замовника/);
+  assert.equal(p.replyMarkup.input_field_placeholder, '12345678');
+});
+
+test('buildArgPrompt: retry → ❌ prefix kept with the core', () => {
+  const p = buildArgPrompt('add', { retry: true });
+  assert.match(p.text, /^❌ Невірний формат\./);
+  assert.match(p.text, /додати в моніторинг/);
+});
+
+test('buildArgPrompt: unknown command → null', () => {
+  assert.equal(buildArgPrompt('info'), null);
+});
+
+test('commandFromReplyPrompt: recognizes each prompt (incl. retry); null otherwise', () => {
+  assert.equal(commandFromReplyPrompt(buildArgPrompt('add').text), 'add');
+  assert.equal(commandFromReplyPrompt(buildArgPrompt('add', { retry: true }).text), 'add');
+  assert.equal(commandFromReplyPrompt(buildArgPrompt('remove').text), 'remove');
+  assert.equal(commandFromReplyPrompt(buildArgPrompt('watch').text), 'watch');
+  assert.equal(commandFromReplyPrompt(buildArgPrompt('unarchive').text), 'unarchive');
+  assert.equal(commandFromReplyPrompt('щось стороннє'), null);
+  assert.equal(commandFromReplyPrompt(123), null);
 });
