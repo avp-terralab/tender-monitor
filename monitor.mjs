@@ -77,13 +77,13 @@ function kyivDate(runIso) {
 // (marked deleted), cap digests to `cap` (newest-first). deleteMessage best-effort.
 export async function expireHistory(items, now, deleteMessage, { ttlMs = HISTORY_TTL_MS, cap = HISTORY_CAP } = {}) {
   const out = [];
-  for (const it of items ?? []) {
+  for (let it of items ?? []) {
     const age = now - new Date(it.sent_at).getTime();
     if (!it.deleted && age > ttlMs) {
       for (const r of it.recipients ?? []) {
         try { await deleteMessage(r.chat_id, r.message_id); } catch { /* best-effort */ }
       }
-      it.deleted = true;
+      it = { ...it, deleted: true };
     }
     if (it.type === 'deadline' && it.deleted) continue;   // drop expired deadlines
     out.push(it);

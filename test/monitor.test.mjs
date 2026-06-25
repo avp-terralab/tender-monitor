@@ -915,9 +915,11 @@ test('runOnce: 09:00 with empty buffer and no events → admin heartbeat as befo
   assert.equal(hbSent.length, 1, 'admin heartbeat fired');
 });
 
-test('runOnce: 09:00 with buffer AND new events → two sends (night digest + current digest)', async () => {
-  // Use far-future deadline to avoid triggering deadline_approaching (which would add a 3rd send)
-  const deadline = '2026-06-30T17:00:00+03:00';
+test('runOnce: 09:00 with buffer AND new events → three sends (night digest + deadline reminder + current digest)', async () => {
+  // Imminent deadline (8h away at 09:00 Kyiv) triggers deadline_approaching,
+  // which is now a SEPARATE sendDigest call before the main digest.
+  // Expected order: [0] night flush, [1] deadline reminder, [2] current digest.
+  const deadline = '2026-05-22T17:00:00+03:00'; // 2026-05-22T14:00:00Z, ~8h from runIso
   const prev = baseSnap({ tenderPeriod: { endDate: deadline } });
   const curr = { ...baseSnap({ tenderPeriod: { endDate: deadline } }), questions: [{ id: 'qN', title: 'New?' }] };
   const stored = {
@@ -951,10 +953,11 @@ test('runOnce: 09:00 with buffer AND new events → two sends (night digest + cu
     loadHeartbeatDate: async () => null,
     saveHeartbeatDate: async () => {},
   });
-  assert.equal(sent.length, 2, 'two broadcasts: night then current');
-  assert.match(sent[0], /🌙 Нічний дайджест/);
+  assert.equal(sent.length, 3, 'three broadcasts: night flush, deadline reminder, current digest');
+  assert.match(sent[0], /🌙 Нічний дайджест/);  // Phase A: night flush
   assert.match(sent[0], /Buffered/);
-  assert.match(sent[1], /Нове питання/); // current cycle
+  assert.match(sent[1], /Залишилось 24 год до завершення/); // Phase B: deadline reminder (separate send)
+  assert.match(sent[2], /Нове питання/); // Phase B: current digest
   assert.equal(cleared, true);
 });
 
