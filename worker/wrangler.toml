@@ -1,3 +1,7 @@
 name = "tender-monitor-bot"
 main = "src/index.mjs"
 compatibility_date = "2026-05-01"
+
+[[kv_namespaces]]
+binding = "EPHEMERAL_KV"
+id = "REPLACE_WITH_KV_ID"   # `cd worker && npx wrangler kv namespace create EPHEMERAL_KV`
