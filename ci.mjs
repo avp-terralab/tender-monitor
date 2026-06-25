@@ -1,6 +1,6 @@
 import { runOnce } from './monitor.mjs';
 import { fetchTender, extractSnapshot, fetchContract } from './prozorro.mjs';
-import { broadcastDigest } from './telegram.mjs';
+import { broadcastDigest, deleteMessage } from './telegram.mjs';
 import { checkWatchedEntities } from './entity_watch.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -59,6 +59,7 @@ const cursorPath = join(stateDir, '_watched_feed_cursor.json');
 const seenPath = join(stateDir, '_watched_seen.json');
 const heartbeatStatePath = join(stateDir, '_heartbeat.json');
 const pendingDigestPath = join(stateDir, '_pending_digest.json');
+const notifHistoryPath = join(stateDir, 'notification_history.json');
 
 const result = await runOnce({
   runIso: new Date().toISOString(),
@@ -110,6 +111,21 @@ const result = await runOnce({
   clearPendingDigest: async () => {
     if (existsSync(pendingDigestPath)) unlinkSync(pendingDigestPath);
   },
+  // Notification history: digests live 24h in chat then move to the 📜 Історія
+  // view; deadline reminders are just deleted. Written here, read by the worker.
+  loadNotificationHistory: async () => {
+    if (!existsSync(notifHistoryPath)) return { items: [] };
+    try {
+      return JSON.parse(readFileSync(notifHistoryPath, 'utf-8'));
+    } catch {
+      return { items: [] };
+    }
+  },
+  saveNotificationHistory: async (obj) => {
+    writeFileSync(notifHistoryPath, JSON.stringify(obj, null, 2) + '\n');
+  },
+  deleteMessage: async (cid, messageId) => deleteMessage({ token, chatId: cid, messageId }),
+  now: new Date(),
   updateSheet: async () => { /* no-op in CI */ },
   watchedEntities,
   checkWatchedEntities,

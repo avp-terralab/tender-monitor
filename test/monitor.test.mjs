@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runOnce, isQuietHour, mergePending, emptyPending } from '../monitor.mjs';
+import { runOnce, isQuietHour, mergePending, emptyPending, expireHistory, logBroadcast } from '../monitor.mjs';
 
 // Use valid tender_id format throughout (UA-YYYY-MM-DD-NNNNNN-x)
 const T_X      = 'UA-2026-05-01-000001-a';
@@ -82,7 +82,8 @@ test('runOnce: first-seen with imminent deadline keeps the deadline alert, drops
     updateSheet: async () => {},
   });
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /менше 24 годин/);
+  // deadline_approaching now goes out as a formatDeadlineReminder broadcast
+  assert.match(sent[0], /Залишилось 24 год до завершення/);
   assert.doesNotMatch(sent[0], /📎 Документів/);
 });
 
@@ -914,8 +915,11 @@ test('runOnce: 09:00 with empty buffer and no events → admin heartbeat as befo
   assert.equal(hbSent.length, 1, 'admin heartbeat fired');
 });
 
-test('runOnce: 09:00 with buffer AND new events → two sends (night digest + current digest)', async () => {
-  const deadline = '2026-05-22T17:00:00+03:00';
+test('runOnce: 09:00 with buffer AND new events → three sends (night digest + deadline reminder + current digest)', async () => {
+  // Imminent deadline (8h away at 09:00 Kyiv) triggers deadline_approaching,
+  // which is now a SEPARATE sendDigest call before the main digest.
+  // Expected order: [0] night flush, [1] deadline reminder, [2] current digest.
+  const deadline = '2026-05-22T17:00:00+03:00'; // 2026-05-22T14:00:00Z, ~8h from runIso
   const prev = baseSnap({ tenderPeriod: { endDate: deadline } });
   const curr = { ...baseSnap({ tenderPeriod: { endDate: deadline } }), questions: [{ id: 'qN', title: 'New?' }] };
   const stored = {
@@ -949,10 +953,11 @@ test('runOnce: 09:00 with buffer AND new events → two sends (night digest + cu
     loadHeartbeatDate: async () => null,
     saveHeartbeatDate: async () => {},
   });
-  assert.equal(sent.length, 2, 'two broadcasts: night then current');
-  assert.match(sent[0], /🌙 Нічний дайджест/);
+  assert.equal(sent.length, 3, 'three broadcasts: night flush, deadline reminder, current digest');
+  assert.match(sent[0], /🌙 Нічний дайджест/);  // Phase A: night flush
   assert.match(sent[0], /Buffered/);
-  assert.match(sent[1], /Нове питання/); // current cycle
+  assert.match(sent[1], /Залишилось 24 год до завершення/); // Phase B: deadline reminder (separate send)
+  assert.match(sent[2], /Нове питання/); // Phase B: current digest
   assert.equal(cleared, true);
 });
 
@@ -1017,4 +1022,33 @@ test('runOnce: 09:00 with current events (no buffer) saves heartbeat date (preve
   });
   assert.equal(sent.length, 1, 'one current-cycle broadcast');
   assert.equal(savedDate, '2026-05-22', 'heartbeat date stamped to prevent dupe fire');
+});
+
+// ─── Task 5: notification history helpers ─────────────────────────────────────
+
+test('logBroadcast: prepends newest-first', () => {
+  const r = logBroadcast([{ type: 'digest', sent_at: 'a' }], { type: 'digest', sent_at: 'b' });
+  assert.equal(r[0].sent_at, 'b');
+  assert.equal(r.length, 2);
+});
+
+test('expireHistory: >24h messages deleted; deadlines dropped; digests kept(deleted); cap', async () => {
+  const deleted = [];
+  const dm = async (chatId, messageId) => { deleted.push(messageId); return true; };
+  const now = new Date('2026-06-25T12:00:00Z').getTime();
+  const old = (type, mid) => ({ sent_at: '2026-06-24T00:00:00Z', type, summary: 's', text: 't', recipients: [{ chat_id: '1', message_id: mid }], deleted: false });
+  const items = [old('digest', 7), old('deadline', 8)];
+  const out = await expireHistory(items, now, dm);
+  assert.deepEqual(deleted.sort(), [7, 8]);
+  assert.ok(out.find((i) => i.type === 'digest')?.deleted === true);
+  assert.ok(!out.some((i) => i.type === 'deadline'));
+});
+
+test('expireHistory: recent items untouched; cap keeps newest 200 digests', async () => {
+  const now = new Date('2026-06-25T12:00:00Z').getTime();
+  const recent = { sent_at: '2026-06-25T11:00:00Z', type: 'digest', summary: 's', text: 't', recipients: [], deleted: false };
+  const many = Array.from({ length: 205 }, () => ({ ...recent }));
+  const out = await expireHistory(many, now, async () => true, { cap: 200 });
+  assert.equal(out.filter((i) => i.type === 'digest').length, 200);
+  assert.equal(out[0].deleted, false, 'recent not deleted');
 });

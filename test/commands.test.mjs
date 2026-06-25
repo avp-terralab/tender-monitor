@@ -27,6 +27,7 @@ import {
   monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
   buildWatchedEntityCard, handleWatchedNav,
   buildArgPrompt, commandFromReplyPrompt,
+  buildHistoryList, buildHistoryItem, handleHistoryNav,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -3663,4 +3664,43 @@ test('commandFromReplyPrompt: recognizes each prompt (incl. retry); null otherwi
   assert.equal(commandFromReplyPrompt(buildArgPrompt('unarchive').text), 'unarchive');
   assert.equal(commandFromReplyPrompt('щось стороннє'), null);
   assert.equal(commandFromReplyPrompt(123), null);
+});
+
+const histItems = (n) => Array.from({ length: n }, (_, i) => ({
+  sent_at: `2026-06-25T0${i % 6}:55:00.000Z`, type: 'digest',
+  summary: `📥 ${i + 1}`, text: `<b>Дайджест ${i}</b>`, recipients: [], deleted: false,
+}));
+
+test('buildHistoryList: empty → 📭', () => {
+  assert.equal(buildHistoryList({ items: [], page: 0 }).keyboard, null);
+  assert.match(buildHistoryList({ items: [], page: 0 }).text, /порожня/);
+});
+
+test('buildHistoryList: digests only, 6/page, hist:i rows + nav', () => {
+  const items = [...histItems(8), { type: 'deadline', summary: 'x', text: 'y', sent_at: 't', recipients: [], deleted: false }];
+  const v = buildHistoryList({ items, page: 0 });
+  const rows = v.keyboard.inline_keyboard;
+  assert.equal(rows[0][0].callback_data, 'hist:i:0');
+  assert.match(rows[0][0].text, /📥 1/);
+  const nav = rows.find((r) => r.some((b) => b.callback_data === 'hist:noop'));
+  assert.ok(nav.some((b) => b.text === 'Далі ▶'));
+});
+
+test('buildHistoryItem: full text + back', () => {
+  const v = buildHistoryItem({ items: histItems(3), idx: 1 });
+  assert.match(v.text, /Дайджест 1/);
+  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'hist:p:0');
+});
+
+test('handleHistoryNav: noop→null; p/i routing', () => {
+  const items = histItems(3);
+  assert.equal(handleHistoryNav({ items, data: 'hist:noop' }), null);
+  assert.match(handleHistoryNav({ items, data: 'hist:p:0' }).text, /Історія сповіщень/);
+  assert.match(handleHistoryNav({ items, data: 'hist:i:0' }).text, /Дайджест 0/);
+});
+
+test('mainKeyboard: has 📜 Історія; parseCommand /history', () => {
+  assert.match(JSON.stringify(mainKeyboard('admin')), /📜 Історія/);
+  assert.deepEqual(parseCommand('/history'), { cmd: 'history' });
+  assert.deepEqual(parseCommand('📜 Історія'), { cmd: 'history' });
 });

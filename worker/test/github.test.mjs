@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers, loadArchivedTenders, fetchAuditLog, fetchLatestDeployCommit, saveAgentJob, loadAgentPending, saveAgentPending, listAgentJobs } from '../src/github.mjs';
+import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers, loadArchivedTenders, fetchAuditLog, fetchLatestDeployCommit, saveAgentJob, loadAgentPending, saveAgentPending, listAgentJobs, loadNotificationHistory } from '../src/github.mjs';
 
 const ENV = { GITHUB_PAT: 'PAT_VALUE' };
 
@@ -448,4 +448,21 @@ test('listAgentJobs: lists dir, reads each, sorts desc by created_at, caps 20', 
 test('listAgentJobs: 404 dir → empty array', async () => {
   const fakeFetch = async () => ({ ok: false, status: 404, text: async () => 'Not Found' });
   assert.deepEqual(await listAgentJobs(ENV, { fetch: fakeFetch }), []);
+});
+
+test('loadNotificationHistory: parses items', async () => {
+  const json = JSON.stringify({ items: [{ type: 'digest', text: 'x' }] });
+  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ content: Buffer.from(json).toString('base64'), sha: 's' }) });
+  const r = await loadNotificationHistory(ENV, { fetch: fakeFetch });
+  assert.deepEqual(r, { items: [{ type: 'digest', text: 'x' }] });
+});
+
+test('loadNotificationHistory: 404 → empty', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 404, text: async () => 'Not Found' });
+  assert.deepEqual(await loadNotificationHistory(ENV, { fetch: fakeFetch }), { items: [] });
+});
+
+test('loadNotificationHistory: bad JSON → empty', async () => {
+  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ content: Buffer.from('not json').toString('base64'), sha: 's' }) });
+  assert.deepEqual(await loadNotificationHistory(ENV, { fetch: fakeFetch }), { items: [] });
 });

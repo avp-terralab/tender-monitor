@@ -18,6 +18,7 @@ import {
   buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage, handleAgentMenuNav,
+  buildHistoryList, handleHistoryNav,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, deleteMessage } from '../../telegram.mjs';
@@ -33,6 +34,7 @@ import {
   fetchAuditLog,
   loadAgentPending, saveAgentPending, saveAgentJob, loadAgentJob,
   listAgentJobs,
+  loadNotificationHistory,
   ConflictError,
 } from './github.mjs';
 
@@ -45,7 +47,7 @@ const BOT_USERNAME = 'terralab_tenders_bot';
 
 // Commands whose reply is an on-demand "view": the bot keeps only the latest one
 // in the chat (deletes the previous view + its trigger on the next view command).
-const EPHEMERAL_VIEW_CMDS = new Set(['info', 'watched', 'archive', 'agent', 'help', 'status', 'whoami']);
+const EPHEMERAL_VIEW_CMDS = new Set(['info', 'watched', 'archive', 'agent', 'help', 'status', 'whoami', 'history']);
 
 export async function runHandler({ update, env, deps = {} }) {
   const _loadWatchlist = deps.loadWatchlist ?? loadWatchlist;
@@ -88,6 +90,7 @@ export async function runHandler({ update, env, deps = {} }) {
   const _saveAgentJob = deps.saveAgentJob ?? saveAgentJob;
   const _loadAgentJob = deps.loadAgentJob ?? loadAgentJob;
   const _listAgentJobs = deps.listAgentJobs ?? listAgentJobs;
+  const _loadNotificationHistory = deps.loadNotificationHistory ?? loadNotificationHistory;
   // Tests may inject their own Map to avoid cross-test cache pollution.
   const _statusCache = deps.statusCache ?? STATUS_CACHE;
 
@@ -100,6 +103,7 @@ export async function runHandler({ update, env, deps = {} }) {
       _loadWatchedEntities, _saveWatchedEntities,
       _fetchTender, _extractSnapshot,
       _loadAgentPending, _saveAgentPending, _saveAgentJob, _loadAgentJob, _listAgentJobs, _now,
+      _loadNotificationHistory,
     });
   }
 
@@ -166,6 +170,7 @@ export async function runHandler({ update, env, deps = {} }) {
   let agentReplyMarkup = null;
   let monitorReplyMarkup = null;
   let forceReplyMarkup = null;
+  let histReplyMarkup = null;
 
   const MUTATING = new Set(['add', 'remove', 'watch', 'unarchive']);
   if (MUTATING.has(cmd.cmd) && !isEditor) {
@@ -587,6 +592,16 @@ export async function runHandler({ update, env, deps = {} }) {
         auditMessage: formatAuditMessage({ action: 'unarchive', target: cmd.tender_id, actor: actorName, chatId, role }),
       });
     }
+  } else if (cmd.cmd === 'history') {
+    try {
+      const { items } = await _loadNotificationHistory(env);
+      const view = buildHistoryList({ items, page: 0 });
+      reply = view.text;
+      histReplyMarkup = view.keyboard ?? undefined;
+    } catch (err) {
+      console.error('worker: /history failed:', err.message);
+      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+    }
   } else if (cmd.cmd === 'help') {
     reply = buildHelpText(role);
   } else if (cmd.cmd === 'whoami') {
@@ -673,7 +688,7 @@ export async function runHandler({ update, env, deps = {} }) {
         text: pages[i],
         replyToMessageId: i === 0 ? msg.message_id : undefined,
         replyMarkup: isLast
-          ? (forceReplyMarkup ?? archiveReplyMarkup ?? agentReplyMarkup ?? watchedReplyMarkup ?? monitorReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
+          ? (forceReplyMarkup ?? histReplyMarkup ?? archiveReplyMarkup ?? agentReplyMarkup ?? watchedReplyMarkup ?? monitorReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
           : undefined,
       });
       const mid = resp?.result?.message_id;
@@ -764,6 +779,7 @@ async function handleCallbackQuery({
   _loadWatchedEntities, _saveWatchedEntities,
   _fetchTender, _extractSnapshot,
   _loadAgentPending, _saveAgentPending, _saveAgentJob, _loadAgentJob, _listAgentJobs, _now,
+  _loadNotificationHistory,
 }) {
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const chatId = String(cq.message?.chat?.id ?? '');
@@ -839,6 +855,28 @@ async function handleCallbackQuery({
         });
       } catch (err) {
         console.error('worker: monitor nav edit failed:', err.message);
+      }
+    }
+    await ack();
+    return;
+  }
+
+  if (data.startsWith('hist:')) {
+    if (data === 'hist:noop') { await ack(); return; }
+    let items = [];
+    try {
+      ({ items } = await _loadNotificationHistory(env));
+    } catch (err) {
+      console.error('worker: hist nav load failed:', err.message);
+      await ack('⚠️ GitHub тимчасово недоступний', true);
+      return;
+    }
+    const view = handleHistoryNav({ items, data });
+    if (view) {
+      try {
+        await _editMessageText({ token: env.TELEGRAM_BOT_TOKEN, chatId, messageId, text: view.text, replyMarkup: view.keyboard ?? undefined });
+      } catch (err) {
+        console.error('worker: hist nav edit failed:', err.message);
       }
     }
     await ack();

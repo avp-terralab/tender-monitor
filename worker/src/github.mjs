@@ -199,6 +199,21 @@ export async function saveArchivedTenders(env, archive, sha, opts = {}) {
   return saveFile(env, ARCHIVED_TENDERS_FILE, text, sha, opts);
 }
 
+const NOTIFICATION_HISTORY_FILE = '_state/notification_history.json';
+
+// History of proactive digests (written by the monitor) — for the worker's
+// 📜 Історія view. Missing file or bad JSON → { items: [] }.
+export async function loadNotificationHistory(env, opts = {}) {
+  const { content } = await loadFile(env, NOTIFICATION_HISTORY_FILE, opts);
+  if (content === null) return { items: [] };
+  try {
+    const parsed = JSON.parse(content);
+    return { items: Array.isArray(parsed.items) ? parsed.items : [] };
+  } catch {
+    return { items: [] };
+  }
+}
+
 const PENDING_DIGEST_FILE = '_state/_pending_digest.json';
 
 export async function loadPendingDigest(env, opts = {}) {

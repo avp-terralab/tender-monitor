@@ -108,6 +108,7 @@ test('runHandler: allowed user reply carries reply_markup keyboard', async () =>
     '📋 Моніторинг закупівель',
     '📦 Архів закупівель',
     '🤖 Агент',
+    '📜 Історія',
     '❓ Допомога (список команд)',
   ]);
 });
@@ -3212,4 +3213,28 @@ test('runHandler: bare /add (non-editor) → permission message, no prompt', asy
   });
   assert.match(sent[0].text, /редакторів/);
   assert.ok(!JSON.stringify(sent[0].replyMarkup ?? {}).includes('force_reply'));
+});
+
+test('runHandler: /history → list with hist:i button', async () => {
+  const sent = [];
+  await runHandler({
+    update: { message: { chat: { id: 123 }, message_id: 7, text: '/history', from: { id: 123 } } },
+    env: ENV,
+    deps: { ...makeDeps({ loadNotificationHistory: async () => ({ items: [{ type: 'digest', summary: '📥 1', text: 'D', sent_at: '2026-06-25T05:55:00Z', recipients: [], deleted: false }] }) }).deps, sendReply: async (a) => sent.push(a) },
+  });
+  assert.equal(sent.length, 1);
+  assert.match(JSON.stringify(sent[0].replyMarkup), /hist:i:0/);
+});
+
+test('runHandler: hist:i:0 → edits to the full digest text', async () => {
+  const edits = []; const acks = [];
+  await runHandler({
+    update: { callback_query: { id: 'ch1', data: 'hist:i:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: { ...makeDeps({ loadNotificationHistory: async () => ({ items: [{ type: 'digest', summary: 's', text: 'ПОВНИЙ ТЕКСТ', sent_at: 't', recipients: [], deleted: false }] }) }).deps,
+      editMessageText: async (a) => edits.push(a), answerCallbackQuery: async (a) => acks.push(a) },
+  });
+  assert.equal(edits.length, 1);
+  assert.match(edits[0].text, /ПОВНИЙ ТЕКСТ/);
+  assert.equal(acks.length, 1);
 });
