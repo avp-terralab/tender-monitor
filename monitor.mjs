@@ -1,7 +1,10 @@
 import { diff, DEADLINE_THRESHOLD_KEYS } from './compare.mjs';
-import { formatDigest, formatHeartbeat, formatNightDigest } from './telegram.mjs';
+import { formatDigest, formatDeadlineReminder, summarizeDigest, formatHeartbeat, formatNightDigest } from './telegram.mjs';
 
 const TENDER_ID_RE = /^UA-\d{4}-\d{2}-\d{2}-\d{6}-[a-z]$/;
+
+const HISTORY_CAP = 200;
+const HISTORY_TTL_MS = 24 * 60 * 60 * 1000;
 
 const TERMINAL_STATUSES = new Set(['complete', 'cancelled', 'unsuccessful']);
 
@@ -70,6 +73,34 @@ function kyivDate(runIso) {
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
+// Delete messages older than ttl; drop expired deadline items, keep digests
+// (marked deleted), cap digests to `cap` (newest-first). deleteMessage best-effort.
+export async function expireHistory(items, now, deleteMessage, { ttlMs = HISTORY_TTL_MS, cap = HISTORY_CAP } = {}) {
+  const out = [];
+  for (const it of items ?? []) {
+    const age = now - new Date(it.sent_at).getTime();
+    if (!it.deleted && age > ttlMs) {
+      for (const r of it.recipients ?? []) {
+        try { await deleteMessage(r.chat_id, r.message_id); } catch { /* best-effort */ }
+      }
+      it.deleted = true;
+    }
+    if (it.type === 'deadline' && it.deleted) continue;   // drop expired deadlines
+    out.push(it);
+  }
+  let digestsSeen = 0;
+  return out.filter((it) => {
+    if (it.type !== 'digest') return true;
+    digestsSeen += 1;
+    return digestsSeen <= cap;   // newest-first → keep first `cap` digests
+  });
+}
+
+// Prepend a new item (newest-first).
+export function logBroadcast(items, item) {
+  return [item, ...(items ?? [])];
+}
+
 export async function runOnce(deps) {
   const {
     runIso, watchlist, fetchTender, extractSnapshot,
@@ -77,6 +108,13 @@ export async function runOnce(deps) {
     disableTender,
     loadPendingDigest, savePendingDigest, clearPendingDigest,
   } = deps;
+
+  const now = deps.now ?? new Date(runIso);
+  const nowMs = now.getTime ? now.getTime() : now;
+  let history = (deps.loadNotificationHistory ? (await deps.loadNotificationHistory()).items : []) ?? [];
+  if (deps.deleteMessage) {
+    history = await expireHistory(history, nowMs, deps.deleteMessage);
+  }
 
   const enabled = watchlist.filter(w => w.enabled);
 
@@ -251,21 +289,42 @@ export async function runOnce(deps) {
       const nightButtons = pendingItems
         .filter(g => g.events?.some(e => e.type === 'new_tender_announced'))
         .map(g => g.tender_id);
-      await sendDigest(
+      const nightRec = await sendDigest(
         morningText,
         nightButtons.length > 0 ? { addButtonsForTenders: nightButtons } : undefined,
       );
+      if (deps.saveNotificationHistory) {
+        history = logBroadcast(history, {
+          sent_at: now.toISOString(),
+          type: 'digest',
+          summary: summarizeDigest(pendingItems),
+          text: morningText,
+          recipients: nightRec ?? [],
+          deleted: false,
+        });
+      }
       if (clearPendingDigest) await clearPendingDigest();
       nightFlushed = true;
     }
   }
 
   // Phase B: process current-cycle events
+
+  // Split deadline_approaching events into a separate broadcast.
+  // digestGroups = groups with deadline events stripped; empty-events groups excluded
+  // from the digest (but kept in groups for quiet-hour buffering via mergePending).
+  const deadlineTenders = groups
+    .filter((g) => (g.events ?? []).some((e) => e.type === 'deadline_approaching'))
+    .map((g) => ({ tender_id: g.tender_id, entity: g.procuring_entity?.name ?? null, deadline: g.deadline ?? null }));
+  const digestGroups = groups
+    .map((g) => ({ ...g, events: (g.events ?? []).filter((e) => e.type !== 'deadline_approaching') }))
+    .filter((g) => g.events.length > 0);
+
   const isSilent = !hasContent;
   if (!isSilent || archivedNow.length > 0) {
     let text = '';
-    if (!isSilent) {
-      text = formatDigest(runIso, groups);
+    if (!isSilent && (digestGroups.length > 0 || invalidErrors.length > 0)) {
+      text = formatDigest(runIso, digestGroups);
       if (invalidErrors.length > 0) {
         text += '\n\n⚠️ не вдалось перевірити:\n' +
           invalidErrors.map(e =>
@@ -291,10 +350,38 @@ export async function runOnce(deps) {
       });
       if (savePendingDigest) await savePendingDigest(updated);
     } else {
-      await sendDigest(
-        text,
-        addButtonsForTenders.length > 0 ? { addButtonsForTenders } : undefined,
-      );
+      // Deadline reminders: sent as a separate message before the main digest.
+      if (deadlineTenders.length > 0) {
+        const dText = formatDeadlineReminder(deadlineTenders);
+        const dRec = await sendDigest(dText);
+        if (deps.saveNotificationHistory) {
+          history = logBroadcast(history, {
+            sent_at: now.toISOString(),
+            type: 'deadline',
+            summary: `⏰ ${deadlineTenders.length}`,
+            text: dText,
+            recipients: dRec ?? [],
+            deleted: false,
+          });
+        }
+      }
+      // Main digest — only if there is something to say.
+      if (text) {
+        const rec = await sendDigest(
+          text,
+          addButtonsForTenders.length > 0 ? { addButtonsForTenders } : undefined,
+        );
+        if (deps.saveNotificationHistory) {
+          history = logBroadcast(history, {
+            sent_at: now.toISOString(),
+            type: 'digest',
+            summary: summarizeDigest(digestGroups),
+            text,
+            recipients: rec ?? [],
+            deleted: false,
+          });
+        }
+      }
     }
   }
 
@@ -360,6 +447,11 @@ export async function runOnce(deps) {
       last_dateModified: r.curr?.dateModified,
     }).catch(() => {})
   ));
+
+  // Phase F: persist notification history
+  if (deps.saveNotificationHistory) {
+    await deps.saveNotificationHistory({ items: history });
+  }
 
   return {
     sent: nightFlushed || heartbeatSent || (!inQuietWindow && (!isSilent || archivedNow.length > 0)),
