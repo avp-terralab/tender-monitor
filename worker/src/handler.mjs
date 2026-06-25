@@ -1,5 +1,5 @@
 import {
-  parseCommand, handleAdd, handleStatus, handleRemove,
+  parseCommand, buildArgPrompt, commandFromReplyPrompt, handleAdd, handleStatus, handleRemove,
   handleWatch, handleUnwatch, handleWatched,
   buildWatchedViewKeyboard, buildWatchedManageKeyboard, WATCHED_MANAGE_PROMPT,
   buildWatchedMenu, buildWatchedEntityCard, handleWatchedNav,
@@ -153,13 +153,19 @@ export async function runHandler({ update, env, deps = {} }) {
   if (!isAllowed && !isStartWithToken) return;
   if (typeof msg.text !== 'string') return;
 
-  const cmd = parseCommand(msg.text);
+  // A reply to a guided "send me the <arg>" prompt → treat the reply text as that
+  // command's argument (stateless; reply_to_message carries the command context).
+  const replyCmd = msg.reply_to_message
+    ? commandFromReplyPrompt(msg.reply_to_message.text)
+    : null;
+  const cmd = parseCommand(replyCmd ? `/${replyCmd} ${msg.text}` : msg.text);
   let reply;
   let notifyReplyMarkup = null;
   let watchedReplyMarkup = null;
   let archiveReplyMarkup = null;
   let agentReplyMarkup = null;
   let monitorReplyMarkup = null;
+  let forceReplyMarkup = null;
 
   const MUTATING = new Set(['add', 'remove', 'watch', 'unarchive']);
   if (MUTATING.has(cmd.cmd) && !isEditor) {
@@ -227,10 +233,10 @@ export async function runHandler({ update, env, deps = {} }) {
       return;
     }
   } else if (cmd.cmd === 'add') {
-    if (cmd.error === 'invalid_id') {
-      reply = '❌ Невалідний tender_id. Формат: UA-YYYY-MM-DD-NNNNNN-x';
-    } else if (cmd.error === 'missing_id') {
-      reply = '❌ Не вказано tender_id. /add UA-YYYY-MM-DD-NNNNNN-x';
+    if (cmd.error) {
+      const p = buildArgPrompt('add', { retry: cmd.error.startsWith('invalid') });
+      reply = p.text;
+      forceReplyMarkup = p.replyMarkup;
     } else {
       let archive = [];
       try {
@@ -249,10 +255,10 @@ export async function runHandler({ update, env, deps = {} }) {
       });
     }
   } else if (cmd.cmd === 'remove') {
-    if (cmd.error === 'invalid_id') {
-      reply = '❌ Невалідний tender_id. Формат: /remove UA-YYYY-MM-DD-NNNNNN-x';
-    } else if (cmd.error === 'missing_id') {
-      reply = '❌ Не вказано tender_id. /remove UA-YYYY-MM-DD-NNNNNN-x';
+    if (cmd.error) {
+      const p = buildArgPrompt('remove', { retry: cmd.error.startsWith('invalid') });
+      reply = p.text;
+      forceReplyMarkup = p.replyMarkup;
     } else {
       reply = await applyMutationWithRetry({
         env,
@@ -418,10 +424,10 @@ export async function runHandler({ update, env, deps = {} }) {
       reply = '⚠️ GitHub недоступний, спробуй ще раз';
     }
   } else if (cmd.cmd === 'watch') {
-    if (cmd.error === 'invalid_edrpou') {
-      reply = '❌ ЄДРПОУ має бути 8 цифр';
-    } else if (cmd.error === 'missing_edrpou') {
-      reply = '❌ Не вказано ЄДРПОУ. /watch 12345678';
+    if (cmd.error) {
+      const p = buildArgPrompt('watch', { retry: cmd.error.startsWith('invalid') });
+      reply = p.text;
+      forceReplyMarkup = p.replyMarkup;
     } else {
       reply = await applyEntityMutationWithRetry({
         env,
@@ -568,10 +574,10 @@ export async function runHandler({ update, env, deps = {} }) {
       reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
     }
   } else if (cmd.cmd === 'unarchive') {
-    if (cmd.error === 'invalid_id') {
-      reply = '❌ Невалідний tender_id. Формат: /unarchive UA-YYYY-MM-DD-NNNNNN-x';
-    } else if (cmd.error === 'missing_id') {
-      reply = '❌ Не вказано tender_id. /unarchive UA-YYYY-MM-DD-NNNNNN-x';
+    if (cmd.error) {
+      const p = buildArgPrompt('unarchive', { retry: cmd.error.startsWith('invalid') });
+      reply = p.text;
+      forceReplyMarkup = p.replyMarkup;
     } else {
       reply = await applyUnarchive({
         env,
@@ -667,7 +673,7 @@ export async function runHandler({ update, env, deps = {} }) {
         text: pages[i],
         replyToMessageId: i === 0 ? msg.message_id : undefined,
         replyMarkup: isLast
-          ? (archiveReplyMarkup ?? agentReplyMarkup ?? watchedReplyMarkup ?? monitorReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
+          ? (forceReplyMarkup ?? archiveReplyMarkup ?? agentReplyMarkup ?? watchedReplyMarkup ?? monitorReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
           : undefined,
       });
       const mid = resp?.result?.message_id;

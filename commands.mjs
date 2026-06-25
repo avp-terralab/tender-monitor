@@ -195,6 +195,38 @@ export function parseCommand(text) {
   return { cmd: null };
 }
 
+// Guided argument prompts. Commands that need an argument (/add, /remove, /watch,
+// /unarchive) reply with a force_reply prompt instead of a dry error; the user's
+// reply is then parsed as the argument. `core` is a stable phrase used to map a
+// reply's reply_to_message text back to its command (survives the retry prefix).
+const ARG_REPLY_SPECS = {
+  add:       { core: 'додати в моніторинг',   prompt: '➕ Надішли tender_id, який додати в моніторинг (UA-…):',   placeholder: 'UA-2026-06-19-008800-a' },
+  remove:    { core: 'прибрати з моніторингу', prompt: '🗑 Надішли tender_id, який прибрати з моніторингу (UA-…):', placeholder: 'UA-2026-06-19-008800-a' },
+  watch:     { core: 'ЄДРПОУ замовника',       prompt: '👁 Надішли ЄДРПОУ замовника (8 цифр):',                    placeholder: '12345678' },
+  unarchive: { core: 'повернути з архіву',     prompt: '↩️ Надішли tender_id, який повернути з архіву (UA-…):',    placeholder: 'UA-2026-06-19-008800-a' },
+};
+
+// { text, replyMarkup } for a guided prompt, or null for a non-guided command.
+// retry → prepend an error note (the core phrase stays, so the reply still maps back).
+export function buildArgPrompt(cmd, { retry = false } = {}) {
+  const spec = ARG_REPLY_SPECS[cmd];
+  if (!spec) return null;
+  return {
+    text: (retry ? '❌ Невірний формат. ' : '') + spec.prompt,
+    replyMarkup: { force_reply: true, input_field_placeholder: spec.placeholder },
+  };
+}
+
+// Maps a reply's reply_to_message text back to the command it was prompting for,
+// or null. Matches by the per-command core phrase (substring).
+export function commandFromReplyPrompt(replyText) {
+  if (typeof replyText !== 'string') return null;
+  for (const [cmd, spec] of Object.entries(ARG_REPLY_SPECS)) {
+    if (replyText.includes(spec.core)) return cmd;
+  }
+  return null;
+}
+
 // ── Audit log ────────────────────────────────────────────────────────────
 // Mutating actions are recorded by enriching the commit message that already
 // accompanies each state write. Format (parseable first line):

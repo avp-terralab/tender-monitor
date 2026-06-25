@@ -278,7 +278,7 @@ test('runHandler: /add invalid id → reply, no GitHub call', async () => {
     deps,
   });
   assert.equal(loadCalled, false);
-  assert.match(sent[0].text, /Невалідний/);
+  assert.match(sent[0].text, /додати в моніторинг/);
 });
 
 test('runHandler: /add missing id → reply', async () => {
@@ -288,7 +288,7 @@ test('runHandler: /add missing id → reply', async () => {
     env: ENV,
     deps,
   });
-  assert.match(sent[0].text, /Не вказано/);
+  assert.match(sent[0].text, /додати в моніторинг/);
 });
 
 test('runHandler: /add new tender → load + save + reply ✅ Додано', async () => {
@@ -476,7 +476,7 @@ test('runHandler: /remove invalid id → error reply, no GitHub call', async () 
     deps,
   });
   assert.equal(loadCalled, false);
-  assert.match(sent[0].text, /Невалідний/);
+  assert.match(sent[0].text, /прибрати з моніторингу/);
 });
 
 test('runHandler: /remove without id → "Не вказано"', async () => {
@@ -486,7 +486,7 @@ test('runHandler: /remove without id → "Не вказано"', async () => {
     env: ENV,
     deps,
   });
-  assert.match(sent[0].text, /Не вказано/);
+  assert.match(sent[0].text, /прибрати з моніторингу/);
 });
 
 test('runHandler: /info with active tenders → fetch each + reply', async () => {
@@ -801,18 +801,18 @@ test('runHandler: /watch invalid → ❌ reply, no calls', async () => {
     env: ENV,
     deps,
   });
-  assert.match(sent[0].text, /ЄДРПОУ має бути 8 цифр/);
+  assert.match(sent[0].text, /ЄДРПОУ замовника/);
   assert.equal(loadCalled, false);
 });
 
-test('runHandler: /watch missing → "Не вказано"', async () => {
+test('runHandler: /watch missing → prompt', async () => {
   const { deps, sent } = await makeDeps();
   await runHandler({
     update: { message: { chat: { id: 123 }, text: '/watch', message_id: 1 } },
     env: ENV,
     deps,
   });
-  assert.match(sent[0].text, /Не вказано/);
+  assert.match(sent[0].text, /ЄДРПОУ замовника/);
 });
 
 test('runHandler: /watch new EDRPOU → save entity + bootstrap seen', async () => {
@@ -3154,4 +3154,62 @@ test('runHandler: a non-VIEW (action) command does NOT delete or record', async 
   });
   assert.equal(deleted.length, 0, 'no deletions for an action command');
   assert.equal(kvStore['eph:123'], JSON.stringify([100]), 'ephemeral state unchanged');
+});
+
+test('runHandler: bare /add (editor) → force_reply prompt, no mutation', async () => {
+  const sent = []; let saved = false;
+  await runHandler({
+    update: { message: { chat: { id: 123 }, message_id: 5, text: '/add', from: { id: 123 } } },
+    env: ENV,
+    deps: { ...makeDeps({ saveWatchlist: async () => { saved = true; } }).deps, sendReply: async (a) => sent.push(a) },
+  });
+  assert.equal(saved, false, 'no mutation on a bare /add');
+  assert.match(sent[0].text, /додати в моніторинг/);
+  assert.match(JSON.stringify(sent[0].replyMarkup), /"force_reply":true/);
+});
+
+test('runHandler: reply to the add-prompt with a valid UA → add happens', async () => {
+  let saved = null;
+  await runHandler({
+    update: { message: {
+      chat: { id: 123 }, message_id: 6, from: { id: 123 },
+      text: 'UA-2026-06-19-008800-a',
+      reply_to_message: { text: 'додати в моніторинг' },
+    } },
+    env: ENV,
+    deps: { ...makeDeps({
+      loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+      saveWatchlist: async (_e, wl) => { saved = wl; },
+      fetchTender: async () => ({ data: { status: 'active.tendering', tenderPeriod: {}, procuringEntity: { name: 'X' } } }),
+      loadArchivedTenders: async () => ({ archive: [], sha: null }),
+    }).deps },
+  });
+  assert.ok(saved, 'watchlist saved → the reply was treated as the /add argument');
+});
+
+test('runHandler: reply to the add-prompt with invalid text → retry prompt, no mutation', async () => {
+  const sent = []; let saved = false;
+  await runHandler({
+    update: { message: {
+      chat: { id: 123 }, message_id: 7, from: { id: 123 },
+      text: 'абищо',
+      reply_to_message: { text: 'додати в моніторинг' },
+    } },
+    env: ENV,
+    deps: { ...makeDeps({ saveWatchlist: async () => { saved = true; } }).deps, sendReply: async (a) => sent.push(a) },
+  });
+  assert.equal(saved, false);
+  assert.match(sent[0].text, /❌ Невірний формат/);
+  assert.match(JSON.stringify(sent[0].replyMarkup), /"force_reply":true/);
+});
+
+test('runHandler: bare /add (non-editor) → permission message, no prompt', async () => {
+  const sent = [];
+  await runHandler({
+    update: { message: { chat: { id: 456 }, message_id: 8, text: '/add', from: { id: 456 } } },
+    env: ENV,
+    deps: { ...makeDeps({ loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }) }).deps, sendReply: async (a) => sent.push(a) },
+  });
+  assert.match(sent[0].text, /редакторів/);
+  assert.ok(!JSON.stringify(sent[0].replyMarkup ?? {}).includes('force_reply'));
 });
