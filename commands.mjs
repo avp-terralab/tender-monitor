@@ -17,6 +17,7 @@ const BUTTON_ALIASES = {
   '📦 Архів закупівель': 'archive',
   '❓ Допомога (список команд)': 'help',
   '🤖 Агент': 'agent',
+  '📜 Історія': 'history',
 };
 
 // Reply keyboard sent with each bot response to an allowed user. Telegram
@@ -27,7 +28,7 @@ const BUTTON_ALIASES = {
 export const MAIN_KEYBOARD = {
   keyboard: [
     [{ text: '👁 Моніторинг замовників' }, { text: '📋 Моніторинг закупівель' }, { text: '📦 Архів закупівель' }],
-    [{ text: '❓ Допомога (список команд)' }],
+    [{ text: '📜 Історія' }, { text: '❓ Допомога (список команд)' }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -42,7 +43,7 @@ export function mainKeyboard(role) {
     ...MAIN_KEYBOARD,
     keyboard: [
       [{ text: '👁 Моніторинг замовників' }, { text: '📋 Моніторинг закупівель' }, { text: '📦 Архів закупівель' }],
-      [{ text: '🤖 Агент' }, { text: '❓ Допомога (список команд)' }],
+      [{ text: '🤖 Агент' }, { text: '📜 Історія' }, { text: '❓ Допомога (список команд)' }],
     ],
   };
 }
@@ -61,6 +62,7 @@ export function parseCommand(text) {
   if (/^\/watched(?:@\w+)?$/i.test(trimmed)) return { cmd: 'watched' };
   if (/^\/whoami(?:@\w+)?$/i.test(trimmed)) return { cmd: 'whoami' };
   if (/^\/agent(?:@\w+)?$/i.test(trimmed)) return { cmd: 'agent' };
+  if (/^\/history(?:@\w+)?$/i.test(trimmed)) return { cmd: 'history' };
 
   const logMatch = trimmed.match(/^\/log(?:@\w+)?(?:\s+(\d+))?\s*$/i);
   if (logMatch) {
@@ -1961,4 +1963,47 @@ export function handleAgentMenuNav({ tenders, jobs, data }) {
   if (parts[1] === 'pick') return buildAgentPickView({ tenders, page: Number(parts[2] ?? 0) });
   if (parts[1] === 'jobs') return buildAgentJobsPage({ jobs, page: Number(parts[2] ?? 0) });
   return null;
+}
+
+// ─── Notification history view ────────────────────────────────────────────────
+
+const HIST_PER_PAGE = 6;
+const HIST_DT = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+});
+
+// Only digests are kept in history; newest-first is the storage order.
+function historyDigests(items) {
+  return (items ?? []).filter((it) => it.type === 'digest');
+}
+
+export function buildHistoryList({ items, page = 0 }) {
+  const list = historyDigests(items);
+  if (list.length === 0) return { text: '📭 Історія сповіщень порожня.', keyboard: null };
+  const pages = Math.max(1, Math.ceil(list.length / HIST_PER_PAGE));
+  const p = Math.min(Math.max(0, page | 0), pages - 1);
+  const start = p * HIST_PER_PAGE;
+  const slice = list.slice(start, start + HIST_PER_PAGE);
+  const rows = slice.map((it, i) => {
+    const when = it.sent_at ? HIST_DT.format(new Date(it.sent_at)) : '—';
+    return [{ text: `🔔 ${when} · ${it.summary ?? ''}`.trim(), callback_data: `hist:i:${start + i}` }];
+  });
+  const nav = buildPageNavRow(p, pages, (x) => `hist:p:${x}`, 'hist:noop');
+  if (nav) rows.push(nav);
+  return { text: `📜 <b>Історія сповіщень</b> — ${list.length}`, keyboard: { inline_keyboard: rows } };
+}
+
+export function buildHistoryItem({ items, idx }) {
+  const list = historyDigests(items);
+  const it = list[idx];
+  if (!it) return buildHistoryList({ items, page: 0 });
+  return { text: it.text ?? '(порожньо)', keyboard: { inline_keyboard: [[{ text: '⬅ Назад до історії', callback_data: 'hist:p:0' }]] } };
+}
+
+export function handleHistoryNav({ items, data }) {
+  if (data === 'hist:noop') return null;
+  const parts = data.split(':'); // hist:p:<page> | hist:i:<idx>
+  if (parts[1] === 'i') return buildHistoryItem({ items, idx: Number(parts[2]) });
+  if (parts[1] === 'p') return buildHistoryList({ items, page: Number(parts[2] ?? 0) });
+  return buildHistoryList({ items, page: 0 });
 }
