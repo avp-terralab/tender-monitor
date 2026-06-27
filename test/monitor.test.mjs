@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runOnce, isQuietHour, mergePending, emptyPending, expireHistory, logBroadcast } from '../monitor.mjs';
+import { runOnce, isQuietHour, mergePending, emptyPending, expireHistory, logBroadcast, checkAgentHealth } from '../monitor.mjs';
 
 // Use valid tender_id format throughout (UA-YYYY-MM-DD-NNNNNN-x)
 const T_X      = 'UA-2026-05-01-000001-a';
@@ -1051,4 +1051,78 @@ test('expireHistory: recent items untouched; cap keeps newest 200 digests', asyn
   const out = await expireHistory(many, now, async () => true, { cap: 200 });
   assert.equal(out.filter((i) => i.type === 'digest').length, 200);
   assert.equal(out[0].deleted, false, 'recent not deleted');
+});
+
+// ─── checkAgentHealth ─────────────────────────────────────────────────────────
+
+const STALE_MS = 30 * 60 * 1000;
+const T_AGENT = 'UA-2026-06-27-000001-a';
+const T_AGENT2 = 'UA-2026-06-27-000002-a';
+
+function ago(ms) { return new Date(Date.now() - ms).toISOString(); }
+
+test('checkAgentHealth: empty jobs → nothing to alert', () => {
+  const { toAlert, alerted } = checkAgentHealth([], {}, Date.now());
+  assert.deepEqual(toAlert, []);
+  assert.deepEqual(alerted, {});
+});
+
+test('checkAgentHealth: fresh pending job → not stale yet', () => {
+  const jobs = [{ tender_id: T_AGENT, status: 'pending', created_at: ago(10 * 60 * 1000) }];
+  const { toAlert } = checkAgentHealth(jobs, {}, Date.now(), { staleMs: STALE_MS });
+  assert.deepEqual(toAlert, []);
+});
+
+test('checkAgentHealth: stale pending job → toAlert entry', () => {
+  const jobs = [{ tender_id: T_AGENT, status: 'pending', created_at: ago(60 * 60 * 1000) }];
+  const { toAlert, alerted } = checkAgentHealth(jobs, {}, Date.now(), { staleMs: STALE_MS });
+  assert.equal(toAlert.length, 1);
+  assert.equal(toAlert[0].tender_id, T_AGENT);
+  assert.equal(toAlert[0].status, 'pending');
+  assert.ok(toAlert[0].ageMs >= STALE_MS);
+  assert.ok(alerted[T_AGENT]);
+});
+
+test('checkAgentHealth: stale running job → uses updated_at', () => {
+  const jobs = [{ tender_id: T_AGENT, status: 'running',
+    created_at: ago(120 * 60 * 1000), updated_at: ago(45 * 60 * 1000) }];
+  const { toAlert } = checkAgentHealth(jobs, {}, Date.now(), { staleMs: STALE_MS });
+  assert.equal(toAlert.length, 1);
+  assert.equal(toAlert[0].status, 'running');
+});
+
+test('checkAgentHealth: already alerted job → no repeat alert', () => {
+  const jobs = [{ tender_id: T_AGENT, status: 'pending', created_at: ago(90 * 60 * 1000) }];
+  const alerted = { [T_AGENT]: ago(60 * 60 * 1000) };
+  const { toAlert, alerted: next } = checkAgentHealth(jobs, alerted, Date.now(), { staleMs: STALE_MS });
+  assert.deepEqual(toAlert, []);
+  assert.ok(next[T_AGENT]);
+});
+
+test('checkAgentHealth: completed job removed from alerted map', () => {
+  const jobs = [{ tender_id: T_AGENT, status: 'done', created_at: ago(90 * 60 * 1000) }];
+  const alerted = { [T_AGENT]: ago(60 * 60 * 1000) };
+  const { alerted: next } = checkAgentHealth(jobs, alerted, Date.now(), { staleMs: STALE_MS });
+  assert.equal(next[T_AGENT], undefined, 'completed job dropped from alerted');
+});
+
+test('checkAgentHealth: multiple jobs — one stale new, one alerted, one fresh', () => {
+  const nowMs = Date.now();
+  const jobs = [
+    { tender_id: T_AGENT, status: 'pending', created_at: ago(90 * 60 * 1000) },
+    { tender_id: T_AGENT2, status: 'pending', created_at: ago(60 * 60 * 1000) },
+    { tender_id: 'UA-2026-06-27-000003-a', status: 'pending', created_at: ago(10 * 60 * 1000) },
+  ];
+  const alerted = { [T_AGENT]: ago(60 * 60 * 1000) };
+  const { toAlert, alerted: next } = checkAgentHealth(jobs, alerted, nowMs, { staleMs: STALE_MS });
+  assert.equal(toAlert.length, 1, 'only T_AGENT2 is new stale');
+  assert.equal(toAlert[0].tender_id, T_AGENT2);
+  assert.ok(next[T_AGENT], 'T_AGENT stays alerted');
+  assert.ok(next[T_AGENT2], 'T_AGENT2 added');
+  assert.equal(next['UA-2026-06-27-000003-a'], undefined, 'fresh job not added');
+});
+
+test('checkAgentHealth: null/undefined jobs → safe', () => {
+  const { toAlert } = checkAgentHealth(null, {}, Date.now());
+  assert.deepEqual(toAlert, []);
 });

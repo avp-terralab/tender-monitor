@@ -1,8 +1,8 @@
-import { runOnce } from './monitor.mjs';
+import { runOnce, checkAgentHealth } from './monitor.mjs';
 import { fetchTender, extractSnapshot, fetchContract } from './prozorro.mjs';
 import { broadcastDigest, deleteMessage } from './telegram.mjs';
 import { checkWatchedEntities } from './entity_watch.mjs';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,6 +60,10 @@ const seenPath = join(stateDir, '_watched_seen.json');
 const heartbeatStatePath = join(stateDir, '_heartbeat.json');
 const pendingDigestPath = join(stateDir, '_pending_digest.json');
 const notifHistoryPath = join(stateDir, 'notification_history.json');
+const agentHealthPath = join(stateDir, '_agent_health_alerted.json');
+const agentJobsDir = join(stateDir, 'agent_jobs');
+
+const _sendAdminAlert = async (text) => broadcastDigest({ token, chatIds: [chatId] }, text);
 
 const result = await runOnce({
   runIso: new Date().toISOString(),
@@ -83,7 +87,7 @@ const result = await runOnce({
   // Heartbeats go only to admin — opted-in viewers don't need ops noise.
   sendHeartbeat: async (text) => broadcastDigest({ token, chatIds: [chatId] }, text),
   // Transient fetch-error alerts also go only to admin (ops signal).
-  sendAdminAlert: async (text) => broadcastDigest({ token, chatIds: [chatId] }, text),
+  sendAdminAlert: _sendAdminAlert,
   // Debounce duplicate heartbeats within the same Kyiv day (multiple cron
   // triggers per hour: GHA scheduled at :00 UTC + external pinger at :30 UTC).
   loadHeartbeatDate: async () => {
@@ -193,3 +197,32 @@ const result = await runOnce({
 });
 
 console.log(JSON.stringify(result, null, 2));
+
+// Agent-health check: alert admin once per stale pending/running job.
+// Fires only if the agent_jobs directory exists (i.e., agent integration is active).
+if (existsSync(agentJobsDir)) {
+  const jobFiles = readdirSync(agentJobsDir).filter(f => f.endsWith('.json'));
+  const allJobs = jobFiles.flatMap(f => {
+    try { return [JSON.parse(readFileSync(join(agentJobsDir, f), 'utf-8'))]; } catch { return []; }
+  });
+
+  let prevAlerted = {};
+  try {
+    if (existsSync(agentHealthPath))
+      prevAlerted = JSON.parse(readFileSync(agentHealthPath, 'utf-8')).alerted ?? {};
+  } catch { /* ignore corrupt file */ }
+
+  const { toAlert, alerted: nextAlerted } = checkAgentHealth(allJobs, prevAlerted, Date.now());
+
+  if (toAlert.length > 0) {
+    const lines = toAlert.map(j => {
+      const mins = Math.round(j.ageMs / 60000);
+      return `• ${j.tender_id} — <code>${j.status}</code> вже ${mins} хв`;
+    }).join('\n');
+    await _sendAdminAlert(
+      `⚠️ <b>Агент-поллер не відповідає!</b>\n\n${lines}\n\nПеревір Windows Task Scheduler.`
+    );
+  }
+
+  writeFileSync(agentHealthPath, JSON.stringify({ alerted: nextAlerted }, null, 2) + '\n');
+}

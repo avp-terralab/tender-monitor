@@ -462,3 +462,35 @@ export async function runOnce(deps) {
     buffered: inQuietWindow && (!isSilent || archivedNow.length > 0),
   };
 }
+
+const AGENT_STALE_MS = 30 * 60 * 1000;
+
+// Pure health-check for agent jobs. Compares job timestamps against nowMs to
+// find jobs stuck in pending/running. `alerted` is a { tender_id → iso_ts } map
+// of jobs already notified — prevents repeated alerts on subsequent cron ticks.
+// Returns { toAlert, alerted } — `alerted` is the updated map (completed/done
+// jobs are automatically removed so they can re-alert if requeued later).
+export function checkAgentHealth(jobs, alerted, nowMs, { staleMs = AGENT_STALE_MS } = {}) {
+  const nextAlerted = {};
+  const toAlert = [];
+
+  for (const job of jobs ?? []) {
+    const { tender_id, status } = job;
+    if (!tender_id || !['pending', 'running'].includes(status)) continue;
+
+    const ts = status === 'running'
+      ? (job.updated_at ?? job.created_at)
+      : job.created_at;
+    if (!ts) continue;
+
+    const ageMs = nowMs - new Date(ts).getTime();
+    if (ageMs < staleMs) continue;
+
+    if (!alerted[tender_id]) {
+      toAlert.push({ tender_id, status, ageMs });
+    }
+    nextAlerted[tender_id] = alerted[tender_id] ?? new Date(nowMs).toISOString();
+  }
+
+  return { toAlert, alerted: nextAlerted };
+}

@@ -1997,7 +1997,8 @@ export function buildHistoryItem({ items, idx }) {
   const list = historyDigests(items);
   const it = list[idx];
   if (!it) return buildHistoryList({ items, page: 0 });
-  return { text: it.text ?? '(порожньо)', keyboard: { inline_keyboard: [[{ text: '⬅ Назад до історії', callback_data: 'hist:p:0' }]] } };
+  const page = Math.floor(idx / HIST_PER_PAGE);
+  return { text: it.text ?? '(порожньо)', keyboard: { inline_keyboard: [[{ text: '⬅ Назад до історії', callback_data: `hist:p:${page}` }]] } };
 }
 
 export function handleHistoryNav({ items, data }) {

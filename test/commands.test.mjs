@@ -3686,10 +3686,22 @@ test('buildHistoryList: digests only, 6/page, hist:i rows + nav', () => {
   assert.ok(nav.some((b) => b.text === 'Далі ▶'));
 });
 
-test('buildHistoryItem: full text + back', () => {
+test('buildHistoryItem: full text + back to page 0', () => {
   const v = buildHistoryItem({ items: histItems(3), idx: 1 });
   assert.match(v.text, /Дайджест 1/);
   assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'hist:p:0');
+});
+
+test('buildHistoryItem: back button remembers page for idx on page 1', () => {
+  // HIST_PER_PAGE=6, so idx=7 is on page 1
+  const v = buildHistoryItem({ items: histItems(14), idx: 7 });
+  assert.match(v.text, /Дайджест 7/);
+  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'hist:p:1');
+});
+
+test('buildHistoryItem: back button remembers page for idx on page 2', () => {
+  const v = buildHistoryItem({ items: histItems(20), idx: 13 });
+  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'hist:p:2');
 });
 
 test('handleHistoryNav: noop→null; p/i routing', () => {

@@ -328,7 +328,7 @@ export async function fetchLatestDeployCommit(env, { fetch: fetchImpl = fetch } 
   );
   if (!res.ok) throw new Error(`GitHub commits API ${res.status}`);
   const commits = await res.json();
-  const BOT_RE = /^(monitor: state update|monitor: cursor sync|bot:|audit:)/;
+  const BOT_RE = /^(monitor: state update|monitor: cursor sync|bot:|audit:|agent job )/;
   for (const c of commits) {
     const msg = (c.commit?.message ?? '').split('\n')[0];
     if (BOT_RE.test(msg)) continue;

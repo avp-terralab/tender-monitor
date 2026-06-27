@@ -426,6 +426,17 @@ test('fetchLatestDeployCommit: skips audit: commits', async () => {
   assert.equal(out.message, 'telegram: ship feature');
 });
 
+test('fetchLatestDeployCommit: skips agent job commits', async () => {
+  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ([
+    { sha: 'aaa1111', commit: { message: 'agent job UA-2026-06-19-008800-a: done', committer: { date: '2026-06-27T08:00:00Z' } } },
+    { sha: 'aaa2222', commit: { message: 'agent job UA-2026-06-19-008800-a: running', committer: { date: '2026-06-27T07:00:00Z' } } },
+    { sha: 'aaa3333', commit: { message: 'agent job UA-2026-06-19-008800-a: pending', committer: { date: '2026-06-27T06:00:00Z' } } },
+    { sha: 'bbb4444', commit: { message: 'feat: add history view', committer: { date: '2026-06-25T10:00:00Z' } } },
+  ]) });
+  const out = await fetchLatestDeployCommit(ENV, { fetch: fakeFetch });
+  assert.equal(out.message, 'feat: add history view');
+});
+
 test('listAgentJobs: lists dir, reads each, sorts desc by created_at, caps 20', async () => {
   const jobA = { tender_id: 'UA-2026-06-01-000001-a', status: 'done', created_at: '2026-06-20T10:00:00Z' };
   const jobB = { tender_id: 'UA-2026-06-02-000002-a', status: 'pending', created_at: '2026-06-22T10:00:00Z' };
