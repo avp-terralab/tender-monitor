@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-06-19-008800-a",
-  "saved_at": "2026-06-26T14:25:53.776Z",
+  "saved_at": "2026-06-27T14:25:40.767Z",
   "snapshot": {
     "tender_id": "UA-2026-06-19-008800-a",
     "title": "Послуги, пов’язані з програмним забезпеченням - Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
-    "status": "active.tendering",
-    "dateModified": "2026-06-19T14:24:37.507739+03:00",
+    "status": "active.qualification",
+    "dateModified": "2026-06-27T17:00:18.880403+03:00",
     "tenderPeriod": {
       "endDate": "2026-06-27T17:00:00+03:00"
     },
@@ -57,7 +57,21 @@
     ],
     "questions": [],
     "complaints": [],
-    "awards": [],
+    "awards": [
+      {
+        "id": "ef4e4a3c5e1e4a3e8420f195d55f7630",
+        "status": "pending",
+        "suppliers": [
+          {
+            "name": "ТОВ \"МАЙЛАБ\"",
+            "identifier": {
+              "id": "41087617"
+            }
+          }
+        ],
+        "complaints": []
+      }
+    ],
     "contracts": [],
     "cancellations": [],
     "_notifiedDeadlines": [
