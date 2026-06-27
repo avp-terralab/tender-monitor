@@ -688,13 +688,32 @@ export async function runHandler({ update, env, deps = {} }) {
         text: pages[i],
         replyToMessageId: i === 0 ? msg.message_id : undefined,
         replyMarkup: isLast
-          ? (forceReplyMarkup ?? histReplyMarkup ?? archiveReplyMarkup ?? agentReplyMarkup ?? watchedReplyMarkup ?? monitorReplyMarkup ?? notifyReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
+          ? (forceReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
           : undefined,
       });
       const mid = resp?.result?.message_id;
       if (mid != null) botReplyIds.push(mid);
     } catch (err) {
       console.error('worker: sendReply failed:', err.message);
+    }
+  }
+
+  // Send inline navigation keyboard as a separate follow-up message so the reply
+  // keyboard (mainKeyboard) can always be refreshed on the main reply above.
+  const inlineView = histReplyMarkup ?? archiveReplyMarkup ?? agentReplyMarkup
+    ?? watchedReplyMarkup ?? monitorReplyMarkup ?? notifyReplyMarkup;
+  if (inlineView) {
+    try {
+      const resp = await _sendReply({
+        token: env.TELEGRAM_BOT_TOKEN,
+        chatId: msg.chat.id,
+        text: '▾',
+        replyMarkup: inlineView,
+      });
+      const mid = resp?.result?.message_id;
+      if (mid != null) botReplyIds.push(mid);
+    } catch (err) {
+      console.error('worker: inline view send failed:', err.message);
     }
   }
 

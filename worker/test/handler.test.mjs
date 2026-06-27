@@ -519,11 +519,13 @@ test('runHandler: /info with active tenders → fetch each + reply', async () =>
   });
   // Disabled UA-C must NOT be fetched
   assert.deepEqual(fetched.sort(), ['UA-A', 'UA-B']);
-  // New behavior: single phase-menu message instead of multi-page dump
-  assert.equal(sent.length, 1);
+  // New behavior: 2 messages — content + mainKeyboard, then '▾' + inline nav
+  assert.equal(sent.length, 2);
   assert.match(sent[0].text, /📋.*Моніторинг закупівель/);
-  // Phase buttons in replyMarkup, not inline text ids
-  assert.ok(sent[0].replyMarkup?.inline_keyboard, 'should have inline keyboard');
+  assert.ok(sent[0].replyMarkup?.keyboard, 'first message should have reply keyboard');
+  // Phase buttons in second message inline keyboard
+  assert.ok(sent[1].replyMarkup?.inline_keyboard, 'should have inline keyboard');
+  assert.equal(sent[1].text, '▾');
   assert.doesNotMatch(sent[0].text, /UA-C/);
 });
 
@@ -640,8 +642,8 @@ test('runHandler: /info partial Prozorro errors → single menu message with err
     update: { message: { chat: { id: 123 }, text: '/info', message_id: 1 } },
     env: ENV, deps,
   });
-  // New behavior: single menu message; error count surfaced in header
-  assert.equal(sent.length, 1);
+  // New behavior: 2 messages — content + mainKeyboard, then '▾' + inline nav; error count surfaced in header
+  assert.equal(sent.length, 2);
   assert.match(sent[0].text, /📋.*Моніторинг закупівель/);
   assert.match(sent[0].text, /⚠️ Не вдалось перевірити: 1/);
 });
@@ -669,11 +671,12 @@ test('runHandler: /info with multiple phases → single menu with phase buttons'
     update: { message: { chat: { id: 123 }, text: '/info', message_id: 7 } },
     env: ENV, deps,
   });
-  // New behavior: single menu message with phase buttons (not multi-page dump)
-  assert.equal(sent.length, 1);
+  // New behavior: 2 messages — content + mainKeyboard, then '▾' + inline nav (not multi-page dump)
+  assert.equal(sent.length, 2);
   assert.match(sent[0].text, /📋.*Моніторинг закупівель/);
   assert.equal(sent[0].replyToMessageId, 7);
-  const kb = sent[0].replyMarkup?.inline_keyboard;
+  assert.ok(sent[0].replyMarkup?.keyboard, 'first message should have reply keyboard');
+  const kb = sent[1].replyMarkup?.inline_keyboard;
   assert.ok(Array.isArray(kb) && kb.length >= 2, 'should have at least 2 phase buttons');
   // Phase buttons contain phase identifiers in their callback_data
   const cbDatas = kb.flat().map(b => b.callback_data);
@@ -720,8 +723,9 @@ test('runHandler: /watched with entities → paginated menu reply', async () => 
     deps,
   });
   assert.match(sent[0].text, /Моніторинг замовників/);
-  assert.match(JSON.stringify(sent[0].replyMarkup), /wat:e:02000010/);
-  assert.match(JSON.stringify(sent[0].replyMarkup), /wat:e:11111111/);
+  assert.ok(sent[0].replyMarkup?.keyboard, 'first message should have reply keyboard');
+  assert.match(JSON.stringify(sent[1].replyMarkup), /wat:e:02000010/);
+  assert.match(JSON.stringify(sent[1].replyMarkup), /wat:e:11111111/);
 });
 
 test('runHandler: /watched when GitHub fails → ⚠️ reply', async () => {
@@ -749,7 +753,9 @@ test('runHandler: /watched VIEW shows entity buttons (paginated menu) for editor
     update: { message: { chat: { id: 123 }, text: '/watched', message_id: 1 } },
     env: ENV, deps,
   });
-  const kb = sent[0].replyMarkup;
+  assert.equal(sent.length, 2);
+  assert.ok(sent[0].replyMarkup?.keyboard, 'first message should have reply keyboard');
+  const kb = sent[1].replyMarkup;
   assert.ok(kb && kb.inline_keyboard, 'should have inline keyboard');
   assert.match(JSON.stringify(kb), /wat:e:12345678/);
   assert.match(JSON.stringify(kb), /wat:e:01999106/);
@@ -764,7 +770,9 @@ test('runHandler: /watched VIEW for viewer → shows paginated menu keyboard (re
     update: { message: { chat: { id: 456 }, text: '/watched', message_id: 1 } },
     env: ENV, deps,
   });
-  const kb = sent[0].replyMarkup;
+  assert.equal(sent.length, 2);
+  assert.ok(sent[0].replyMarkup?.keyboard, 'first message should have reply keyboard');
+  const kb = sent[1].replyMarkup;
   assert.ok(kb && kb.inline_keyboard, 'viewer gets menu keyboard too');
   assert.match(JSON.stringify(kb), /wat:e:/);
 });
@@ -1163,10 +1171,11 @@ test('runHandler: /archive (no arg) shows the grouped-nav menu in one message', 
     env: ENV,
     deps,
   });
-  assert.equal(sent.length, 1, 'archive button shows a single menu message');
+  assert.equal(sent.length, 2, 'archive shows 2 messages — content + nav');
   assert.match(sent[0].text, /усього 100/);
+  assert.ok(sent[0].replyMarkup?.keyboard, 'first message should have reply keyboard');
   assert.deepEqual(
-    sent[0].replyMarkup.inline_keyboard[0].map(b => b.callback_data),
+    sent[1].replyMarkup.inline_keyboard[0].map(b => b.callback_data),
     ['arch:co', 'arch:pe'],
   );
 });
@@ -2798,8 +2807,9 @@ test('runHandler: /agent (admin) → action menu (pick + jobs)', async () => {
     loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true, notes: 'Тест' }], sha: 's' }),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
-  assert.equal(sent.length, 1);
-  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.equal(sent.length, 2);
+  assert.ok(sent[0].replyMarkup?.keyboard, 'first message should have reply keyboard');
+  const cbs = JSON.stringify(sent[1].replyMarkup);
   assert.match(cbs, /agent:pick:0/);
   assert.match(cbs, /agent:jobs:0/);
 });
@@ -2817,9 +2827,10 @@ test('runHandler: /info <id> (admin) attaches the «Надіслати аген�
     loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true }], sha: 's' }),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: `/info ${ID}`, message_id: 1 } }, env: ENV, deps });
-  assert.equal(sent.length, 1);
-  assert.ok(sent.at(-1).replyMarkup.inline_keyboard, 'agent button expected on /info card');
-  assert.equal(sent.at(-1).replyMarkup.inline_keyboard[0][0].callback_data, `agent:start:${ID}`);
+  assert.equal(sent.length, 2);
+  assert.ok(sent[0].replyMarkup?.keyboard, 'first message should have reply keyboard');
+  assert.ok(sent[1].replyMarkup.inline_keyboard, 'agent button expected on /info card');
+  assert.equal(sent[1].replyMarkup.inline_keyboard[0][0].callback_data, `agent:start:${ID}`);
 });
 
 
@@ -2835,7 +2846,8 @@ test('runHandler: /agent (admin, multiple watchlist entries) → menu (filtering
       : { data: { ...RAW_OK.data, tenderID: OTHER, status: 'active.qualification' } },
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
-  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.equal(sent.length, 2);
+  const cbs = JSON.stringify(sent[1].replyMarkup);
   assert.match(cbs, /agent:pick:0/);
 });
 
@@ -2845,8 +2857,8 @@ test('runHandler: /agent with none in tendering → menu shown (pick button show
     fetchTender: async () => ({ data: { ...RAW_OK.data, status: 'active.qualification' } }),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
-  assert.equal(sent.length, 1);
-  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.equal(sent.length, 2);
+  const cbs = JSON.stringify(sent[1].replyMarkup);
   assert.match(cbs, /agent:pick:0/);
   assert.match(cbs, /agent:jobs:0/);
 });
@@ -2868,8 +2880,8 @@ test('runHandler: /agent with a done job → menu shown (done-job link moves to 
     loadAgentJob: async () => ({ tender_id: ID, status: 'done', result: { drive_link: 'https://drive.google.com/drive/folders/REAL' } }),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
-  assert.equal(sent.length, 1);
-  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.equal(sent.length, 2);
+  const cbs = JSON.stringify(sent[1].replyMarkup);
   assert.match(cbs, /agent:pick:0/);
   assert.match(cbs, /agent:jobs:0/);
 });
@@ -2881,8 +2893,9 @@ test('runHandler: /agent (admin) → menu with pick + jobs buttons', async () =>
     env: ENV,
     deps: { ...makeDeps().deps, sendReply: async (a) => sent.push(a) },
   });
-  assert.equal(sent.length, 1);
-  const cbs = JSON.stringify(sent[0].replyMarkup);
+  assert.equal(sent.length, 2);
+  assert.ok(sent[0].replyMarkup?.keyboard, 'first message should have reply keyboard');
+  const cbs = JSON.stringify(sent[1].replyMarkup);
   assert.match(cbs, /agent:pick:0/);
   assert.match(cbs, /agent:jobs:0/);
 });
@@ -2900,8 +2913,9 @@ test('runHandler: /info (no id) → single menu message with mon:ph button', asy
       sendReply: async (a) => sent.push(a),
     },
   });
-  assert.equal(sent.length, 1, 'one message, not a multi-page dump');
-  assert.match(JSON.stringify(sent[0].replyMarkup), /mon:ph:0:0/);
+  assert.equal(sent.length, 2, 'two messages — content + nav');
+  assert.ok(sent[0].replyMarkup?.keyboard, 'first message should have reply keyboard');
+  assert.match(JSON.stringify(sent[1].replyMarkup), /mon:ph:0:0/);
 });
 
 test('runHandler: /watched → menu message with wat:e button', async () => {
@@ -2914,8 +2928,9 @@ test('runHandler: /watched → menu message with wat:e button', async () => {
       sendReply: async (a) => sent.push(a),
     },
   });
-  assert.equal(sent.length, 1);
-  assert.match(JSON.stringify(sent[0].replyMarkup), /wat:e:11111111/);
+  assert.equal(sent.length, 2);
+  assert.ok(sent[0].replyMarkup?.keyboard, 'first message should have reply keyboard');
+  assert.match(JSON.stringify(sent[1].replyMarkup), /wat:e:11111111/);
 });
 
 test('runHandler: callback mon:ph:0:0 → edits message in place with cards', async () => {
@@ -3222,8 +3237,9 @@ test('runHandler: /history → list with hist:i button', async () => {
     env: ENV,
     deps: { ...makeDeps({ loadNotificationHistory: async () => ({ items: [{ type: 'digest', summary: '📥 1', text: 'D', sent_at: '2026-06-25T05:55:00Z', recipients: [], deleted: false }] }) }).deps, sendReply: async (a) => sent.push(a) },
   });
-  assert.equal(sent.length, 1);
-  assert.match(JSON.stringify(sent[0].replyMarkup), /hist:i:0/);
+  assert.equal(sent.length, 2);
+  assert.ok(sent[0].replyMarkup?.keyboard, 'first message should have reply keyboard');
+  assert.match(JSON.stringify(sent[1].replyMarkup), /hist:i:0/);
 });
 
 test('runHandler: hist:i:0 → edits to the full digest text', async () => {
