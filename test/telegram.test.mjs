@@ -1098,11 +1098,26 @@ test('broadcastDigest: a failing chat is skipped (not in result)', async () => {
 
 test('formatDeadlineReminder: header + a line per tender', () => {
   const t = formatDeadlineReminder([
-    { tender_id: 'UA-2026-06-19-008800-a', entity: 'КНП МКЛ №1', deadline: '27.06 17:00' },
+    { tender_id: 'UA-2026-06-19-008800-a', entity: 'КНП МКЛ №1', deadline: '2026-06-27T17:00:00+03:00' },
   ]);
   assert.match(t, /24 год/);
   assert.match(t, /UA-2026-06-19-008800-a/);
   assert.match(t, /КНП МКЛ №1/);
+  assert.match(t, /27\.06\.2026 до 17:00/, 'deadline formatted via fmtDeadline');
+  assert.doesNotMatch(t, /T17:00:00/, 'raw ISO not shown');
+});
+
+test('formatDeadlineReminder: full entity name is abbreviated', () => {
+  const t = formatDeadlineReminder([
+    {
+      tender_id: 'UA-2026-06-19-008800-a',
+      entity: 'КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО МІСЬКА КЛІНІЧНА ЛІКАРНЯ №1 ОДЕСЬКОЇ МІСЬКОЇ РАДИ',
+      deadline: '2026-06-27T17:00:00+03:00',
+    },
+  ]);
+  assert.match(t, /КНП/, 'legal form abbreviated');
+  assert.doesNotMatch(t, /КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО/, 'full form not shown');
+  assert.match(t, /27\.06\.2026 до 17:00/);
 });
 
 test('summarizeDigest: compact emoji·count per headline type', () => {

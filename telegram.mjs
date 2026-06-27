@@ -336,8 +336,8 @@ export function formatDigest(runIso, groups) {
 export function formatDeadlineReminder(tenders) {
   const lines = ['⏰ Залишилось 24 год до завершення приймання пропозицій:'];
   for (const t of tenders ?? []) {
-    const ent = t.entity ? ` · ${escapeHtml(t.entity)}` : '';
-    const dl = t.deadline ? ` · до ${escapeHtml(t.deadline)}` : '';
+    const ent = t.entity ? ` · ${escapeHtml(abbreviateLegalForm(t.entity))}` : '';
+    const dl = t.deadline ? ` · ${escapeHtml(fmtDeadline(t.deadline))}` : '';
     lines.push(`🆔 ${escapeHtml(t.tender_id)}${ent}${dl}`);
   }
   return lines.join('\n');
