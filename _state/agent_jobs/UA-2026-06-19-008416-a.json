@@ -4,7 +4,13 @@
   "company": "ТЕРРАЛАБ АЙ ТІ",
   "price": "93600",
   "requested_by": "1744078008",
-  "status": "running",
+  "status": "done",
   "created_at": "2026-06-27T08:14:47.003Z",
-  "updated_at": "2026-06-28T16:14:41.245761+00:00"
+  "updated_at": "2026-06-28T16:14:41.245761+00:00",
+  "result": {
+    "package_dir": "G:\\Мій диск\\AI\\Агент для тендерних закупівель\\28.06.26 КНП Львівський обласний медичний центр превенції та терапії узалежнень\\Тендерна пропозиція",
+    "report_path": null,
+    "n_docx": 9,
+    "drive_link": "https://drive.google.com/drive/folders/1Yanif_DsGj8Qu6k_nuSG82R7JGvnEkax"
+  }
 }
