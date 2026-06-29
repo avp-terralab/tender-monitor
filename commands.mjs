@@ -2082,13 +2082,35 @@ export function buildHistoryCalendar({ items, month }) {
   return { text: `📜 <b>Історія сповіщень</b> — ${list.length}`, keyboard: { inline_keyboard: rows } };
 }
 
-export function buildHistoryDay({ items, date }) {
+export function buildHistoryDay({ items, date, page = 0 }) {
   const list = historyDigests(items);
-  const evts = list.filter((it) => histIsoDay(it.sent_at) === date);
-  if (evts.length === 0) return { text: `📭 Немає сповіщень за ${date}.`, keyboard: null };
-  const rows = evts.map((it, i) => [{ text: `${HIST_TIME.format(new Date(it.sent_at))} ${it.summary}`, callback_data: `hist:i:${list.indexOf(it)}` }]);
-  rows.push([{ text: '◀ Назад', callback_data: `hist:cal:${date.slice(0, 7)}` }]);
-  return { text: `📜 <b>Сповіщення за ${date}</b>`, keyboard: { inline_keyboard: rows } };
+  const indexed = list.map((it, idx) => ({ it, idx }))
+    .filter(({ it }) => histIsoDay(it.sent_at) === date);
+  if (indexed.length === 0) return buildHistoryCalendar({ items, month: date.slice(0, 7) });
+  const PAGE_SIZE = 8;
+  const pages = Math.max(1, Math.ceil(indexed.length / PAGE_SIZE));
+  const p = Math.min(Math.max(0, Math.trunc(page ?? 0)), pages - 1);
+  const slice = indexed.slice(p * PAGE_SIZE, (p + 1) * PAGE_SIZE);
+  const rows = [];
+  for (const { it, idx } of slice) {
+    const d = new Date(it.sent_at);
+    const when = it.sent_at && !isNaN(d) ? HIST_TIME.format(d) : '—';
+    rows.push([{ text: `🔔 ${when} · ${it.summary ?? ''}`.trim(), callback_data: `hist:i:${idx}` }]);
+  }
+  if (pages > 1) {
+    rows.push([
+      p > 0 ? { text: '◀ Назад', callback_data: `hist:day:${date}:p:${p - 1}` } : { text: ' ', callback_data: 'hist:noop' },
+      { text: `${p + 1}/${pages}`, callback_data: 'hist:noop' },
+      p < pages - 1 ? { text: 'Далі ▶', callback_data: `hist:day:${date}:p:${p + 1}` } : { text: ' ', callback_data: 'hist:noop' },
+    ]);
+  }
+  rows.push([{ text: '⬅ Назад до календаря', callback_data: `hist:cal:${date.slice(0, 7)}` }]);
+  const [yr, mo, dy] = date.split('-').map(Number);
+  const dateLabel = HIST_DAY.format(new Date(Date.UTC(yr, mo - 1, dy)));
+  return {
+    text: `📅 <b>${dateLabel}</b> — ${indexed.length} сповіщень`,
+    keyboard: { inline_keyboard: rows },
+  };
 }
 
 export function buildHistoryList({ items, page = 0 }) {

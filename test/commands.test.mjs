@@ -3854,6 +3854,65 @@ test('buildHistoryCalendar: May 2026 starts on Friday → 4 empty cells before d
   assert.equal(allCells[4].text, '1');   // cell 4 = day 1 (Friday)
 });
 
+// ─── buildHistoryDay ──────────────────────────────────────────────────────
+
+test('buildHistoryDay: shows only entries for that day with back button', () => {
+  const items = [
+    { type: 'digest', sent_at: '2026-06-29T12:00:00.000Z', summary: '📥 1', text: 'text1', recipients: [], deleted: false },
+    { type: 'digest', sent_at: '2026-06-29T10:00:00.000Z', summary: '📥 2', text: 'text2', recipients: [], deleted: false },
+    { type: 'digest', sent_at: '2026-06-28T10:00:00.000Z', summary: '📥 3', text: 'text3', recipients: [], deleted: false },
+  ];
+  const v = buildHistoryDay({ items, date: '2026-06-29' });
+  assert.match(v.text, /📅/);
+  assert.match(v.text, /29 червня/);
+  assert.match(v.text, /2 сповіщень/);
+  const rows = v.keyboard.inline_keyboard;
+  const entries = rows.filter((r) => r[0].callback_data.startsWith('hist:i:'));
+  assert.equal(entries.length, 2);
+  assert.equal(entries[0][0].callback_data, 'hist:i:0');  // global idx 0
+  assert.equal(entries[1][0].callback_data, 'hist:i:1');  // global idx 1
+  const back = rows.at(-1)[0];
+  assert.equal(back.callback_data, 'hist:cal:2026-06');
+  assert.match(back.text, /Назад до календаря/);
+});
+
+test('buildHistoryDay: global idx survives when earlier entries are from other days', () => {
+  // items[0] = June28, items[1] = June29 — idx for June29 entry is 1
+  const items = [
+    { type: 'digest', sent_at: '2026-06-28T10:00:00.000Z', summary: 'A', text: 'tA', recipients: [], deleted: false },
+    { type: 'digest', sent_at: '2026-06-29T12:00:00.000Z', summary: 'B', text: 'tB', recipients: [], deleted: false },
+  ];
+  const v = buildHistoryDay({ items, date: '2026-06-29' });
+  const entries = v.keyboard.inline_keyboard.filter((r) => r[0].callback_data.startsWith('hist:i:'));
+  assert.equal(entries[0][0].callback_data, 'hist:i:1');  // global idx 1, not 0
+});
+
+test('buildHistoryDay: pagination when > 8 entries on the same day', () => {
+  const items = Array.from({ length: 10 }, (_, i) => ({
+    type: 'digest',
+    sent_at: `2026-06-29T${String(10 + i).padStart(2, '0')}:00:00.000Z`,
+    summary: `s${i}`, text: 't', recipients: [], deleted: false,
+  }));
+  const v0 = buildHistoryDay({ items, date: '2026-06-29', page: 0 });
+  const entries0 = v0.keyboard.inline_keyboard.filter((r) => r[0].callback_data.startsWith('hist:i:'));
+  assert.equal(entries0.length, 8);
+  const navRow = v0.keyboard.inline_keyboard.find((r) => r.some((b) => b.text === 'Далі ▶'));
+  assert.ok(navRow, 'page 0 should have Далі ▶');
+  const nextBtn = navRow.find((b) => b.text === 'Далі ▶');
+  assert.equal(nextBtn.callback_data, 'hist:day:2026-06-29:p:1');
+
+  const v1 = buildHistoryDay({ items, date: '2026-06-29', page: 1 });
+  const entries1 = v1.keyboard.inline_keyboard.filter((r) => r[0].callback_data.startsWith('hist:i:'));
+  assert.equal(entries1.length, 2);
+  const prevBtn = v1.keyboard.inline_keyboard.flat().find((b) => b.text === '◀ Назад');
+  assert.equal(prevBtn?.callback_data, 'hist:day:2026-06-29:p:0');
+});
+
+test('buildHistoryDay: unknown date falls back to calendar', () => {
+  const v = buildHistoryDay({ items: histItems(3), date: '2026-05-01' });
+  assert.match(v.text, /Історія сповіщень/);
+});
+
 test('mainKeyboard: has 📜 Історія; parseCommand /history', () => {
   assert.match(JSON.stringify(mainKeyboard('admin')), /📜 Історія/);
   assert.deepEqual(parseCommand('/history'), { cmd: 'history' });
