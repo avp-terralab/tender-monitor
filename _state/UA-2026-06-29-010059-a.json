@@ -1,0 +1,86 @@
+{
+  "tender_id": "UA-2026-06-29-010059-a",
+  "saved_at": "2026-06-29T14:25:43.693Z",
+  "snapshot": {
+    "tender_id": "UA-2026-06-29-010059-a",
+    "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії»",
+    "status": "active.tendering",
+    "dateModified": "2026-06-29T16:15:34.445308+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-07-07T15:51:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"РАХІВСЬКА РАЙОННА ЛІКАРНЯ\" РАХІВСЬКОЇ РАЙОННОЇ РАДИ",
+      "edrpou": "01992624"
+    },
+    "value": {
+      "amount": 212500,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": true
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Параска Ганиш",
+      "email": "shtcovid2021@gmail.com",
+      "telephone": "+380673197691"
+    },
+    "documents": [
+      {
+        "id": "986786bc16b74afa89e8124097bc76d6",
+        "title": "ТД.doc",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-06-29T16:14:09.519777+03:00"
+      },
+      {
+        "id": "c15b25b086f646f5945727fe8e3ee6a7",
+        "title": "ДОДАТОК 1.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-06-29T16:14:09.519777+03:00"
+      },
+      {
+        "id": "ca4d318aa19748078bd7ab1d900c11ec",
+        "title": "Додаток 2 Технічні вимоги.docx",
+        "documentType": "technicalSpecifications",
+        "datePublished": "2026-06-29T16:14:09.519777+03:00"
+      },
+      {
+        "id": "578babc186b94ea4b4cddda8f870ca4c",
+        "title": "Проєкт_Договору.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-06-29T16:14:09.519777+03:00"
+      },
+      {
+        "id": "a063a299c37f4b3794df8737fa7944e0",
+        "title": "ДОДАТОК 4.docx",
+        "documentType": "evaluationCriteria",
+        "datePublished": "2026-06-29T16:14:09.519777+03:00"
+      },
+      {
+        "id": "a49c7b3a78d34060b6cf6dcf87a8687f",
+        "title": "ДОДАТОК 5.docx",
+        "documentType": "evaluationCriteria",
+        "datePublished": "2026-06-29T16:14:09.519777+03:00"
+      },
+      {
+        "id": "9e0bf323a35e48f1834d9c0fc569c44a",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-06-29T16:15:34.053756+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
