@@ -3714,11 +3714,19 @@ test('buildHistoryItem: back button for idx=13 → June25', () => {
   assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'hist:day:2026-06-25');
 });
 
-test('handleHistoryNav: noop→null; p/i routing', () => {
+test('handleHistoryNav: noop→null; i/cal/day/p routing', () => {
   const items = histItems(3);
   assert.equal(handleHistoryNav({ items, data: 'hist:noop' }), null);
-  assert.match(handleHistoryNav({ items, data: 'hist:p:0' }).text, /Історія сповіщень/);
+  // hist:i → full text
   assert.match(handleHistoryNav({ items, data: 'hist:i:0' }).text, /Дайджест 0/);
+  // hist:cal → calendar grid
+  assert.match(handleHistoryNav({ items, data: 'hist:cal:2026-06' }).text, /Історія сповіщень/);
+  // hist:day → day list (histItems(3): all 3 on 2026-06-29)
+  assert.match(handleHistoryNav({ items, data: 'hist:day:2026-06-29' }).text, /29 червня/);
+  // hist:day with page → day list page 0 (no pagination for 3 entries)
+  assert.match(handleHistoryNav({ items, data: 'hist:day:2026-06-29:p:0' }).text, /29 червня/);
+  // hist:p backward compat → flat list
+  assert.match(handleHistoryNav({ items, data: 'hist:p:0' }).text, /Історія сповіщень/);
 });
 
 test('buildHistoryList: inserts noop date headers, entries show time only', () => {

@@ -2154,8 +2154,15 @@ export function buildHistoryItem({ items, idx }) {
 
 export function handleHistoryNav({ items, data }) {
   if (data === 'hist:noop') return null;
-  const parts = data.split(':'); // hist:p:<page> | hist:i:<idx>
+  const parts = data.split(':');
   if (parts[1] === 'i') return buildHistoryItem({ items, idx: Number(parts[2]) });
+  if (parts[1] === 'cal') return buildHistoryCalendar({ items, month: parts[2] });
+  if (parts[1] === 'day') {
+    // hist:day:YYYY-MM-DD  or  hist:day:YYYY-MM-DD:p:N
+    const date = parts[2];
+    const page = parts[3] === 'p' ? Number(parts[4] ?? 0) : 0;
+    return buildHistoryDay({ items, date, page });
+  }
   if (parts[1] === 'p') return buildHistoryList({ items, page: Number(parts[2] ?? 0) });
-  return buildHistoryList({ items, page: 0 });
+  return buildHistoryCalendar({ items });
 }
