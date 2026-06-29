@@ -1120,11 +1120,21 @@ test('formatDeadlineReminder: full entity name is abbreviated', () => {
   assert.match(t, /27\.06\.2026 до 17:00/);
 });
 
-test('summarizeDigest: compact emoji·count per headline type', () => {
-  const groups = [
+test('summarizeDigest: counts groups not events; highest-priority emoji wins', () => {
+  // Two groups, both have new_tender_announced → 📥 2 (not 📥 2 · 🔄 1)
+  assert.equal(summarizeDigest([
     { events: [{ type: 'new_tender_announced' }] },
     { events: [{ type: 'new_tender_announced' }, { type: 'status_changed' }] },
-  ];
-  assert.equal(summarizeDigest(groups), '📥 2 · 🔄 1');
+  ]), '📥 2');
+  // Mixed: 1 new tender + 1 status change in separate groups
+  assert.equal(summarizeDigest([
+    { events: [{ type: 'new_tender_announced' }] },
+    { events: [{ type: 'status_changed' }] },
+  ]), '📥 1 · 🔄 1');
+  // Non-headline types use proper emoji, count = number of groups
+  assert.equal(summarizeDigest([
+    { events: [{ type: 'deadline_changed' }] },
+    { events: [{ type: 'deadline_changed' }] },
+  ]), '📅 2');
   assert.equal(summarizeDigest([]), '🔔 оновлення');
 });

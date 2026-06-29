@@ -344,19 +344,44 @@ export function formatDeadlineReminder(tenders) {
 }
 
 // One-line summary of a digest's events for the history list row.
+// Priority order: each group (tender) is attributed to its first matching type.
+// Sum of all counts = number of tender blocks visible in the detail view.
 const SUMMARY_TYPES = [
   ['new_tender_announced', '📥'],
-  ['status_changed', '🔄'],
-  ['award_qualified', '🏆'],
   ['contract_signed', '✍️'],
+  ['award_qualified', '🏆'],
+  ['status_changed', '🔄'],
+  ['award_disqualified', '❌'],
+  ['award_cancelled', '↩️'],
+  ['award_created', '👤'],
+  ['contract_terminated', '⛔'],
+  ['contract_created', '📜'],
+  ['contract_documents_added', '📎'],
+  ['cancellation_initiated', '⚠️'],
+  ['new_complaint', '⚖️'],
+  ['complaint_status_changed', '⚖️'],
+  ['td_amended', '📝'],
+  ['deadline_changed', '📅'],
+  ['new_question', '❓'],
+  ['question_answered', '💬'],
+  ['auction_scheduled', '🕐'],
+  ['auction_rescheduled', '🕐'],
+  ['monitoring_started', '🟢'],
 ];
 export function summarizeDigest(groups) {
+  // Count groups (tenders), not individual events. Each group is attributed
+  // to its highest-priority event type so the total matches the visible blocks.
   const counts = new Map();
-  for (const g of groups ?? []) for (const e of (g.events ?? [])) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
-  const parts = SUMMARY_TYPES.filter(([t]) => counts.get(t)).map(([t, emoji]) => `${emoji} ${counts.get(t)}`);
+  for (const g of groups ?? []) {
+    const types = new Set((g.events ?? []).map(e => e.type));
+    for (const [type, emoji] of SUMMARY_TYPES) {
+      if (types.has(type)) { counts.set(emoji, (counts.get(emoji) ?? 0) + 1); break; }
+    }
+  }
+  const parts = [...counts.entries()].map(([emoji, n]) => `${emoji} ${n}`);
   if (parts.length) return parts.join(' · ');
-  const total = [...counts.values()].reduce((a, b) => a + b, 0);
-  return total ? `📌 ${total}` : '🔔 оновлення';
+  const n = (groups ?? []).length;
+  return n ? `🔔 ${n}` : '🔔 оновлення';
 }
 
 export function formatMoney(amount) {

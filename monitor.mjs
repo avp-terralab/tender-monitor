@@ -354,16 +354,7 @@ export async function runOnce(deps) {
       if (deadlineTenders.length > 0) {
         const dText = formatDeadlineReminder(deadlineTenders);
         const dRec = await sendDigest(dText);
-        if (deps.saveNotificationHistory) {
-          history = logBroadcast(history, {
-            sent_at: now.toISOString(),
-            type: 'deadline',
-            summary: `⏰ ${deadlineTenders.length}`,
-            text: dText,
-            recipients: dRec ?? [],
-            deleted: false,
-          });
-        }
+        void dRec; // deadline reminders are not archived to history
       }
       // Main digest — only if there is something to say.
       if (text) {
