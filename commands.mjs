@@ -1986,6 +1986,8 @@ function safeHistDay(sent_at) {
 
 // Returns one page of entries starting at startIdx.
 // Stops before adding an entry from a new day if entries.length >= 6.
+// Same-day entries are always added (no upper bound). In practice digests
+// arrive at most once per monitor run, so a single day rarely exceeds ~10 entries.
 function histSlicePage(list, startIdx) {
   const entries = [];
   let lastDay = null;
@@ -2014,7 +2016,7 @@ export function buildHistoryList({ items, page = 0 }) {
   if (list.length === 0) return { text: '📭 Історія сповіщень порожня.', keyboard: null };
   const starts = histPageStarts(list);
   const pages = starts.length;
-  const p = Math.min(Math.max(0, page | 0), pages - 1);
+  const p = Math.min(Math.max(0, Math.trunc(page ?? 0)), pages - 1);
   const { entries } = histSlicePage(list, starts[p]);
   const rows = [];
   let prevDay = null;
