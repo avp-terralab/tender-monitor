@@ -1032,16 +1032,18 @@ test('logBroadcast: prepends newest-first', () => {
   assert.equal(r.length, 2);
 });
 
-test('expireHistory: >24h messages deleted; deadlines dropped; digests kept(deleted); cap', async () => {
+test('expireHistory: >24h messages deleted; deadlines always dropped; digests kept(deleted); cap', async () => {
   const deleted = [];
   const dm = async (chatId, messageId) => { deleted.push(messageId); return true; };
   const now = new Date('2026-06-25T12:00:00Z').getTime();
   const old = (type, mid) => ({ sent_at: '2026-06-24T00:00:00Z', type, summary: 's', text: 't', recipients: [{ chat_id: '1', message_id: mid }], deleted: false });
-  const items = [old('digest', 7), old('deadline', 8)];
+  const recent = (type, mid) => ({ sent_at: '2026-06-25T11:00:00Z', type, summary: 's', text: 't', recipients: [{ chat_id: '1', message_id: mid }], deleted: false });
+  // expired digest + expired deadline + recent (non-expired) deadline
+  const items = [old('digest', 7), old('deadline', 8), recent('deadline', 9)];
   const out = await expireHistory(items, now, dm);
-  assert.deepEqual(deleted.sort(), [7, 8]);
+  assert.deepEqual(deleted.sort(), [7, 8]); // message 9 not deleted (not expired), but still dropped from history
   assert.ok(out.find((i) => i.type === 'digest')?.deleted === true);
-  assert.ok(!out.some((i) => i.type === 'deadline'));
+  assert.ok(!out.some((i) => i.type === 'deadline')); // both deadline items dropped regardless of age
 });
 
 test('expireHistory: recent items untouched; cap keeps newest 200 digests', async () => {

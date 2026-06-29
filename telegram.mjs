@@ -366,6 +366,10 @@ const SUMMARY_TYPES = [
   ['question_answered', '💬'],
   ['auction_scheduled', '🕐'],
   ['auction_rescheduled', '🕐'],
+  ['auction_started', '⚡'],
+  ['qualification_started', '🔍'],
+  ['prequalification_started', '🔄'],
+  ['awarded_phase', '🏅'],
   ['monitoring_started', '🟢'],
 ];
 export function summarizeDigest(groups) {

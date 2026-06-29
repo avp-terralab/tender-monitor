@@ -85,7 +85,7 @@ export async function expireHistory(items, now, deleteMessage, { ttlMs = HISTORY
       }
       it = { ...it, deleted: true };
     }
-    if (it.type === 'deadline' && it.deleted) continue;   // drop expired deadlines
+    if (it.type === 'deadline') continue;   // deadline reminders are never archived
     out.push(it);
   }
   let digestsSeen = 0;
@@ -353,8 +353,7 @@ export async function runOnce(deps) {
       // Deadline reminders: sent as a separate message before the main digest.
       if (deadlineTenders.length > 0) {
         const dText = formatDeadlineReminder(deadlineTenders);
-        const dRec = await sendDigest(dText);
-        void dRec; // deadline reminders are not archived to history
+        await sendDigest(dText);
       }
       // Main digest — only if there is something to say.
       if (text) {
