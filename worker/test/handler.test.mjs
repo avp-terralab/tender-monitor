@@ -2762,6 +2762,41 @@ test('agent:confirm with kind=amend → amend job saved, target from prior done,
   assert.equal(acks.length, 1);
 });
 
+test('agent:retry → resets error job to pending, acks ✅', async () => {
+  const errorJob = {
+    tender_id: AGENT_TID, link: 'https://prozorro.gov.ua/tender/' + AGENT_TID,
+    company: 'МАЙЛАБ', price: '100000',
+    status: 'error', created_at: '2026-06-21T08:00:00.000Z',
+    result: { detail: 'no .docx generated (claude rc=1)' },
+  };
+  const { deps, jobs, acks } = makeAgentDeps({
+    loadAgentJob: async () => structuredClone(errorJob),
+  });
+  await runHandler({ update: CB(`agent:retry:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].status, 'pending');
+  assert.equal(jobs[0].result, undefined);
+  assert.match(acks[0].text, /повтор/i);
+});
+
+test('agent:retry on non-error job → acks info, no save', async () => {
+  const { deps, jobs, acks } = makeAgentDeps({
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'running' }),
+  });
+  await runHandler({ update: CB(`agent:retry:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 0);
+  assert.match(acks[0].text, /не в стані error/i);
+});
+
+test('agent:retry on missing job → acks warning', async () => {
+  const { deps, jobs, acks } = makeAgentDeps({
+    loadAgentJob: async () => null,
+  });
+  await runHandler({ update: CB(`agent:retry:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 0);
+  assert.match(acks[0].text, /не знайдено/i);
+});
+
 test('agent:cancel → pending cleared, Скасовано reply', async () => {
   const { deps, store, sent, acks } = makeAgentDeps();
   store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' };

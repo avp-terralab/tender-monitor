@@ -1333,6 +1333,30 @@ async function handleAgentCallback({
     return;
   }
 
+  if (action === 'retry') {
+    let job;
+    try {
+      job = await _loadAgentJob(env, tid);
+    } catch (err) {
+      console.error('worker: agent retry load failed:', err.message);
+      await ack('⚠️ GitHub тимчасово недоступний', true);
+      return;
+    }
+    if (!job) { await ack('⚠️ Job не знайдено', true); return; }
+    if (job.status !== 'error') { await ack('ℹ️ Job вже не в стані error', true); return; }
+    const retried = { ...job, status: 'pending', updated_at: _now().toISOString() };
+    delete retried.result;
+    try {
+      await _saveAgentJob(env, retried);
+    } catch (err) {
+      console.error('worker: agent retry save failed:', err.message);
+      await ack('⚠️ Не вдалось зберегти, спробуй ще раз', true);
+      return;
+    }
+    await ack('✅ Поставлено на повтор');
+    return;
+  }
+
   if (action === 'cancel') {
     await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
     try {
