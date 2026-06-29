@@ -677,6 +677,11 @@ export async function runHandler({ update, env, deps = {} }) {
     }
   }
 
+  // Inline view keyboard (history, archive, agent, etc.) goes on the main message.
+  // reply keyboard (mainKeyboard) persists in Telegram without being refreshed.
+  const inlineView = histReplyMarkup ?? archiveReplyMarkup ?? agentReplyMarkup
+    ?? watchedReplyMarkup ?? monitorReplyMarkup ?? notifyReplyMarkup;
+
   const pages = Array.isArray(reply) ? reply : [reply];
   const botReplyIds = [];
   for (let i = 0; i < pages.length; i++) {
@@ -688,32 +693,13 @@ export async function runHandler({ update, env, deps = {} }) {
         text: pages[i],
         replyToMessageId: i === 0 ? msg.message_id : undefined,
         replyMarkup: isLast
-          ? (forceReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
+          ? (inlineView ?? forceReplyMarkup ?? (isAllowed ? mainKeyboard(role) : undefined))
           : undefined,
       });
       const mid = resp?.result?.message_id;
       if (mid != null) botReplyIds.push(mid);
     } catch (err) {
       console.error('worker: sendReply failed:', err.message);
-    }
-  }
-
-  // Send inline navigation keyboard as a separate follow-up message so the reply
-  // keyboard (mainKeyboard) can always be refreshed on the main reply above.
-  const inlineView = histReplyMarkup ?? archiveReplyMarkup ?? agentReplyMarkup
-    ?? watchedReplyMarkup ?? monitorReplyMarkup ?? notifyReplyMarkup;
-  if (inlineView) {
-    try {
-      const resp = await _sendReply({
-        token: env.TELEGRAM_BOT_TOKEN,
-        chatId: msg.chat.id,
-        text: '▾',
-        replyMarkup: inlineView,
-      });
-      const mid = resp?.result?.message_id;
-      if (mid != null) botReplyIds.push(mid);
-    } catch (err) {
-      console.error('worker: inline view send failed:', err.message);
     }
   }
 
