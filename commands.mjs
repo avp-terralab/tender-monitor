@@ -1967,9 +1967,11 @@ export function handleAgentMenuNav({ tenders, jobs, data }) {
 
 // ─── Notification history view ────────────────────────────────────────────────
 
-const HIST_PER_PAGE = 6;
-const HIST_DT = new Intl.DateTimeFormat('uk-UA', {
-  timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+const HIST_DAY = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', day: 'numeric', month: 'long',
+});
+const HIST_TIME = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false,
 });
 
 // Only digests are kept in history; newest-first is the storage order.
@@ -1977,16 +1979,54 @@ function historyDigests(items) {
   return (items ?? []).filter((it) => it.type === 'digest');
 }
 
+function safeHistDay(sent_at) {
+  const d = new Date(sent_at);
+  return isNaN(d) ? null : HIST_DAY.format(d);
+}
+
+// Returns one page of entries starting at startIdx.
+// Stops before adding an entry from a new day if entries.length >= 6.
+function histSlicePage(list, startIdx) {
+  const entries = [];
+  let lastDay = null;
+  let i = startIdx;
+  for (; i < list.length; i++) {
+    const day = safeHistDay(list[i].sent_at);
+    if (day !== lastDay && entries.length >= 6) break;
+    entries.push(list[i]);
+    lastDay = day;
+  }
+  return { entries, nextStart: i, hasNext: i < list.length };
+}
+
+function histPageStarts(list) {
+  const starts = [];
+  let s = 0;
+  while (s < list.length) {
+    starts.push(s);
+    s = histSlicePage(list, s).nextStart;
+  }
+  return starts;
+}
+
 export function buildHistoryList({ items, page = 0 }) {
   const list = historyDigests(items);
   if (list.length === 0) return { text: '📭 Історія сповіщень порожня.', keyboard: null };
-  const pages = Math.max(1, Math.ceil(list.length / HIST_PER_PAGE));
+  const starts = histPageStarts(list);
+  const pages = starts.length;
   const p = Math.min(Math.max(0, page | 0), pages - 1);
-  const start = p * HIST_PER_PAGE;
-  const slice = list.slice(start, start + HIST_PER_PAGE);
-  const rows = slice.map((it, i) => {
-    const when = it.sent_at ? HIST_DT.format(new Date(it.sent_at)) : '—';
-    return [{ text: `🔔 ${when} · ${it.summary ?? ''}`.trim(), callback_data: `hist:i:${start + i}` }];
+  const { entries } = histSlicePage(list, starts[p]);
+  const rows = [];
+  let prevDay = null;
+  entries.forEach((it, i) => {
+    const day = safeHistDay(it.sent_at);
+    if (day !== prevDay) {
+      rows.push([{ text: `── ${day ?? '—'} ──`, callback_data: 'hist:noop' }]);
+      prevDay = day;
+    }
+    const d = new Date(it.sent_at);
+    const when = it.sent_at && !isNaN(d) ? HIST_TIME.format(d) : '—';
+    rows.push([{ text: `🔔 ${when} · ${it.summary ?? ''}`.trim(), callback_data: `hist:i:${starts[p] + i}` }]);
   });
   const nav = buildPageNavRow(p, pages, (x) => `hist:p:${x}`, 'hist:noop');
   if (nav) rows.push(nav);
@@ -1997,7 +2037,9 @@ export function buildHistoryItem({ items, idx }) {
   const list = historyDigests(items);
   const it = list[idx];
   if (!it) return buildHistoryList({ items, page: 0 });
-  const page = Math.floor(idx / HIST_PER_PAGE);
+  const starts = histPageStarts(list);
+  let page = 0;
+  for (let j = starts.length - 1; j >= 0; j--) { if (starts[j] <= idx) { page = j; break; } }
   return { text: it.text ?? '(порожньо)', keyboard: { inline_keyboard: [[{ text: '⬅ Назад до історії', callback_data: `hist:p:${page}` }]] } };
 }
 

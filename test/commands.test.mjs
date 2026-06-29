@@ -3667,8 +3667,12 @@ test('commandFromReplyPrompt: recognizes each prompt (incl. retry); null otherwi
 });
 
 const histItems = (n) => Array.from({ length: n }, (_, i) => ({
-  sent_at: `2026-06-25T0${i % 6}:55:00.000Z`, type: 'digest',
-  summary: `📥 ${i + 1}`, text: `<b>Дайджест ${i}</b>`, recipients: [], deleted: false,
+  type: 'digest',
+  sent_at: new Date(Date.UTC(2026, 5, 29 - Math.floor(i / 3), 12 - (i % 3), 0, 0)).toISOString(),
+  summary: `📥 ${i + 1}`,
+  text: `<b>Дайджест ${i}</b>`,
+  recipients: [],
+  deleted: false,
 }));
 
 test('buildHistoryList: empty → 📭', () => {
@@ -3680,9 +3684,11 @@ test('buildHistoryList: digests only, 6/page, hist:i rows + nav', () => {
   const items = [...histItems(8), { type: 'deadline', summary: 'x', text: 'y', sent_at: 't', recipients: [], deleted: false }];
   const v = buildHistoryList({ items, page: 0 });
   const rows = v.keyboard.inline_keyboard;
-  assert.equal(rows[0][0].callback_data, 'hist:i:0');
-  assert.match(rows[0][0].text, /📥 1/);
-  const nav = rows.find((r) => r.some((b) => b.callback_data === 'hist:noop'));
+  assert.equal(rows[0][0].callback_data, 'hist:noop');    // date header row
+  assert.equal(rows[1][0].callback_data, 'hist:i:0');     // first entry
+  assert.match(rows[1][0].text, /📥 1/);
+  assert.ok(!rows[1][0].text.includes('29.06'));           // no date in entry row
+  const nav = rows.at(-1);
   assert.ok(nav.some((b) => b.text === 'Далі ▶'));
 });
 
@@ -3693,7 +3699,7 @@ test('buildHistoryItem: full text + back to page 0', () => {
 });
 
 test('buildHistoryItem: back button remembers page for idx on page 1', () => {
-  // HIST_PER_PAGE=6, so idx=7 is on page 1
+  // page 0 = June29(0-2)+June28(3-5)=6 entries; page 1 starts at June27(6-8); idx=7 is on page 1
   const v = buildHistoryItem({ items: histItems(14), idx: 7 });
   assert.match(v.text, /Дайджест 7/);
   assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'hist:p:1');
@@ -3709,6 +3715,68 @@ test('handleHistoryNav: noop→null; p/i routing', () => {
   assert.equal(handleHistoryNav({ items, data: 'hist:noop' }), null);
   assert.match(handleHistoryNav({ items, data: 'hist:p:0' }).text, /Історія сповіщень/);
   assert.match(handleHistoryNav({ items, data: 'hist:i:0' }).text, /Дайджест 0/);
+});
+
+test('buildHistoryList: inserts noop date headers, entries show time only', () => {
+  const items = [
+    { type: 'digest', sent_at: '2026-06-29T12:00:00.000Z', summary: 'A', text: 'ta', recipients: [], deleted: false },
+    { type: 'digest', sent_at: '2026-06-29T10:00:00.000Z', summary: 'B', text: 'tb', recipients: [], deleted: false },
+    { type: 'digest', sent_at: '2026-06-28T12:00:00.000Z', summary: 'C', text: 'tc', recipients: [], deleted: false },
+  ];
+  const rows = buildHistoryList({ items, page: 0 }).keyboard.inline_keyboard;
+  // row 0: date header June 29
+  assert.equal(rows[0][0].callback_data, 'hist:noop');
+  assert.match(rows[0][0].text, /29 червня/);
+  // row 1: entry A — time 15:00 Kyiv (12:00 UTC = 15:00 Kyiv), no "29.06" date prefix
+  assert.equal(rows[1][0].callback_data, 'hist:i:0');
+  assert.match(rows[1][0].text, /15:00/);
+  assert.ok(!rows[1][0].text.includes('29.06'));
+  // row 2: entry B
+  assert.equal(rows[2][0].callback_data, 'hist:i:1');
+  // row 3: date header June 28
+  assert.equal(rows[3][0].callback_data, 'hist:noop');
+  assert.match(rows[3][0].text, /28 червня/);
+  // row 4: entry C — no nav (single page, 3 entries)
+  assert.equal(rows[4][0].callback_data, 'hist:i:2');
+  assert.equal(rows.length, 5);
+});
+
+test('buildHistoryList: 5+3 entries across 2 days fit on one page', () => {
+  const mk = (d, n) => Array.from({ length: n }, (_, i) => ({
+    type: 'digest', sent_at: `${d}T${10 + i}:00:00.000Z`, summary: `s${i}`, text: 't', recipients: [], deleted: false,
+  }));
+  // 5 June29 + 3 June28: when June28 starts, entries.length=5 < 6 → don't break, all 8 on page 0
+  const items = [...mk('2026-06-29', 5), ...mk('2026-06-28', 3)];
+  const rows = buildHistoryList({ items, page: 0 }).keyboard.inline_keyboard;
+  assert.equal(rows.filter((r) => r[0].callback_data === 'hist:noop').length, 2);       // 2 date headers
+  assert.equal(rows.filter((r) => r[0].callback_data.startsWith('hist:i:')).length, 8); // all 8 entries
+  assert.ok(!rows.at(-1).some((b) => b.text === 'Далі ▶'));                              // no next page
+});
+
+test('buildHistoryList: 6+2 entries split across 2 pages at day boundary', () => {
+  const mk = (d, n) => Array.from({ length: n }, (_, i) => ({
+    type: 'digest', sent_at: `${d}T${10 + i}:00:00.000Z`, summary: `s${i}`, text: 't', recipients: [], deleted: false,
+  }));
+  // 6 June29 + 2 June28: when June28 starts, entries.length=6 >= 6 → break
+  const items = [...mk('2026-06-29', 6), ...mk('2026-06-28', 2)];
+  const v0 = buildHistoryList({ items, page: 0 });
+  const rows0 = v0.keyboard.inline_keyboard;
+  assert.equal(rows0.filter((r) => r[0].callback_data.startsWith('hist:i:')).length, 6); // 6 on page 0
+  assert.ok(rows0.at(-1).some((b) => b.text === 'Далі ▶'));                               // nav → next page
+
+  const rows1 = buildHistoryList({ items, page: 1 }).keyboard.inline_keyboard;
+  assert.equal(rows1.filter((r) => r[0].callback_data.startsWith('hist:i:')).length, 2); // 2 on page 1
+  assert.ok(rows1.at(-1).some((b) => b.text === '◀ Назад'));                              // nav ← prev page
+});
+
+test('buildHistoryList: single day with 8 entries fits on one page (no split)', () => {
+  const items = Array.from({ length: 8 }, (_, i) => ({
+    type: 'digest', sent_at: `2026-06-29T${10 + i}:00:00.000Z`, summary: `s${i}`, text: 't', recipients: [], deleted: false,
+  }));
+  const rows = buildHistoryList({ items, page: 0 }).keyboard.inline_keyboard;
+  assert.equal(rows.filter((r) => r[0].callback_data === 'hist:noop').length, 1);        // 1 date header
+  assert.equal(rows.filter((r) => r[0].callback_data.startsWith('hist:i:')).length, 8);  // all 8 entries
+  assert.ok(!rows.at(-1).some((b) => b.text === 'Далі ▶'));                               // no next page
 });
 
 test('mainKeyboard: has 📜 Історія; parseCommand /history', () => {
