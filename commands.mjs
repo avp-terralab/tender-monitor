@@ -2011,6 +2011,86 @@ function histPageStarts(list) {
   return starts;
 }
 
+// Returns 'YYYY-MM-DD' for a timestamp in Europe/Kyiv, or null if invalid.
+function histIsoDay(sent_at) {
+  const d = new Date(sent_at);
+  if (isNaN(d)) return null;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv' }).format(d);
+}
+
+// Sorted unique 'YYYY-MM' strings (Kyiv time) for all entries in the list.
+function activeMths(list) {
+  const set = new Set();
+  for (const it of list) { const day = histIsoDay(it.sent_at); if (day) set.add(day.slice(0, 7)); }
+  return [...set].sort();
+}
+
+function prevMonth(mths, current) {
+  const before = mths.filter((m) => m < current);
+  return before.length ? before[before.length - 1] : null;
+}
+
+function nextMonth(mths, current) {
+  const after = mths.filter((m) => m > current);
+  return after.length ? after[0] : null;
+}
+
+// First emoji_presentation character from a string, or undefined.
+function firstEmoji(summary) {
+  if (!summary) return undefined;
+  return summary.match(/\p{Emoji_Presentation}/u)?.[0];
+}
+
+export function buildHistoryCalendar({ items, month }) {
+  const list = historyDigests(items);
+  const mths = activeMths(list);
+  let cur = month ?? (mths.length ? mths[mths.length - 1] : null);
+  if (!cur) { cur = histIsoDay(new Date().toISOString())?.slice(0, 7) ?? '1970-01'; }
+  const [yearStr, monthStr] = cur.split('-');
+  const year = Number(yearStr);
+  const month0 = Number(monthStr) - 1;
+  const daysInMonth = new Date(year, month0 + 1, 0).getDate();
+  const offset = (new Date(year, month0, 1).getDay() + 6) % 7;
+  const monthLabel = new Intl.DateTimeFormat('uk-UA', { month: 'long', year: 'numeric' })
+    .format(new Date(Date.UTC(year, month0, 1)));
+  const label = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
+  const prev = prevMonth(mths, cur);
+  const next = nextMonth(mths, cur);
+  const rows = [];
+  rows.push([
+    { text: '◀', callback_data: prev ? `hist:cal:${prev}` : 'hist:noop' },
+    { text: label, callback_data: 'hist:noop' },
+    { text: '▶', callback_data: next ? `hist:cal:${next}` : 'hist:noop' },
+  ]);
+  rows.push(['Пн','Вт','Ср','Чт','Пт','Сб','Нд'].map((d) => ({ text: d, callback_data: 'hist:noop' })));
+  const cells = [...Array(offset).fill(null)];
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+  for (let i = 0; i < cells.length; i += 7) {
+    rows.push(cells.slice(i, i + 7).map((d) => {
+      if (d === null) return { text: ' ', callback_data: 'hist:noop' };
+      const dd = String(d).padStart(2, '0');
+      const isoDate = `${year}-${monthStr}-${dd}`;
+      const evts = list.filter((it) => histIsoDay(it.sent_at) === isoDate);
+      if (evts.length > 0) {
+        const emoji = firstEmoji(evts[0].summary) ?? '🔔';
+        return { text: `${d}${emoji}`, callback_data: `hist:day:${isoDate}` };
+      }
+      return { text: String(d), callback_data: 'hist:noop' };
+    }));
+  }
+  return { text: `📜 <b>Історія сповіщень</b> — ${list.length}`, keyboard: { inline_keyboard: rows } };
+}
+
+export function buildHistoryDay({ items, date }) {
+  const list = historyDigests(items);
+  const evts = list.filter((it) => histIsoDay(it.sent_at) === date);
+  if (evts.length === 0) return { text: `📭 Немає сповіщень за ${date}.`, keyboard: null };
+  const rows = evts.map((it, i) => [{ text: `${HIST_TIME.format(new Date(it.sent_at))} ${it.summary}`, callback_data: `hist:i:${list.indexOf(it)}` }]);
+  rows.push([{ text: '◀ Назад', callback_data: `hist:cal:${date.slice(0, 7)}` }]);
+  return { text: `📜 <b>Сповіщення за ${date}</b>`, keyboard: { inline_keyboard: rows } };
+}
+
 export function buildHistoryList({ items, page = 0 }) {
   const list = historyDigests(items);
   if (list.length === 0) return { text: '📭 Історія сповіщень порожня.', keyboard: null };

@@ -27,7 +27,7 @@ import {
   monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
   buildWatchedEntityCard, handleWatchedNav,
   buildArgPrompt, commandFromReplyPrompt,
-  buildHistoryList, buildHistoryItem, handleHistoryNav,
+  buildHistoryCalendar, buildHistoryDay, buildHistoryList, buildHistoryItem, handleHistoryNav,
 } from '../commands.mjs';
 
 test('parseCommand: /list is treated as unknown after removal', () => {
@@ -3777,6 +3777,81 @@ test('buildHistoryList: single day with 8 entries fits on one page (no split)', 
   assert.equal(rows.filter((r) => r[0].callback_data === 'hist:noop').length, 1);        // 1 date header
   assert.equal(rows.filter((r) => r[0].callback_data.startsWith('hist:i:')).length, 8);  // all 8 entries
   assert.ok(!rows.at(-1).some((b) => b.text === 'Далі ▶'));                               // no next page
+});
+
+// ─── buildHistoryCalendar ─────────────────────────────────────────────────
+
+test('buildHistoryCalendar: empty history → grid with all-noop days', () => {
+  // June 1 2026 is Monday → offset 0, 30 days → 5 week-rows
+  const v = buildHistoryCalendar({ items: [], month: '2026-06' });
+  const rows = v.keyboard.inline_keyboard;
+  assert.equal(rows[0].length, 3);                                     // nav: ◀ | month | ▶
+  assert.equal(rows[0][0].callback_data, 'hist:noop');                 // no prev month
+  assert.equal(rows[0][2].callback_data, 'hist:noop');                 // no next month
+  assert.match(rows[0][1].text, /червень/i);                           // month label
+  assert.equal(rows[1].length, 7);                                     // weekday headers
+  assert.ok(rows[1].every((b) => b.callback_data === 'hist:noop'));
+  assert.equal(rows.length, 7);                                        // nav + headers + 5 weeks
+  assert.ok(rows.slice(2).flat().every((b) => b.callback_data === 'hist:noop'));
+});
+
+test('buildHistoryCalendar: days with events → hist:day callback + emoji', () => {
+  const items = [
+    { type: 'digest', sent_at: '2026-06-29T12:00:00.000Z', summary: '📥 2', text: 't', recipients: [], deleted: false },
+    { type: 'digest', sent_at: '2026-06-27T09:00:00.000Z', summary: '🔔 1', text: 't', recipients: [], deleted: false },
+  ];
+  const allCells = buildHistoryCalendar({ items, month: '2026-06' }).keyboard.inline_keyboard.slice(2).flat();
+  const day29 = allCells.find((b) => b.callback_data === 'hist:day:2026-06-29');
+  assert.ok(day29, 'day 29 should have hist:day callback');
+  assert.match(day29.text, /^29/);
+  assert.match(day29.text, /📥/);
+  const day27 = allCells.find((b) => b.callback_data === 'hist:day:2026-06-27');
+  assert.ok(day27);
+  assert.match(day27.text, /🔔/);
+  const day28 = allCells.find((b) => b.text === '28');
+  assert.equal(day28?.callback_data, 'hist:noop');                     // no events → noop
+});
+
+test('buildHistoryCalendar: nav arrows point to prev/next months with events', () => {
+  const items = [
+    { type: 'digest', sent_at: '2026-05-15T10:00:00.000Z', summary: 'A', text: 't', recipients: [], deleted: false },
+    { type: 'digest', sent_at: '2026-06-29T12:00:00.000Z', summary: 'B', text: 't', recipients: [], deleted: false },
+    { type: 'digest', sent_at: '2026-07-01T10:00:00.000Z', summary: 'C', text: 't', recipients: [], deleted: false },
+  ];
+  const nav = buildHistoryCalendar({ items, month: '2026-06' }).keyboard.inline_keyboard[0];
+  assert.equal(nav[0].callback_data, 'hist:cal:2026-05');
+  assert.equal(nav[2].callback_data, 'hist:cal:2026-07');
+});
+
+test('buildHistoryCalendar: first/last month → both nav arrows noop', () => {
+  const items = [{ type: 'digest', sent_at: '2026-06-29T12:00:00.000Z', summary: 'A', text: 't', recipients: [], deleted: false }];
+  const nav = buildHistoryCalendar({ items, month: '2026-06' }).keyboard.inline_keyboard[0];
+  assert.equal(nav[0].callback_data, 'hist:noop');
+  assert.equal(nav[2].callback_data, 'hist:noop');
+});
+
+test('buildHistoryCalendar: defaults to latest month with events when no month arg', () => {
+  const items = [
+    { type: 'digest', sent_at: '2026-04-10T10:00:00.000Z', summary: 'A', text: 't', recipients: [], deleted: false },
+    { type: 'digest', sent_at: '2026-06-29T12:00:00.000Z', summary: 'B', text: 't', recipients: [], deleted: false },
+  ];
+  const v = buildHistoryCalendar({ items });
+  assert.match(v.keyboard.inline_keyboard[0][1].text, /червень/i);
+});
+
+test('buildHistoryCalendar: Monday-start offset correct (June 2026: day 1 = Mon → col 0)', () => {
+  const allCells = buildHistoryCalendar({ items: [], month: '2026-06' }).keyboard.inline_keyboard.slice(2).flat();
+  assert.equal(allCells[0].text, '1');                                 // no leading empty cells
+});
+
+test('buildHistoryCalendar: May 2026 starts on Friday → 4 empty cells before day 1', () => {
+  // May 1 2026 is Friday. getDay()=5. offset=(5+6)%7=4
+  const allCells = buildHistoryCalendar({ items: [], month: '2026-05' }).keyboard.inline_keyboard.slice(2).flat();
+  assert.equal(allCells[0].text, ' ');   // cell 0..3 empty
+  assert.equal(allCells[1].text, ' ');
+  assert.equal(allCells[2].text, ' ');
+  assert.equal(allCells[3].text, ' ');
+  assert.equal(allCells[4].text, '1');   // cell 4 = day 1 (Friday)
 });
 
 test('mainKeyboard: has 📜 Історія; parseCommand /history', () => {
