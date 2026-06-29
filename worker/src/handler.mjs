@@ -18,7 +18,7 @@ import {
   buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage, handleAgentMenuNav,
-  buildHistoryList, handleHistoryNav,
+  buildHistoryCalendar, handleHistoryNav,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, deleteMessage } from '../../telegram.mjs';
@@ -595,7 +595,7 @@ export async function runHandler({ update, env, deps = {} }) {
   } else if (cmd.cmd === 'history') {
     try {
       const { items } = await _loadNotificationHistory(env);
-      const view = buildHistoryList({ items, page: 0 });
+      const view = buildHistoryCalendar({ items });
       reply = view.text;
       histReplyMarkup = view.keyboard ?? undefined;
     } catch (err) {

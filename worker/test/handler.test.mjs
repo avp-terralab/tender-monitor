@@ -3252,7 +3252,7 @@ test('runHandler: bare /add (non-editor) → permission message, no prompt', asy
   assert.ok(!JSON.stringify(sent[0].replyMarkup ?? {}).includes('force_reply'));
 });
 
-test('runHandler: /history → list with hist:i button', async () => {
+test('runHandler: /history → calendar with hist:day button for days with events', async () => {
   const sent = [];
   await runHandler({
     update: { message: { chat: { id: 123 }, message_id: 7, text: '/history', from: { id: 123 } } },
@@ -3260,7 +3260,7 @@ test('runHandler: /history → list with hist:i button', async () => {
     deps: { ...makeDeps({ loadNotificationHistory: async () => ({ items: [{ type: 'digest', summary: '📥 1', text: 'D', sent_at: '2026-06-25T05:55:00Z', recipients: [], deleted: false }] }) }).deps, sendReply: async (a) => sent.push(a) },
   });
   assert.equal(sent.length, 1);
-  assert.match(JSON.stringify(sent[0].replyMarkup), /hist:i:0/);
+  assert.match(JSON.stringify(sent[0].replyMarkup), /hist:day:2026-06-25/);
 });
 
 test('runHandler: hist:i:0 → edits to the full digest text', async () => {
