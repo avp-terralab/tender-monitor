@@ -3692,22 +3692,26 @@ test('buildHistoryList: digests only, 6/page, hist:i rows + nav', () => {
   assert.ok(nav.some((b) => b.text === 'Далі ▶'));
 });
 
-test('buildHistoryItem: full text + back to page 0', () => {
+test('buildHistoryItem: full text + back button → hist:day:<date>', () => {
+  // histItems(3): all 3 entries are on 2026-06-29
   const v = buildHistoryItem({ items: histItems(3), idx: 1 });
   assert.match(v.text, /Дайджест 1/);
-  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'hist:p:0');
+  const back = v.keyboard.inline_keyboard.at(-1)[0];
+  assert.equal(back.callback_data, 'hist:day:2026-06-29');
+  assert.match(back.text, /29 червня/);
 });
 
-test('buildHistoryItem: back button remembers page for idx on page 1', () => {
-  // page 0 = June29(0-2)+June28(3-5)=6 entries; page 1 starts at June27(6-8); idx=7 is on page 1
+test('buildHistoryItem: back button shows day for idx on different day (idx=7 → June27)', () => {
+  // histItems: i=7 → Date.UTC(2026,5,29-floor(7/3),12-(7%3)) = Date.UTC(2026,5,27,11) = 2026-06-27T11Z → Kyiv 14:00 → 2026-06-27
   const v = buildHistoryItem({ items: histItems(14), idx: 7 });
   assert.match(v.text, /Дайджест 7/);
-  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'hist:p:1');
+  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'hist:day:2026-06-27');
 });
 
-test('buildHistoryItem: back button remembers page for idx on page 2', () => {
+test('buildHistoryItem: back button for idx=13 → June25', () => {
+  // i=13 → Date.UTC(2026,5,29-floor(13/3),12-(13%3)) = Date.UTC(2026,5,25,11) = 2026-06-25T11Z → Kyiv → 2026-06-25
   const v = buildHistoryItem({ items: histItems(20), idx: 13 });
-  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'hist:p:2');
+  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'hist:day:2026-06-25');
 });
 
 test('handleHistoryNav: noop→null; p/i routing', () => {

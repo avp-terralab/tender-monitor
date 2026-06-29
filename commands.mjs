@@ -2140,11 +2140,16 @@ export function buildHistoryList({ items, page = 0 }) {
 export function buildHistoryItem({ items, idx }) {
   const list = historyDigests(items);
   const it = list[idx];
-  if (!it) return buildHistoryList({ items, page: 0 });
-  const starts = histPageStarts(list);
-  let page = 0;
-  for (let j = starts.length - 1; j >= 0; j--) { if (starts[j] <= idx) { page = j; break; } }
-  return { text: it.text ?? '(порожньо)', keyboard: { inline_keyboard: [[{ text: '⬅ Назад до історії', callback_data: `hist:p:${page}` }]] } };
+  if (!it) return buildHistoryCalendar({ items });
+  const isoDate = histIsoDay(it.sent_at) ?? '';
+  const dateLabel = isoDate ? HIST_DAY.format(new Date(it.sent_at)) : '—';
+  return {
+    text: it.text ?? '(порожньо)',
+    keyboard: { inline_keyboard: [[{
+      text: `⬅ Назад до ${dateLabel}`,
+      callback_data: isoDate ? `hist:day:${isoDate}` : 'hist:noop',
+    }]] },
+  };
 }
 
 export function handleHistoryNav({ items, data }) {
