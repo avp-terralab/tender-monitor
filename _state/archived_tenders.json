@@ -2171,5 +2171,136 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-05-26-011600-a",
+    "notes": "КОМУНАЛЬНИЙ ЗАКЛАД КИЇВСЬКОЇ ОБЛАСНОЇ РАДИ \"БАЗА СПЕЦІАЛЬНОГО МЕДИЧНОГО ПОСТАЧАННЯ\" — ДК 021:2015-72260000-5 Послуги, пов’язані з програмним забезпеченням (Послуги ,пов'язані з програмним забезпеченн…",
+    "archived_at": "2026-07-03T20:55:40.597Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-05-26-011600-a",
+      "title": "ДК 021:2015-72260000-5 Послуги, пов’язані з програмним забезпеченням (Послуги ,пов'язані з програмним забезпеченням лабораторної інформаційної системи  для автоматизації лабораторних процесів в лабораторії)",
+      "status": "complete",
+      "dateModified": "2026-07-03T23:31:26.325444+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-06-14T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНИЙ ЗАКЛАД КИЇВСЬКОЇ ОБЛАСНОЇ РАДИ \"БАЗА СПЕЦІАЛЬНОГО МЕДИЧНОГО ПОСТАЧАННЯ\"",
+        "edrpou": "02125740"
+      },
+      "value": {
+        "amount": 96000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5",
+        "72260000-5",
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Бешляга Андрій Олегович",
+        "email": "kzkorbazatender@gmail.com",
+        "telephone": "380734158868"
+      },
+      "documents": [
+        {
+          "id": "3fc84bda85b74b6fbfe14904951ac0fe",
+          "title": "ТД (програмне забезпечення).docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-26T15:39:33.917793+03:00"
+        },
+        {
+          "id": "1bbee41ff9b64dabb0a3849f1ce59d51",
+          "title": "ПРОЄКТ ДОГОВОРУ (7).docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-05-26T15:39:33.917793+03:00"
+        },
+        {
+          "id": "ba05b282adff4f4385e3be02b25b0f95",
+          "title": "ТД (програмне забезпечення).docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-05-26T15:39:33.917793+03:00"
+        },
+        {
+          "id": "2ab2c93ccba74e93ab6a2f069fd212c3",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-06-04T15:49:35.354424+03:00"
+        },
+        {
+          "id": "2ab2c93ccba74e93ab6a2f069fd212c3",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-06-04T15:50:25.949902+03:00"
+        },
+        {
+          "id": "2ab2c93ccba74e93ab6a2f069fd212c3",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-06-09T11:21:56.917239+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "cf3274ee9e954fe3a3bccf108850edd6",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "3b0de5fa8e1b4f019a3d752ad6ef5e03",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "id": "635dc04dcc194e50ab55214b891f78cb",
+              "hash": "md5:72d69c08c6ee9c5f7399d78c59a598e7",
+              "title": "Договір Терралаб АЙ ТІ (3).PDF",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/3b0de5fa8e1b4f019a3d752ad6ef5e03/documents/635dc04dcc194e50ab55214b891f78cb?download=3a5d6059495847518572ede98af743ff",
+              "documentOf": "contract",
+              "datePublished": "2026-07-03T23:30:57.281382+03:00",
+              "dateModified": "2026-07-03T23:30:57.281382+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "7763416495d44a90ae3f1562bef2e970",
+              "hash": "md5:79643e3f8eeb66a37ef253ea052f95f9",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/3b0de5fa8e1b4f019a3d752ad6ef5e03/documents/7763416495d44a90ae3f1562bef2e970?download=2e6ee38d516f42dd90b933e2d7df7f0f",
+              "documentOf": "contract",
+              "datePublished": "2026-07-03T23:31:24.611019+03:00",
+              "dateModified": "2026-07-03T23:31:24.611019+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
