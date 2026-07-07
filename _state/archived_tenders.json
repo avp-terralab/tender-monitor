@@ -2432,5 +2432,135 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-06-19-008416-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО ЛЬВІВСЬКОЇ ОБЛАСНОЇ РАДИ \"ЛЬВІВСЬКИЙ ОБЛАСНИЙ МЕДИЧНИЙ ЦЕНТР ПРЕВЕНЦІЇ ТА ТЕРАПІЇ УЗАЛЕЖНЕНЬ\" — Послуги з постачання програмного забезпечення лабораторної інформа…",
+    "archived_at": "2026-07-07T13:55:49.088Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-06-19-008416-a",
+      "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії (код згідно ДК 021:2015 \"Єдиний закупівельний словник\" - 48810000-9 - Інформаційні системи)",
+      "status": "complete",
+      "dateModified": "2026-07-07T16:31:23.812305+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-06-28T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО ЛЬВІВСЬКОЇ ОБЛАСНОЇ РАДИ \"ЛЬВІВСЬКИЙ ОБЛАСНИЙ МЕДИЧНИЙ ЦЕНТР ПРЕВЕНЦІЇ ТА ТЕРАПІЇ УЗАЛЕЖНЕНЬ\"",
+        "edrpou": "01997768"
+      },
+      "value": {
+        "amount": 93600,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "48814000-7",
+        "description": "Медичні інформаційні системи",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "48814000-7"
+      ],
+      "contact": {
+        "name": "Людмила Шведюк",
+        "email": "shvedjuklv@ukr.net",
+        "telephone": "+380322555542"
+      },
+      "documents": [
+        {
+          "id": "076130fe0861492d90a0486b5950a729",
+          "title": "Додаток №1 Перелік документів та (або) інформації_УЧАСНИК.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-06-19T14:10:10.485877+03:00"
+        },
+        {
+          "id": "32e243edd7fa420d9d1a43b88c4af343",
+          "title": "Додаток №2 Перелік документів та (або) інформації_ПЕРЕМОЖЕЦЬ.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-06-19T14:10:10.485877+03:00"
+        },
+        {
+          "id": "2ca47131ab6b4c1c888d2fea7d436ad8",
+          "title": "Додаток №3 Проєкт договору_Поновлення.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-06-19T14:10:10.485877+03:00"
+        },
+        {
+          "id": "16e51f70f4cf42089d3064f7f4e543e8",
+          "title": "Додаток №4 Інформація про необхідні технічні, якісні та кількісні характеристики.docx",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-06-19T14:10:10.485877+03:00"
+        },
+        {
+          "id": "c5b52e55249b455bbd3de5b35a35637e",
+          "title": "Тендерна документація.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-06-19T14:10:10.485877+03:00"
+        },
+        {
+          "id": "3d600660593845aab350bad44ed951b3",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-06-19T14:11:58.429395+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "1b3d818b2f4c4565afba88de81662193",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "1e4ba2cfc5d0484e8cbba6d3466c7700",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:f8083c8a38592f93f68b6fea9bae481206cdf883;SHA2-384:5de6efe7b9e7efb0af3e2e959eb72148acb2924366a6e9700ad6bd7a86f4901ee883e9f6d753c695b3f7b95eb84e53a8;Antivirus: ESET Antivirus",
+              "id": "1213ba25c5b5490f8592fb33e6e9b4ce",
+              "hash": "md5:0b43209c58d44ab7d742620b86b260dd",
+              "title": "0607-01 від 07.07.2026.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/1e4ba2cfc5d0484e8cbba6d3466c7700/documents/1213ba25c5b5490f8592fb33e6e9b4ce?download=7ad300acbda243968557b1573bf0a3e8",
+              "documentOf": "contract",
+              "datePublished": "2026-07-07T16:30:30.296721+03:00",
+              "dateModified": "2026-07-07T16:30:30.510193+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "4cb7c97ff9fb4670bf845eece95ce07a",
+              "hash": "md5:88836af21d831aebb2f77dee129d5f37",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/1e4ba2cfc5d0484e8cbba6d3466c7700/documents/4cb7c97ff9fb4670bf845eece95ce07a?download=b22f73aab1af41e19851db5fadcae3be",
+              "documentOf": "contract",
+              "datePublished": "2026-07-07T16:31:23.607683+03:00",
+              "dateModified": "2026-07-07T16:31:23.607683+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
