@@ -2302,5 +2302,135 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-06-15-004251-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"БОРЩІВСЬКА МІСЬКА ЛІКАРНЯ\" БОРЩІВСЬКОЇ МІСЬКОЇ РАДИ — Послуги з постачання програмного забезпечення лабораторної інформаційної системи для цифровізації основних …",
+    "archived_at": "2026-07-07T11:56:06.320Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-06-15-004251-a",
+      "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для цифровізації основних процесів лабораторних підрозділів\n\n",
+      "status": "complete",
+      "dateModified": "2026-07-07T14:44:36.290737+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-06-24T11:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"БОРЩІВСЬКА МІСЬКА ЛІКАРНЯ\" БОРЩІВСЬКОЇ МІСЬКОЇ РАДИ",
+        "edrpou": "02000493"
+      },
+      "value": {
+        "amount": 350000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Віталій  Дутка",
+        "email": "bor-likarnya@i.ua",
+        "telephone": "+380687028723, +380354121261"
+      },
+      "documents": [
+        {
+          "id": "d3a591b03c7549a190f212b5e4627fb8",
+          "title": "ТД Послуги з постачання програмного забезпечення лабораторної інформаційної системи для цифровізації основних процесів лабораторних підрозділів.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-06-15T11:49:20.131507+03:00"
+        },
+        {
+          "id": "9f9ed898efb04632a460ea7b3d500ede",
+          "title": "Додаток 1 до ТД.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-06-15T11:49:20.131507+03:00"
+        },
+        {
+          "id": "671106561beb4ee48b3cac155f9f7e1e",
+          "title": "Додаток 2 до ТД.docx",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-06-15T11:49:20.131507+03:00"
+        },
+        {
+          "id": "4ec25dcb4f8f438dbda283c381ad1482",
+          "title": "Додаток 3 до ТД.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-06-15T11:49:20.131507+03:00"
+        },
+        {
+          "id": "9dd5fcf4eee74c53a618fc8de13c8080",
+          "title": "Додаток 4 до ТД.docx",
+          "documentType": "evaluationCriteria",
+          "datePublished": "2026-06-15T11:49:20.131507+03:00"
+        },
+        {
+          "id": "e8000482bd254d0d84f9a604ea803491",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-06-15T11:50:27.806202+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "7b3387cb3fa3479f9a8c640eb3809d45",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "49a735ea192a4832bad3b9a25bcab4c5",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:1d6caadaf319d27e5e5de96656f1b02b899c5529;SHA2-384:2a7d9c46569f2dc2f036712af642bbd7269323ff3362bf7a3ee849d84dc471202ec9ab5ac76fdb380a92f3274228e4d9;Antivirus: ESET Antivirus",
+              "id": "873bab0a970c4e4ba7f827b0353be4bb",
+              "hash": "md5:a6634e5e7b8aee448612998da7af2486",
+              "title": "Договір №02-07-01.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/49a735ea192a4832bad3b9a25bcab4c5/documents/873bab0a970c4e4ba7f827b0353be4bb?download=c717c63ab7ec4e3a8c6501ef0a363354",
+              "documentOf": "contract",
+              "datePublished": "2026-07-07T14:43:42.195387+03:00",
+              "dateModified": "2026-07-07T14:43:42.388459+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "7e97e9e16f5a4cbdb3064b90990f0185",
+              "hash": "md5:acca770483e21fc1dacb489dfa56452d",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/49a735ea192a4832bad3b9a25bcab4c5/documents/7e97e9e16f5a4cbdb3064b90990f0185?download=d29b69545443401f835356178a02c973",
+              "documentOf": "contract",
+              "datePublished": "2026-07-07T14:44:36.090313+03:00",
+              "dateModified": "2026-07-07T14:44:36.090313+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
