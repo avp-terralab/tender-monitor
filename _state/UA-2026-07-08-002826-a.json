@@ -1,0 +1,69 @@
+{
+  "tender_id": "UA-2026-07-08-002826-a",
+  "saved_at": "2026-07-08T08:55:46.915Z",
+  "snapshot": {
+    "tender_id": "UA-2026-07-08-002826-a",
+    "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+    "status": "active.tendering",
+    "dateModified": "2026-07-08T11:04:46.841066+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-07-16T00:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "Комунальне некомерційне підприємство Саф’янівської сільської ради Ізмаїльського району Одеської області «Центральна районна лікарня»\n",
+      "edrpou": "26418688"
+    },
+    "value": {
+      "amount": 380666.67,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72268000-1",
+      "description": "Послуги з постачання програмного забезпечення",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72268000-1",
+      "72268000-1",
+      "72268000-1",
+      "72263000-6",
+      "72266000-7",
+      "72268000-1",
+      "72266000-7",
+      "72268000-1"
+    ],
+    "contact": {
+      "name": "Інна Воловенко",
+      "email": "dogovirizmailcrl@ukr.net",
+      "telephone": "+380484197504"
+    },
+    "documents": [
+      {
+        "id": "3824bc46dd9741ecb9a06bd4bd8ba0a3",
+        "title": "ТД .docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-07-08T10:55:10.318982+03:00"
+      },
+      {
+        "id": "d1883b793df84ff8a31da920535e2d4f",
+        "title": "Додаток 3 (проєкт договору).docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-07-08T10:55:10.318982+03:00"
+      },
+      {
+        "id": "2c293194c0cc4978b3d8b0ed28dd5f4f",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-07-08T11:04:46.384872+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
