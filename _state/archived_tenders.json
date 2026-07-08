@@ -2562,5 +2562,191 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-06-18-014256-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ХЕРСОНСЬКИЙ РЕГІОНАЛЬНИЙ ОНКОЛОГІЧНИЙ ЦЕНТР\" ХЕРСОНСЬКОЇ ОБЛАСНОЇ РАДИ  — Послуги з постачання програмного забезпечення лабораторної інформаційної системи для ав…",
+    "archived_at": "2026-07-08T18:16:38.940Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-06-18-014256-a",
+      "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії за кодом ДК 021:2015: 72260000-5 Послуги, пов’язані з програмним забезпеченням",
+      "status": "complete",
+      "dateModified": "2026-07-08T21:01:19.339763+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-06-26T08:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ХЕРСОНСЬКИЙ РЕГІОНАЛЬНИЙ ОНКОЛОГІЧНИЙ ЦЕНТР\" ХЕРСОНСЬКОЇ ОБЛАСНОЇ РАДИ ",
+        "edrpou": "02009896"
+      },
+      "value": {
+        "amount": 181200,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5",
+        "72260000-5",
+        "72261000-2",
+        "72263000-6"
+      ],
+      "contact": {
+        "name": "Вікторія Кожухарь",
+        "email": "vk02009896@ukr.net",
+        "telephone": "+380950462957"
+      },
+      "documents": [
+        {
+          "id": "f7fcc57fe1ff499bbc5874295c272a60",
+          "title": "Додаток 4 до ТД 18.06.2026 Перелік документів Переможця.doc.asice",
+          "documentType": null,
+          "datePublished": "2026-06-18T22:52:50.692801+03:00"
+        },
+        {
+          "id": "bd2393f732134e23baeb83357243e86c",
+          "title": "Додаток 3 до ТД 18.06.2026 Проєкт договору..docx.asice",
+          "documentType": null,
+          "datePublished": "2026-06-18T22:52:50.692801+03:00"
+        },
+        {
+          "id": "8550597111e043a38d50520de2e3383c",
+          "title": "Додаток 2 до ТД18.06.2026 Перелік документів для Учасником.doc.asice",
+          "documentType": null,
+          "datePublished": "2026-06-18T22:52:50.692801+03:00"
+        },
+        {
+          "id": "7957173ce03741b6be0c0e251b26464a",
+          "title": "Додаток 1 до ТД 18.06.2026.docx.asice",
+          "documentType": null,
+          "datePublished": "2026-06-18T22:52:50.692801+03:00"
+        },
+        {
+          "id": "51dca32e34a445df89003b5a05106fc4",
+          "title": "ТД 18.06.2026.doc.asice",
+          "documentType": null,
+          "datePublished": "2026-06-18T22:52:50.692801+03:00"
+        },
+        {
+          "id": "346fe16aba21417a8e8b1da1f2e1e3aa",
+          "title": "Додаток 2 до ТД18.06.2026 Перелік документів для Учасником.doc",
+          "documentType": null,
+          "datePublished": "2026-06-18T22:52:50.692801+03:00"
+        },
+        {
+          "id": "d3d3d1e7b4424536a4f305f4042eb28b",
+          "title": "Додаток 1 до ТД 18.06.2026.docx",
+          "documentType": null,
+          "datePublished": "2026-06-18T22:52:50.692801+03:00"
+        },
+        {
+          "id": "e86f9c433f2f48a583ff2f037f3ff443",
+          "title": "Додаток 3 до ТД 18.06.2026 Проєкт договору..docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-06-18T22:52:50.692801+03:00"
+        },
+        {
+          "id": "ccf23e3db02345dd92a8d949a3df8bb2",
+          "title": "ТД 18.06.2026.doc",
+          "documentType": null,
+          "datePublished": "2026-06-18T22:52:50.692801+03:00"
+        },
+        {
+          "id": "ff1c26ba9ac74d3195393b51e8eb4bfe",
+          "title": "Додаток 4 до ТД 18.06.2026 Перелік документів Переможця.doc",
+          "documentType": null,
+          "datePublished": "2026-06-18T22:52:50.692801+03:00"
+        },
+        {
+          "id": "09373d43959147e296770ce837650c82",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-06-18T22:53:41.820960+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "899c350bc5d341d888848e2037982200",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"МАЙЛАБ\"",
+              "identifier": {
+                "id": "41087617"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "3c578c400a304bd3a34135cb9b705c81",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "description": "SHA1:85c65b9955dc979d222b1573cad82e2e415cc8a3;SHA2-384:9fd4d60d02c35e003ee8fe3411921eec6bb9731b3fc137fbee1f88c5cabf99631758861160ac011e0c3acdb1c1a5f03d;Antivirus: ESET Antivirus",
+              "id": "7dae697da1bc40bb97e21d00e4c17ce7",
+              "hash": "md5:5dcf05df4972c419b51caa8deacfce47",
+              "title": "Tendernyi dohovir 06_07_01 KNP Khersonskyi rehionalnyi onkolohichnyi tsentr KhOR.zip",
+              "format": "application/zip",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/3c578c400a304bd3a34135cb9b705c81/documents/7dae697da1bc40bb97e21d00e4c17ce7?download=70789d9f44f544c286baae4ebcf902ba",
+              "documentOf": "contract",
+              "datePublished": "2026-07-08T21:00:46.661259+03:00",
+              "dateModified": "2026-07-08T21:00:46.860717+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "description": "SHA1:daa71d4d669c034d13143c03c8060b57bd559075;SHA2-384:36bc54047c144948be02046a38113679d130ed96876d285c7c2b53107ae62061dfc57ffacba67bbf5970b30e6f1863e5;Antivirus: ESET Antivirus",
+              "id": "a4171bc376a44a8893f53e3f47977dd6",
+              "hash": "md5:bbcb2e8ded5cea2a48135a50e618b853",
+              "title": "Tendernyi dohovir 06_07_01 KNP Khersonskyi rehionalnyi onkolohichnyi tsentr KhOR.pdf.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/3c578c400a304bd3a34135cb9b705c81/documents/a4171bc376a44a8893f53e3f47977dd6?download=f4acf69252d84ba08d7d3b05de2e359e",
+              "documentOf": "contract",
+              "datePublished": "2026-07-08T21:00:47.558549+03:00",
+              "dateModified": "2026-07-08T21:00:47.745534+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "description": "SHA1:622eea09271a42946515b97e1836e83b76e4d36e;SHA2-384:72147128c1b2700c4cb03eda0e8f984bb1764313254bcb45486ca7671bc98f24d2007f6fbd4f9d23e4d0c4f00ad53464;Antivirus: ESET Antivirus",
+              "id": "24612defa87d4a4ba5ef73614c607a76",
+              "hash": "md5:b92fceeb58d0887e43ea5d91e4257c4a",
+              "title": "Tendernyi dohovir 06_07_01 KNP Khersonskyi rehionalnyi onkolohichnyi tsentr KhOR.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/3c578c400a304bd3a34135cb9b705c81/documents/24612defa87d4a4ba5ef73614c607a76?download=eb2a9e0c5b6243d99f1dd9ae50656115",
+              "documentOf": "contract",
+              "datePublished": "2026-07-08T21:00:48.235457+03:00",
+              "dateModified": "2026-07-08T21:00:48.444174+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "fda06d5b1ad74d33b09cd935b6b845d7",
+              "hash": "md5:270a37907be5c7cc45b8c042ecf5ccc3",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/3c578c400a304bd3a34135cb9b705c81/documents/fda06d5b1ad74d33b09cd935b6b845d7?download=7b469d4ff30946d4991bba6b5c643701",
+              "documentOf": "contract",
+              "datePublished": "2026-07-08T21:01:19.073070+03:00",
+              "dateModified": "2026-07-08T21:01:19.073070+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
