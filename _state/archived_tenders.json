@@ -2748,5 +2748,118 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-06-19-008800-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО МІСЬКА КЛІНІЧНА ЛІКАРНЯ №1 ОДЕСЬКОЇ МІСЬКОЇ РАДИ — Послуги, пов’язані з програмним забезпеченням - Послуги з постачання та налаштування програмного забезпечення л…",
+    "archived_at": "2026-07-09T12:58:08.219Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-06-19-008800-a",
+      "title": "Послуги, пов’язані з програмним забезпеченням - Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+      "status": "complete",
+      "dateModified": "2026-07-09T15:49:15.421789+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-06-27T17:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО МІСЬКА КЛІНІЧНА ЛІКАРНЯ №1 ОДЕСЬКОЇ МІСЬКОЇ РАДИ",
+        "edrpou": "01998986"
+      },
+      "value": {
+        "amount": 292468,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5",
+        "72260000-5",
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "МОЛЯВКО НАТАЛЯ ВОЛОДИМИРІВНА",
+        "email": "evreiska@ukr.net",
+        "telephone": "380661340017"
+      },
+      "documents": [
+        {
+          "id": "1ab1d4dbb99844d6adf374eb07acc39e",
+          "title": "ТД програмне забезпечення на рік.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-06-19T14:24:28.295579+03:00"
+        },
+        {
+          "id": "f5f8f26039f44d9b99c0b46c8fce490b",
+          "title": "ПРДоговір.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-06-19T14:24:28.295579+03:00"
+        },
+        {
+          "id": "a1e823e0d41448f1acebee2d3c47a72d",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-06-19T14:24:35.219403+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "ef4e4a3c5e1e4a3e8420f195d55f7630",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"МАЙЛАБ\"",
+              "identifier": {
+                "id": "41087617"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "1a8b73268d20456db468aa5ab11e9d97",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "id": "bf1be2b112644c45a49d97a394ec8e62",
+              "hash": "md5:d52e8195004d900babe7e19aef3a4c5b",
+              "title": "Договір № 03.07-01від 09.07.2026 ТОВ  МАЙЛАБ на суму 219500,00 грн..pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/1a8b73268d20456db468aa5ab11e9d97/documents/bf1be2b112644c45a49d97a394ec8e62?download=69b9b5f1c5a24861bd848a9e71f1a8a8",
+              "documentOf": "contract",
+              "datePublished": "2026-07-09T15:48:45.833401+03:00",
+              "dateModified": "2026-07-09T15:48:45.833401+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "c0941bdca96146cdac29db1d9f54a0b7",
+              "hash": "md5:f21557acaf529f6102be6b0fc1b4edc7",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/1a8b73268d20456db468aa5ab11e9d97/documents/c0941bdca96146cdac29db1d9f54a0b7?download=f87db644017f41e294b3da77c682436f",
+              "documentOf": "contract",
+              "datePublished": "2026-07-09T15:49:13.520490+03:00",
+              "dateModified": "2026-07-09T15:49:13.520490+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
