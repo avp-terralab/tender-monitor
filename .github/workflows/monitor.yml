@@ -72,14 +72,22 @@ jobs:
           git commit -m "$MSG"
           # Retry with rebase if origin moved during the run (concurrent push
           # from another workflow or manual commit). State files are append-only
-          # / merge-friendly, so rebase is safe.
+          # / merge-friendly, so rebase is usually clean — but two runs computing
+          # near-identical state (e.g. cursor timestamps) moments apart can produce
+          # a genuine line-level conflict git can't auto-merge. In that case the
+          # concurrent run's own commit already captured equivalent state, so it's
+          # safe to drop this run's commit rather than hard-fail.
           for attempt in 1 2 3; do
             if git push; then
               echo "Pushed on attempt $attempt"
               exit 0
             fi
             echo "Push attempt $attempt failed; pulling --rebase and retrying..."
-            git pull --rebase
+            if ! git pull --rebase; then
+              echo "Rebase conflict (concurrent state update) — aborting rebase and skipping this commit."
+              git rebase --abort
+              exit 0
+            fi
           done
           echo "Push failed after 3 attempts"
           exit 1
