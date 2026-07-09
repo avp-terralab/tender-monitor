@@ -210,6 +210,7 @@ export async function runOnce(deps) {
             tender_id: e.tender_id ?? `[entity-watch ${e.source}]`,
             error: e.error,
             is_invalid: false,
+            source: 'entity_watch',
           });
         }
       }
@@ -380,8 +381,24 @@ export async function runOnce(deps) {
   // and invalid/permanent errors went to everyone in the digest. Best-effort:
   // a failure here must not block state persistence below.
   if (adminErrors.length > 0 && !inQuietWindow && deps.sendAdminAlert) {
-    const adminText = '⚠️ Тимчасово не вдалось перевірити (мережа/Prozorro, повтор наступного запуску):\n' +
-      adminErrors.map(e => `  • ${e.tender_id} — ${e.error}`).join('\n');
+    const watchlistAdminErrors = adminErrors.filter(e => e.source !== 'entity_watch');
+    const entityWatchAdminErrors = adminErrors.filter(e => e.source === 'entity_watch');
+    const sections = [];
+    if (watchlistAdminErrors.length > 0) {
+      sections.push(
+        '⚠️ Тимчасово не вдалось перевірити тендери з твого списку стеження\n' +
+        '(мережа/Prozorro, повтор наступного запуску):\n' +
+        watchlistAdminErrors.map(e => `  • ${e.tender_id} — ${e.error}`).join('\n')
+      );
+    }
+    if (entityWatchAdminErrors.length > 0) {
+      sections.push(
+        'ℹ️ Не вдалось завантажити деталі тендера від відстежуваного замовника —\n' +
+        'код ДК ще не перевірено, спробуємо ще раз наступного запуску:\n' +
+        entityWatchAdminErrors.map(e => `  • ${e.tender_id} — ${e.error}`).join('\n')
+      );
+    }
+    const adminText = sections.join('\n\n');
     try {
       await deps.sendAdminAlert(adminText);
     } catch (err) {
