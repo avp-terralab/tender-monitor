@@ -487,6 +487,86 @@ test('runOnce: entity-watch errors go to admin only, not the public digest', asy
   assert.match(adminSent[0], /Prozorro 503/);
 });
 
+test('runOnce: entity-watch admin alert uses the ДК-not-checked-yet wording', async () => {
+  const adminSent = [];
+  await runOnce({
+    runIso: '2026-05-08T13:00:00+03:00',
+    watchlist: [],
+    fetchTender: async () => ({ data: {} }),
+    extractSnapshot: (r) => r.data,
+    loadState: async () => null,
+    saveState: async () => {},
+    sendDigest: async () => {},
+    sendAdminAlert: async (text) => { adminSent.push(text); },
+    updateSheet: async () => {},
+    checkWatchedEntities: async () => ({
+      alerts: [],
+      errors: [{ tender_id: 'UA-2026-07-09-007845-a', error: 'Prozorro summary 404: UA-2026-07-09-007845-a' }],
+    }),
+  });
+  assert.equal(adminSent.length, 1);
+  assert.match(adminSent[0], /код ДК ще не перевірено/);
+  assert.doesNotMatch(adminSent[0], /списку стеження/);
+});
+
+test('runOnce: watchlist admin alert does NOT use the entity-watch wording', async () => {
+  const adminSent = [];
+  await runOnce({
+    runIso: '2026-05-08T13:00:00+03:00',
+    watchlist: [
+      { tender_id: T_OK, enabled: true },
+      { tender_id: T_BAD, enabled: true },
+    ],
+    fetchTender: async (id) => {
+      if (id === T_BAD) throw new Error('500');
+      return { data: baseSnap({ tender_id: T_OK, status: 'active.qualification' }) };
+    },
+    extractSnapshot: (r) => r.data,
+    loadState: async (id) => id === T_OK ? baseSnap({ tender_id: T_OK, status: 'active.tendering' }) : null,
+    saveState: async () => {},
+    sendDigest: async () => {},
+    sendAdminAlert: async (text) => { adminSent.push(text); },
+    updateSheet: async () => {},
+  });
+  assert.equal(adminSent.length, 1);
+  assert.match(adminSent[0], /списку стеження/);
+  assert.doesNotMatch(adminSent[0], /код ДК ще не перевірено/);
+});
+
+test('runOnce: mixed watchlist + entity-watch admin errors render both sections', async () => {
+  const adminSent = [];
+  await runOnce({
+    runIso: '2026-05-08T13:00:00+03:00',
+    // Two watchlist entries with only a partial failure: a single failing entry
+    // would be indistinguishable from a 100%-failure "global outage" (which
+    // silences the watchlist section entirely, by unrelated pre-existing
+    // design) — so T_OK must succeed alongside T_BAD's failure.
+    watchlist: [
+      { tender_id: T_OK, enabled: true },
+      { tender_id: T_BAD, enabled: true },
+    ],
+    fetchTender: async (id) => {
+      if (id === T_BAD) throw new Error('500');
+      return { data: baseSnap({ tender_id: T_OK, status: 'active.qualification' }) };
+    },
+    extractSnapshot: (r) => r.data,
+    loadState: async (id) => id === T_OK ? baseSnap({ tender_id: T_OK, status: 'active.tendering' }) : null,
+    saveState: async () => {},
+    sendDigest: async () => {},
+    sendAdminAlert: async (text) => { adminSent.push(text); },
+    updateSheet: async () => {},
+    checkWatchedEntities: async () => ({
+      alerts: [],
+      errors: [{ tender_id: 'UA-2026-07-09-007845-a', error: 'Prozorro summary 404: UA-2026-07-09-007845-a' }],
+    }),
+  });
+  assert.equal(adminSent.length, 1);
+  assert.match(adminSent[0], /списку стеження/);
+  assert.match(adminSent[0], /код ДК ще не перевірено/);
+  // Two sections separated by a blank line.
+  assert.match(adminSent[0], /\n\n/);
+});
+
 test('runOnce: global fetch outage (all enabled fail transiently) stays fully silent', async () => {
   const sent = [];
   const adminSent = [];
