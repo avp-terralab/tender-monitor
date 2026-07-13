@@ -1,0 +1,68 @@
+{
+  "tender_id": "UA-2026-07-10-001623-a",
+  "saved_at": "2026-07-13T09:55:55.619Z",
+  "snapshot": {
+    "tender_id": "UA-2026-07-10-001623-a",
+    "title": "ДК 021:2015 71620000-0 - Аналітичні послуги (71621000-7 - Послуги з технічного аналізу чи консультаційні послуги) , а саме -  послуги з підготовки лабораторії до акредитації в Національному агентстві з акредитації України на відповідність вимогам ISO 15189:2022",
+    "status": "active.tendering",
+    "dateModified": "2026-07-10T11:47:55.554313+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-07-18T00:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "Комунальне некомерційне підприємство \"Черкаська міська інфекційна лікарня\"",
+      "edrpou": "02004976"
+    },
+    "value": {
+      "amount": 420000,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "71621000-7",
+      "description": "Послуги з технічного аналізу чи консультаційні послуги",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "71621000-7",
+      "71621000-7",
+      "71621000-7",
+      "71621000-7",
+      "71621000-7",
+      "71621000-7",
+      "71621000-7"
+    ],
+    "contact": {
+      "name": "Богдан  Шокал",
+      "email": "shokal.bohdan@gmail.com",
+      "telephone": "+380981774784"
+    },
+    "documents": [
+      {
+        "id": "aa640d90c36240b1b839924bdae7dbde",
+        "title": "Додаток 4, проект договору.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-07-10T10:09:20.109338+03:00"
+      },
+      {
+        "id": "89c576231c9342c796da172f86017903",
+        "title": "ТД  консалт.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-07-10T10:09:20.109338+03:00"
+      },
+      {
+        "id": "64405462f5414444952d004376fdb115",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-07-10T11:47:55.123882+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
