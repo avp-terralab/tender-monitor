@@ -1,0 +1,47 @@
+{
+  "items": {
+    "UA-2026-07-08-002826-a": {
+      "tender_id": "UA-2026-07-08-002826-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+      "status": "active.qualification",
+      "deadline": "2026-07-16T00:00:00+03:00",
+      "procuring_entity": {
+        "name": "Комунальне некомерційне підприємство Саф’янівської сільської ради Ізмаїльського району Одеської області «Центральна районна лікарня»\n",
+        "edrpou": "26418688"
+      },
+      "value": {
+        "amount": 380666.67,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurement_method_type": "aboveThreshold",
+      "classification": {
+        "id": "72268000-1",
+        "description": "Послуги з постачання програмного забезпечення",
+        "scheme": "ДК021"
+      },
+      "contact": {
+        "name": "Інна Воловенко",
+        "email": "dogovirizmailcrl@ukr.net",
+        "telephone": "+380484197504"
+      },
+      "prozorro_url": "https://prozorro.gov.ua/tender/UA-2026-07-08-002826-a",
+      "events": [
+        {
+          "type": "qualification_started",
+          "old": "active.tendering",
+          "new": "active.qualification"
+        },
+        {
+          "type": "award_created",
+          "supplier_name": "ТОВ \"МАЙЛАБ\"",
+          "supplier_edrpou": "41087617"
+        }
+      ],
+      "first_fired_at": "2026-07-15T21:25:39.543Z",
+      "last_fired_at": "2026-07-15T21:25:39.543Z"
+    }
+  },
+  "archived": [],
+  "errors": []
+}
