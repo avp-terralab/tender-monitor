@@ -1,0 +1,74 @@
+{
+  "tender_id": "UA-2026-07-16-005999-a",
+  "saved_at": "2026-07-16T11:55:42.534Z",
+  "snapshot": {
+    "tender_id": "UA-2026-07-16-005999-a",
+    "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+    "status": "active.tendering",
+    "dateModified": "2026-07-16T14:05:12.644312+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-07-24T15:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "Комунальне підприємство \"Рівненський обласний клінічний лікувально-діагностичний центр імені Віктора Поліщука\" Рівненської обласної ради",
+      "edrpou": "13972414"
+    },
+    "value": {
+      "amount": 247000,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Волошина Анна Анатоліївна",
+      "email": "anna.ua2012@gmail.com",
+      "telephone": "+380362633352"
+    },
+    "documents": [
+      {
+        "id": "588b3366783f42f5acaff650f51a2199",
+        "title": "ДТ 2026.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-07-16T13:56:47.560176+03:00"
+      },
+      {
+        "id": "4a687b14de8948518c510a47408ded8b",
+        "title": "Додаток 2 Перелік документів_ що мають бути подані учасником у складі своєї тендерної пропозиції.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-07-16T13:56:47.560176+03:00"
+      },
+      {
+        "id": "6dfa259f7ff14eabae05581ad96cc7d1",
+        "title": "Додаток 3 Перелік документів_ що мають бути подані переможцем  процедури .docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-07-16T13:56:47.560176+03:00"
+      },
+      {
+        "id": "8a56747585ac4f88a54e767c9ce90ccd",
+        "title": "Проєкт_Договору_ЛІС.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-07-16T13:56:47.560176+03:00"
+      },
+      {
+        "id": "8a81271b313b4c2da243a20ba522d729",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-07-16T14:05:04.197148+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
