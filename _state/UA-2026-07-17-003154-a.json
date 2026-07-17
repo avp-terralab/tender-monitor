@@ -1,0 +1,98 @@
+{
+  "tender_id": "UA-2026-07-17-003154-a",
+  "saved_at": "2026-07-17T08:55:46.294Z",
+  "snapshot": {
+    "tender_id": "UA-2026-07-17-003154-a",
+    "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії ",
+    "status": "active.tendering",
+    "dateModified": "2026-07-17T11:14:22.429179+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-07-28T10:38:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ЛЮБОМЛЬСЬКЕ ТЕРИТОРІАЛЬНЕ МЕДИЧНЕ ОБ'ЄДНАННЯ\" ЛЮБОМЛЬСЬКОЇ МІСЬКОЇ РАДИ ",
+      "edrpou": "37271416"
+    },
+    "value": {
+      "amount": 365000,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Дмитро Сташевський",
+      "email": "zakupki_tmo_luboml@ukr.net",
+      "telephone": "+380975266574"
+    },
+    "documents": [
+      {
+        "id": "213232dc5dc046f1ab7c33ea893be92b",
+        "title": "ТД.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-07-17T11:12:39.042915+03:00"
+      },
+      {
+        "id": "9a03d8c53e844cb9bc7bfd91ede41633",
+        "title": "Кваліфікаційні критерії.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-07-17T11:12:39.042915+03:00"
+      },
+      {
+        "id": "27ae27265317487b97e5059fe3a804d5",
+        "title": "Технічні вимоги.docx",
+        "documentType": "technicalSpecifications",
+        "datePublished": "2026-07-17T11:12:39.042915+03:00"
+      },
+      {
+        "id": "8a16fdb0e7404a89a79391f6d2d3635f",
+        "title": "Проєкт договору.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-07-17T11:12:39.042915+03:00"
+      },
+      {
+        "id": "3b110bbbb0714444a9aa18ff37f939cd",
+        "title": "Тендерна пропозиція.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-07-17T11:12:39.042915+03:00"
+      },
+      {
+        "id": "7424936ea86d46d186f6e7a969d9d3dc",
+        "title": "Документи до ТД.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-07-17T11:12:39.042915+03:00"
+      },
+      {
+        "id": "f2650a7d003d420c9de7ed4ccd771209",
+        "title": "Документи для переможця.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-07-17T11:12:39.042915+03:00"
+      },
+      {
+        "id": "71629119917649498b1027b2e06d12f5",
+        "title": "Інформація про Учасника.docx",
+        "documentType": "evaluationCriteria",
+        "datePublished": "2026-07-17T11:12:39.042915+03:00"
+      },
+      {
+        "id": "2fcfc6b6e1034453b0a14c7d4b255e9f",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-07-17T11:14:21.347346+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
