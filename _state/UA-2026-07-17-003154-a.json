@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-07-17-003154-a",
-  "saved_at": "2026-07-17T08:55:46.294Z",
+  "saved_at": "2026-07-17T11:20:49.907Z",
   "snapshot": {
     "tender_id": "UA-2026-07-17-003154-a",
     "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії ",
     "status": "active.tendering",
-    "dateModified": "2026-07-17T11:14:22.429179+03:00",
+    "dateModified": "2026-07-17T14:01:54.509653+03:00",
     "tenderPeriod": {
       "endDate": "2026-07-28T10:38:00+03:00"
     },
@@ -87,6 +87,30 @@
         "title": "sign.p7s",
         "documentType": "notice",
         "datePublished": "2026-07-17T11:14:21.347346+03:00"
+      },
+      {
+        "id": "4fbb8da099344a3ba1f70ed2be72bf22",
+        "title": "Протокол 290.pdf",
+        "documentType": null,
+        "datePublished": "2026-07-17T14:00:52.091149+03:00"
+      },
+      {
+        "id": "3b110bbbb0714444a9aa18ff37f939cd",
+        "title": "Тендерна пропозиція.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-07-17T14:00:52.637305+03:00"
+      },
+      {
+        "id": "7424936ea86d46d186f6e7a969d9d3dc",
+        "title": "Документи до ТД.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-07-17T14:00:53.395221+03:00"
+      },
+      {
+        "id": "2fcfc6b6e1034453b0a14c7d4b255e9f",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-07-17T14:01:54.323223+03:00"
       }
     ],
     "questions": [],
