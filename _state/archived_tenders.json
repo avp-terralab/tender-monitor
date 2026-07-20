@@ -2861,5 +2861,140 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-06-29-010059-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"РАХІВСЬКА РАЙОННА ЛІКАРНЯ\" РАХІВСЬКОЇ РАЙОННОЇ РАДИ — Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автома…",
+    "archived_at": "2026-07-20T08:56:04.742Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-06-29-010059-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії»",
+      "status": "complete",
+      "dateModified": "2026-07-20T11:45:52.599743+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-07-07T15:51:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"РАХІВСЬКА РАЙОННА ЛІКАРНЯ\" РАХІВСЬКОЇ РАЙОННОЇ РАДИ",
+        "edrpou": "01992624"
+      },
+      "value": {
+        "amount": 212500,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": true
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Параска Ганиш",
+        "email": "shtcovid2021@gmail.com",
+        "telephone": "+380673197691"
+      },
+      "documents": [
+        {
+          "id": "986786bc16b74afa89e8124097bc76d6",
+          "title": "ТД.doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-06-29T16:14:09.519777+03:00"
+        },
+        {
+          "id": "c15b25b086f646f5945727fe8e3ee6a7",
+          "title": "ДОДАТОК 1.docx",
+          "documentType": "eligibilityCriteria",
+          "datePublished": "2026-06-29T16:14:09.519777+03:00"
+        },
+        {
+          "id": "ca4d318aa19748078bd7ab1d900c11ec",
+          "title": "Додаток 2 Технічні вимоги.docx",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-06-29T16:14:09.519777+03:00"
+        },
+        {
+          "id": "578babc186b94ea4b4cddda8f870ca4c",
+          "title": "Проєкт_Договору.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-06-29T16:14:09.519777+03:00"
+        },
+        {
+          "id": "a063a299c37f4b3794df8737fa7944e0",
+          "title": "ДОДАТОК 4.docx",
+          "documentType": "evaluationCriteria",
+          "datePublished": "2026-06-29T16:14:09.519777+03:00"
+        },
+        {
+          "id": "a49c7b3a78d34060b6cf6dcf87a8687f",
+          "title": "ДОДАТОК 5.docx",
+          "documentType": "evaluationCriteria",
+          "datePublished": "2026-06-29T16:14:09.519777+03:00"
+        },
+        {
+          "id": "9e0bf323a35e48f1834d9c0fc569c44a",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-06-29T16:15:34.053756+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "da56f181d1284a319fa2481c9aacfe16",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"МАЙЛАБ\"",
+              "identifier": {
+                "id": "41087617"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "36d1974839b946219647dc1179da86ea",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "description": "SHA1:1fef0d5454af400a56531226f3c3fcb44e2966b9;SHA2-384:6813b5ff2a9527e7f769c57f2655dee7435475f4def024d1b491fb6f3f29a8ff8de47e3d8a91f85406a4688efeaf50be;Antivirus: ESET Antivirus",
+              "id": "40640405c1324733a6ec5f0f02a19029",
+              "hash": "md5:3b77c4694ce181993378c2330748546b",
+              "title": "Договір 451.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/36d1974839b946219647dc1179da86ea/documents/40640405c1324733a6ec5f0f02a19029?download=1c5d345c7e7c440fa2d492614ff8b725",
+              "documentOf": "contract",
+              "datePublished": "2026-07-20T11:45:06.942570+03:00",
+              "dateModified": "2026-07-20T11:45:07.139236+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "4ece74e8f1da4500926fcf6d7bc468c4",
+              "hash": "md5:c8f1a40a8ca17c8f659b4606444a9aec",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/36d1974839b946219647dc1179da86ea/documents/4ece74e8f1da4500926fcf6d7bc468c4?download=4d1c487350f24f99916d9d4cf4ca07a5",
+              "documentOf": "contract",
+              "datePublished": "2026-07-20T11:45:52.417191+03:00",
+              "dateModified": "2026-07-20T11:45:52.417191+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
