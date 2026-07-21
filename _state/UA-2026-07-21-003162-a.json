@@ -1,0 +1,74 @@
+{
+  "tender_id": "UA-2026-07-21-003162-a",
+  "saved_at": "2026-07-21T08:55:46.605Z",
+  "snapshot": {
+    "tender_id": "UA-2026-07-21-003162-a",
+    "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+    "status": "active.tendering",
+    "dateModified": "2026-07-21T11:16:53.373047+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-07-29T01:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "Комунальне некомерційне підприємство \"Центральна районна лікарня Калуської міської  ради Івано-Франківської області\"",
+      "edrpou": "33578224"
+    },
+    "value": {
+      "amount": 86300,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Дмитерчук Микола Миколайович",
+      "email": "mykola_dmyterchuk@ukr.net",
+      "telephone": "380956623651"
+    },
+    "documents": [
+      {
+        "id": "4f2936d221f945f0b0905374c80290f2",
+        "title": "ДОДАТОК 2.doc",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-07-21T11:11:29.192397+03:00"
+      },
+      {
+        "id": "cb8eb00acbe240858acd585dd2cfe253",
+        "title": "ДОДАТОК 1.doc",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-07-21T11:11:29.192397+03:00"
+      },
+      {
+        "id": "6548eb67d3e2453b81d830983d4191da",
+        "title": "тендерна документація програма.doc",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-07-21T11:11:29.192397+03:00"
+      },
+      {
+        "id": "928c8c2abcf542c68e02b68a5860125d",
+        "title": "ДОДАТОК 3.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-07-21T11:11:29.192397+03:00"
+      },
+      {
+        "id": "07972c0cd1534d2dab5e80f5908eaefd",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-07-21T11:16:41.970719+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
