@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-07-10-001623-a",
-  "saved_at": "2026-07-21T21:08:18.373Z",
+  "saved_at": "2026-07-22T08:55:48.048Z",
   "snapshot": {
     "tender_id": "UA-2026-07-10-001623-a",
     "title": "ДК 021:2015 71620000-0 - Аналітичні послуги (71621000-7 - Послуги з технічного аналізу чи консультаційні послуги) , а саме -  послуги з підготовки лабораторії до акредитації в Національному агентстві з акредитації України на відповідність вимогам ISO 15189:2022",
-    "status": "active.auction",
-    "dateModified": "2026-07-22T00:00:27.845522+03:00",
+    "status": "active.qualification",
+    "dateModified": "2026-07-22T11:53:51.887600+03:00",
     "tenderPeriod": {
       "endDate": "2026-07-22T00:00:00+03:00"
     },
@@ -111,6 +111,12 @@
         "title": "sign.p7s",
         "documentType": "notice",
         "datePublished": "2026-07-17T18:32:54.678727+03:00"
+      },
+      {
+        "id": "1bafae245ae9432bae4d132cd9a89ab1",
+        "title": "audit_0b0ed670a6924b3ba28ae2f6b1240ec1_f655de5cdf254b23845c91f47f549d48.yaml",
+        "documentType": null,
+        "datePublished": "2026-07-22T11:53:32.762857+03:00"
       }
     ],
     "questions": [
@@ -126,7 +132,21 @@
       }
     ],
     "complaints": [],
-    "awards": [],
+    "awards": [
+      {
+        "id": "922592f142f846138d6aacab7dcbe4af",
+        "status": "pending",
+        "suppliers": [
+          {
+            "name": "ДЕМЧЕНКО СЕРГІЙ ВІКТОРОВИЧ",
+            "identifier": {
+              "id": "3026501679"
+            }
+          }
+        ],
+        "complaints": []
+      }
+    ],
     "contracts": [],
     "cancellations": [],
     "_notifiedDeadlines": [
