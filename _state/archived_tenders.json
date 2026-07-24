@@ -2996,5 +2996,124 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-07-08-002826-a",
+    "notes": "Комунальне некомерційне підприємство Саф’янівської сільської ради Ізмаїльського району Одеської області «Центральна районна лікарня»\n — Послуги з постачання та налаштування програмного забезпечення л…",
+    "archived_at": "2026-07-24T11:26:08.878Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-07-08-002826-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+      "status": "complete",
+      "dateModified": "2026-07-24T14:15:10.897866+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-07-16T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне некомерційне підприємство Саф’янівської сільської ради Ізмаїльського району Одеської області «Центральна районна лікарня»\n",
+        "edrpou": "26418688"
+      },
+      "value": {
+        "amount": 380666.67,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72268000-1",
+        "description": "Послуги з постачання програмного забезпечення",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72268000-1",
+        "72268000-1",
+        "72268000-1",
+        "72263000-6",
+        "72266000-7",
+        "72268000-1",
+        "72266000-7",
+        "72268000-1"
+      ],
+      "contact": {
+        "name": "Інна Воловенко",
+        "email": "dogovirizmailcrl@ukr.net",
+        "telephone": "+380484197504"
+      },
+      "documents": [
+        {
+          "id": "3824bc46dd9741ecb9a06bd4bd8ba0a3",
+          "title": "ТД .docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-07-08T10:55:10.318982+03:00"
+        },
+        {
+          "id": "d1883b793df84ff8a31da920535e2d4f",
+          "title": "Додаток 3 (проєкт договору).docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-07-08T10:55:10.318982+03:00"
+        },
+        {
+          "id": "2c293194c0cc4978b3d8b0ed28dd5f4f",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-07-08T11:04:46.384872+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "9e9905f221e5468482c4526b609ec644",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"МАЙЛАБ\"",
+              "identifier": {
+                "id": "41087617"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "43940d568a3849f9b60c5946015cb37f",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:3e98608b42405941bc485b55da1c186e3cc47b8e;SHA2-384:688054f645a5ffcef7a4b2cb030bf516e47d17fb20f24aa98644a532e42316f6ee843b83c98e83470e45a41225ab39b3;Antivirus: ESET Antivirus",
+              "id": "2e1ac42d77b64dec9e1c41c9d2b4ac4a",
+              "hash": "md5:beb0ca5c73c5faf537fb4bd0d443bd5a",
+              "title": "Договір.PDF",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/43940d568a3849f9b60c5946015cb37f/documents/2e1ac42d77b64dec9e1c41c9d2b4ac4a?download=3999127f7f5c41b7ab1cfc031df99f89",
+              "documentOf": "contract",
+              "datePublished": "2026-07-24T14:13:17.371259+03:00",
+              "dateModified": "2026-07-24T14:13:17.577604+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "25d03fbe4fb24fcea50dc1478286feff",
+              "hash": "md5:d737298f8bd4690f6f5b965a62aea0e7",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/43940d568a3849f9b60c5946015cb37f/documents/25d03fbe4fb24fcea50dc1478286feff?download=796550d986b041a688baadab7aa74981",
+              "documentOf": "contract",
+              "datePublished": "2026-07-24T14:15:10.697473+03:00",
+              "dateModified": "2026-07-24T14:15:10.697473+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
