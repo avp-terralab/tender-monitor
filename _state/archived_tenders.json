@@ -3115,5 +3115,134 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-07-16-005999-a",
+    "notes": "Комунальне підприємство \"Рівненський обласний клінічний лікувально-діагностичний центр імені Віктора Поліщука\" Рівненської обласної ради — Послуги з постачання та налаштування програмного забезпеченн…",
+    "archived_at": "2026-08-05T09:26:21.055Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-07-16-005999-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+      "status": "complete",
+      "dateModified": "2026-08-05T12:19:14.909107+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-07-24T15:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне підприємство \"Рівненський обласний клінічний лікувально-діагностичний центр імені Віктора Поліщука\" Рівненської обласної ради",
+        "edrpou": "13972414"
+      },
+      "value": {
+        "amount": 247000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Волошина Анна Анатоліївна",
+        "email": "anna.ua2012@gmail.com",
+        "telephone": "+380362633352"
+      },
+      "documents": [
+        {
+          "id": "588b3366783f42f5acaff650f51a2199",
+          "title": "ДТ 2026.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-07-16T13:56:47.560176+03:00"
+        },
+        {
+          "id": "4a687b14de8948518c510a47408ded8b",
+          "title": "Додаток 2 Перелік документів_ що мають бути подані учасником у складі своєї тендерної пропозиції.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-07-16T13:56:47.560176+03:00"
+        },
+        {
+          "id": "6dfa259f7ff14eabae05581ad96cc7d1",
+          "title": "Додаток 3 Перелік документів_ що мають бути подані переможцем  процедури .docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-07-16T13:56:47.560176+03:00"
+        },
+        {
+          "id": "8a56747585ac4f88a54e767c9ce90ccd",
+          "title": "Проєкт_Договору_ЛІС.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-07-16T13:56:47.560176+03:00"
+        },
+        {
+          "id": "8a81271b313b4c2da243a20ba522d729",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-07-16T14:05:04.197148+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "a27feb6ba31d4f92890789b8526a086d",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "dce1d597ce5c4383a37cacfe775aa917",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "title_en": "Договір _199.pdf",
+              "title_ru": "Договір _199.pdf",
+              "description": "SHA1: 2164afb61c643d396318bb89832cc089c2a55ef9",
+              "id": "1f731990e5104b5ca24b3676be331911",
+              "hash": "md5:01790dcef956085fec632bb544185bba",
+              "title": "Договір _199.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/dce1d597ce5c4383a37cacfe775aa917/documents/1f731990e5104b5ca24b3676be331911?download=55f0a3a46fbd49629545686315e5b9a6",
+              "documentOf": "contract",
+              "datePublished": "2026-08-05T12:12:13.207840+03:00",
+              "dateModified": "2026-08-05T12:12:13.207840+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "documentType": "notice",
+              "title_en": "sign.p7s",
+              "title_ru": "sign.p7s",
+              "description": "SHA1: 09b536c76e67e0534ec1b2d2995e975b1ee77c5c",
+              "id": "1bf16574f536439eafa88f7f420edd9a",
+              "hash": "md5:e6b3df9e0c942cc0bf8d34370ecba6f6",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/dce1d597ce5c4383a37cacfe775aa917/documents/1bf16574f536439eafa88f7f420edd9a?download=29abcfe387294e6b85e6853fed457393",
+              "documentOf": "contract",
+              "datePublished": "2026-08-05T12:19:06.538248+03:00",
+              "dateModified": "2026-08-05T12:19:06.538248+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
