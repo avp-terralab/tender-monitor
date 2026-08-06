@@ -21,7 +21,7 @@ import {
   buildHistoryCalendar, handleHistoryNav,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
-import { sendReply, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, deleteMessage } from '../../telegram.mjs';
+import { sendReply, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, deleteMessage, escapeHtml, truncate } from '../../telegram.mjs';
 import { loadEphemeral, saveEphemeral } from './ephemeral.mjs';
 import {
   loadWatchlist, saveWatchlist,
@@ -48,6 +48,46 @@ const BOT_USERNAME = 'terralab_tenders_bot';
 // Commands whose reply is an on-demand "view": the bot keeps only the latest one
 // in the chat (deletes the previous view + its trigger on the next view command).
 const EPHEMERAL_VIEW_CMDS = new Set(['info', 'watched', 'archive', 'agent', 'help', 'status', 'whoami', 'history']);
+
+const GH_UNAVAILABLE = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+// Callback toasts are plain text and capped by Telegram at 200 chars, so they
+// carry a shorter base than a full reply.
+const GH_UNAVAILABLE_SHORT = '⚠️ GitHub тимчасово недоступний';
+
+// What each status actually means for this bot. An expired PAT (401) and a real
+// GitHub outage (5xx) produced identical user-facing text before, so the only
+// way to tell them apart was reading the Worker logs.
+const GH_STATUS_HINTS = {
+  401: 'токен недійсний або протермінований',
+  403: 'немає прав або вичерпано ліміт запитів',
+  404: 'файл або репозиторій не знайдено',
+  409: 'конфлікт версій',
+  422: 'GitHub відхилив запит',
+};
+
+// One-line diagnosis of a GitHub failure. Falls back to the raw message for
+// errors that never reached HTTP at all (network, DNS, JSON parse).
+export function describeGithubError(err) {
+  const status = err?.status;
+  if (typeof status === 'number') {
+    const hint = GH_STATUS_HINTS[status] ?? (status >= 500 ? 'збій на боці GitHub' : 'невідома помилка');
+    return `HTTP ${status} · ${hint}`;
+  }
+  const msg = String(err?.message ?? err ?? '').trim();
+  return msg ? truncate(msg, 150) : 'невідома помилка';
+}
+
+// Admins get the cause appended so it is visible straight from Telegram;
+// everyone else keeps the plain "try again" line.
+export function githubUnavailableText(err, isAdmin, base = GH_UNAVAILABLE) {
+  if (!isAdmin) return base;
+  return `${base}\n\n🔧 <code>${escapeHtml(describeGithubError(err))}</code>`;
+}
+
+export function githubUnavailableAck(err, isAdmin, base = GH_UNAVAILABLE_SHORT) {
+  if (!isAdmin) return base;
+  return truncate(`${base} · ${describeGithubError(err)}`, 200);
+}
 
 export async function runHandler({ update, env, deps = {} }) {
   const _loadWatchlist = deps.loadWatchlist ?? loadWatchlist;
@@ -231,7 +271,7 @@ export async function runHandler({ update, env, deps = {} }) {
         }
       } catch (err) {
         console.error('worker: redeem load failed:', err.message);
-        reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+        reply = githubUnavailableText(err, isAdmin);
       }
     } else {
       // /start without payload was supposed to be handled earlier — defensive only
@@ -251,6 +291,7 @@ export async function runHandler({ update, env, deps = {} }) {
         // continue without archive cross-check on transient failures
       }
       reply = await applyMutationWithRetry({
+        isAdmin,
         env,
         loadWatchlist: _loadWatchlist,
         saveWatchlist: _saveWatchlist,
@@ -266,6 +307,7 @@ export async function runHandler({ update, env, deps = {} }) {
       forceReplyMarkup = p.replyMarkup;
     } else {
       reply = await applyMutationWithRetry({
+        isAdmin,
         env,
         loadWatchlist: _loadWatchlist,
         saveWatchlist: _saveWatchlist,
@@ -355,7 +397,7 @@ export async function runHandler({ update, env, deps = {} }) {
       }
     } catch (err) {
       console.error('worker: status loadWatchlist failed:', err.message);
-      reply = `⚠️ Worker live, але GitHub недоступний: ${err.message}`;
+      reply = githubUnavailableText(err, true, '⚠️ Worker live, але GitHub недоступний');
     }
   } else if (cmd.cmd === 'info') {
     try {
@@ -426,7 +468,7 @@ export async function runHandler({ update, env, deps = {} }) {
       }
     } catch (err) {
       console.error('worker: info loadWatchlist failed:', err.message);
-      reply = '⚠️ GitHub недоступний, спробуй ще раз';
+      reply = githubUnavailableText(err, isAdmin, '⚠️ GitHub недоступний, спробуй ще раз');
     }
   } else if (cmd.cmd === 'watch') {
     if (cmd.error) {
@@ -435,6 +477,7 @@ export async function runHandler({ update, env, deps = {} }) {
       forceReplyMarkup = p.replyMarkup;
     } else {
       reply = await applyEntityMutationWithRetry({
+        isAdmin,
         env,
         loadWatchedEntities: _loadWatchedEntities,
         saveWatchedEntities: _saveWatchedEntities,
@@ -467,7 +510,7 @@ export async function runHandler({ update, env, deps = {} }) {
       watchedReplyMarkup = menu.keyboard ?? undefined;
     } catch (err) {
       console.error('worker: /watched failed:', err.message);
-      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+      reply = githubUnavailableText(err, isAdmin);
     }
   } else if (cmd.cmd === 'unwatch_removed') {
     reply = 'ℹ️ Команду /unwatch прибрано. Відкрий /watched і тисни 🗑 біля замовника, щоб припинити стеження.';
@@ -481,6 +524,7 @@ export async function runHandler({ update, env, deps = {} }) {
       reply = '❌ Вкажи імʼя: /invite editor [імʼя]';
     } else {
       reply = await applyInviteMutationWithRetry({
+        isAdmin,
         env,
         loadInvites: _loadInvites,
         saveInvites: _saveInvites,
@@ -496,7 +540,7 @@ export async function runHandler({ update, env, deps = {} }) {
       reply = handleInvitesList({ invites, now: _now });
     } catch (err) {
       console.error('worker: /invites failed:', err.message);
-      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+      reply = githubUnavailableText(err, isAdmin);
     }
   } else if (cmd.cmd === 'users') {
     if (!isAdmin) return;
@@ -505,7 +549,7 @@ export async function runHandler({ update, env, deps = {} }) {
       reply = handleUsersList({ allowedUsers: users, adminChatId });
     } catch (err) {
       console.error('worker: /users failed:', err.message);
-      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+      reply = githubUnavailableText(err, isAdmin);
     }
   } else if (cmd.cmd === 'revoke') {
     if (!isAdmin) return;
@@ -515,6 +559,7 @@ export async function runHandler({ update, env, deps = {} }) {
       reply = '❌ chat_id має бути числом';
     } else {
       reply = await applyAllowedUsersMutationWithRetry({
+        isAdmin,
         env,
         loadAllowedUsers: _loadAllowedUsers,
         saveAllowedUsers: _saveAllowedUsers,
@@ -535,6 +580,7 @@ export async function runHandler({ update, env, deps = {} }) {
       reply = '❌ chat_id має бути числом';
     } else {
       reply = await applyAllowedUsersMutationWithRetry({
+        isAdmin,
         env,
         loadAllowedUsers: _loadAllowedUsers,
         saveAllowedUsers: _saveAllowedUsers,
@@ -576,7 +622,7 @@ export async function runHandler({ update, env, deps = {} }) {
       }
     } catch (err) {
       console.error('worker: /archive failed:', err.message);
-      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+      reply = githubUnavailableText(err, isAdmin);
     }
   } else if (cmd.cmd === 'unarchive') {
     if (cmd.error) {
@@ -585,6 +631,7 @@ export async function runHandler({ update, env, deps = {} }) {
       forceReplyMarkup = p.replyMarkup;
     } else {
       reply = await applyUnarchive({
+        isAdmin,
         env,
         loadArchivedTenders: _loadArchivedTenders,
         saveArchivedTenders: _saveArchivedTenders,
@@ -600,7 +647,7 @@ export async function runHandler({ update, env, deps = {} }) {
       histReplyMarkup = view.keyboard ?? undefined;
     } catch (err) {
       console.error('worker: /history failed:', err.message);
-      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+      reply = githubUnavailableText(err, isAdmin);
     }
   } else if (cmd.cmd === 'help') {
     reply = buildHelpText(role);
@@ -610,7 +657,7 @@ export async function runHandler({ update, env, deps = {} }) {
       reply = handleWhoami({ allowedUsers: users, adminChatId, chatId });
     } catch (err) {
       console.error('worker: /whoami failed:', err.message);
-      reply = '⚠️ GitHub тимчасово недоступний';
+      reply = githubUnavailableText(err, isAdmin, GH_UNAVAILABLE_SHORT);
     }
   } else if (cmd.cmd === 'notify') {
     if (cmd.error === 'invalid_arg') {
@@ -634,7 +681,7 @@ export async function runHandler({ update, env, deps = {} }) {
           }
           console.error('worker: /notify failed:', err.message);
           reply = err.message.includes('GitHub')
-            ? '⚠️ GitHub тимчасово недоступний, спробуй за хвилину'
+            ? githubUnavailableText(err, isAdmin)
             : '⚠️ Сталася помилка на стороні бота';
           break;
         }
@@ -650,7 +697,7 @@ export async function runHandler({ update, env, deps = {} }) {
       reply = formatAuditLog(entries, { limit: cmd.limit });
     } catch (err) {
       console.error('worker: /log failed:', err.message);
-      reply = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+      reply = githubUnavailableText(err, isAdmin);
     }
   } else if (cmd.cmd === 'agent') {
     if (!isAdmin) return;
@@ -848,7 +895,7 @@ async function handleCallbackQuery({
       }));
     } catch (err) {
       console.error('worker: monitor nav load failed:', err.message);
-      await ack('⚠️ Prozorro/GitHub тимчасово недоступний', true);
+      await ack(githubUnavailableAck(err, isAdmin, '⚠️ Prozorro/GitHub тимчасово недоступний'), true);
       return;
     }
     const view = handleMonitorNav({ groups, data, runIso: new Date().toISOString(), role, errors });
@@ -873,7 +920,7 @@ async function handleCallbackQuery({
       ({ items } = await _loadNotificationHistory(env));
     } catch (err) {
       console.error('worker: hist nav load failed:', err.message);
-      await ack('⚠️ GitHub тимчасово недоступний', true);
+      await ack(githubUnavailableAck(err, isAdmin), true);
       return;
     }
     const view = handleHistoryNav({ items, data });
@@ -896,7 +943,7 @@ async function handleCallbackQuery({
       ({ archive } = await _loadArchivedTenders(env));
     } catch (err) {
       console.error('worker: archive nav load failed:', err.message);
-      await ack('⚠️ GitHub тимчасово недоступний', true);
+      await ack(githubUnavailableAck(err, isAdmin), true);
       return;
     }
     const view = handleArchiveNav({ archive, data });
@@ -925,6 +972,7 @@ async function handleCallbackQuery({
       return;
     }
     const result = await applyMutationWithRetry({
+      isAdmin,
       env,
       loadWatchlist: _loadWatchlist,
       saveWatchlist: _saveWatchlist,
@@ -997,7 +1045,7 @@ async function handleCallbackQuery({
       ({ entities } = await _loadWatchedEntities(env));
     } catch (err) {
       console.error('worker: wat nav load failed:', err.message);
-      await ack('⚠️ GitHub тимчасово недоступний', true);
+      await ack(githubUnavailableAck(err, isAdmin), true);
       return;
     }
     const view = handleWatchedNav({ entities, data, canManage: isEditor });
@@ -1025,7 +1073,7 @@ async function handleCallbackQuery({
       ({ entities } = await _loadWatchedEntities(env));
     } catch (err) {
       console.error('worker: watched mode load failed:', err.message);
-      await ack('⚠️ GitHub тимчасово недоступний', true);
+      await ack(githubUnavailableAck(err, isAdmin), true);
       return;
     }
     if (data === 'watched:manage') {
@@ -1079,7 +1127,7 @@ async function handleCallbackQuery({
       return;
     }
     await handleAgentCallback({
-      data, env, chatId, messageId, ack, _sendReply, _editMessageText,
+      data, env, chatId, messageId, ack, isAdmin, _sendReply, _editMessageText,
       _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
       _fetchTender, _extractSnapshot,
       _loadWatchlist, _loadAgentJob, _listAgentJobs,
@@ -1101,7 +1149,7 @@ const AGENT_PENDING_TTL_MS = 15 * 60 * 1000;
 // names are Cyrillic, price is digits, tenderId is an id — so the HTML parse_mode
 // the send helpers always set is harmless. entityName is intentionally omitted.
 async function handleAgentCallback({
-  data, env, chatId, messageId, ack, _sendReply, _editMessageText,
+  data, env, chatId, messageId, ack, isAdmin, _sendReply, _editMessageText,
   _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
   _fetchTender, _extractSnapshot,
   _loadWatchlist, _loadAgentJob, _listAgentJobs,
@@ -1142,7 +1190,7 @@ async function handleAgentCallback({
       }
     } catch (err) {
       console.error('worker: agent menu nav load failed:', err.message);
-      await ack('⚠️ Prozorro/GitHub тимчасово недоступний', true);
+      await ack(githubUnavailableAck(err, isAdmin, '⚠️ Prozorro/GitHub тимчасово недоступний'), true);
       return;
     }
     const view = handleAgentMenuNav({ tenders, jobs, data });
@@ -1166,7 +1214,7 @@ async function handleAgentCallback({
       prior = await _loadAgentJob(env, tid);
     } catch (err) {
       console.error('worker: agent amend load job failed:', err.message);
-      await ack('⚠️ GitHub тимчасово недоступний', true);
+      await ack(githubUnavailableAck(err, isAdmin), true);
       return;
     }
     if (!prior || prior.status !== 'done' || !prior.result?.drive_link) {
@@ -1325,7 +1373,7 @@ async function handleAgentCallback({
       job = await _loadAgentJob(env, tid);
     } catch (err) {
       console.error('worker: agent retry load failed:', err.message);
-      await ack('⚠️ GitHub тимчасово недоступний', true);
+      await ack(githubUnavailableAck(err, isAdmin), true);
       return;
     }
     if (!job) { await ack('⚠️ Job не знайдено', true); return; }
@@ -1467,7 +1515,7 @@ async function handleAgentTextReply({
   return true;
 }
 
-async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, computeMutation, auditMessage }) {
+async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, computeMutation, auditMessage , isAdmin }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { watchlist, sha } = await loadWatchlist(env);
@@ -1481,7 +1529,7 @@ async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, compu
       if (err instanceof ConflictError) break;
       console.error('worker: applyMutationWithRetry failed:', err.message);
       if (err.message.includes('GitHub')) {
-        return '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+        return githubUnavailableText(err, isAdmin);
       }
       return '⚠️ Сталася помилка на стороні бота';
     }
@@ -1489,7 +1537,7 @@ async function applyMutationWithRetry({ env, loadWatchlist, saveWatchlist, compu
   return '⚠️ Не зміг зберегти, спробуй за хвилину';
 }
 
-async function applyAllowedUsersMutationWithRetry({ env, loadAllowedUsers, saveAllowedUsers, computeMutation, auditMessage }) {
+async function applyAllowedUsersMutationWithRetry({ env, loadAllowedUsers, saveAllowedUsers, computeMutation, auditMessage , isAdmin }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { users, sha } = await loadAllowedUsers(env);
@@ -1503,14 +1551,14 @@ async function applyAllowedUsersMutationWithRetry({ env, loadAllowedUsers, saveA
       if (err instanceof ConflictError) break;
       console.error('worker: applyAllowedUsersMutationWithRetry failed:', err.message);
       return err.message.includes('GitHub')
-        ? '⚠️ GitHub тимчасово недоступний, спробуй за хвилину'
+        ? githubUnavailableText(err, isAdmin)
         : '⚠️ Сталася помилка на стороні бота';
     }
   }
   return '⚠️ Не зміг зберегти, спробуй за хвилину';
 }
 
-async function applyInviteMutationWithRetry({ env, loadInvites, saveInvites, computeMutation, auditMessage }) {
+async function applyInviteMutationWithRetry({ env, loadInvites, saveInvites, computeMutation, auditMessage , isAdmin }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { invites, sha } = await loadInvites(env);
@@ -1524,14 +1572,14 @@ async function applyInviteMutationWithRetry({ env, loadInvites, saveInvites, com
       if (err instanceof ConflictError) break;
       console.error('worker: applyInviteMutationWithRetry failed:', err.message);
       return err.message.includes('GitHub')
-        ? '⚠️ GitHub тимчасово недоступний, спробуй за хвилину'
+        ? githubUnavailableText(err, isAdmin)
         : '⚠️ Сталася помилка на стороні бота';
     }
   }
   return '⚠️ Не зміг зберегти, спробуй за хвилину';
 }
 
-async function applyEntityMutationWithRetry({ env, loadWatchedEntities, saveWatchedEntities, computeMutation, onSuccess, auditMessage }) {
+async function applyEntityMutationWithRetry({ env, loadWatchedEntities, saveWatchedEntities, computeMutation, onSuccess, auditMessage , isAdmin }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { entities, sha } = await loadWatchedEntities(env);
@@ -1546,7 +1594,7 @@ async function applyEntityMutationWithRetry({ env, loadWatchedEntities, saveWatc
       if (err instanceof ConflictError) break;
       console.error('worker: applyEntityMutation failed:', err.message);
       if (err.message.includes('GitHub')) {
-        return '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
+        return githubUnavailableText(err, isAdmin);
       }
       return '⚠️ Сталася помилка на стороні бота';
     }
@@ -1608,7 +1656,7 @@ async function applyLiveArchive({
   return archiveWritten;
 }
 
-async function applyUnarchive({ env, loadArchivedTenders, saveArchivedTenders, tender_id, auditMessage }) {
+async function applyUnarchive({ env, loadArchivedTenders, saveArchivedTenders, tender_id, auditMessage , isAdmin }) {
   try {
     const { archive, sha } = await loadArchivedTenders(env);
     const result = handleUnarchive({ archive }, { tender_id });
@@ -1622,7 +1670,7 @@ async function applyUnarchive({ env, loadArchivedTenders, saveArchivedTenders, t
     }
     console.error('worker: applyUnarchive failed:', err.message);
     return err.message.includes('GitHub')
-      ? '⚠️ GitHub тимчасово недоступний, спробуй за хвилину'
+      ? githubUnavailableText(err, isAdmin)
       : '⚠️ Сталася помилка на стороні бота';
   }
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runHandler } from '../src/handler.mjs';
+import { runHandler, describeGithubError, githubUnavailableText, githubUnavailableAck } from '../src/handler.mjs';
 
 const RAW_OK = {
   data: {
@@ -3274,4 +3274,79 @@ test('runHandler: hist:i:0 → edits to the full digest text', async () => {
   assert.equal(edits.length, 1);
   assert.match(edits[0].text, /ПОВНИЙ ТЕКСТ/);
   assert.equal(acks.length, 1);
+});
+
+// --- GitHub error diagnosis (admin-only) ------------------------------------
+// Regression guard for the 2026-08-06 incident: an expired PAT and a real
+// GitHub outage both surfaced as the same "тимчасово недоступний" line, so the
+// cause was only visible in the Worker logs.
+
+const ghErr = (status) => Object.assign(new Error(`GitHub GET ${status}: boom`), { status });
+
+test('describeGithubError: decodes known statuses', () => {
+  assert.equal(describeGithubError(ghErr(401)), 'HTTP 401 · токен недійсний або протермінований');
+  assert.equal(describeGithubError(ghErr(403)), 'HTTP 403 · немає прав або вичерпано ліміт запитів');
+  assert.equal(describeGithubError(ghErr(503)), 'HTTP 503 · збій на боці GitHub');
+});
+
+test('describeGithubError: falls back to the message when there was no HTTP status', () => {
+  assert.equal(describeGithubError(new Error('Network connection lost')), 'Network connection lost');
+  assert.equal(describeGithubError(undefined), 'невідома помилка');
+});
+
+test('githubUnavailableText: admin gets the cause, others get the plain line', () => {
+  const admin = githubUnavailableText(ghErr(401), true);
+  assert.match(admin, /HTTP 401/);
+  assert.match(admin, /протермінований/);
+  const viewer = githubUnavailableText(ghErr(401), false);
+  assert.doesNotMatch(viewer, /HTTP 401/);
+  assert.match(viewer, /GitHub тимчасово недоступний/);
+});
+
+test('githubUnavailableAck: stays within the Telegram toast limit', () => {
+  const ack = githubUnavailableAck(Object.assign(new Error('x'.repeat(500)), {}), true);
+  assert.ok(ack.length <= 200, `toast was ${ack.length} chars`);
+});
+
+test('runHandler: /watched GitHub failure → admin sees the HTTP status', async () => {
+  const { deps, sent } = makeDeps({
+    loadWatchedEntities: async () => { throw ghErr(401); },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, message_id: 5, text: '/watched', from: { id: 123 } } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /HTTP 401/);
+  assert.match(sent[0].text, /протермінований/);
+});
+
+test('runHandler: /watched GitHub failure → non-admin sees no internals', async () => {
+  const { deps, sent } = makeDeps({
+    loadWatchedEntities: async () => { throw ghErr(401); },
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', role: 'editor', label: 'Editor' }], sha: null }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, message_id: 5, text: '/watched', from: { id: 456 } } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.doesNotMatch(sent[0].text, /HTTP 401/);
+  assert.match(sent[0].text, /GitHub тимчасово недоступний/);
+});
+
+test('runHandler: callback toast carries the status for the admin', async () => {
+  const acks = [];
+  await runHandler({
+    update: { callback_query: { id: 'cbgh', data: 'wat:menu:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV,
+    deps: {
+      ...makeDeps({ loadWatchedEntities: async () => { throw ghErr(403); } }).deps,
+      answerCallbackQuery: async (a) => acks.push(a),
+    },
+  });
+  assert.equal(acks.length, 1);
+  assert.match(acks[0].text, /HTTP 403/);
 });

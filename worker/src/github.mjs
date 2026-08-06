@@ -8,7 +8,18 @@ export class ConflictError extends Error {
   constructor(msg) {
     super(msg);
     this.name = 'ConflictError';
+    this.status = 409;
   }
+}
+
+// Every GitHub failure used to reach the user as the same "temporarily
+// unavailable" line, with the status visible only in the Worker logs — an
+// expired PAT looked exactly like a real outage. Carrying the status on the
+// error lets the handler name the cause for the admin.
+function ghError(message, status) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
 }
 
 // Newest commit on the default branch. Used by /status to show when the monitor
@@ -24,7 +35,7 @@ export async function fetchLastCommit(env, { fetch: fetchImpl = fetch } = {}) {
       },
     }
   );
-  if (!res.ok) throw new Error(`GitHub GET ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw ghError(`GitHub GET ${res.status}: ${await res.text()}`, res.status);
   const arr = await res.json();
   if (!Array.isArray(arr) || arr.length === 0) return null;
   const c = arr[0];
@@ -47,7 +58,7 @@ export async function loadWatchlist(env, { fetch: fetchImpl = fetch } = {}) {
     }
   );
   if (!res.ok) {
-    throw new Error(`GitHub GET ${res.status}: ${await res.text()}`);
+    throw ghError(`GitHub GET ${res.status}: ${await res.text()}`, res.status);
   }
   const { content, sha } = await res.json();
   const bytes = Uint8Array.from(atob(content.replace(/\n/g, '')), (c) => c.charCodeAt(0));
@@ -82,7 +93,7 @@ export async function saveWatchlist(env, watchlist, sha, { fetch: fetchImpl = fe
     throw new ConflictError(`GitHub PUT 409 conflict on ${WATCHLIST_FILE}`);
   }
   if (!res.ok) {
-    throw new Error(`GitHub PUT ${res.status}: ${await res.text()}`);
+    throw ghError(`GitHub PUT ${res.status}: ${await res.text()}`, res.status);
   }
   return res.json();
 }
@@ -100,7 +111,7 @@ async function loadFile(env, filePath, { fetch: fetchImpl = fetch } = {}) {
   );
   if (res.status === 404) return { content: null, sha: null };
   if (!res.ok) {
-    throw new Error(`GitHub GET ${res.status}: ${await res.text()}`);
+    throw ghError(`GitHub GET ${res.status}: ${await res.text()}`, res.status);
   }
   const { content, sha } = await res.json();
   const bytes = Uint8Array.from(atob(content.replace(/\n/g, '')), (c) => c.charCodeAt(0));
@@ -134,7 +145,7 @@ async function saveFile(env, filePath, text, sha, { fetch: fetchImpl = fetch, me
     throw new ConflictError(`GitHub PUT 409 conflict on ${filePath}`);
   }
   if (!res.ok) {
-    throw new Error(`GitHub PUT ${res.status}: ${await res.text()}`);
+    throw ghError(`GitHub PUT ${res.status}: ${await res.text()}`, res.status);
   }
   return res.json();
 }
@@ -300,7 +311,7 @@ export async function listAgentJobs(env, { fetch: fetchImpl = fetch } = {}) {
     },
   );
   if (res.status === 404) return [];
-  if (!res.ok) throw new Error(`GitHub GET ${res.status}: list agent_jobs`);
+  if (!res.ok) throw ghError(`GitHub GET ${res.status}: list agent_jobs`, res.status);
   const items = await res.json();
   if (!Array.isArray(items)) return [];
   const tids = items
@@ -326,7 +337,7 @@ export async function fetchLatestDeployCommit(env, { fetch: fetchImpl = fetch } 
       },
     },
   );
-  if (!res.ok) throw new Error(`GitHub commits API ${res.status}`);
+  if (!res.ok) throw ghError(`GitHub commits API ${res.status}`, res.status);
   const commits = await res.json();
   const BOT_RE = /^(monitor: state update|monitor: cursor sync|bot:|audit:|agent job )/;
   for (const c of commits) {
@@ -354,7 +365,7 @@ export async function fetchAuditLog(env, { fetch: fetchImpl = fetch, perPage = 1
       },
     },
   );
-  if (!res.ok) throw new Error(`GitHub GET ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw ghError(`GitHub GET ${res.status}: ${await res.text()}`, res.status);
   const commits = await res.json();
   if (!Array.isArray(commits)) throw new Error(`GitHub commits API: unexpected response shape`);
   return commits.map(c => ({
