@@ -1,0 +1,110 @@
+{
+  "tender_id": "UA-2026-08-06-000553-a",
+  "saved_at": "2026-08-06T06:55:46.029Z",
+  "snapshot": {
+    "tender_id": "UA-2026-08-06-000553-a",
+    "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії (код ДК 021:2015-72260000-5 - Послуги, пов’язані з програмним забезпеченням)",
+    "status": "active.tendering",
+    "dateModified": "2026-08-06T09:08:07.833202+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-08-14T10:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "Комунальне некомерційне підприємство «Таїрівської селищної ради «Таїрівський консультативно-діагностичний центр»",
+      "edrpou": "43060644"
+    },
+    "value": {
+      "amount": 217100,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Пасічніченко Вікторія Миколаївна",
+      "email": "vikakdc1977@gmail.com",
+      "telephone": "380487701730"
+    },
+    "documents": [
+      {
+        "id": "008cd8b884c840cdb3d1963a1023a5e0",
+        "title": "Додаток 1 квалиф критерии.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-06T09:08:02.024998+03:00"
+      },
+      {
+        "id": "da6a49d2f26744f1ae69e559f5b3f401",
+        "title": "Додаток 2 технични вимоги.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-06T09:08:02.024998+03:00"
+      },
+      {
+        "id": "0428f7f46f2b44038bf8f69df2200e0a",
+        "title": "Додаток 3 документи учасника переможця.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-06T09:08:02.024998+03:00"
+      },
+      {
+        "id": "01bec96b522c465da493704c063ad965",
+        "title": "Додаток 4 проект договору.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-08-06T09:08:02.024998+03:00"
+      },
+      {
+        "id": "b86e67e724154c20ac5b0139cdf3a6c3",
+        "title": "Додаток 5 информация про учасника.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-06T09:08:02.024998+03:00"
+      },
+      {
+        "id": "41a56c35cdda43eba76a737e88034d04",
+        "title": "Додаток 6 тендерна пропозиция.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-06T09:08:02.024998+03:00"
+      },
+      {
+        "id": "b88007fbff3e4c078b169363a11123a0",
+        "title": "Додаток 7 згода персональни дани.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-06T09:08:02.024998+03:00"
+      },
+      {
+        "id": "29541bc226574df2a1a809beeaa4f68a",
+        "title": "Додаток 8 документи учасника.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-06T09:08:02.024998+03:00"
+      },
+      {
+        "id": "9bf1a521697943a6b649c43ed72afd27",
+        "title": "Тендерна_документация_видкрити_торги_з_особливостями.doc",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-06T09:08:02.024998+03:00"
+      },
+      {
+        "id": "d482a0cef875448c999de42e711e57fd",
+        "title": "Додаток 9 документи переможця.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-06T09:08:02.024998+03:00"
+      },
+      {
+        "id": "4824d8ea16c74dc7a511b57b2cd12c0f",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-08-06T09:08:07.103396+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
