@@ -1,0 +1,85 @@
+{
+  "tender_id": "UA-2026-08-07-009770-a",
+  "saved_at": "2026-08-07T13:00:32.853Z",
+  "snapshot": {
+    "tender_id": "UA-2026-08-07-009770-a",
+    "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії за кодом ДК 021:2015:72260000-5 Послуги, пов’язані з програмним забезпеченням",
+    "status": "active.tendering",
+    "dateModified": "2026-08-07T15:36:06.778059+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-08-17T00:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "Комунальне некомерційне підприємство \"Миколаївська обласна станція переливання крові\" Миколаївської обласної ради",
+      "edrpou": "05483339"
+    },
+    "value": {
+      "amount": 170000,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72268000-1",
+      "description": "Послуги з постачання програмного забезпечення",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72268000-1",
+      "72268000-1",
+      "72268000-1",
+      "72268000-1",
+      "72268000-1",
+      "72268000-1"
+    ],
+    "contact": {
+      "name": "Гриненко Яна Вікторівна",
+      "email": "mospk@ukr.net",
+      "telephone": "+380512709453"
+    },
+    "documents": [
+      {
+        "id": "4ccb27379f1540aaab21b55b0c451fc5",
+        "title": "Додаток 1 перелік документів та інформації_ які подаються учасником процедури закупівлі.docx",
+        "documentType": null,
+        "datePublished": "2026-08-07T15:33:36.692463+03:00"
+      },
+      {
+        "id": "8e0cbb6244b5461f919eb35de796cb93",
+        "title": "Додаток 2 перелік документів та інформації_ які подаються переможцем процедури закупівлі.docx",
+        "documentType": null,
+        "datePublished": "2026-08-07T15:33:36.692463+03:00"
+      },
+      {
+        "id": "d97ba449ec824c268b0e395ec1108296",
+        "title": "Додаток 3 інформація про необхідні технічні_ якісні та кількісні характеристики.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-08-07T15:33:36.692463+03:00"
+      },
+      {
+        "id": "f95333c510e54919beadd35ac4a9e381",
+        "title": "Додаток 4 Проєкт_Договору.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-08-07T15:33:36.692463+03:00"
+      },
+      {
+        "id": "4e9926bab749496ab37674dcb08e5130",
+        "title": "ТД.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-07T15:33:36.692463+03:00"
+      },
+      {
+        "id": "56b379a5dfac483ab5aadff93e59a69a",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-08-07T15:35:55.756028+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
