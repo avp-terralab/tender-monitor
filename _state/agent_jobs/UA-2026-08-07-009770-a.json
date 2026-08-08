@@ -4,6 +4,7 @@
   "company": "МАЙЛАБ",
   "price": "161525",
   "requested_by": "1744078008",
-  "status": "pending",
-  "created_at": "2026-08-08T04:59:13.741Z"
+  "status": "running",
+  "created_at": "2026-08-08T04:59:13.741Z",
+  "updated_at": "2026-08-08T05:00:23.955709+00:00"
 }
