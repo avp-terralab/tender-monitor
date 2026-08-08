@@ -1752,6 +1752,7 @@ export const AGENT_COMPANIES = {
   terralab_it: 'ТЕРРАЛАБ АЙ ТІ',
   terralab_consulting: 'ТЕРРАЛАБ КОНСАЛТИНГ',
   terralab_suprovid: 'ТЕРРАЛАБ СУПРОВІД',
+  terralab_pro: 'ТЕРРАЛАБ ПРО',
 };
 
 export function companyForSlug(slug) {

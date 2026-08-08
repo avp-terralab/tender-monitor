@@ -3047,7 +3047,10 @@ test('companyForSlug / slugForCompany: round-trip', () => {
   assert.equal(slugForCompany('ТЕРРАЛАБ КОНСАЛТИНГ'), 'terralab_consulting');
   assert.equal(companyForSlug('nope'), null);
   assert.equal(slugForCompany('nope'), null);
-  assert.equal(Object.keys(AGENT_COMPANIES).length, 4);
+  assert.equal(companyForSlug('terralab_pro'), 'ТЕРРАЛАБ ПРО');
+  assert.equal(slugForCompany('ТЕРРАЛАБ ПРО'), 'terralab_pro');
+  // 5 юросіб-учасників — має збігатися з COMPANIES у run_agent.py агента
+  assert.equal(Object.keys(AGENT_COMPANIES).length, 5);
 });
 
 test('agentTriggerButtonRow: admin gets row, others null', () => {
@@ -3060,11 +3063,11 @@ test('agentTriggerButtonRow: admin gets row, others null', () => {
   assert.equal(agentTriggerButtonRow('UA-x', 'viewer'), null);
 });
 
-test('buildAgentCompanyKeyboard: 4 companies + cancel, callback_data ≤ 64', () => {
+test('buildAgentCompanyKeyboard: 5 companies + cancel, callback_data ≤ 64', () => {
   const kb = buildAgentCompanyKeyboard('UA-x');
   const buttons = kb.inline_keyboard.flat();
   const companyButtons = buttons.filter(b => b.callback_data.startsWith('agent:co:'));
-  assert.equal(companyButtons.length, 4);
+  assert.equal(companyButtons.length, 5);
   const maylab = companyButtons.find(b => b.callback_data === 'agent:co:UA-x:maylab');
   assert.ok(maylab);
   assert.equal(maylab.text, 'МАЙЛАБ');
