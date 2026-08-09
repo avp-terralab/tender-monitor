@@ -19,7 +19,7 @@ Cloudflare Worker + спільні pure-модулі. Стежить за тен
 
 | Інструмент | Роль | Тека |
 |---|---|---|
-| 📡 Tender Monitor (бот) | моніторить Prozorro, шле сповіщення, **ставить задачі агенту** | `C:\Users\andre\Desktop\AI\tenders\tender-monitor` |
+| 📡 Tender Monitor (бот) | моніторить Prozorro, шле сповіщення, **ставить задачі агенту** | `C:\Users\andre\Desktop\AI\tender-monitor` |
 | 🤖 Агент підготовки пропозицій | **готує/доробляє** пакети пропозицій за задачами | `C:\Users\andre\Desktop\AI\Агент підготовки пропозицій` |
 
 **Стик — один job-файл** `tender-monitor/_state/agent_jobs/<tender_id>.json`
