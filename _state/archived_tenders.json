@@ -3244,5 +3244,130 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-07-21-003162-a",
+    "notes": "Комунальне некомерційне підприємство \"Центральна районна лікарня Калуської міської  ради Івано-Франківської області\" — Послуги з постачання та налаштування програмного забезпечення лабораторної інфор…",
+    "archived_at": "2026-08-10T07:25:50.333Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-07-21-003162-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+      "status": "complete",
+      "dateModified": "2026-08-10T10:05:04.840373+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-07-29T01:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне некомерційне підприємство \"Центральна районна лікарня Калуської міської  ради Івано-Франківської області\"",
+        "edrpou": "33578224"
+      },
+      "value": {
+        "amount": 86300,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Дмитерчук Микола Миколайович",
+        "email": "mykola_dmyterchuk@ukr.net",
+        "telephone": "380956623651"
+      },
+      "documents": [
+        {
+          "id": "4f2936d221f945f0b0905374c80290f2",
+          "title": "ДОДАТОК 2.doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-07-21T11:11:29.192397+03:00"
+        },
+        {
+          "id": "cb8eb00acbe240858acd585dd2cfe253",
+          "title": "ДОДАТОК 1.doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-07-21T11:11:29.192397+03:00"
+        },
+        {
+          "id": "6548eb67d3e2453b81d830983d4191da",
+          "title": "тендерна документація програма.doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-07-21T11:11:29.192397+03:00"
+        },
+        {
+          "id": "928c8c2abcf542c68e02b68a5860125d",
+          "title": "ДОДАТОК 3.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-07-21T11:11:29.192397+03:00"
+        },
+        {
+          "id": "07972c0cd1534d2dab5e80f5908eaefd",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-07-21T11:16:41.970719+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "a5867f7997c74286a6195daf07da656d",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "f86f9335d8a4443ca2869918839090c9",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "relatedItem": "f86f9335d8a4443ca2869918839090c9",
+              "id": "ed6085ac9d234e32afa7de306fd59309",
+              "hash": "md5:502de775b6a0381a57821824b82846a4",
+              "title": "договір  459.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/f86f9335d8a4443ca2869918839090c9/documents/ed6085ac9d234e32afa7de306fd59309?download=9b8358100e9f42cb96cf7c0a0c69be07",
+              "documentOf": "contract",
+              "datePublished": "2026-08-10T10:01:38.621183+03:00",
+              "dateModified": "2026-08-10T10:01:38.621183+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "relatedItem": "f86f9335d8a4443ca2869918839090c9",
+              "id": "7ed6d68241234f228b3d506259309beb",
+              "hash": "md5:509ec8e0dec41d35da2c008094ed3f7a",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/f86f9335d8a4443ca2869918839090c9/documents/7ed6d68241234f228b3d506259309beb?download=ae7c6761099f49d3989adbda20f323ac",
+              "documentOf": "contract",
+              "datePublished": "2026-08-10T10:02:00.963362+03:00",
+              "dateModified": "2026-08-10T10:02:00.963362+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
