@@ -1630,6 +1630,96 @@ test('runHandler: callback_query "add:UA-…" success → handleAdd, edit keyboa
   assert.match(acks[0].text, /додано/i);
 });
 
+// ── Кнопка з оголошення замовника знімає його зі стеження (11.08.2026) ──────
+// Кнопка `add:` існує ТІЛЬКИ під сповіщенням `new_tender_announced`, тож гілка
+// колбека — це й є «тільки кнопка з оголошення»; /add вручну нічого не чіпає.
+const addBtnDeps = (overrides = {}, entities = []) => {
+  const savedEntities = [];
+  const acks = [];
+  const base = makeDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 'sha1' }),
+    saveWatchlist: async () => ({}),
+    // Реальний extractSnapshot віддає procuringEntity.edrpou — фейк робить так само.
+    extractSnapshot: (raw) => ({
+      ...raw.data,
+      procuringEntity: { name: 'КНП «Тест»', edrpou: '11111111' },
+    }),
+    loadWatchedEntities: async () => ({ entities, sha: 'e-sha' }),
+    saveWatchedEntities: async (env, next) => { savedEntities.push(next); },
+    ...overrides,
+  });
+  return {
+    deps: { ...base.deps, answerCallbackQuery: async (a) => acks.push(a),
+            editMessageReplyMarkup: async () => {} },
+    sent: base.sent, savedEntities, acks,
+  };
+};
+
+test('add-кнопка: замовника, за яким стежили, знято зі стеження', async () => {
+  const { deps, sent, savedEntities } = addBtnDeps({}, [
+    { edrpou: '11111111', name: 'КНП «Тест»', enabled: true },
+    { edrpou: '22222222', name: 'Інший', enabled: true },
+  ]);
+  await runHandler({
+    update: { callback_query: { id: 'c1', data: `add:${ID}`, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV, deps,
+  });
+  assert.equal(savedEntities.length, 1, 'watched_entities збережено один раз');
+  assert.deepEqual(savedEntities[0].map(e => e.edrpou), ['22222222'], 'лишився тільки інший');
+  const notice = sent.find(s => /прибрано зі стеження/.test(s.text ?? ''));
+  assert.ok(notice, 'користувач має отримати повідомлення');
+  assert.match(notice.text, /11111111/);
+  assert.match(notice.text, new RegExp(ID));
+});
+
+test('add-кнопка: якщо за замовником не стежили — нічого не чіпаємо', async () => {
+  const { deps, sent, savedEntities } = addBtnDeps({}, [
+    { edrpou: '99999999', name: 'Хтось інший', enabled: true },
+  ]);
+  await runHandler({
+    update: { callback_query: { id: 'c1', data: `add:${ID}`, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV, deps,
+  });
+  assert.equal(savedEntities.length, 0, 'жодного запису у watched_entities');
+  assert.ok(!sent.some(s => /прибрано зі стеження/.test(s.text ?? '')));
+});
+
+test('add-кнопка: тендер уже в моніторингу → замовник лишається у стеженні', async () => {
+  const { deps, savedEntities } = addBtnDeps({
+    loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true }], sha: 'sha1' }),
+  }, [{ edrpou: '11111111', name: 'КНП «Тест»', enabled: true }]);
+  await runHandler({
+    update: { callback_query: { id: 'c1', data: `add:${ID}`, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV, deps,
+  });
+  assert.equal(savedEntities.length, 0, 'нічого не додали → нічого не знімаємо');
+});
+
+test('/add вручну: стеження за замовником НЕ чіпається', async () => {
+  const { deps, savedEntities } = addBtnDeps({}, [
+    { edrpou: '11111111', name: 'КНП «Тест»', enabled: true },
+  ]);
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: `/add ${ID}`, message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.equal(savedEntities.length, 0, 'ручний /add не знімає замовника');
+});
+
+test('add-кнопка: збій запису watched_entities не ламає додавання тендера', async () => {
+  const savedWl = [];
+  const { deps, acks } = addBtnDeps({
+    saveWatchlist: async (env, wl) => { savedWl.push(wl); },
+    saveWatchedEntities: async () => { throw new Error('GitHub GET 503'); },
+  }, [{ edrpou: '11111111', name: 'КНП «Тест»', enabled: true }]);
+  await runHandler({
+    update: { callback_query: { id: 'c1', data: `add:${ID}`, message: { chat: { id: 123 }, message_id: 42 } } },
+    env: ENV, deps,
+  });
+  assert.equal(savedWl.length, 1, 'тендер усе одно додано');
+  assert.match(acks[0].text, /додано/i);
+});
+
 test('runHandler: viewer (no role field, legacy) → /add refused, no save', async () => {
   let saveCalled = false;
   const { deps, sent } = makeDeps({
@@ -2625,17 +2715,72 @@ test('agent:start (admin) → company keyboard shown', async () => {
   assert.equal(acks.length, 1);
 });
 
-test('agent:start (non-admin) → rejected, no keyboard, no state write', async () => {
+test('agent:start (viewer) → rejected, no keyboard, no state write', async () => {
   let pendingSaved = false;
   const { deps, edits, acks } = makeAgentDeps({
     loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
     saveAgentPending: async () => { pendingSaved = true; },
   });
   await runHandler({ update: CB(`agent:start:${AGENT_TID}`, 456), env: ENV, deps });
-  assert.equal(edits.length, 0, 'no company keyboard for non-admin');
+  assert.equal(edits.length, 0, 'no company keyboard for viewer');
   assert.equal(pendingSaved, false, 'no pending state written');
   assert.equal(acks.length, 1);
-  assert.match(acks[0].text, /адмін/i);
+  assert.match(acks[0].text, /редактор/i);
+});
+
+// Editors got agent rights on 11.08.2026 — the whole menu, prepare AND amend.
+test('agent:start (editor) → company keyboard shown, same as admin', async () => {
+  const { deps, edits, acks } = makeAgentDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'E', role: 'editor' }], sha: 's' }),
+  });
+  await runHandler({ update: CB(`agent:start:${AGENT_TID}`, 456), env: ENV, deps });
+  assert.equal(edits.length, 1, 'editor gets the company keyboard');
+  assert.match(edits[0].text, /Оберіть компанію/);
+  assert.equal(acks.length, 1);
+});
+
+test('/agent (editor) → menu; (viewer) → no reply', async () => {
+  const editorDeps = makeAgentDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'E', role: 'editor' }], sha: 's' }),
+  });
+  await runHandler({ update: agentMsg('/agent', 456), env: ENV, deps: editorDeps.deps });
+  assert.equal(editorDeps.sent.length, 1);
+  assert.match(editorDeps.sent[0].text, /Агент/);
+
+  const viewerDeps = makeAgentDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+  });
+  await runHandler({ update: agentMsg('/agent', 456), env: ENV, deps: viewerDeps.deps });
+  assert.equal(viewerDeps.sent.length, 0, 'viewer gets no agent menu');
+});
+
+test('editor confirm → job queued, audit commit message, admin notified', async () => {
+  const saved = [];
+  const { deps, store, sent } = makeAgentDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Едітор', role: 'editor' }], sha: 's' }),
+    saveAgentJob: async (_e, job, opts) => { saved.push({ job, opts }); },
+  });
+  store.pending['456'] = { tid: AGENT_TID, company: 'МАЙЛАБ', price: '181200', step: 'confirm' };
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`, 456), env: ENV, deps });
+
+  assert.equal(saved.length, 1, 'job queued');
+  assert.equal(saved[0].job.requested_by, '456', 'result goes back to the editor');
+  assert.match(saved[0].opts?.message ?? '', /^audit: agent /, 'commit message lands in /log');
+  assert.match(saved[0].opts?.message ?? '', /\[456\/editor\]/);
+
+  const toAdmin = sent.filter(s => String(s.chatId) === String(ENV.ADMIN_CHAT_ID));
+  assert.equal(toAdmin.length, 1, 'admin gets one heads-up');
+  assert.match(toAdmin[0].text, /запустив агента по/);
+  assert.match(toAdmin[0].text, /МАЙЛАБ/);
+});
+
+test('admin confirm → job queued, but no self-notification', async () => {
+  const { deps, store, sent, jobs } = makeAgentDeps();
+  store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', price: '181200', step: 'confirm' };
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.equal(sent.filter(s => /запустив агента/.test(s.text ?? '')).length, 0,
+    'admin is not notified about their own run');
 });
 
 test('agent:co:<tid>:maylab → pending saved with company МАЙЛАБ + price prompt', async () => {

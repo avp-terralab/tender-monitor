@@ -268,6 +268,8 @@ function auditPhrase(e) {
     case 'watch_resume': return `відновив стеження за ${tgt}`;
     case 'unarchive': return `повернув з архіву ${tgt}`;
     case 'revoke':    return `прибрав доступ ${tgt}`;
+    case 'agent':     return `запустив агента по ${tgt}`;
+    case 'agent_amend': return `надіслав агенту доробку по ${tgt}`;
     case 'invite': {
       const raw = e.target ?? '';
       const [role, ...rest] = raw.split(':');
@@ -795,10 +797,15 @@ export async function handleAdd(deps, { tender_id, notes }) {
   }
 
   const finalNotes = notes ?? buildAutoNotes(snapshot);
+  // ЄДРПОУ замовника віддається наверх, щоб виклик із кнопки-оголошення міг
+  // прибрати цього замовника зі стеження: тендер уже в моніторингу закупівель,
+  // тримати його ще й у моніторингу замовників немає сенсу (рішення 11.08.2026).
+  const edrpou = snapshot.procuringEntity?.edrpou ?? null;
 
   if (existing) {
     return {
       reply: formatAddReply(snapshot, { reEnable: true, nowIso }),
+      edrpou,
       mutation: {
         type: 'update',
         tender_id,
@@ -809,6 +816,7 @@ export async function handleAdd(deps, { tender_id, notes }) {
 
   return {
     reply: formatAddReply(snapshot, { reEnable: false, nowIso }),
+    edrpou,
     mutation: {
       type: 'append',
       row: { tender_id, enabled: true, notes: finalNotes },
@@ -1633,6 +1641,12 @@ const HELP_EDIT_ARCHIVE = [
   '/unarchive [UA-...] — видалити з архіву',
 ];
 
+// Agent block — shown to editor + admin (see canUseAgent).
+const HELP_AGENT = [
+  'Агент підготовки пропозицій:',
+  '/agent — надіслати тендер агенту або переглянути останні задачі',
+].join('\n');
+
 const HELP_ADMIN = [
   'Адмін-команди:',
   '/status — здоровʼя бота (розширена статистика для адміна)',
@@ -1665,6 +1679,8 @@ export function buildHelpText(role) {
     archive.push(...HELP_EDIT_ARCHIVE);
   }
   parts.push(archive.join('\n'));
+
+  if (canUseAgent(role)) parts.push(HELP_AGENT);
 
   if (role === 'admin') parts.push(HELP_ADMIN);
 
@@ -1722,9 +1738,9 @@ const EDIT_COMMANDS = [
   { command: 'remove',    description: 'Видалити тендер' },
   { command: 'watch',     description: 'Стежити за замовником (ЄДРПОУ)' },
   { command: 'unarchive', description: 'Видалити тендер з архіву' },
+  { command: 'agent',     description: 'Надіслати тендер агенту' },
 ];
 const ADMIN_COMMANDS = [
-  { command: 'agent',   description: 'Надіслати тендер агенту' },
   { command: 'status',  description: 'Здоровʼя бота' },
   { command: 'invite',  description: 'Створити invite-посилання' },
   { command: 'role',    description: 'Змінити роль користувача' },
@@ -1766,17 +1782,24 @@ export function slugForCompany(name) {
   return entry ? entry[0] : null;
 }
 
-// Admin-only entry button shown under a tender. Returns a single-button row
-// (to splice into an existing keyboard) or null when the role isn't admin so
-// the caller simply omits it — mirrors how other admin-only UI is gated.
+// Entry button shown under a tender for roles that may drive the agent
+// (admin + editor since 11.08.2026). Returns a single-button row (to splice
+// into an existing keyboard) or null for viewers, so the caller simply omits it.
 export function agentTriggerButtonRow(tenderId, role) {
-  if (role !== 'admin') return null;
+  if (!canUseAgent(role)) return null;
   return [{ text: '🤖 Надіслати агенту', callback_data: `agent:start:${tenderId}` }];
+}
+
+// Single source of truth for «хто може запускати агента». Editors got the right
+// on 11.08.2026 (owner's decision) — the whole menu, prepare AND amend. Grant it
+// to a person by giving them the editor role: /role editor <chat_id>.
+export function canUseAgent(role) {
+  return role === 'admin' || role === 'editor';
 }
 
 // /agent — on-demand picker: one button per ENABLED watched tender, labelled by
 // its notes (or the id), callback agent:start:<tid>. Returns an inline_keyboard
-// or null when there are no active tenders. Admin-only (gated by the caller).
+// or null when there are no active tenders. Admin/editor (gated by the caller).
 export function buildAgentTenderListKeyboard(watchlist) {
   const rows = [];
   for (const r of (watchlist ?? [])) {
@@ -1918,6 +1941,21 @@ export function buildAgentJob({ tenderId, link, company, price, requestedBy, cre
     status: 'pending',
     created_at: createdAt,
   };
+}
+
+// Heads-up sent to the admin when SOMEONE ELSE (an editor) fires the agent —
+// the agent's own result goes only to `requested_by`, so without this the admin
+// would never see that a run was started. Returns null when the actor IS the
+// admin (no self-notification). Free text (actor name) is HTML-escaped.
+export function buildAgentAdminNotice({ kind, actorName, chatId, tenderId, company, price, instruction }) {
+  const who = `${escapeHtml(sanitizeActor(actorName))} (<code>${escapeHtml(String(chatId))}</code>)`;
+  if (kind === 'amend') {
+    const what = instruction ? `\n✏️ ${escapeHtml(instruction)}` : '';
+    return `🤖 ${who} надіслав агенту доробку по ${escapeHtml(tenderId)}${what}`;
+  }
+  const co = company ? ` · ${escapeHtml(company)}` : '';
+  const pr = price ? ` · ${escapeHtml(String(price))}` : '';
+  return `🤖 ${who} запустив агента по ${escapeHtml(tenderId)}${co}${pr}`;
 }
 
 // Free-text agent instruction (amend dialog). Trim; null when empty/non-string;

@@ -532,11 +532,11 @@ export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, te
     const buttonsHere = addButtonsForTenders.filter(id => annotated.includes(id));
     const rows = buttonsHere.flatMap(id => {
       const row = [[{ text: `➕ Додати в моніторинг ${id}`, callback_data: `add:${id}` }]];
-      // Admin-only agent-trigger entry button, directly under the add button for
-      // the same tender. Inlined (rather than importing agentTriggerButtonRow from
-      // commands.mjs) to avoid a telegram.mjs ↔ commands.mjs import cycle; kept in
-      // sync with that helper's row shape.
-      if (role === 'admin') {
+      // Agent-trigger entry button (admin + editor — див. canUseAgent), directly
+      // under the add button for the same tender. Inlined (rather than importing
+      // agentTriggerButtonRow from commands.mjs) to avoid a telegram.mjs ↔
+      // commands.mjs import cycle; kept in sync with that helper's row shape.
+      if (role === 'admin' || role === 'editor') {
         row.push([{ text: '🤖 Надіслати агенту', callback_data: `agent:start:${id}` }]);
       }
       return row;

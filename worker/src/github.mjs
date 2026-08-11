@@ -273,14 +273,16 @@ export async function saveAgentPending(env, pending, sha, opts = {}) {
 // Persists a single agent job for the offline poller to pick up. One file per
 // tender at _state/agent_jobs/<tender_id>.json. Mirrors saveWatchlist's PUT
 // shape (base64 body, sha for update, branch main, auth headers).
-export async function saveAgentJob(env, job, { fetch: fetchImpl = fetch } = {}) {
+export async function saveAgentJob(env, job, { fetch: fetchImpl = fetch, message } = {}) {
   const filePath = `_state/agent_jobs/${job.tender_id}.json`;
   // Look up an existing sha so a re-queued tender updates rather than 409s.
   const { sha } = await loadFile(env, filePath, { fetch: fetchImpl });
   const text = JSON.stringify(job, null, 2) + '\n';
   return saveFile(env, filePath, text, sha, {
     fetch: fetchImpl,
-    message: `agent job ${job.tender_id}: pending`,
+    // Callers pass an `audit:`-formatted message so the run lands in /log
+    // (fetchAuditLog scans all repo commits). Default keeps the old wording.
+    message: message ?? `agent job ${job.tender_id}: pending`,
   });
 }
 

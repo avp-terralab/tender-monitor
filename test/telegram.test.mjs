@@ -704,7 +704,8 @@ test('sendDigest: role admin adds 🤖 agent button under the add button', async
   assert.match(body, /Надіслати агенту/);
 });
 
-test('sendDigest: non-admin role keeps add button only (no agent button)', async () => {
+// Editors got agent rights on 11.08.2026 — the digest button follows canUseAgent.
+test('sendDigest: editor gets both add and agent buttons', async () => {
   const calls = [];
   const fakeFetch = async (url, opts) => {
     calls.push(opts.body.toString());
@@ -717,10 +718,26 @@ test('sendDigest: non-admin role keeps add button only (no agent button)', async
   );
   const body = decodeURIComponent(calls[0].replace(/\+/g, ' '));
   assert.match(body, /"callback_data":"add:UA-2026-05-14-008910-a"/);
+  assert.match(body, /agent:start:UA-2026-05-14-008910-a/);
+});
+
+test('sendDigest: unknown/viewer role keeps add button only (no agent button)', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'UA-2026-05-14-008910-a here',
+    { addButtonsForTenders: ['UA-2026-05-14-008910-a'], role: null },
+  );
+  const body = decodeURIComponent(calls[0].replace(/\+/g, ' '));
+  assert.match(body, /"callback_data":"add:UA-2026-05-14-008910-a"/);
   assert.doesNotMatch(body, /agent:start/);
 });
 
-test('broadcastDigest: admin recipient gets agent button, editor does not', async () => {
+test('broadcastDigest: admin and editor get the agent button, viewer gets no buttons', async () => {
   const captured = [];
   const fakeFetch = async (url, opts) => {
     const params = new URLSearchParams(opts.body.toString());
@@ -730,6 +747,7 @@ test('broadcastDigest: admin recipient gets agent button, editor does not', asyn
   await broadcastDigest(
     { token: 'TOK', chatIds: [
       { chatId: '111', role: 'editor' },
+      { chatId: '222', role: 'viewer' },
       { chatId: '333', role: 'admin' },
     ], fetch: fakeFetch },
     '🔔 UA-2026-05-19-002203-a — new',
@@ -737,8 +755,9 @@ test('broadcastDigest: admin recipient gets agent button, editor does not', asyn
   );
   const byChat = Object.fromEntries(captured.map(c => [c.chat_id, c.reply_markup]));
   assert.match(byChat['333'], /agent:start:UA-2026-05-19-002203-a/);
-  assert.ok(!/agent:start/.test(byChat['111']), 'editor must not get agent button');
+  assert.match(byChat['111'], /agent:start:UA-2026-05-19-002203-a/);
   assert.match(byChat['111'], /Додати в моніторинг/);
+  assert.ok(!byChat['222'], 'viewer gets no action buttons at all');
 });
 
 test('sendDigest: no options → no reply_markup (backward compat)', async () => {

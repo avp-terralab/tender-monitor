@@ -16,6 +16,7 @@ import {
   companyForSlug, agentTriggerButtonRow, buildAgentTenderListKeyboard,
   buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
+  buildAgentAdminNotice,
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage, handleAgentMenuNav,
   buildHistoryCalendar, handleHistoryNav,
@@ -157,10 +158,10 @@ export async function runHandler({ update, env, deps = {} }) {
   const actorName = [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ')
     || userRecord?.label || chatId;
 
-  // Agent-trigger price step: if this admin has a pending dialog awaiting a price,
-  // the next plain text message is the price — intercept it before command parsing.
-  // Admin-only (the dialog can only be opened by an admin in the first place).
-  if (isAdmin && typeof msg.text === 'string' && !msg.text.startsWith('/')) {
+  // Agent-trigger price step: if this user has a pending dialog awaiting a price
+  // (or an amend instruction), the next plain text message is it — intercept
+  // before command parsing. Admin + editor (the dialog can only be opened by them).
+  if (isEditor && typeof msg.text === 'string' && !msg.text.startsWith('/')) {
     const handled = await handleAgentTextReply({
       env, chatId, msg, _sendReply,
       _loadAgentPending, _saveAgentPending, _now,
@@ -439,11 +440,11 @@ export async function runHandler({ update, env, deps = {} }) {
           reply = menu.text;
           monitorReplyMarkup = menu.keyboard ?? undefined;
         }
-        // Admin can fire the agent from a single-tender /info card — but only
-        // while proposals are still being accepted (active.tendering).
-        if (cmd.tender_id && isAdmin && groups.length === 1
+        // Admin/editor can fire the agent from a single-tender /info card — but
+        // only while proposals are still being accepted (active.tendering).
+        if (cmd.tender_id && isEditor && groups.length === 1
             && groups[0].status === 'active.tendering') {
-          agentReplyMarkup = { inline_keyboard: [agentTriggerButtonRow(cmd.tender_id, 'admin')] };
+          agentReplyMarkup = { inline_keyboard: [agentTriggerButtonRow(cmd.tender_id, role)] };
         }
 
         // Live archive: when /info UA-... shows a terminal status for a watchlist
@@ -700,7 +701,7 @@ export async function runHandler({ update, env, deps = {} }) {
       reply = githubUnavailableText(err, isAdmin);
     }
   } else if (cmd.cmd === 'agent') {
-    if (!isAdmin) return;
+    if (!isEditor) return;
     const menu = buildAgentMenu();
     reply = menu.text;
     agentReplyMarkup = menu.keyboard;
@@ -971,6 +972,7 @@ async function handleCallbackQuery({
       await ack('❌ Невалідний tender_id');
       return;
     }
+    let addedEdrpou = null;
     const result = await applyMutationWithRetry({
       isAdmin,
       env,
@@ -983,14 +985,26 @@ async function handleCallbackQuery({
         } catch (err) {
           console.error('worker: callback add loadArchivedTenders failed:', err.message);
         }
-        return handleAdd({
+        const r = await handleAdd({
           watchlist, archive,
           fetchTender: _fetchTender, extractSnapshot: _extractSnapshot,
         }, { tender_id: tenderId, notes: null });
+        // Лише коли справді щось міняємо у watchlist (не «вже моніторю» / архів).
+        if (r.mutation) addedEdrpou = r.edrpou ?? null;
+        return r;
       },
       auditMessage: formatAuditMessage({ action: 'add', target: tenderId, actor: actorName, chatId, role }),
     });
     await onAddResult({ result, tenderId, chatId, messageId, env, _editMessageReplyMarkup, ack });
+    // Ця кнопка з'являється ТІЛЬКИ під оголошенням відстежуваного замовника
+    // (`new_tender_announced`). Щойно його закупівля поїхала в моніторинг
+    // тендерів — тримати самого замовника у стеженні немає сенсу.
+    if (typeof result === 'string' && /^✅/.test(result) && addedEdrpou) {
+      await dropWatchedEntityAfterAdd({
+        env, edrpou: addedEdrpou, tenderId, chatId, actorName, role,
+        _loadWatchedEntities, _saveWatchedEntities, _sendReply,
+      });
+    }
     return;
   }
 
@@ -1120,14 +1134,15 @@ async function handleCallbackQuery({
   }
 
   if (data.startsWith('agent:')) {
-    // Every agent step is admin-only. Non-admin allowed users get a clear reject
-    // (they never see the entry button, but guard the callback regardless).
-    if (!isAdmin) {
-      await ack('🚫 Лише адмін', true);
+    // Agent steps are open to admin + editor (canUseAgent). Viewers get a clear
+    // reject (they never see the entry button, but guard the callback regardless).
+    if (!isEditor) {
+      await ack('🚫 Це команда для редакторів', true);
       return;
     }
     await handleAgentCallback({
-      data, env, chatId, messageId, ack, isAdmin, _sendReply, _editMessageText,
+      data, env, chatId, messageId, ack, isAdmin, adminChatId, actorName, role,
+      _sendReply, _editMessageText,
       _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
       _fetchTender, _extractSnapshot,
       _loadWatchlist, _loadAgentJob, _listAgentJobs,
@@ -1142,14 +1157,35 @@ async function handleCallbackQuery({
 // is not swallowed as the stale tender's price.
 const AGENT_PENDING_TTL_MS = 15 * 60 * 1000;
 
-// Drives the admin-only agent-trigger dialog (start → pick company → enter price
-// → confirm). State between the company tap and the price text lives in
+// Tells the admin that someone ELSE queued an agent run. The agent's result goes
+// only to `requested_by`, so without this the admin would never learn about it.
+// No-op when the actor is the admin, when no admin chat is configured, or when
+// Telegram rejects the send (best effort — must never fail the queued job).
+async function notifyAdminAgentRun({
+  env, isAdmin, adminChatId, _sendReply,
+  kind, actorName, chatId, tenderId, company, price, instruction,
+}) {
+  if (isAdmin || !adminChatId) return;
+  try {
+    await _sendReply({
+      token: env.TELEGRAM_BOT_TOKEN,
+      chatId: Number(adminChatId),
+      text: buildAgentAdminNotice({ kind, actorName, chatId, tenderId, company, price, instruction }),
+    });
+  } catch (err) {
+    console.error('worker: agent admin notice failed:', err.message);
+  }
+}
+
+// Drives the agent-trigger dialog for admin + editor (start → pick company →
+// enter price → confirm). State between the company tap and the price text lives in
 // _state/agent_pending.json keyed by chatId (the Worker is stateless across
 // invocations). Messages go out without HTML-sensitive interpolation: company
 // names are Cyrillic, price is digits, tenderId is an id — so the HTML parse_mode
 // the send helpers always set is harmless. entityName is intentionally omitted.
 async function handleAgentCallback({
-  data, env, chatId, messageId, ack, isAdmin, _sendReply, _editMessageText,
+  data, env, chatId, messageId, ack, isAdmin, adminChatId, actorName, role,
+  _sendReply, _editMessageText,
   _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
   _fetchTender, _extractSnapshot,
   _loadWatchlist, _loadAgentJob, _listAgentJobs,
@@ -1327,7 +1363,9 @@ async function handleAgentCallback({
         createdAt: _now().toISOString(),
       });
       try {
-        await _saveAgentJob(env, job);
+        await _saveAgentJob(env, job, {
+          message: formatAuditMessage({ action: 'agent_amend', target: tid, actor: actorName, chatId, role }),
+        });
       } catch (err) {
         console.error('worker: saveAgentJob (amend) failed:', err.message);
         await ack('⚠️ Не зміг поставити в чергу, спробуй ще раз', true);
@@ -1339,6 +1377,10 @@ async function handleAgentCallback({
       } catch (err) {
         console.error('worker: agent amend confirm reply failed:', err.message);
       }
+      await notifyAdminAgentRun({
+        env, isAdmin, adminChatId, _sendReply,
+        kind: 'amend', actorName, chatId, tenderId: tid, instruction: entry.instruction,
+      });
       await ack('✅ В черзі');
       return;
     }
@@ -1351,7 +1393,9 @@ async function handleAgentCallback({
       requestedBy: String(chatId), createdAt: _now().toISOString(),
     });
     try {
-      await _saveAgentJob(env, job);
+      await _saveAgentJob(env, job, {
+        message: formatAuditMessage({ action: 'agent', target: tid, actor: actorName, chatId, role }),
+      });
     } catch (err) {
       console.error('worker: saveAgentJob failed:', err.message);
       await ack('⚠️ Не зміг поставити в чергу, спробуй ще раз', true);
@@ -1363,6 +1407,11 @@ async function handleAgentCallback({
     } catch (err) {
       console.error('worker: agent confirm reply failed:', err.message);
     }
+    await notifyAdminAgentRun({
+      env, isAdmin, adminChatId, _sendReply,
+      kind: 'prepare', actorName, chatId, tenderId: tid,
+      company: entry.company, price: entry.price,
+    });
     await ack('✅ В черзі');
     return;
   }
@@ -1693,6 +1742,37 @@ async function onAddResult({ result, tenderId, chatId, messageId, env, _editMess
     return;
   }
   await ack(typeof result === 'string' ? result : '⚠️ Помилка', true);
+}
+
+// Прибирає замовника зі стеження після того, як його оголошену закупівлю додали
+// в моніторинг тендерів (рішення власника 11.08.2026: далі він там зайвий).
+// Best-effort: тендер уже додано, тож жодна помилка тут не має ламати результат —
+// лише лог. Мовчить, якщо цього ЄДРПОУ у стеженні не було.
+async function dropWatchedEntityAfterAdd({
+  env, edrpou, tenderId, chatId, actorName, role,
+  _loadWatchedEntities, _saveWatchedEntities, _sendReply,
+}) {
+  try {
+    const { entities, sha } = await _loadWatchedEntities(env);
+    const watched = entities.find((e) => e.edrpou === edrpou);
+    if (!watched) return;                       // за цим замовником не стежили
+    const next = applyEntityMutation(entities, { type: 'delete_entity', edrpou });
+    await _saveWatchedEntities(env, next, sha, {
+      message: formatAuditMessage({
+        action: 'unwatch', target: edrpou, actor: actorName, chatId, role,
+      }),
+    });
+    const namePart = watched.name && watched.name !== '(unknown)'
+      ? ` (${escapeHtml(watched.name)})` : '';
+    await _sendReply({
+      token: env.TELEGRAM_BOT_TOKEN,
+      chatId: Number(chatId),
+      text: `🗑 Замовника <code>${escapeHtml(edrpou)}</code>${namePart} прибрано зі стеження — `
+        + `його закупівля ${escapeHtml(tenderId)} тепер у моніторингу тендерів.`,
+    });
+  } catch (err) {
+    console.error('worker: drop watched entity after add failed:', err.message);
+  }
 }
 
 async function safeEditKeyboard(_edit, env, chatId, messageId, label) {

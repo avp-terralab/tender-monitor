@@ -19,7 +19,8 @@ import {
   findContractDate, buildArchiveMenu, groupArchiveByProvider, buildArchiveCompanyList,
   groupArchiveByYear, buildArchiveYearList, buildArchiveMonthList, renderArchivePage, handleArchiveNav,
   AGENT_COMPANIES, companyForSlug, slugForCompany,
-  agentTriggerButtonRow, buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
+  agentTriggerButtonRow, canUseAgent, buildAgentAdminNotice,
+  buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage,
   handleAgentMenuNav,
@@ -3053,14 +3054,64 @@ test('companyForSlug / slugForCompany: round-trip', () => {
   assert.equal(Object.keys(AGENT_COMPANIES).length, 5);
 });
 
-test('agentTriggerButtonRow: admin gets row, others null', () => {
-  const row = agentTriggerButtonRow('UA-x', 'admin');
-  assert.ok(Array.isArray(row));
-  assert.equal(row.length, 1);
-  assert.equal(row[0].callback_data, 'agent:start:UA-x');
-  assert.match(row[0].text, /агенту/);
-  assert.equal(agentTriggerButtonRow('UA-x', 'editor'), null);
+test('agentTriggerButtonRow: admin and editor get the row, viewer null', () => {
+  for (const role of ['admin', 'editor']) {
+    const row = agentTriggerButtonRow('UA-x', role);
+    assert.ok(Array.isArray(row), `${role} should get a row`);
+    assert.equal(row.length, 1);
+    assert.equal(row[0].callback_data, 'agent:start:UA-x');
+    assert.match(row[0].text, /агенту/);
+  }
   assert.equal(agentTriggerButtonRow('UA-x', 'viewer'), null);
+  assert.equal(agentTriggerButtonRow('UA-x', undefined), null);
+});
+
+test('canUseAgent: admin + editor only', () => {
+  assert.equal(canUseAgent('admin'), true);
+  assert.equal(canUseAgent('editor'), true);
+  assert.equal(canUseAgent('viewer'), false);
+  assert.equal(canUseAgent(undefined), false);
+});
+
+test('BOT_COMMANDS_BY_ROLE: editor sees /agent, viewer does not', () => {
+  const has = (role) => BOT_COMMANDS_BY_ROLE[role].some(c => c.command === 'agent');
+  assert.equal(has('editor'), true);
+  assert.equal(has('admin'), true);
+  assert.equal(has('viewer'), false);
+});
+
+test('buildHelpText: /agent listed for editor and admin, not viewer', () => {
+  assert.match(buildHelpText('editor'), /\/agent/);
+  assert.match(buildHelpText('admin'), /\/agent/);
+  assert.ok(!buildHelpText('viewer').includes('/agent'));
+});
+
+test('buildAgentAdminNotice: prepare and amend lines, actor escaped', () => {
+  const prep = buildAgentAdminNotice({
+    kind: 'prepare', actorName: 'Іван <b>', chatId: '77',
+    tenderId: 'UA-x', company: 'МАЙЛАБ', price: '181 200',
+  });
+  assert.match(prep, /запустив агента по UA-x/);
+  assert.match(prep, /МАЙЛАБ/);
+  assert.match(prep, /181 200/);
+  assert.match(prep, /77/);
+  assert.ok(!prep.includes('<b>'), 'actor name must be HTML-escaped');
+
+  const am = buildAgentAdminNotice({
+    kind: 'amend', actorName: 'Іван', chatId: '77',
+    tenderId: 'UA-x', instruction: 'додай КВЕД',
+  });
+  assert.match(am, /доробку по UA-x/);
+  assert.match(am, /додай КВЕД/);
+});
+
+test('formatAuditLog: agent runs render in /log', () => {
+  const log = formatAuditLog([
+    { action: 'agent', target: 'UA-x', actor: 'Іван', chatId: '77', role: 'editor', date: '2026-08-11T10:00:00Z' },
+    { action: 'agent_amend', target: 'UA-y', actor: 'Іван', chatId: '77', role: 'editor', date: '2026-08-11T10:05:00Z' },
+  ], { limit: 10 });
+  assert.match(log, /запустив агента по UA-x/);
+  assert.match(log, /надіслав агенту доробку по UA-y/);
 });
 
 test('buildAgentCompanyKeyboard: 5 companies + cancel, callback_data ≤ 64', () => {
