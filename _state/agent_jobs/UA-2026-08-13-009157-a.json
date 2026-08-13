@@ -4,6 +4,7 @@
   "company": "ТЕРРАЛАБ АЙ ТІ",
   "price": "236500",
   "requested_by": "7321709183",
-  "status": "pending",
-  "created_at": "2026-08-13T13:31:14.142Z"
+  "status": "running",
+  "created_at": "2026-08-13T13:31:14.142Z",
+  "updated_at": "2026-08-13T13:32:24.182300+00:00"
 }
