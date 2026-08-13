@@ -35,10 +35,11 @@ export const MAIN_KEYBOARD = {
 };
 
 // Role-aware reply keyboard. Three monitoring/archive buttons on one row.
-// Non-admins get «❓ Допомога» on its own bottom row; admins get «🤖 Агент» and
-// «❓ Допомога» together on one row (taps map to commands via BUTTON_ALIASES).
+// Viewers get «❓ Допомога» on its own bottom row; roles that may drive the
+// agent (see canUseAgent) get «🤖 Агент» and «❓ Допомога» together on one row
+// (taps map to commands via BUTTON_ALIASES).
 export function mainKeyboard(role) {
-  if (role !== 'admin') return MAIN_KEYBOARD;
+  if (!canUseAgent(role)) return MAIN_KEYBOARD;
   return {
     ...MAIN_KEYBOARD,
     keyboard: [

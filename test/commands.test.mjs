@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseCommand, mainKeyboard, buildAutoNotes, formatAddReply,
+  parseCommand, mainKeyboard, MAIN_KEYBOARD, buildAutoNotes, formatAddReply,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
@@ -3246,11 +3246,17 @@ test('abbreviateLegalForm: facility-type phrases (ТМО mid, МКЛ/ЦМЛ/ОК
 });
 
 
-test('mainKeyboard / 🤖 Агент alias: admin gets the agent button, others do not', () => {
+test('mainKeyboard / 🤖 Агент alias: admin and editor get the agent button, viewer does not', () => {
   const admin = mainKeyboard('admin').keyboard.flat().map(b => b.text);
   assert.ok(admin.includes('🤖 Агент'), 'admin keyboard must include the agent button');
+  const editor = mainKeyboard('editor').keyboard.flat().map(b => b.text);
+  assert.ok(editor.includes('🤖 Агент'), 'editor keyboard must include the agent button');
   const viewer = mainKeyboard('viewer').keyboard.flat().map(b => b.text);
-  assert.ok(!viewer.includes('🤖 Агент'), 'non-admin keyboard must NOT include the agent button');
+  assert.ok(!viewer.includes('🤖 Агент'), 'non-admin/editor keyboard must NOT include the agent button');
+  assert.deepEqual(mainKeyboard('viewer'), MAIN_KEYBOARD, 'viewer keyboard layout must be unchanged');
+  const unknown = mainKeyboard(undefined).keyboard.flat().map(b => b.text);
+  assert.ok(!unknown.includes('🤖 Агент'), 'unknown/undefined role must behave like a viewer');
+  assert.deepEqual(mainKeyboard(undefined), MAIN_KEYBOARD, 'unknown/undefined role keyboard must match the plain viewer layout');
   assert.deepEqual(parseCommand('🤖 Агент'), { cmd: 'agent' });
 });
 
