@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat, formatNightDigest, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, broadcastDigest, deleteMessage, formatDeadlineReminder, summarizeDigest } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, formatNightDigest, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, broadcastDigest, deleteMessage, formatDeadlineReminder, summarizeDigest, winnerButtonRow } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -758,6 +758,66 @@ test('broadcastDigest: admin and editor get the agent button, viewer gets no but
   assert.match(byChat['111'], /agent:start:UA-2026-05-19-002203-a/);
   assert.match(byChat['111'], /Додати в моніторинг/);
   assert.ok(!byChat['222'], 'viewer gets no action buttons at all');
+});
+
+test('winnerButtonRow: appears only for our EDRPOU and privileged roles', () => {
+  assert.deepEqual(
+    winnerButtonRow('UA-1', '39376596', 'admin'),
+    [{ text: '📄 Документи переможця', callback_data: 'agent:winner:UA-1' }],
+  );
+  assert.ok(winnerButtonRow('UA-1', '39376596', 'editor'));
+  // чужий переможець — кнопки немає
+  assert.equal(winnerButtonRow('UA-1', '12345678', 'admin'), null);
+  // viewer не запускає агента
+  assert.equal(winnerButtonRow('UA-1', '39376596', 'viewer'), null);
+  // ЄДРПОУ не приїхав
+  assert.equal(winnerButtonRow('UA-1', null, 'admin'), null);
+});
+
+test('sendDigest: winnerTenders attaches the winner button for our EDRPOU + admin', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'UA-2026-05-14-008910-a here',
+    { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a', supplierEdrpou: '39376596' }], role: 'admin' },
+  );
+  const body = decodeURIComponent(calls[0].replace(/\+/g, ' '));
+  assert.match(body, /"callback_data":"agent:winner:UA-2026-05-14-008910-a"/);
+  assert.match(body, /Документи переможця/);
+});
+
+test('sendDigest: winnerTenders for a competitor EDRPOU shows no winner button', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'UA-2026-05-14-008910-a here',
+    { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a', supplierEdrpou: '12345678' }], role: 'admin' },
+  );
+  assert.doesNotMatch(calls[0], /agent:winner/);
+  assert.doesNotMatch(calls[0], /reply_markup/);
+});
+
+test('sendDigest: winnerTenders for our EDRPOU but viewer role shows no winner button', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'UA-2026-05-14-008910-a here',
+    { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a', supplierEdrpou: '39376596' }], role: 'viewer' },
+  );
+  assert.doesNotMatch(calls[0], /agent:winner/);
+  assert.doesNotMatch(calls[0], /reply_markup/);
 });
 
 test('sendDigest: no options → no reply_markup (backward compat)', async () => {
