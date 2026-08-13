@@ -18,8 +18,10 @@ import {
   buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
   buildAgentAdminNotice,
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
+  buildAgentWinnerJob, buildAgentWinnerConfirmText,
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage, handleAgentMenuNav,
   buildHistoryCalendar, handleHistoryNav,
+  abbreviateLegalForm,
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, deleteMessage, escapeHtml, truncate } from '../../telegram.mjs';
@@ -144,7 +146,7 @@ export async function runHandler({ update, env, deps = {} }) {
       _loadWatchedEntities, _saveWatchedEntities,
       _fetchTender, _extractSnapshot,
       _loadAgentPending, _saveAgentPending, _saveAgentJob, _loadAgentJob, _listAgentJobs, _now,
-      _loadNotificationHistory,
+      _loadNotificationHistory, _loadTenderState,
     });
   }
 
@@ -832,7 +834,7 @@ async function handleCallbackQuery({
   _loadWatchedEntities, _saveWatchedEntities,
   _fetchTender, _extractSnapshot,
   _loadAgentPending, _saveAgentPending, _saveAgentJob, _loadAgentJob, _listAgentJobs, _now,
-  _loadNotificationHistory,
+  _loadNotificationHistory, _loadTenderState,
 }) {
   const adminChatId = String(env.ADMIN_CHAT_ID ?? '');
   const chatId = String(cq.message?.chat?.id ?? '');
@@ -1145,7 +1147,7 @@ async function handleCallbackQuery({
       _sendReply, _editMessageText,
       _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
       _fetchTender, _extractSnapshot,
-      _loadWatchlist, _loadAgentJob, _listAgentJobs,
+      _loadWatchlist, _loadAgentJob, _listAgentJobs, _loadTenderState,
     });
     return;
   }
@@ -1182,13 +1184,13 @@ async function notifyAdminAgentRun({
 // _state/agent_pending.json keyed by chatId (the Worker is stateless across
 // invocations). Messages go out without HTML-sensitive interpolation: company
 // names are Cyrillic, price is digits, tenderId is an id — so the HTML parse_mode
-// the send helpers always set is harmless. entityName is intentionally omitted.
+// the send helpers always set is harmless (buildAgent*Text escape anyway).
 async function handleAgentCallback({
   data, env, chatId, messageId, ack, isAdmin, adminChatId, actorName, role,
   _sendReply, _editMessageText,
   _loadAgentPending, _saveAgentPending, _saveAgentJob, _now,
   _fetchTender, _extractSnapshot,
-  _loadWatchlist, _loadAgentJob, _listAgentJobs,
+  _loadWatchlist, _loadAgentJob, _listAgentJobs, _loadTenderState,
 }) {
   const parts = data.split(':'); // agent:<action>:<tid>[:<slug>]
   const action = parts[1];
@@ -1197,6 +1199,23 @@ async function handleAgentCallback({
   const sendNew = (text, replyMarkup) => _sendReply({
     token: env.TELEGRAM_BOT_TOKEN, chatId: Number(chatId), text, replyMarkup,
   });
+
+  // Customer name for the winner confirmation, from the monitor's own saved
+  // snapshot (_state/<tid>.json) — no Prozorro round-trip, and null whenever the
+  // snapshot is missing, so the confirm text simply degrades to id + company.
+  // Purely cosmetic: this must NOT gate anything (whether a winner run is
+  // allowed for a given tender status is the owner's call, not this function's).
+  const winnerEntityName = async () => {
+    if (!_loadTenderState) return null;
+    try {
+      const snap = await _loadTenderState(env, tid);
+      const name = snap?.procuringEntity?.name;
+      return name ? abbreviateLegalForm(name) : null;
+    } catch (err) {
+      console.error('worker: agent winner entity lookup failed:', err.message);
+      return null;
+    }
+  };
 
   // Menu-level navigation (edit-in-place). Dialog actions fall through below.
   if (action === 'noop') { await ack(); return; }
@@ -1275,6 +1294,64 @@ async function handleAgentCallback({
     return;
   }
 
+  if (action === 'winner') {
+    // Unlike amend, a winner run needs no prior agent job at all — it may be
+    // fired straight from a "we won" notification for a tender the agent never
+    // prepared. So a missing/failed prior job is a normal path, not an error.
+    //
+    // The company comes, in order of authority:
+    //   1. the slug in callback_data — resolved in monitor.mjs from the award's
+    //      ЄДРПОУ, i.e. the entity Prozorro says actually WON;
+    //   2. the prior agent job (the 📊 Останні задачі button carries no slug);
+    //   3. the company picker.
+    // (1) must beat (2): the job file is per-tender and a re-prepare under a
+    // different legal entity overwrites it, so the prior job can easily name an
+    // entity that lost — and the draft contract would then be filled with the
+    // wrong requisites, director, tax system and bank details.
+    const fromSlug = companyForSlug(parts[3] ?? '');
+    let prior = null;
+    if (!fromSlug) {
+      try {
+        prior = await _loadAgentJob(env, tid);
+      } catch (err) {
+        console.error('worker: agent winner load job failed:', err.message);
+      }
+    }
+    const company = fromSlug ?? prior?.company ?? null;
+    if (!company) {
+      // Company unknown — ask with the same picker `prepare` uses, then land
+      // on the winner confirm (not the price step; see the `co` branch below).
+      try {
+        const { pending, sha } = await _loadAgentPending(env);
+        pending[chatId] = { tid, kind: 'winner', step: 'await_company', at: _now().toISOString() };
+        await _saveAgentPending(env, pending, sha);
+        await sendNew('Оберіть компанію-переможця:', buildAgentCompanyKeyboard(tid));
+      } catch (err) {
+        console.error('worker: agent winner company prompt failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+      await ack();
+      return;
+    }
+    const entityName = await winnerEntityName();
+    try {
+      const { pending, sha } = await _loadAgentPending(env);
+      pending[chatId] = { tid, kind: 'winner', step: 'confirm', company, at: _now().toISOString() };
+      await _saveAgentPending(env, pending, sha);
+      await sendNew(
+        buildAgentWinnerConfirmText({ tenderId: tid, company, entityName }),
+        buildAgentConfirmKeyboard(tid),
+      );
+    } catch (err) {
+      console.error('worker: agent winner confirm prompt failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
+    }
+    await ack();
+    return;
+  }
+
   if (action === 'start') {
     // Authoritative gate (covers /agent, /info and digest buttons): the agent
     // runs only while the tender is accepting proposals (active.tendering).
@@ -1286,6 +1363,24 @@ async function handleAgentCallback({
       }
     } catch (err) {
       console.error('worker: agent start status check failed:', err.message);
+    }
+    // Starting a PREPARE of this tender supersedes an abandoned winner dialog
+    // for the SAME tender: without this the `co` tap that follows would be read
+    // as a winner continuation (its step is already `confirm`) and would queue a
+    // winner job for a tender that was never awarded — the C1 hijack. Scoped
+    // deliberately: only `kind:'winner'` AND the same tid is dropped. Clearing
+    // pending unconditionally would kill an unrelated in-flight dialog (e.g. an
+    // `amend` awaiting its instruction for another tender) — one bug traded for
+    // another. Best-effort: a failure here must not block the picker.
+    try {
+      const { pending, sha } = await _loadAgentPending(env);
+      const prior = pending?.[chatId];
+      if (prior?.kind === 'winner' && prior?.tid === tid) {
+        delete pending[chatId];
+        await _saveAgentPending(env, pending, sha);
+      }
+    } catch (err) {
+      console.error('worker: agent start clear stale winner pending failed:', err.message);
     }
     try {
       await _editMessageText({
@@ -1309,8 +1404,57 @@ async function handleAgentCallback({
     const slug = parts[3] ?? '';
     const company = companyForSlug(slug);
     if (!company) { await ack('❌ Невідома компанія'); return; }
+
+    // Company selection is shared between `prepare` (→ await_price) and
+    // `winner` (→ straight to confirm, no price). Only winner's own pending
+    // entry, for THIS SAME tid, continues the winner dialog — button taps
+    // aren't covered by AGENT_PENDING_TTL_MS (that only fires from text-reply
+    // steps), so a `winner` entry can otherwise sit there indefinitely and
+    // hijack a later `co` tap for an unrelated tender.
+    //
+    // Both `await_company` and `confirm` are legitimate continuation steps.
+    // `confirm` matters because the company picker message stays visible after
+    // a pick: tapping the WRONG company and then the right one on that same
+    // message is an ordinary correction, and it must land back on the winner
+    // confirmation — not fall through to prepare, which would ask for a price
+    // and then queue a full re-generation of the proposal.
+    // The SAME-tender hijack (C1) is closed on the other side instead: a fresh
+    // `agent:start` for this tender clears the abandoned winner dialog first
+    // (see the `start` branch above), so by the time `co` runs there is no
+    // winner pending left to continue. Anything else (no pending, different
+    // tender, different kind) falls through to the ordinary prepare behaviour.
+    let pending, sha, isWinnerContinuation = false;
     try {
-      const { pending, sha } = await _loadAgentPending(env);
+      ({ pending, sha } = await _loadAgentPending(env));
+      const prior = pending?.[chatId];
+      isWinnerContinuation = prior?.kind === 'winner'
+        && prior?.tid === tid
+        && (prior?.step === 'await_company' || prior?.step === 'confirm');
+    } catch (err) {
+      console.error('worker: agent co load pending failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
+    }
+
+    if (isWinnerContinuation) {
+      const entityName = await winnerEntityName();
+      try {
+        pending[chatId] = { tid, kind: 'winner', company, step: 'confirm', at: _now().toISOString() };
+        await _saveAgentPending(env, pending, sha);
+        await sendNew(
+          buildAgentWinnerConfirmText({ tenderId: tid, company, entityName }),
+          buildAgentConfirmKeyboard(tid),
+        );
+      } catch (err) {
+        console.error('worker: agent winner co save pending failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+      await ack();
+      return;
+    }
+
+    try {
       pending[chatId] = { tid, company, step: 'await_price', at: _now().toISOString() };
       await _saveAgentPending(env, pending, sha);
     } catch (err) {
@@ -1339,6 +1483,53 @@ async function handleAgentCallback({
     }
     if (!entry || entry.tid !== tid || entry.step !== 'confirm') {
       await ack('⚠️ Немає активного запиту');
+      return;
+    }
+
+    // Winner: build a job_type:'winner' record. No price. `target` carries the
+    // prior done job's Drive folders unchanged when one exists — omitted
+    // entirely otherwise (a winner run needs no prior prepare/agent job).
+    if (entry.kind === 'winner') {
+      let prior = null;
+      try {
+        prior = await _loadAgentJob(env, tid);
+      } catch (err) {
+        console.error('worker: agent winner confirm load job failed:', err.message);
+      }
+      const target = prior?.result
+        ? {
+            drive_link: prior.result.drive_link ?? null,
+            package_dir: prior.result.package_dir ?? null,
+            published_dir: prior.result.published_dir ?? null,
+          }
+        : null;
+      const job = buildAgentWinnerJob({
+        tenderId: tid,
+        company: entry.company ?? prior?.company ?? null,
+        target,
+        requestedBy: String(chatId),
+        createdAt: _now().toISOString(),
+      });
+      try {
+        await _saveAgentJob(env, job, {
+          message: formatAuditMessage({ action: 'agent_winner', target: tid, actor: actorName, chatId, role }),
+        });
+      } catch (err) {
+        console.error('worker: saveAgentJob (winner) failed:', err.message);
+        await ack('⚠️ Не зміг поставити в чергу, спробуй ще раз', true);
+        return;
+      }
+      await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
+      try {
+        await sendNew('✅ Документи переможця поставлено в чергу. Сповіщу, коли буде готово.');
+      } catch (err) {
+        console.error('worker: agent winner confirm reply failed:', err.message);
+      }
+      await notifyAdminAgentRun({
+        env, isAdmin, adminChatId, _sendReply,
+        kind: 'winner', actorName, chatId, tenderId: tid, company: job.company,
+      });
+      await ack('✅ В черзі');
       return;
     }
 

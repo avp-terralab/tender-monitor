@@ -522,7 +522,27 @@ async function sendOne({ token, chatId, fetch: fetchImpl = fetch }, text, replyM
   throw lastErr;
 }
 
-export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, text, { addButtonsForTenders = [], role } = {}) {
+// Кнопка під «🏆 Учасника визнано переможцем» — рядок додається лише коли
+// виклик уже визначив, що переможець це МИ (tenderId присутній у
+// winnerTenders — companyForEdrpou звіряється на боці викликача, в
+// monitor.mjs), і лише для тих, хто взагалі може запускати агента. Роль
+// перевіряється тут інлайн (як і сусідній agent-trigger рядок вище), а не
+// через canUseAgent з commands.mjs — щоб не створювати цикл імпортів
+// telegram.mjs ↔ commands.mjs.
+// `slug` — ASCII slug of the company Prozorro named as the winner (resolved in
+// monitor.mjs via slugForCompany; slugForCompany lives in commands.mjs and is
+// NOT imported here, again to keep telegram.mjs ↔ commands.mjs acyclic). It
+// rides along in callback_data so the Worker knows WHICH of our legal entities
+// actually won, instead of guessing from the (overwritable) per-tender job
+// file. `agent:winner:<UA-2026-05-14-008910-a>:terralab_consulting` is 54 bytes
+// — inside Telegram's 64-byte callback_data limit for every slug we have.
+export function winnerButtonRow(tenderId, role, slug = null) {
+  if (!(role === 'admin' || role === 'editor')) return null;
+  const data = slug ? `agent:winner:${tenderId}:${slug}` : `agent:winner:${tenderId}`;
+  return [{ text: '📄 Документи переможця', callback_data: data }];
+}
+
+export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, text, { addButtonsForTenders = [], winnerTenders = [], role } = {}) {
   const chunks = chunkMessage(text, 4000);
   let last;
   for (let i = 0; i < chunks.length; i++) {
@@ -541,6 +561,16 @@ export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, te
       }
       return row;
     });
+    // Winner-documents entry button (award_qualified events whose supplier is
+    // one of ours) — independent of addButtonsForTenders since a winner
+    // notification is for a tender already on the watchlist, not a new one.
+    // The caller (monitor.mjs) already resolved "is this ours" via
+    // companyForEdrpou before building winnerTenders.
+    for (const { tenderId, slug } of winnerTenders) {
+      if (!annotated.includes(tenderId)) continue;
+      const winRow = winnerButtonRow(tenderId, role, slug ?? null);
+      if (winRow) rows.push(winRow);
+    }
     const replyMarkup = rows.length > 0 ? { inline_keyboard: rows } : null;
     last = await sendOne({ token, chatId, fetch: fetchImpl }, annotated, replyMarkup);
   }

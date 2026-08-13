@@ -1,5 +1,6 @@
 import { diff, DEADLINE_THRESHOLD_KEYS } from './compare.mjs';
 import { formatDigest, formatDeadlineReminder, summarizeDigest, formatHeartbeat, formatNightDigest } from './telegram.mjs';
+import { companyForEdrpou, slugForCompany } from './commands.mjs';
 
 const TENDER_ID_RE = /^UA-\d{4}-\d{2}-\d{2}-\d{6}-[a-z]$/;
 
@@ -99,6 +100,33 @@ export async function expireHistory(items, now, deleteMessage, { ttlMs = HISTORY
 // Prepend a new item (newest-first).
 export function logBroadcast(items, item) {
   return [item, ...(items ?? [])];
+}
+
+// [{ tenderId, company, slug }] for groups whose award_qualified event names one
+// of our own registration codes as the winning supplier — feeds sendDigest's
+// winnerTenders option so it can show the «📄 Документи переможця» button.
+// companyForEdrpou handles a null/missing supplier_edrpou by returning null
+// (no throw), which naturally excludes such events here too.
+//
+// The resolved company travels WITH the button (as an ASCII slug in
+// callback_data): the job file is per-tender and gets overwritten when a tender
+// is re-prepared under a different legal entity, so falling back to the prior
+// job's company can fill the draft contract with the WRONG entity's requisites,
+// director, tax system and bank details. Prozorro's award tells us exactly who
+// won — that answer must not be thrown away here.
+export function winnerTendersFor(groups) {
+  const out = [];
+  for (const g of groups ?? []) {
+    let company = null;
+    for (const e of g.events ?? []) {
+      if (e.type !== 'award_qualified') continue;
+      const co = companyForEdrpou(e.supplier_edrpou);
+      if (co) { company = co; break; }
+    }
+    if (!company) continue;
+    out.push({ tenderId: g.tender_id, company, slug: slugForCompany(company) });
+  }
+  return out;
 }
 
 export async function runOnce(deps) {
@@ -290,9 +318,13 @@ export async function runOnce(deps) {
       const nightButtons = pendingItems
         .filter(g => g.events?.some(e => e.type === 'new_tender_announced'))
         .map(g => g.tender_id);
+      const nightWinnerTenders = winnerTendersFor(pendingItems);
+      const nightOpts = {};
+      if (nightButtons.length > 0) nightOpts.addButtonsForTenders = nightButtons;
+      if (nightWinnerTenders.length > 0) nightOpts.winnerTenders = nightWinnerTenders;
       const nightRec = await sendDigest(
         morningText,
-        nightButtons.length > 0 ? { addButtonsForTenders: nightButtons } : undefined,
+        Object.keys(nightOpts).length > 0 ? nightOpts : undefined,
       );
       if (deps.saveNotificationHistory) {
         history = logBroadcast(history, {
@@ -342,6 +374,7 @@ export async function runOnce(deps) {
     const addButtonsForTenders = groups
       .filter(g => g.events?.some(e => e.type === 'new_tender_announced'))
       .map(g => g.tender_id);
+    const winnerTenders = winnerTendersFor(groups);
 
     if (inQuietWindow) {
       // Buffer instead of broadcast.
@@ -358,9 +391,12 @@ export async function runOnce(deps) {
       }
       // Main digest — only if there is something to say.
       if (text) {
+        const digestOpts = {};
+        if (addButtonsForTenders.length > 0) digestOpts.addButtonsForTenders = addButtonsForTenders;
+        if (winnerTenders.length > 0) digestOpts.winnerTenders = winnerTenders;
         const rec = await sendDigest(
           text,
-          addButtonsForTenders.length > 0 ? { addButtonsForTenders } : undefined,
+          Object.keys(digestOpts).length > 0 ? digestOpts : undefined,
         );
         if (deps.saveNotificationHistory) {
           history = logBroadcast(history, {

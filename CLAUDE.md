@@ -43,7 +43,7 @@ Cloudflare Worker + спільні pure-модулі. Стежить за тен
   бере `pending`, виконує роботу, **пише статус назад** (`running` → `done`/`error`),
   коміт `agent job <tid>: <status>`.
 
-**Два типи задач (за полем `job_type`):**
+**Три типи задач (за полем `job_type`):**
 - **`prepare`** (поле `job_type` ВІДСУТНЄ) — підготовка з нуля:
   `{ tender_id, link, company, price, requested_by, status:'pending', created_at }`
   → агент `run_agent.run(...)` будує пакет у нову теку Drive.
@@ -51,6 +51,13 @@ Cloudflare Worker + спільні pure-модулі. Стежить за тен
   `{ tender_id, link, job_type:'amend', instruction, company,
      target:{drive_link, package_dir}, requested_by, status:'pending', created_at }`
   (БЕЗ `price`) → агент `run_agent.run_amend(...)` відкриває `target` і застосовує `instruction`.
+- **`winner`** (`job_type:'winner'`) — документи переможця:
+  `{ tender_id, link, job_type:'winner', company, target?:{drive_link, package_dir,
+     published_dir}, requested_by, status:'pending', created_at }`
+  (БЕЗ `price`; поля `target` немає ВЗАГАЛІ, якщо агент цей тендер не готував — виграти
+  можна й пакет, підготовлений вручну) → агент `run_agent.run_winner(...)` заповнює
+  проєкт договору й збирає документи переможця в
+  `ТЕНДЕРИ 2026\<N>. <Замовник>\Документи переможця\`.
 
 **Статуси (пише агент назад):** `pending` → `running` (+`updated_at`) →
 `done` (+`result:{package_dir, published_dir, drive_link, report_path, n_docx}`;
@@ -59,25 +66,49 @@ Cloudflare Worker + спільні pure-модулі. Стежить за тен
 веде саме на `published_dir`) |
 `error` (+`result.detail`/`log_path`). «Готова пропозиція» = `done` + `result.drive_link`.
 
+Для `winner` у `result` додаються `winner_dir`, `winner_link`, `report_path`, `n_docs`.
+**`drive_link`, `package_dir` і `published_dir` winner НЕ переозначує** — переносить їх
+з `target` без змін (лишає порожніми, якщо `target` не приїхав), бо саме за `drive_link`
+бот визначає, що пропозиція готова, і малює кнопки `✏️ Доробити`/підписання. Перелік
+знайдених/прострочених/відсутніх документів переможця — НЕ окремі поля `result` (на
+відміну від початкового задуму), а вільний текст у звіті `_ЗВІТ ПЕРЕМОЖЦЯ.md` (секції
+`## Прострочене` і `## Відсутнє`), який поллер інлайнить у Telegram-повідомлення.
+
 **Вхід у боті:** `/agent` (або кнопка 🤖 Агент) → 🚀 prepare (тендер → компанія → ціна →
 підтвердження); 📊 Останні задачі → ✏️ Доробити на готовій пропозиції → amend (інструкція →
-підтвердження).
+підтвердження), поруч там же — 📄 Документи переможця → winner (компанія, якщо ще
+невідома, → підтвердження). Другий вхід у winner — кнопка під сповіщенням
+«🏆 Учасника визнано переможцем»: показується лише коли ЄДРПОУ переможця наш
+(`companyForEdrpou`, звіряється у `monitor.mjs` ДО виклику `sendDigest`) і роль дозволяє
+агента.
 
 **Хто може запускати (з 11.08.2026): `admin` + `editor`** — єдине джерело правди
 `canUseAgent(role)` у `commands.mjs`; право видається роллю: `/role editor <chat_id>`.
-Обидва типи задач доступні редактору повністю (prepare і amend). Результат агент шле
+Усі три типи задач доступні редактору повністю (prepare, amend і winner). Результат агент шле
 тому, хто замовив (`requested_by`), а НЕ адміну. Щоб адмін усе одно бачив чужі запуски:
 на крок «✅ Підтвердити» бот (а) шле адміну коротке сповіщення `buildAgentAdminNotice`
 (не шле, якщо запустив сам адмін) і (б) пише job-файл комітом у форматі
-`audit: agent|agent_amend <tid> · <хто> [<chat_id>/<роль>]`, тож запуск видно в `/log`.
+`audit: agent|agent_amend|agent_winner <tid> · <хто> [<chat_id>/<роль>]`, тож запуск видно в `/log`.
 
 **Ключові місця:**
-- Бот: `commands.mjs` (`buildAgentJob`, `buildAgentAmendJob`, `buildAgentJobsPage`,
-  `validateInstruction`, `handleAgentMenuNav`), `worker/src/handler.mjs` (`handleAgentCallback`,
-  `handleAgentTextReply`), `worker/src/github.mjs` (`saveAgentJob`, `loadAgentJob`, `listAgentJobs`).
-- Агент: `scripts/agent_poller.py` (`process_pending`), `scripts/run_agent.py`
-  (`run`, `run_amend`, `build_prompt`, `build_amend_prompt`), `scripts/job_lib.py`
-  (`is_pending`, `is_amend`, `mark`).
+- Бот: `commands.mjs` (`buildAgentJob`, `buildAgentAmendJob`, `buildAgentWinnerJob`,
+  `buildAgentWinnerConfirmText`, `buildAgentJobsPage`, `OUR_EDRPOU`, `companyForEdrpou`,
+  `validateInstruction`, `handleAgentMenuNav`), `telegram.mjs` (`winnerButtonRow(tenderId, role)`
+  — БЕЗ параметра ЄДРПОУ: компанію звіряє викликач `monitor.mjs` (`winnerTendersFor`) ще ДО
+  виклику `sendDigest`; роль перевіряється тут-таки інлайн, а не через `canUseAgent` з
+  `commands.mjs`, щоб не створювати цикл імпортів `telegram.mjs` ↔ `commands.mjs` — його в
+  коді НЕМАЄ), `worker/src/handler.mjs` (`handleAgentCallback` — гілки `winner`/`co`/`confirm`;
+  гілка `co` продовжує winner-діалог лише коли pending-запис має `kind:'winner'` **і** той
+  самий `tid`, інакше падає в звичайний prepare), `worker/src/github.mjs` (`saveAgentJob`,
+  `loadAgentJob`, `listAgentJobs`).
+- Агент: `scripts/agent_poller.py` (`process_pending` — гілкує `prepare`/`amend`/`winner`;
+  `resolve_drive_item`/`make_resolve_drive_item` резолвлять `winner_link` через Drive API),
+  `scripts/run_agent.py` (`run`, `run_amend`, `run_winner`, `build_prompt`, `build_amend_prompt`,
+  `build_winner_prompt`; `run_winner` приймає `work_root` — робочу датовану теку з кешем
+  `_td_requirements.json`, `None`, коли агент цей тендер не готував; якщо headless `claude`
+  зависає ВЖЕ ПІСЛЯ того, як пакет і звіт записані, статус все одно `ok` з приміткою `note`,
+  а не `timeout`), `scripts/job_lib.py` (`is_pending`, `is_amend`, `is_winner`, `mark`).
+- Скіл агента для winner: `.claude/skills/tender-winner-docs/SKILL.md`.
 - Спека контракту доробки: `docs/superpowers/specs/2026-06-24-agent-amend-proposal-design.md`.
 
 > **Правило:** зміниш контракт job-файлу з одного боку — **онови інший репозиторій**

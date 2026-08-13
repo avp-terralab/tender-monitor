@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   parseCommand, mainKeyboard, MAIN_KEYBOARD, buildAutoNotes, formatAddReply,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
@@ -25,6 +26,7 @@ import {
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage,
   handleAgentMenuNav,
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
+  OUR_EDRPOU, companyForEdrpou, buildAgentWinnerJob, buildAgentWinnerConfirmText,
   monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
   buildWatchedEntityCard, handleWatchedNav,
   buildArgPrompt, commandFromReplyPrompt,
@@ -3690,6 +3692,167 @@ test('buildAgentJobsPage: amend job shows ✏️ marker in its line', () => {
     job('UA-2026-06-01-000002-a', 'running', { job_type: 'amend' }),
   ], page: 0 });
   assert.match(v.text, /✏️/);
+});
+
+test('OUR_EDRPOU maps our codes to AGENT_COMPANIES names', () => {
+  assert.equal(companyForEdrpou('39376596'), 'ТЕРРАЛАБ АЙ ТІ');
+  assert.equal(companyForEdrpou('41087617'), 'МАЙЛАБ');
+  assert.equal(companyForEdrpou('00000000'), null);
+  assert.equal(companyForEdrpou(undefined), null);
+  // числовий ЄДРПОУ з API теж має резолвитись
+  assert.equal(companyForEdrpou(39376596), 'ТЕРРАЛАБ АЙ ТІ');
+  // списки не мають розʼїхатись
+  const known = new Set(Object.values(AGENT_COMPANIES));
+  for (const name of Object.values(OUR_EDRPOU)) assert.ok(known.has(name), name);
+  assert.equal(Object.keys(OUR_EDRPOU).length, 5);
+});
+
+test('buildAgentWinnerJob has no price and carries target', () => {
+  const job = buildAgentWinnerJob({
+    tenderId: 'UA-1',
+    company: 'МАЙЛАБ',
+    target: { drive_link: 'https://d/1', package_dir: 'P', published_dir: 'PUB' },
+    requestedBy: '555',
+    createdAt: '2026-08-13T10:00:00.000Z',
+  });
+  assert.equal(job.job_type, 'winner');
+  assert.equal(job.status, 'pending');
+  assert.equal(job.link, 'https://prozorro.gov.ua/tender/UA-1');
+  assert.equal(job.price, undefined);
+  assert.equal(job.target.published_dir, 'PUB');
+  assert.equal(job.requested_by, '555');
+});
+
+test('buildAgentWinnerJob omits target when there is no prior job', () => {
+  const job = buildAgentWinnerJob({
+    tenderId: 'UA-2', company: 'МАЙЛАБ', target: null,
+    requestedBy: '555', createdAt: '2026-08-13T10:00:00.000Z',
+  });
+  assert.equal(job.target, undefined);
+  assert.ok(!('target' in job));
+});
+
+test('jobs page shows the winner button on a done proposal', () => {
+  const jobs = [{
+    tender_id: 'UA-1', status: 'done', company: 'МАЙЛАБ',
+    result: { drive_link: 'https://d/1' },
+  }];
+  const view = buildAgentJobsPage({ jobs });
+  const flat = view.keyboard.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-1'));
+  // наявна кнопка доробки лишилась
+  assert.ok(flat.some((b) => b.callback_data === 'agent:amend:UA-1'));
+});
+
+test('jobs page marks winner jobs with an icon', () => {
+  const view = buildAgentJobsPage({
+    jobs: [{ tender_id: 'UA-9', status: 'running', job_type: 'winner' }],
+  });
+  assert.ok(view.text.includes('📄'));
+});
+
+test('admin notice mentions winner runs', () => {
+  const s = buildAgentAdminNotice({
+    kind: 'winner', actorName: 'Оксана', chatId: 555, tenderId: 'UA-1',
+  });
+  assert.ok(s.includes('документи переможця'));
+  assert.ok(s.includes('UA-1'));
+});
+
+// M4: the winner branch was silently dropping the `company` argument it is
+// handed — the entity decides the contract requisites, so it must be visible.
+test('admin notice: winner run names the company, and omits it cleanly when absent', () => {
+  const withCo = buildAgentAdminNotice({
+    kind: 'winner', actorName: 'Оксана', chatId: 555, tenderId: 'UA-1', company: 'МАЙЛАБ',
+  });
+  assert.ok(withCo.includes('МАЙЛАБ'), withCo);
+  assert.ok(withCo.includes('документи переможця'));
+  const noCo = buildAgentAdminNotice({
+    kind: 'winner', actorName: 'Оксана', chatId: 555, tenderId: 'UA-1', company: null,
+  });
+  assert.ok(!noCo.includes('·'), noCo);
+});
+
+// I5: a tender we WON but never prepared has no prepare job, so result.drive_link
+// is null — but result.winner_link points straight at the archive folder. Without
+// this the page rendered only ⬅ Назад and the package was unreachable.
+test('jobs page: winner-only job (no drive_link) still exposes 📁 from winner_link, no ✏️', () => {
+  const view = buildAgentJobsPage({
+    jobs: [{
+      tender_id: 'UA-7', status: 'done', job_type: 'winner', company: 'МАЙЛАБ',
+      result: { winner_link: 'https://d/win', winner_dir: 'G:\\x' },
+    }],
+  });
+  const flat = view.keyboard.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.url === 'https://d/win'), 'winner_link renders as a 📁 button');
+  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-7'));
+  assert.ok(!flat.some((b) => b.callback_data === 'agent:amend:UA-7'),
+    '✏️ Доробити still requires a prepared proposal');
+});
+
+test('jobs page: drive_link wins over winner_link when both are present, ✏️ stays', () => {
+  const view = buildAgentJobsPage({
+    jobs: [{
+      tender_id: 'UA-8', status: 'done', company: 'МАЙЛАБ',
+      result: { drive_link: 'https://d/prep', winner_link: 'https://d/win' },
+    }],
+  });
+  const flat = view.keyboard.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.url === 'https://d/prep'));
+  assert.ok(!flat.some((b) => b.url === 'https://d/win'));
+  assert.ok(flat.some((b) => b.callback_data === 'agent:amend:UA-8'));
+});
+
+test('jobs page: winner button offered for a job with no result at all', () => {
+  const view = buildAgentJobsPage({
+    jobs: [{ tender_id: 'UA-6', status: 'error', company: 'МАЙЛАБ' }],
+  });
+  const flat = view.keyboard.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-6'));
+  assert.ok(!flat.some((b) => b.callback_data === 'agent:amend:UA-6'));
+  assert.ok(!flat.some((b) => b.url));
+});
+
+// R1: the winner row is emitted for EVERY job with a tender_id, but its label
+// used to be the bare constant `📄 Документи переможця` — the tender id lived
+// only in callback_data. A page of pending/running/error jobs (PAGE_SIZE is 6)
+// therefore rendered up to six visually identical, unidentifiable buttons, and
+// tapping the wrong one silently starts an agent run that writes into a
+// hand-maintained shared archive for the WRONG tender. Each winner button must
+// name its own tender.
+test('jobs page: each winner button names its own tender id (3 jobs → 3 distinct labels)', () => {
+  const view = buildAgentJobsPage({
+    jobs: [
+      { tender_id: 'UA-A', status: 'pending' },
+      { tender_id: 'UA-B', status: 'running' },
+      { tender_id: 'UA-C', status: 'error' },
+    ],
+  });
+  const winners = view.keyboard.inline_keyboard.flat()
+    .filter((b) => typeof b.callback_data === 'string' && b.callback_data.startsWith('agent:winner:'));
+  assert.equal(winners.length, 3);
+  for (const tid of ['UA-A', 'UA-B', 'UA-C']) {
+    const btn = winners.find((b) => b.callback_data === `agent:winner:${tid}`);
+    assert.ok(btn, `no winner button for ${tid}`);
+    assert.ok(btn.text.includes(tid),
+      `winner button for ${tid} must be self-identifying, got ${JSON.stringify(btn.text)}`);
+  }
+  assert.equal(new Set(winners.map((b) => b.text)).size, 3,
+    `winner labels must be distinct, got ${JSON.stringify(winners.map((b) => b.text))}`);
+});
+
+// T6b: a Ukrainian ЄДРПОУ with a leading zero is ordinary (this repo's fixtures
+// carry 01998644). As a bare numeric literal such a key would be stored without
+// the zero and would never match, so the keys must be strings.
+test('OUR_EDRPOU keys are strings, so a leading-zero code could never be mangled', () => {
+  for (const k of Object.keys(OUR_EDRPOU)) {
+    assert.equal(typeof k, 'string');
+    assert.match(k, /^\d{8}$/, k);
+  }
+  const src = readFileSync(new URL('../commands.mjs', import.meta.url), 'utf8');
+  const block = src.slice(src.indexOf('export const OUR_EDRPOU'));
+  const body = block.slice(0, block.indexOf('};'));
+  assert.ok(!/^\s*\d+\s*:/m.test(body), 'OUR_EDRPOU must not use bare numeric keys');
 });
 
 test('buildArgPrompt: add → force_reply prompt + UA placeholder', () => {

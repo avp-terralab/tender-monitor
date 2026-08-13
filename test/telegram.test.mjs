@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDigest, chunkMessage, formatHeartbeat, formatNightDigest, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, broadcastDigest, deleteMessage, formatDeadlineReminder, summarizeDigest } from '../telegram.mjs';
+import { formatDigest, chunkMessage, formatHeartbeat, formatNightDigest, truncate, stripDkCode, fmtStatus, fmtDeadline, fmtTimeLeft, getUpdates, sendReply, sendDigest, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, broadcastDigest, deleteMessage, formatDeadlineReminder, summarizeDigest, winnerButtonRow } from '../telegram.mjs';
 
 test('formatDigest: deadline_changed + new_question', () => {
   const text = formatDigest('2026-05-08T13:00:00+03:00', [{
@@ -758,6 +758,104 @@ test('broadcastDigest: admin and editor get the agent button, viewer gets no but
   assert.match(byChat['111'], /agent:start:UA-2026-05-19-002203-a/);
   assert.match(byChat['111'], /Додати в моніторинг/);
   assert.ok(!byChat['222'], 'viewer gets no action buttons at all');
+});
+
+// companyForEdrpou resolution now happens one layer up (monitor.mjs, before
+// winnerTenders is built) — telegram.mjs no longer knows about EDRPOU at
+// all. This function only gates on role and tenderId presence.
+test('winnerButtonRow: refuses a viewer role, produces agent:winner:<tenderId> for admin/editor', () => {
+  assert.deepEqual(
+    winnerButtonRow('UA-1', 'admin'),
+    [{ text: '📄 Документи переможця', callback_data: 'agent:winner:UA-1' }],
+  );
+  assert.ok(winnerButtonRow('UA-1', 'editor'));
+  // viewer не запускає агента
+  assert.equal(winnerButtonRow('UA-1', 'viewer'), null);
+  assert.equal(winnerButtonRow('UA-1', null), null);
+});
+
+// I4: the winning entity resolved from the award's ЄДРПОУ rides along in
+// callback_data, so the Worker does not have to re-derive it from the
+// (overwritable) per-tender job file.
+test('winnerButtonRow: appends the company slug when one is known, and stays inside 64 bytes', () => {
+  assert.deepEqual(
+    winnerButtonRow('UA-2026-05-14-008910-a', 'admin', 'terralab_consulting'),
+    [{
+      text: '📄 Документи переможця',
+      callback_data: 'agent:winner:UA-2026-05-14-008910-a:terralab_consulting',
+    }],
+  );
+  const data = winnerButtonRow('UA-2026-05-14-008910-a', 'admin', 'terralab_consulting')[0].callback_data;
+  assert.ok(Buffer.byteLength(data, 'utf8') <= 64, `callback_data is ${Buffer.byteLength(data, 'utf8')} bytes`);
+  // Кнопка зі сторінки задач слуга не має — формат лишається без хвоста.
+  assert.equal(
+    winnerButtonRow('UA-1', 'admin', null)[0].callback_data,
+    'agent:winner:UA-1',
+  );
+});
+
+test('sendDigest: winnerTenders entry with a slug carries it into callback_data', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'UA-2026-05-14-008910-a here',
+    {
+      winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a', company: 'МАЙЛАБ', slug: 'maylab' }],
+      role: 'admin',
+    },
+  );
+  const body = decodeURIComponent(calls[0].replace(/\+/g, ' '));
+  assert.match(body, /"callback_data":"agent:winner:UA-2026-05-14-008910-a:maylab"/);
+});
+
+test('sendDigest: renders the winner button for an entry in winnerTenders and not otherwise', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'UA-2026-05-14-008910-a here',
+    { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a' }], role: 'admin' },
+  );
+  const body = decodeURIComponent(calls[0].replace(/\+/g, ' '));
+  assert.match(body, /"callback_data":"agent:winner:UA-2026-05-14-008910-a"/);
+  assert.match(body, /Документи переможця/);
+});
+
+test('sendDigest: winnerTenders entry for a tenderId absent from the text shows no winner button', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'no tender ids in this body at all',
+    { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a' }], role: 'admin' },
+  );
+  assert.doesNotMatch(calls[0], /agent:winner/);
+  assert.doesNotMatch(calls[0], /reply_markup/);
+});
+
+test('sendDigest: winnerTenders entry present but viewer role shows no winner button', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'UA-2026-05-14-008910-a here',
+    { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a' }], role: 'viewer' },
+  );
+  assert.doesNotMatch(calls[0], /agent:winner/);
+  assert.doesNotMatch(calls[0], /reply_markup/);
 });
 
 test('sendDigest: no options → no reply_markup (backward compat)', async () => {
