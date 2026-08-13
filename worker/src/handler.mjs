@@ -18,6 +18,7 @@ import {
   buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
   buildAgentAdminNotice,
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
+  buildAgentWinnerJob, buildAgentWinnerConfirmText,
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage, handleAgentMenuNav,
   buildHistoryCalendar, handleHistoryNav,
 } from '../../commands.mjs';
@@ -1275,6 +1276,50 @@ async function handleAgentCallback({
     return;
   }
 
+  if (action === 'winner') {
+    // Unlike amend, a winner run needs no prior agent job at all — it may be
+    // fired straight from a "we won" notification for a tender the agent never
+    // prepared. So a missing/failed prior job is a normal path, not an error.
+    let prior = null;
+    try {
+      prior = await _loadAgentJob(env, tid);
+    } catch (err) {
+      console.error('worker: agent winner load job failed:', err.message);
+    }
+    const company = prior?.company ?? null;
+    if (!company) {
+      // Company unknown — ask with the same picker `prepare` uses, then land
+      // on the winner confirm (not the price step; see the `co` branch below).
+      try {
+        const { pending, sha } = await _loadAgentPending(env);
+        pending[chatId] = { tid, kind: 'winner', step: 'await_company', at: _now().toISOString() };
+        await _saveAgentPending(env, pending, sha);
+        await sendNew('Оберіть компанію-переможця:', buildAgentCompanyKeyboard(tid));
+      } catch (err) {
+        console.error('worker: agent winner company prompt failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+      await ack();
+      return;
+    }
+    try {
+      const { pending, sha } = await _loadAgentPending(env);
+      pending[chatId] = { tid, kind: 'winner', step: 'confirm', company, at: _now().toISOString() };
+      await _saveAgentPending(env, pending, sha);
+      await sendNew(
+        buildAgentWinnerConfirmText({ tenderId: tid, company }),
+        buildAgentConfirmKeyboard(tid),
+      );
+    } catch (err) {
+      console.error('worker: agent winner confirm prompt failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
+    }
+    await ack();
+    return;
+  }
+
   if (action === 'start') {
     // Authoritative gate (covers /agent, /info and digest buttons): the agent
     // runs only while the tender is accepting proposals (active.tendering).
@@ -1309,8 +1354,39 @@ async function handleAgentCallback({
     const slug = parts[3] ?? '';
     const company = companyForSlug(slug);
     if (!company) { await ack('❌ Невідома компанія'); return; }
+
+    // Company selection is shared between `prepare` (→ await_price) and
+    // `winner` (→ straight to confirm, no price). Only winner's own pending
+    // entry carries kind: 'winner' — every other dialog (including a fresh
+    // co tap with no pending at all) falls through to the prepare behaviour.
+    let pending, sha, priorKind = null;
     try {
-      const { pending, sha } = await _loadAgentPending(env);
+      ({ pending, sha } = await _loadAgentPending(env));
+      priorKind = pending?.[chatId]?.kind ?? null;
+    } catch (err) {
+      console.error('worker: agent co load pending failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
+    }
+
+    if (priorKind === 'winner') {
+      try {
+        pending[chatId] = { tid, kind: 'winner', company, step: 'confirm', at: _now().toISOString() };
+        await _saveAgentPending(env, pending, sha);
+        await sendNew(
+          buildAgentWinnerConfirmText({ tenderId: tid, company }),
+          buildAgentConfirmKeyboard(tid),
+        );
+      } catch (err) {
+        console.error('worker: agent winner co save pending failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+      await ack();
+      return;
+    }
+
+    try {
       pending[chatId] = { tid, company, step: 'await_price', at: _now().toISOString() };
       await _saveAgentPending(env, pending, sha);
     } catch (err) {
@@ -1339,6 +1415,53 @@ async function handleAgentCallback({
     }
     if (!entry || entry.tid !== tid || entry.step !== 'confirm') {
       await ack('⚠️ Немає активного запиту');
+      return;
+    }
+
+    // Winner: build a job_type:'winner' record. No price. `target` carries the
+    // prior done job's Drive folders unchanged when one exists — omitted
+    // entirely otherwise (a winner run needs no prior prepare/agent job).
+    if (entry.kind === 'winner') {
+      let prior = null;
+      try {
+        prior = await _loadAgentJob(env, tid);
+      } catch (err) {
+        console.error('worker: agent winner confirm load job failed:', err.message);
+      }
+      const target = prior?.result
+        ? {
+            drive_link: prior.result.drive_link ?? null,
+            package_dir: prior.result.package_dir ?? null,
+            published_dir: prior.result.published_dir ?? null,
+          }
+        : null;
+      const job = buildAgentWinnerJob({
+        tenderId: tid,
+        company: entry.company ?? prior?.company ?? null,
+        target,
+        requestedBy: String(chatId),
+        createdAt: _now().toISOString(),
+      });
+      try {
+        await _saveAgentJob(env, job, {
+          message: formatAuditMessage({ action: 'agent_winner', target: tid, actor: actorName, chatId, role }),
+        });
+      } catch (err) {
+        console.error('worker: saveAgentJob (winner) failed:', err.message);
+        await ack('⚠️ Не зміг поставити в чергу, спробуй ще раз', true);
+        return;
+      }
+      await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
+      try {
+        await sendNew('✅ Документи переможця поставлено в чергу. Сповіщу, коли буде готово.');
+      } catch (err) {
+        console.error('worker: agent winner confirm reply failed:', err.message);
+      }
+      await notifyAdminAgentRun({
+        env, isAdmin, adminChatId, _sendReply,
+        kind: 'winner', actorName, chatId, tenderId: tid, company: job.company,
+      });
+      await ack('✅ В черзі');
       return;
     }
 
