@@ -3169,6 +3169,55 @@ test('agent:co with a SAME-tid winner pending stuck at step confirm → falls th
   assert.equal('job_type' in jobs[0].job, false, 'must not be job_type: winner');
 });
 
+// Fix round 3 (R2): narrowing the continuation to `await_company` closed C1 but
+// broke an ordinary correction — tap 📄, tap the WRONG company (pending moves to
+// step:'confirm'), then tap the RIGHT one on the same still-visible picker. That
+// second tap fell through to prepare: price asked, and a confirm queued a FULL
+// prepare run instead of the winner package. The two sequences are told apart by
+// `agent:start`, which now clears a stale winner dialog for the SAME tender —
+// so `confirm` is a legitimate continuation step only when no start intervened.
+test('agent:co correcting a mis-tapped company (winner pending at confirm, no intervening start) → winner confirm again', async () => {
+  const { deps, store, sent, jobs } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+  });
+  store.pending['123'] = {
+    tid: AGENT_TID, kind: 'winner', step: 'confirm', company: 'МАЙЛАБ', at: '2026-06-21T09:00:00.000Z',
+  };
+  await runHandler({ update: CB(`agent:co:${AGENT_TID}:terralab_pro`), env: ENV, deps });
+  assert.match(sent.at(-1).text, /Документи переможця/, 'the winner confirmation must be shown again');
+  assert.match(sent.at(-1).text, /ТЕРРАЛАБ ПРО/, 'with the CORRECTED company');
+  assert.ok(!/Введіть ціну/.test(sent.at(-1).text), 'a correction must never ask for a price');
+  assert.deepEqual(store.pending['123'], {
+    tid: AGENT_TID, kind: 'winner', company: 'ТЕРРАЛАБ ПРО', step: 'confirm', at: '2026-06-21T10:00:00.000Z',
+  });
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].job.job_type, 'winner', 'confirming a correction queues a winner job, not a prepare');
+  assert.equal(jobs[0].job.company, 'ТЕРРАЛАБ ПРО');
+  assert.equal(jobs[0].job.price, undefined);
+});
+
+test('agent:start for tender A clears an abandoned winner dialog for that SAME tender A', async () => {
+  const { deps, store } = makeAgentDeps();
+  store.pending['123'] = {
+    tid: AGENT_TID, kind: 'winner', step: 'confirm', company: 'МАЙЛАБ', at: '2026-06-21T09:00:00.000Z',
+  };
+  await runHandler({ update: CB(`agent:start:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(store.pending['123'], undefined,
+    'a fresh prepare of the same tender supersedes the abandoned winner dialog');
+});
+
+// The clear must be surgical: clearing pending unconditionally would trade C1
+// for a new bug — an in-flight instruction dialog for an UNRELATED tender would
+// be silently dropped and the user's next message parsed as an ordinary command.
+test('agent:start for tender A leaves an in-flight amend dialog for tender B alone', async () => {
+  const { deps, store } = makeAgentDeps();
+  const amend = { tid: AGENT_TID_B, kind: 'amend', step: 'await_instruction', at: '2026-06-21T09:00:00.000Z' };
+  store.pending['123'] = { ...amend };
+  await runHandler({ update: CB(`agent:start:${AGENT_TID}`), env: ENV, deps });
+  assert.deepEqual(store.pending['123'], amend, 'an unrelated amend dialog must survive');
+});
+
 test('agent:confirm with kind=winner → winner job saved, target from prior done job, price omitted', async () => {
   const { deps, store, sent, jobs, acks } = makeAgentDeps({
     loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Едітор', role: 'editor' }], sha: 's' }),

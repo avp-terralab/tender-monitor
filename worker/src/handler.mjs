@@ -1364,6 +1364,24 @@ async function handleAgentCallback({
     } catch (err) {
       console.error('worker: agent start status check failed:', err.message);
     }
+    // Starting a PREPARE of this tender supersedes an abandoned winner dialog
+    // for the SAME tender: without this the `co` tap that follows would be read
+    // as a winner continuation (its step is already `confirm`) and would queue a
+    // winner job for a tender that was never awarded — the C1 hijack. Scoped
+    // deliberately: only `kind:'winner'` AND the same tid is dropped. Clearing
+    // pending unconditionally would kill an unrelated in-flight dialog (e.g. an
+    // `amend` awaiting its instruction for another tender) — one bug traded for
+    // another. Best-effort: a failure here must not block the picker.
+    try {
+      const { pending, sha } = await _loadAgentPending(env);
+      const prior = pending?.[chatId];
+      if (prior?.kind === 'winner' && prior?.tid === tid) {
+        delete pending[chatId];
+        await _saveAgentPending(env, pending, sha);
+      }
+    } catch (err) {
+      console.error('worker: agent start clear stale winner pending failed:', err.message);
+    }
     try {
       await _editMessageText({
         token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
@@ -1389,24 +1407,29 @@ async function handleAgentCallback({
 
     // Company selection is shared between `prepare` (→ await_price) and
     // `winner` (→ straight to confirm, no price). Only winner's own pending
-    // entry, for THIS SAME tid, AND still sitting at `await_company` continues
-    // the winner dialog — button taps aren't covered by AGENT_PENDING_TTL_MS
-    // (that only fires from text-reply steps), so a `winner` entry can
-    // otherwise sit there indefinitely and hijack a later `co` tap. The tid
-    // check alone leaves the SAME-tender case open: `agent:start` neither
-    // writes nor clears pending, so an abandoned winner dialog at
-    // step:'confirm' would turn a fresh prepare of that same tender into a
-    // winner job for a tender that was never awarded. `await_company` is the
-    // only step from which `co` can legitimately continue a winner dialog.
-    // Anything else (no pending, different tender, different kind, later step)
-    // falls through to the ordinary prepare behaviour for the current tender.
+    // entry, for THIS SAME tid, continues the winner dialog — button taps
+    // aren't covered by AGENT_PENDING_TTL_MS (that only fires from text-reply
+    // steps), so a `winner` entry can otherwise sit there indefinitely and
+    // hijack a later `co` tap for an unrelated tender.
+    //
+    // Both `await_company` and `confirm` are legitimate continuation steps.
+    // `confirm` matters because the company picker message stays visible after
+    // a pick: tapping the WRONG company and then the right one on that same
+    // message is an ordinary correction, and it must land back on the winner
+    // confirmation — not fall through to prepare, which would ask for a price
+    // and then queue a full re-generation of the proposal.
+    // The SAME-tender hijack (C1) is closed on the other side instead: a fresh
+    // `agent:start` for this tender clears the abandoned winner dialog first
+    // (see the `start` branch above), so by the time `co` runs there is no
+    // winner pending left to continue. Anything else (no pending, different
+    // tender, different kind) falls through to the ordinary prepare behaviour.
     let pending, sha, isWinnerContinuation = false;
     try {
       ({ pending, sha } = await _loadAgentPending(env));
       const prior = pending?.[chatId];
       isWinnerContinuation = prior?.kind === 'winner'
         && prior?.tid === tid
-        && prior?.step === 'await_company';
+        && (prior?.step === 'await_company' || prior?.step === 'confirm');
     } catch (err) {
       console.error('worker: agent co load pending failed:', err.message);
       await ack('⚠️ Помилка, спробуй ще раз', true);
