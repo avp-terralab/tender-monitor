@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runOnce, isQuietHour, mergePending, emptyPending, expireHistory, logBroadcast, checkAgentHealth } from '../monitor.mjs';
+import { runOnce, isQuietHour, mergePending, emptyPending, expireHistory, logBroadcast, checkAgentHealth, winnerTendersFor } from '../monitor.mjs';
 
 // Use valid tender_id format throughout (UA-YYYY-MM-DD-NNNNNN-x)
 const T_X      = 'UA-2026-05-01-000001-a';
@@ -771,7 +771,42 @@ test('runOnce: award_qualified for OUR registration code passes winnerTenders to
     saveSeen: async () => {},
   });
   assert.equal(sent.length, 1);
-  assert.deepEqual(sent[0].opts, { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a' }] });
+  // The resolved winning entity travels WITH the button (fix I4): the per-tender
+  // job file is overwritten on a re-prepare, so the company must not be re-derived
+  // from it downstream.
+  assert.deepEqual(sent[0].opts, {
+    winnerTenders: [{
+      tenderId: 'UA-2026-05-14-008910-a',
+      company: 'ТЕРРАЛАБ АЙ ТІ',
+      slug: 'terralab_it',
+    }],
+  });
+});
+
+// I4: the resolved company must survive the trip to the button. Previously
+// winnerTendersFor computed it (companyForEdrpou) and threw it away, leaving the
+// Worker to guess the entity from a job file that a re-prepare can overwrite.
+test('winnerTendersFor: carries the awarded company and its ASCII slug', () => {
+  assert.deepEqual(
+    winnerTendersFor([{
+      tender_id: 'UA-1',
+      events: [
+        { type: 'award_qualified', supplier_edrpou: '99999999' },
+        { type: 'award_qualified', supplier_edrpou: '41087617' },
+      ],
+    }]),
+    [{ tenderId: 'UA-1', company: 'МАЙЛАБ', slug: 'maylab' }],
+  );
+});
+
+test('winnerTendersFor: competitor-only / missing edrpou / no events → empty', () => {
+  assert.deepEqual(winnerTendersFor([
+    { tender_id: 'UA-2', events: [{ type: 'award_qualified', supplier_edrpou: '99999999' }] },
+    { tender_id: 'UA-3', events: [{ type: 'award_qualified' }] },
+    { tender_id: 'UA-4', events: [{ type: 'status_change', supplier_edrpou: '41087617' }] },
+    { tender_id: 'UA-5' },
+  ]), []);
+  assert.deepEqual(winnerTendersFor(null), []);
 });
 
 test('runOnce: award_qualified for a COMPETITOR registration code does NOT pass winnerTenders', async () => {

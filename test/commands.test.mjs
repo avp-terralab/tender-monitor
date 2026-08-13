@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   parseCommand, mainKeyboard, buildAutoNotes, formatAddReply,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
@@ -3750,6 +3751,74 @@ test('admin notice mentions winner runs', () => {
   });
   assert.ok(s.includes('документи переможця'));
   assert.ok(s.includes('UA-1'));
+});
+
+// M4: the winner branch was silently dropping the `company` argument it is
+// handed — the entity decides the contract requisites, so it must be visible.
+test('admin notice: winner run names the company, and omits it cleanly when absent', () => {
+  const withCo = buildAgentAdminNotice({
+    kind: 'winner', actorName: 'Оксана', chatId: 555, tenderId: 'UA-1', company: 'МАЙЛАБ',
+  });
+  assert.ok(withCo.includes('МАЙЛАБ'), withCo);
+  assert.ok(withCo.includes('документи переможця'));
+  const noCo = buildAgentAdminNotice({
+    kind: 'winner', actorName: 'Оксана', chatId: 555, tenderId: 'UA-1', company: null,
+  });
+  assert.ok(!noCo.includes('·'), noCo);
+});
+
+// I5: a tender we WON but never prepared has no prepare job, so result.drive_link
+// is null — but result.winner_link points straight at the archive folder. Without
+// this the page rendered only ⬅ Назад and the package was unreachable.
+test('jobs page: winner-only job (no drive_link) still exposes 📁 from winner_link, no ✏️', () => {
+  const view = buildAgentJobsPage({
+    jobs: [{
+      tender_id: 'UA-7', status: 'done', job_type: 'winner', company: 'МАЙЛАБ',
+      result: { winner_link: 'https://d/win', winner_dir: 'G:\\x' },
+    }],
+  });
+  const flat = view.keyboard.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.url === 'https://d/win'), 'winner_link renders as a 📁 button');
+  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-7'));
+  assert.ok(!flat.some((b) => b.callback_data === 'agent:amend:UA-7'),
+    '✏️ Доробити still requires a prepared proposal');
+});
+
+test('jobs page: drive_link wins over winner_link when both are present, ✏️ stays', () => {
+  const view = buildAgentJobsPage({
+    jobs: [{
+      tender_id: 'UA-8', status: 'done', company: 'МАЙЛАБ',
+      result: { drive_link: 'https://d/prep', winner_link: 'https://d/win' },
+    }],
+  });
+  const flat = view.keyboard.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.url === 'https://d/prep'));
+  assert.ok(!flat.some((b) => b.url === 'https://d/win'));
+  assert.ok(flat.some((b) => b.callback_data === 'agent:amend:UA-8'));
+});
+
+test('jobs page: winner button offered for a job with no result at all', () => {
+  const view = buildAgentJobsPage({
+    jobs: [{ tender_id: 'UA-6', status: 'error', company: 'МАЙЛАБ' }],
+  });
+  const flat = view.keyboard.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-6'));
+  assert.ok(!flat.some((b) => b.callback_data === 'agent:amend:UA-6'));
+  assert.ok(!flat.some((b) => b.url));
+});
+
+// T6b: a Ukrainian ЄДРПОУ with a leading zero is ordinary (this repo's fixtures
+// carry 01998644). As a bare numeric literal such a key would be stored without
+// the zero and would never match, so the keys must be strings.
+test('OUR_EDRPOU keys are strings, so a leading-zero code could never be mangled', () => {
+  for (const k of Object.keys(OUR_EDRPOU)) {
+    assert.equal(typeof k, 'string');
+    assert.match(k, /^\d{8}$/, k);
+  }
+  const src = readFileSync(new URL('../commands.mjs', import.meta.url), 'utf8');
+  const block = src.slice(src.indexOf('export const OUR_EDRPOU'));
+  const body = block.slice(0, block.indexOf('};'));
+  assert.ok(!/^\s*\d+\s*:/m.test(body), 'OUR_EDRPOU must not use bare numeric keys');
 });
 
 test('buildArgPrompt: add → force_reply prompt + UA placeholder', () => {

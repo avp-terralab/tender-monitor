@@ -1,6 +1,6 @@
 import { diff, DEADLINE_THRESHOLD_KEYS } from './compare.mjs';
 import { formatDigest, formatDeadlineReminder, summarizeDigest, formatHeartbeat, formatNightDigest } from './telegram.mjs';
-import { companyForEdrpou } from './commands.mjs';
+import { companyForEdrpou, slugForCompany } from './commands.mjs';
 
 const TENDER_ID_RE = /^UA-\d{4}-\d{2}-\d{2}-\d{6}-[a-z]$/;
 
@@ -102,15 +102,31 @@ export function logBroadcast(items, item) {
   return [item, ...(items ?? [])];
 }
 
-// [{ tenderId }] for groups whose award_qualified event names one of our own
-// registration codes as the winning supplier — feeds sendDigest's
+// [{ tenderId, company, slug }] for groups whose award_qualified event names one
+// of our own registration codes as the winning supplier — feeds sendDigest's
 // winnerTenders option so it can show the «📄 Документи переможця» button.
 // companyForEdrpou handles a null/missing supplier_edrpou by returning null
 // (no throw), which naturally excludes such events here too.
+//
+// The resolved company travels WITH the button (as an ASCII slug in
+// callback_data): the job file is per-tender and gets overwritten when a tender
+// is re-prepared under a different legal entity, so falling back to the prior
+// job's company can fill the draft contract with the WRONG entity's requisites,
+// director, tax system and bank details. Prozorro's award tells us exactly who
+// won — that answer must not be thrown away here.
 export function winnerTendersFor(groups) {
-  return (groups ?? [])
-    .filter(g => g.events?.some(e => e.type === 'award_qualified' && companyForEdrpou(e.supplier_edrpou)))
-    .map(g => ({ tenderId: g.tender_id }));
+  const out = [];
+  for (const g of groups ?? []) {
+    let company = null;
+    for (const e of g.events ?? []) {
+      if (e.type !== 'award_qualified') continue;
+      const co = companyForEdrpou(e.supplier_edrpou);
+      if (co) { company = co; break; }
+    }
+    if (!company) continue;
+    out.push({ tenderId: g.tender_id, company, slug: slugForCompany(company) });
+  }
+  return out;
 }
 
 export async function runOnce(deps) {

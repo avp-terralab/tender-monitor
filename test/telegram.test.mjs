@@ -774,6 +774,44 @@ test('winnerButtonRow: refuses a viewer role, produces agent:winner:<tenderId> f
   assert.equal(winnerButtonRow('UA-1', null), null);
 });
 
+// I4: the winning entity resolved from the award's ЄДРПОУ rides along in
+// callback_data, so the Worker does not have to re-derive it from the
+// (overwritable) per-tender job file.
+test('winnerButtonRow: appends the company slug when one is known, and stays inside 64 bytes', () => {
+  assert.deepEqual(
+    winnerButtonRow('UA-2026-05-14-008910-a', 'admin', 'terralab_consulting'),
+    [{
+      text: '📄 Документи переможця',
+      callback_data: 'agent:winner:UA-2026-05-14-008910-a:terralab_consulting',
+    }],
+  );
+  const data = winnerButtonRow('UA-2026-05-14-008910-a', 'admin', 'terralab_consulting')[0].callback_data;
+  assert.ok(Buffer.byteLength(data, 'utf8') <= 64, `callback_data is ${Buffer.byteLength(data, 'utf8')} bytes`);
+  // Кнопка зі сторінки задач слуга не має — формат лишається без хвоста.
+  assert.equal(
+    winnerButtonRow('UA-1', 'admin', null)[0].callback_data,
+    'agent:winner:UA-1',
+  );
+});
+
+test('sendDigest: winnerTenders entry with a slug carries it into callback_data', async () => {
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    calls.push(opts.body.toString());
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  await sendDigest(
+    { token: 'TOK', chatId: '1', fetch: fakeFetch },
+    'UA-2026-05-14-008910-a here',
+    {
+      winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a', company: 'МАЙЛАБ', slug: 'maylab' }],
+      role: 'admin',
+    },
+  );
+  const body = decodeURIComponent(calls[0].replace(/\+/g, ' '));
+  assert.match(body, /"callback_data":"agent:winner:UA-2026-05-14-008910-a:maylab"/);
+});
+
 test('sendDigest: renders the winner button for an entry in winnerTenders and not otherwise', async () => {
   const calls = [];
   const fakeFetch = async (url, opts) => {
