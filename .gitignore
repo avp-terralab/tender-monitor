@@ -8,3 +8,6 @@ node_modules/
 /*.png
 # Local sub-agent worktrees (created by AI assistant skills)
 /.claude/
+/.worktrees/
+# Scratch workspace of the subagent-driven-development skill (ledger, briefs, diffs)
+/.superpowers/
