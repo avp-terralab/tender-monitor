@@ -1782,6 +1782,26 @@ export function slugForCompany(name) {
   return entry ? entry[0] : null;
 }
 
+// Наші юрособи за ЄДРПОУ. Значення — РІВНО ті рядки, що в AGENT_COMPANIES:
+// агент валідує назву компанії проти свого COMPANIES і за нею ж знаходить теку
+// активів. Використовується, щоб показати кнопку «Документи переможця» лише
+// тоді, коли переможцем визнано НАС.
+export const OUR_EDRPOU = {
+  41087617: 'МАЙЛАБ',
+  39376596: 'ТЕРРАЛАБ АЙ ТІ',
+  43308066: 'ТЕРРАЛАБ КОНСАЛТИНГ',
+  44643484: 'ТЕРРАЛАБ СУПРОВІД',
+  46104055: 'ТЕРРАЛАБ ПРО',
+};
+
+export function companyForEdrpou(edrpou) {
+  if (edrpou === null || edrpou === undefined) return null;
+  const key = String(edrpou).trim();
+  return Object.prototype.hasOwnProperty.call(OUR_EDRPOU, key)
+    ? OUR_EDRPOU[key]
+    : null;
+}
+
 // Entry button shown under a tender for roles that may drive the agent
 // (admin + editor since 11.08.2026). Returns a single-button row (to splice
 // into an existing keyboard) or null for viewers, so the caller simply omits it.
@@ -1909,7 +1929,7 @@ export function buildAgentJobsPage({ jobs, page = 0 }) {
   const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
   const body = slice.map((j) => {
     const icon = AGENT_JOB_ICONS[j.status] ?? '•';
-    const mark = j.job_type === 'amend' ? '✏️ ' : '';
+    const mark = j.job_type === 'amend' ? '✏️ ' : (j.job_type === 'winner' ? '📄 ' : '');
     const co = j.company ? ` · ${escapeHtml(j.company)}` : '';
     const tid = escapeHtml(j.tender_id ?? '');
     return `${mark}${icon} <a href="https://prozorro.gov.ua/tender/${tid}">${tid}</a>${co}`;
@@ -1920,6 +1940,9 @@ export function buildAgentJobsPage({ jobs, page = 0 }) {
       rows.push([
         { text: `📁 ${j.tender_id}`, url: j.result.drive_link },
         { text: '✏️ Доробити', callback_data: `agent:amend:${j.tender_id}` },
+      ]);
+      rows.push([
+        { text: '📄 Документи переможця', callback_data: `agent:winner:${j.tender_id}` },
       ]);
     }
   }
@@ -1949,6 +1972,9 @@ export function buildAgentJob({ tenderId, link, company, price, requestedBy, cre
 // admin (no self-notification). Free text (actor name) is HTML-escaped.
 export function buildAgentAdminNotice({ kind, actorName, chatId, tenderId, company, price, instruction }) {
   const who = `${escapeHtml(sanitizeActor(actorName))} (<code>${escapeHtml(String(chatId))}</code>)`;
+  if (kind === 'winner') {
+    return `🤖 ${who} запустив документи переможця по ${escapeHtml(tenderId)}`;
+  }
   if (kind === 'amend') {
     const what = instruction ? `\n✏️ ${escapeHtml(instruction)}` : '';
     return `🤖 ${who} надіслав агенту доробку по ${escapeHtml(tenderId)}${what}`;
@@ -1990,6 +2016,28 @@ export function buildAgentAmendJob({ tenderId, instruction, company, target, req
 export function buildAgentAmendConfirmText({ tenderId, instruction }) {
   const short = instruction.length > 300 ? `${instruction.slice(0, 300)}…` : instruction;
   return `✏️ Доробити ${tenderId}:\n«${escapeHtml(short)}»`;
+}
+
+// Winner job: заповнити проєкт договору й зібрати документи переможця.
+// Без `price`. `target` переноситься з попереднього job-а, коли він є; якщо
+// агент цей тендер не готував — поля немає взагалі.
+export function buildAgentWinnerJob({ tenderId, company, target, requestedBy, createdAt }) {
+  const job = {
+    tender_id: tenderId,
+    link: `https://prozorro.gov.ua/tender/${tenderId}`,
+    job_type: 'winner',
+    company,
+    requested_by: requestedBy,
+    status: 'pending',
+    created_at: createdAt,
+  };
+  if (target) job.target = target;
+  return job;
+}
+
+export function buildAgentWinnerConfirmText({ tenderId, company, entityName }) {
+  const ent = entityName ? `\nЗамовник: ${escapeHtml(entityName)}` : '';
+  return `📄 Документи переможця\nТендер: ${escapeHtml(tenderId)}${ent}\nКомпанія: ${escapeHtml(company)}`;
 }
 
 // Pure router for the agent MENU callbacks (menu/pick/jobs). Returns null for

@@ -25,6 +25,7 @@ import {
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage,
   handleAgentMenuNav,
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
+  OUR_EDRPOU, companyForEdrpou, buildAgentWinnerJob, buildAgentWinnerConfirmText,
   monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
   buildWatchedEntityCard, handleWatchedNav,
   buildArgPrompt, commandFromReplyPrompt,
@@ -3684,6 +3685,71 @@ test('buildAgentJobsPage: amend job shows ✏️ marker in its line', () => {
     job('UA-2026-06-01-000002-a', 'running', { job_type: 'amend' }),
   ], page: 0 });
   assert.match(v.text, /✏️/);
+});
+
+test('OUR_EDRPOU maps our codes to AGENT_COMPANIES names', () => {
+  assert.equal(companyForEdrpou('39376596'), 'ТЕРРАЛАБ АЙ ТІ');
+  assert.equal(companyForEdrpou('41087617'), 'МАЙЛАБ');
+  assert.equal(companyForEdrpou('00000000'), null);
+  assert.equal(companyForEdrpou(undefined), null);
+  // числовий ЄДРПОУ з API теж має резолвитись
+  assert.equal(companyForEdrpou(39376596), 'ТЕРРАЛАБ АЙ ТІ');
+  // списки не мають розʼїхатись
+  const known = new Set(Object.values(AGENT_COMPANIES));
+  for (const name of Object.values(OUR_EDRPOU)) assert.ok(known.has(name), name);
+  assert.equal(Object.keys(OUR_EDRPOU).length, 5);
+});
+
+test('buildAgentWinnerJob has no price and carries target', () => {
+  const job = buildAgentWinnerJob({
+    tenderId: 'UA-1',
+    company: 'МАЙЛАБ',
+    target: { drive_link: 'https://d/1', package_dir: 'P', published_dir: 'PUB' },
+    requestedBy: '555',
+    createdAt: '2026-08-13T10:00:00.000Z',
+  });
+  assert.equal(job.job_type, 'winner');
+  assert.equal(job.status, 'pending');
+  assert.equal(job.link, 'https://prozorro.gov.ua/tender/UA-1');
+  assert.equal(job.price, undefined);
+  assert.equal(job.target.published_dir, 'PUB');
+  assert.equal(job.requested_by, '555');
+});
+
+test('buildAgentWinnerJob omits target when there is no prior job', () => {
+  const job = buildAgentWinnerJob({
+    tenderId: 'UA-2', company: 'МАЙЛАБ', target: null,
+    requestedBy: '555', createdAt: '2026-08-13T10:00:00.000Z',
+  });
+  assert.equal(job.target, undefined);
+  assert.ok(!('target' in job));
+});
+
+test('jobs page shows the winner button on a done proposal', () => {
+  const jobs = [{
+    tender_id: 'UA-1', status: 'done', company: 'МАЙЛАБ',
+    result: { drive_link: 'https://d/1' },
+  }];
+  const view = buildAgentJobsPage({ jobs });
+  const flat = view.keyboard.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-1'));
+  // наявна кнопка доробки лишилась
+  assert.ok(flat.some((b) => b.callback_data === 'agent:amend:UA-1'));
+});
+
+test('jobs page marks winner jobs with an icon', () => {
+  const view = buildAgentJobsPage({
+    jobs: [{ tender_id: 'UA-9', status: 'running', job_type: 'winner' }],
+  });
+  assert.ok(view.text.includes('📄'));
+});
+
+test('admin notice mentions winner runs', () => {
+  const s = buildAgentAdminNotice({
+    kind: 'winner', actorName: 'Оксана', chatId: 555, tenderId: 'UA-1',
+  });
+  assert.ok(s.includes('документи переможця'));
+  assert.ok(s.includes('UA-1'));
 });
 
 test('buildArgPrompt: add → force_reply prompt + UA placeholder', () => {
