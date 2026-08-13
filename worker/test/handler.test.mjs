@@ -3029,6 +3029,47 @@ test('agent:co WITHOUT a winner pending (plain prepare) → unaffected, still as
   assert.match(sent.at(-1).text, /Введіть ціну/);
 });
 
+// Fix round 1: `co` must scope the winner-vs-prepare routing to the SAME tid
+// as the current callback, not just `pending[chatId]?.kind`. A stale winner
+// pending left over from an abandoned tender A must not hijack a later,
+// unrelated prepare dialog for tender B.
+const AGENT_TID_B = 'UA-2026-05-01-010777-b';
+
+test('agent:co for tender B with a STALE winner pending from tender A → falls through to prepare (price prompt)', async () => {
+  const { deps, store, sent } = makeAgentDeps();
+  store.pending['123'] = { tid: AGENT_TID, kind: 'winner', step: 'await_company', at: '2026-06-21T10:00:00.000Z' };
+  await runHandler({ update: CB(`agent:co:${AGENT_TID_B}:maylab`), env: ENV, deps });
+  assert.deepEqual(store.pending['123'], {
+    tid: AGENT_TID_B, company: 'МАЙЛАБ', step: 'await_price', at: '2026-06-21T10:00:00.000Z',
+  }, 'pending is rewritten as an ordinary prepare dialog scoped to tender B, not carried over from A');
+  assert.match(sent.at(-1).text, /Введіть ціну/);
+  assert.ok(!/Документи переможця/.test(sent.at(-1).text), 'must not show the winner confirm for an unrelated tender');
+});
+
+test('agent:co for tender B with stale winner pending from A, then price + confirm → ordinary job with price, no job_type winner', async () => {
+  const { deps, store, jobs } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+  });
+  store.pending['123'] = { tid: AGENT_TID, kind: 'winner', step: 'await_company', at: '2026-06-21T10:00:00.000Z' };
+  await runHandler({ update: CB(`agent:co:${AGENT_TID_B}:maylab`), env: ENV, deps });
+  await runHandler({ update: agentMsg('50000'), env: ENV, deps });
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID_B}`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].job.tender_id, AGENT_TID_B);
+  assert.equal(jobs[0].job.price, '50000');
+  assert.equal('job_type' in jobs[0].job, false, 'must be an ordinary prepare job, not job_type: winner');
+});
+
+test('agent:co with a SAME-tid winner pending → still routes to the winner confirmation (regression guard)', async () => {
+  const { deps, store, sent } = makeAgentDeps();
+  store.pending['123'] = { tid: AGENT_TID, kind: 'winner', step: 'await_company', at: '2026-06-21T10:00:00.000Z' };
+  await runHandler({ update: CB(`agent:co:${AGENT_TID}:maylab`), env: ENV, deps });
+  assert.deepEqual(store.pending['123'], {
+    tid: AGENT_TID, kind: 'winner', company: 'МАЙЛАБ', step: 'confirm', at: '2026-06-21T10:00:00.000Z',
+  });
+  assert.match(sent.at(-1).text, /Документи переможця/);
+});
+
 test('agent:confirm with kind=winner → winner job saved, target from prior done job, price omitted', async () => {
   const { deps, store, sent, jobs, acks } = makeAgentDeps({
     loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Едітор', role: 'editor' }], sha: 's' }),

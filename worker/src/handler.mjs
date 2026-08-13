@@ -1357,19 +1357,24 @@ async function handleAgentCallback({
 
     // Company selection is shared between `prepare` (→ await_price) and
     // `winner` (→ straight to confirm, no price). Only winner's own pending
-    // entry carries kind: 'winner' — every other dialog (including a fresh
-    // co tap with no pending at all) falls through to the prepare behaviour.
-    let pending, sha, priorKind = null;
+    // entry, for THIS SAME tid, continues the winner dialog — button taps
+    // aren't covered by AGENT_PENDING_TTL_MS (that only fires from text-reply
+    // steps), so a `winner` entry can otherwise sit there indefinitely and
+    // hijack an unrelated later `co` tap for a different tender. Anything
+    // else (no pending, different tender, different kind) falls through to
+    // the ordinary prepare behaviour for the current tender.
+    let pending, sha, isWinnerContinuation = false;
     try {
       ({ pending, sha } = await _loadAgentPending(env));
-      priorKind = pending?.[chatId]?.kind ?? null;
+      const prior = pending?.[chatId];
+      isWinnerContinuation = prior?.kind === 'winner' && prior?.tid === tid;
     } catch (err) {
       console.error('worker: agent co load pending failed:', err.message);
       await ack('⚠️ Помилка, спробуй ще раз', true);
       return;
     }
 
-    if (priorKind === 'winner') {
+    if (isWinnerContinuation) {
       try {
         pending[chatId] = { tid, kind: 'winner', company, step: 'confirm', at: _now().toISOString() };
         await _saveAgentPending(env, pending, sha);
