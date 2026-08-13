@@ -103,6 +103,17 @@
 
 ## Потік у боті
 
+> **Виправлено 13.08.2026 після рев'ю (Task 9):** опис нижче писався до
+> реалізації і розходиться з кодом у двох місцях. Callback — `agent:winner:<tid>`
+> (з префіксом `agent:`, як в усіх інших дій агента), не `winner:<tenderId>`.
+> Матч ЄДРПОУ й перевірку ролі робить НЕ `telegram.mjs` напряму — `monitor.mjs`
+> (`winnerTendersFor`) звіряє `e.supplier_edrpou` проти `OUR_EDRPOU` (через
+> `companyForEdrpou`) ще ДО виклику `sendDigest` і передає готовий список
+> `winnerTenders`; `winnerButtonRow(tenderId, role)` усередині `sendDigest`
+> перевіряє тільки роль, інлайн, БЕЗ імпорту `canUseAgent` з `commands.mjs` —
+> `telegram.mjs` свідомо не імпортує нічого з `commands.mjs` (уникнення циклу
+> `telegram.mjs` ↔ `commands.mjs`).
+
 ### Вхід 1 — кнопка під сповіщенням
 
 `telegram.mjs` формує сповіщення про подію `award_qualified`. Додається кнопка

@@ -994,6 +994,16 @@ git commit -m "feat(bot): OUR_EDRPOU, winner job builder and jobs-page button"
 - Consumes: `companyForEdrpou`, `canUseAgent` з `commands.mjs` (Task 6).
 - Produces: `winnerButtonRow(tenderId, supplierEdrpou, role) -> [{text, callback_data}] | null`.
 
+> **Виправлено 13.08.2026 після рев'ю (Task 9):** у шипнутому коді сигнатура —
+> `winnerButtonRow(tenderId, role)`, БЕЗ `supplierEdrpou`. Матч ЄДРПОУ переможця
+> проти `OUR_EDRPOU` (через `companyForEdrpou`) робить `monitor.mjs`
+> (`winnerTendersFor`) ще ДО виклику `sendDigest`, а не сам `winnerButtonRow`. Роль
+> перевіряється в `winnerButtonRow` інлайн (`role === 'admin' || role === 'editor'`),
+> а НЕ через імпорт `canUseAgent` з `commands.mjs` — `telegram.mjs` свідомо не
+> імпортує нічого з `commands.mjs`, щоб не створювати цикл `telegram.mjs` ↔
+> `commands.mjs`. Псевдокод нижче (Step 3, Step 5) лишений як історія задуму —
+> дивись фактичний код у `telegram.mjs`/`monitor.mjs`.
+
 - [ ] **Step 1: Написати падаючі тести**
 
 ```javascript
@@ -1221,6 +1231,15 @@ Expected: FAIL — job не збережено (гілки `winner` ще нем�
 ```
 
 - [ ] **Step 5: Обробити вибір компанії для winner у гілці `co`**
+
+> **Виправлено 13.08.2026 після рев'ю (Task 9):** псевдокод нижче гілкує лише за
+> `priorKind === 'winner'` — це був реальний баг: pending-запис `kind:'winner'` не
+> має TTL на кнопкових кроках (`AGENT_PENDING_TTL_MS` спрацьовує тільки на
+> текстових), тож старий запис міг зависнути й перехопити наступний `co`-тап для
+> ЗОВСІМ ІНШОГО тендера. Шипнутий код у `handler.mjs` додатково звіряє
+> `prior?.tid === tid` — `isWinnerContinuation = prior?.kind === 'winner' &&
+> prior?.tid === tid`; продовжує winner-діалог тільки коли обидва збігаються,
+> інакше падає в звичайну prepare-гілку для ПОТОЧНОГО тендера.
 
 У гілці `if (action === 'co')` замінити запис pending так, щоб для winner не питалась ціна:
 
