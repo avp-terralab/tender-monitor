@@ -1952,8 +1952,15 @@ export function buildAgentJobsPage({ jobs, page = 0 }) {
     if (folderUrl) row.push({ text: `📁 ${j.tender_id}`, url: folderUrl });
     if (prepared) row.push({ text: '✏️ Доробити', callback_data: `agent:amend:${j.tender_id}` });
     if (row.length > 0) rows.push(row);
+    // Кнопка переможця виводиться для КОЖНОЇ задачі з tender_id, тож у межах
+    // сторінки (PAGE_SIZE) їх може бути до шести. Раніше підпис був сталою
+    // «📄 Документи переможця», а тендер жив лише в callback_data — поруч
+    // виходили візуально НЕВІДРІЗНЯЛЬНІ кнопки (для pending/running/error рядка
+    // з 📁 над ними немає, отже й сусідство не ідентифікує). Помилковий дотик
+    // мовчки запускає прогін агента, який пише в спільний ручний архів ЧУЖОГО
+    // тендера, тож підпис має називати свій тендер сам.
     rows.push([
-      { text: '📄 Документи переможця', callback_data: `agent:winner:${j.tender_id}` },
+      { text: `📄 Документи переможця ${j.tender_id}`, callback_data: `agent:winner:${j.tender_id}` },
     ]);
   }
   const nav = buildPageNavRow(p, pages, (x) => `agent:jobs:${x}`, 'agent:noop');

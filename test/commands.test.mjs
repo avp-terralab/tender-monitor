@@ -3807,6 +3807,34 @@ test('jobs page: winner button offered for a job with no result at all', () => {
   assert.ok(!flat.some((b) => b.url));
 });
 
+// R1: the winner row is emitted for EVERY job with a tender_id, but its label
+// used to be the bare constant `📄 Документи переможця` — the tender id lived
+// only in callback_data. A page of pending/running/error jobs (PAGE_SIZE is 6)
+// therefore rendered up to six visually identical, unidentifiable buttons, and
+// tapping the wrong one silently starts an agent run that writes into a
+// hand-maintained shared archive for the WRONG tender. Each winner button must
+// name its own tender.
+test('jobs page: each winner button names its own tender id (3 jobs → 3 distinct labels)', () => {
+  const view = buildAgentJobsPage({
+    jobs: [
+      { tender_id: 'UA-A', status: 'pending' },
+      { tender_id: 'UA-B', status: 'running' },
+      { tender_id: 'UA-C', status: 'error' },
+    ],
+  });
+  const winners = view.keyboard.inline_keyboard.flat()
+    .filter((b) => typeof b.callback_data === 'string' && b.callback_data.startsWith('agent:winner:'));
+  assert.equal(winners.length, 3);
+  for (const tid of ['UA-A', 'UA-B', 'UA-C']) {
+    const btn = winners.find((b) => b.callback_data === `agent:winner:${tid}`);
+    assert.ok(btn, `no winner button for ${tid}`);
+    assert.ok(btn.text.includes(tid),
+      `winner button for ${tid} must be self-identifying, got ${JSON.stringify(btn.text)}`);
+  }
+  assert.equal(new Set(winners.map((b) => b.text)).size, 3,
+    `winner labels must be distinct, got ${JSON.stringify(winners.map((b) => b.text))}`);
+});
+
 // T6b: a Ukrainian ЄДРПОУ with a leading zero is ordinary (this repo's fixtures
 // carry 01998644). As a bare numeric literal such a key would be stored without
 // the zero and would never match, so the keys must be strings.
