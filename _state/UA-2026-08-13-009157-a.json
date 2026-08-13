@@ -1,0 +1,98 @@
+{
+  "tender_id": "UA-2026-08-13-009157-a",
+  "saved_at": "2026-08-13T12:55:49.483Z",
+  "snapshot": {
+    "tender_id": "UA-2026-08-13-009157-a",
+    "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії \nДК 021:2015 72250000-2 Послуги, пов’язані із системами та підтримкою",
+    "status": "active.tendering",
+    "dateModified": "2026-08-13T15:16:29.998458+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-08-21T09:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"СТАРОКОСТЯНТИНІВСЬКА БАГАТОПРОФІЛЬНА ЛІКАРНЯ\" СТАРОКОСТЯНТИНІВСЬКОЇ МІСЬКОЇ РАДИ ХМЕЛЬНИЦЬКОГО РАЙОНУ ХМЕЛЬНИЦЬКОЇ ОБЛАСТІ",
+      "edrpou": "02004479"
+    },
+    "value": {
+      "amount": 236666.67,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72250000-2",
+      "description": "Послуги, пов’язані із системами та підтримкою",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72250000-2"
+    ],
+    "contact": {
+      "name": "Лавриненко Оксана",
+      "email": "sneg018434@ukr.net",
+      "telephone": "380673342556"
+    },
+    "documents": [
+      {
+        "id": "667ade59ab844c07824fb87ea9bf8b38",
+        "title": "Додаток 7 (перелік документів для переможця)..docx",
+        "documentType": null,
+        "datePublished": "2026-08-13T15:14:13.558502+03:00"
+      },
+      {
+        "id": "21e2bcad125147f79385808138761eaf",
+        "title": "Додаток 2 (підстави відхилення)..docx",
+        "documentType": null,
+        "datePublished": "2026-08-13T15:14:13.558502+03:00"
+      },
+      {
+        "id": "c01f9b707dcf4a0ca91c4dbd278b8a85",
+        "title": "Додаток 4 Проєкт договору.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-08-13T15:14:13.558502+03:00"
+      },
+      {
+        "id": "c94044b04ac44a4788c7c2593b109e02",
+        "title": "Тендерна документація.docx",
+        "documentType": null,
+        "datePublished": "2026-08-13T15:14:13.558502+03:00"
+      },
+      {
+        "id": "5a656478d14546a59df7efd5202f0dad",
+        "title": "Додаток 3 Технічні вимоги.docx",
+        "documentType": null,
+        "datePublished": "2026-08-13T15:14:13.558502+03:00"
+      },
+      {
+        "id": "58e9cbdd2fa94e1380206646b4dd8057",
+        "title": "додаток 5 Цінова пропозиція.DOCX",
+        "documentType": null,
+        "datePublished": "2026-08-13T15:14:13.558502+03:00"
+      },
+      {
+        "id": "ccb478d940454702b31f80fe60006f11",
+        "title": "додаток 1 Кваліфікаційні критерії.docx",
+        "documentType": null,
+        "datePublished": "2026-08-13T15:14:13.558502+03:00"
+      },
+      {
+        "id": "2b8d4d7d77b14dfbb80799f1824b25de",
+        "title": "Додаток 6 документи для Учасника.docx",
+        "documentType": null,
+        "datePublished": "2026-08-13T15:14:13.558502+03:00"
+      },
+      {
+        "id": "2d1e533987654589baeabae30851c905",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-08-13T15:16:11.162747+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
