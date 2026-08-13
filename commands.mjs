@@ -1726,35 +1726,21 @@ export function buildWelcomeText(label, role) {
   ].join('\n');
 }
 
-const VIEW_COMMANDS = [
-  { command: 'help',    description: 'Список команд' },
-  { command: 'whoami',  description: 'Твоя роль і стан сповіщень' },
-  { command: 'notify',  description: 'Увімкнути/вимкнути сповіщення' },
-  { command: 'info',    description: 'Список або деталі тендерів' },
-  { command: 'watched', description: 'Список замовників' },
-  { command: 'archive', description: 'Архів завершених закупівель' },
-];
-const EDIT_COMMANDS = [
-  { command: 'add',       description: 'Додати тендер у моніторинг' },
-  { command: 'remove',    description: 'Видалити тендер' },
-  { command: 'watch',     description: 'Стежити за замовником (ЄДРПОУ)' },
-  { command: 'unarchive', description: 'Видалити тендер з архіву' },
-  { command: 'agent',     description: 'Надіслати тендер агенту' },
-];
-const ADMIN_COMMANDS = [
-  { command: 'status',  description: 'Здоровʼя бота' },
-  { command: 'invite',  description: 'Створити invite-посилання' },
-  { command: 'role',    description: 'Змінити роль користувача' },
-  { command: 'invites', description: 'Активні invite-посилання' },
-  { command: 'users',   description: 'Список користувачів' },
-  { command: 'revoke',  description: 'Видалити користувача' },
-  { command: 'log',     description: 'Журнал дій користувачів' },
+// Telegram's "/" autocomplete menu — deliberately ONE entry for every role.
+// Everything else is already reachable from the reply keyboard or from
+// «❓ Допомога», so a 6/11/18-command list was pure clutter. /start is the one
+// entry that earns its place: the reply keyboard occasionally disappears, and
+// /start is what brings it back — this is a recovery affordance, not decoration.
+// The commands themselves keep working exactly as before; they are simply no
+// longer suggested. The full role-filtered list lives in buildHelpText().
+const START_ONLY_COMMANDS = [
+  { command: 'start', description: 'Головне меню' },
 ];
 
 export const BOT_COMMANDS_BY_ROLE = {
-  viewer: VIEW_COMMANDS,
-  editor: [...VIEW_COMMANDS, ...EDIT_COMMANDS],
-  admin:  [...VIEW_COMMANDS, ...EDIT_COMMANDS, ...ADMIN_COMMANDS],
+  viewer: START_ONLY_COMMANDS,
+  editor: START_ONLY_COMMANDS,
+  admin:  START_ONLY_COMMANDS,
 };
 
 // ── Agent trigger (Phase 3) ────────────────────────────────────────────────

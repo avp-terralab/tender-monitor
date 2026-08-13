@@ -955,7 +955,7 @@ test('runHandler: /start <token> redeem with role:editor → setMyCommands for n
   const targetCall = calls.find(c => c.chatId === '777');
   assert.ok(targetCall, 'expected setMyCommands for new redeemer 777');
   const names = targetCall.commands.map(c => c.command);
-  assert.ok(names.includes('add'), 'editor commands should include /add');
+  assert.deepEqual(names, ['start'], 'the "/" menu is one entry for every role');
 });
 
 test('runHandler: /start <token> redeem with role:viewer → setMyCommands for new viewer', async () => {
@@ -985,8 +985,7 @@ test('runHandler: /start <token> redeem with role:viewer → setMyCommands for n
   const targetCall = calls.find(c => c.chatId === '888');
   assert.ok(targetCall, 'expected setMyCommands for new redeemer 888');
   const names = targetCall.commands.map(c => c.command);
-  assert.ok(!names.includes('add'), 'viewer commands should NOT include /add');
-  assert.ok(names.includes('info'), 'viewer commands should include /info');
+  assert.deepEqual(names, ['start'], 'the "/" menu is one entry for every role');
 });
 
 test('runHandler: /start <token> invalid → reply, no mutations', async () => {
@@ -2050,9 +2049,7 @@ test('runHandler: /start (no token), viewer → setMyCommands called with viewer
   assert.equal(calls.length, 1);
   assert.equal(calls[0].chatId, '456');
   const names = calls[0].commands.map(c => c.command);
-  assert.ok(names.includes('info'));
-  assert.ok(!names.includes('add'));
-  assert.ok(!names.includes('invite'));
+  assert.deepEqual(names, ['start'], 'the "/" menu is one entry for every role');
 });
 
 test('runHandler: /start (no token), editor → setMyCommands with editor set', async () => {
@@ -2068,8 +2065,7 @@ test('runHandler: /start (no token), editor → setMyCommands with editor set', 
   });
   assert.equal(calls.length, 1);
   const names = calls[0].commands.map(c => c.command);
-  assert.ok(names.includes('add'));
-  assert.ok(!names.includes('invite'));
+  assert.deepEqual(names, ['start'], 'the "/" menu is one entry for every role');
 });
 
 test('runHandler: /start (no token), admin → setMyCommands with admin set', async () => {
@@ -2084,8 +2080,7 @@ test('runHandler: /start (no token), admin → setMyCommands with admin set', as
   });
   assert.equal(calls.length, 1);
   const names = calls[0].commands.map(c => c.command);
-  assert.ok(names.includes('invite'));
-  assert.ok(names.includes('role'));
+  assert.deepEqual(names, ['start'], 'the "/" menu is one entry for every role');
 });
 
 test('runHandler: /start from non-allowed → setMyCommands NOT called', async () => {
@@ -2115,11 +2110,12 @@ test('runHandler: /role editor 456 success → setMyCommands for target chat 456
     env: ENV,
     deps,
   });
-  // Expect at least one call with chatId 456 and editor commands
+  // Expect at least one call with chatId 456 (the "/" menu is re-sent on the
+  // role change; its contents are role-independent — one /start entry).
   const targetCall = calls.find(c => c.chatId === '456');
   assert.ok(targetCall, 'expected setMyCommands for target chat 456');
   const names = targetCall.commands.map(c => c.command);
-  assert.ok(names.includes('add'));
+  assert.deepEqual(names, ['start'], 'the "/" menu is one entry for every role');
 });
 
 test('runHandler: /role editor 456 success → target user receives role-change notice', async () => {
