@@ -2997,6 +2997,77 @@ test('agent:winner with no prior job at all → asks for company (not an error)'
   assert.ok(!acks.some(a => /⚠️/.test(a.text ?? '')), 'no error ack for a missing prior job');
 });
 
+// I4: a tender re-prepared under a different legal entity overwrites the
+// per-tender job file, so the prior job can easily name an entity that LOST.
+// Prozorro's award tells us who actually won — that slug, carried in the
+// callback, must beat the job file.
+test('agent:winner with a slug in the callback → slug wins over a conflicting prior job', async () => {
+  let loadedJob = false;
+  const { deps, store, sent } = makeAgentDeps({
+    loadAgentJob: async () => {
+      loadedJob = true;
+      return { tender_id: AGENT_TID, status: 'done', company: 'ТЕРРАЛАБ ПРО', result: { drive_link: 'https://d/x' } };
+    },
+  });
+  await runHandler({ update: CB(`agent:winner:${AGENT_TID}:maylab`), env: ENV, deps });
+  assert.equal(store.pending['123'].company, 'МАЙЛАБ',
+    'the awarded entity from the callback, not the prior job company');
+  assert.equal(store.pending['123'].step, 'confirm');
+  assert.match(sent.at(-1).text, /МАЙЛАБ/);
+  assert.ok(!/ТЕРРАЛАБ ПРО/.test(sent.at(-1).text));
+  assert.equal(loadedJob, false, 'a known winner needs no job-file lookup at all');
+});
+
+test('agent:winner with an UNKNOWN slug → falls back to the prior job company', async () => {
+  const { deps, store, sent } = makeAgentDeps({
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'done', company: 'ТЕРРАЛАБ ПРО' }),
+  });
+  await runHandler({ update: CB(`agent:winner:${AGENT_TID}:not_a_company`), env: ENV, deps });
+  assert.equal(store.pending['123'].company, 'ТЕРРАЛАБ ПРО');
+  assert.match(sent.at(-1).text, /ТЕРРАЛАБ ПРО/);
+});
+
+test('agent:winner from the jobs page (no slug, no prior job) → still falls back to the picker', async () => {
+  const { deps, store, sent } = makeAgentDeps();
+  await runHandler({ update: CB(`agent:winner:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(store.pending['123'].step, 'await_company');
+  assert.match(sent.at(-1).text, /Оберіть компанію-переможця/);
+});
+
+// M2: the confirmation showed only a tender id and a company. The customer name
+// comes from the monitor's own saved snapshot — no Prozorro round-trip — and is
+// purely cosmetic (it gates nothing).
+test('agent:winner confirm text names the замовник when a saved snapshot has one', async () => {
+  const { deps, sent } = makeAgentDeps({
+    loadTenderState: async () => ({
+      procuringEntity: { name: 'Комунальне некомерційне підприємство «Черкаська міська інфекційна лікарня»' },
+    }),
+  });
+  await runHandler({ update: CB(`agent:winner:${AGENT_TID}:maylab`), env: ENV, deps });
+  assert.match(sent.at(-1).text, /Замовник: КНП «Черкаська міська інфекційна лікарня»/);
+  assert.match(sent.at(-1).text, /МАЙЛАБ/);
+});
+
+test('agent:winner confirm text: no saved snapshot / lookup throws → id + company only, no crash', async () => {
+  const { deps, sent, acks } = makeAgentDeps({
+    loadTenderState: async () => { throw new Error('gh down'); },
+  });
+  await runHandler({ update: CB(`agent:winner:${AGENT_TID}:maylab`), env: ENV, deps });
+  assert.match(sent.at(-1).text, /Документи переможця/);
+  assert.ok(!/Замовник:/.test(sent.at(-1).text));
+  assert.equal(acks.length, 1);
+  assert.ok(!acks.some(a => /⚠️/.test(a.text ?? '')));
+});
+
+test('agent:co winner continuation also names the замовник', async () => {
+  const { deps, store, sent } = makeAgentDeps({
+    loadTenderState: async () => ({ procuringEntity: { name: 'КНП «Тестова лікарня»' } }),
+  });
+  store.pending['123'] = { tid: AGENT_TID, kind: 'winner', step: 'await_company', at: '2026-06-21T10:00:00.000Z' };
+  await runHandler({ update: CB(`agent:co:${AGENT_TID}:maylab`), env: ENV, deps });
+  assert.match(sent.at(-1).text, /Замовник: КНП «Тестова лікарня»/);
+});
+
 test('agent:winner when loadAgentJob throws → still asks for company, does not abort', async () => {
   const { deps, store, sent, acks } = makeAgentDeps({
     loadAgentJob: async () => { throw new Error('boom'); },
@@ -3068,6 +3139,34 @@ test('agent:co with a SAME-tid winner pending → still routes to the winner con
     tid: AGENT_TID, kind: 'winner', company: 'МАЙЛАБ', step: 'confirm', at: '2026-06-21T10:00:00.000Z',
   });
   assert.match(sent.at(-1).text, /Документи переможця/);
+});
+
+// Fix round 2 (C1): the tid guard alone does NOT close the same-tender case.
+// `agent:start` neither writes nor clears the pending record and button steps
+// have no TTL, so an abandoned winner dialog for tender A (left at
+// step:'confirm') would hijack a later PREPARE for that same tender A: `co`
+// saw kind==='winner' && tid===A, skipped the price step and queued a winner
+// job for a tender that was never awarded. Only `await_company` — the one step
+// from which `co` can legitimately continue a winner dialog — may continue it.
+test('agent:co with a SAME-tid winner pending stuck at step confirm → falls through to prepare, price asked', async () => {
+  const { deps, store, sent, jobs } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+  });
+  store.pending['123'] = {
+    tid: AGENT_TID, kind: 'winner', step: 'confirm', company: 'МАЙЛАБ', at: '2026-06-21T09:00:00.000Z',
+  };
+  await runHandler({ update: CB(`agent:start:${AGENT_TID}`), env: ENV, deps });
+  await runHandler({ update: CB(`agent:co:${AGENT_TID}:terralab_pro`), env: ENV, deps });
+  assert.match(sent.at(-1).text, /Введіть ціну/, 'a fresh prepare must reach the price step');
+  assert.ok(!/Документи переможця/.test(sent.at(-1).text), 'stale same-tid winner pending must not hijack a prepare');
+  assert.deepEqual(store.pending['123'], {
+    tid: AGENT_TID, company: 'ТЕРРАЛАБ ПРО', step: 'await_price', at: '2026-06-21T10:00:00.000Z',
+  });
+  await runHandler({ update: agentMsg('50000'), env: ENV, deps });
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].job.price, '50000', 'the confirmed job is a prepare job with a price');
+  assert.equal('job_type' in jobs[0].job, false, 'must not be job_type: winner');
 });
 
 test('agent:confirm with kind=winner → winner job saved, target from prior done job, price omitted', async () => {
