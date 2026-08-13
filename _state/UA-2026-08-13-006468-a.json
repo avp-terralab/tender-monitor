@@ -1,0 +1,62 @@
+{
+  "tender_id": "UA-2026-08-13-006468-a",
+  "saved_at": "2026-08-13T11:25:53.671Z",
+  "snapshot": {
+    "tender_id": "UA-2026-08-13-006468-a",
+    "title": "ДК 021:2015:72260000-5 Послуги, пов’язані з програмним забезпеченням (Послуги, пов’язані з програмним забезпеченням)",
+    "status": "active.tendering",
+    "dateModified": "2026-08-13T13:26:23.908857+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-08-21T00:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КОМУНАЛЬНИЙ ЗАКЛАД КИЇВСЬКОЇ ОБЛАСНОЇ РАДИ \"БАЗА СПЕЦІАЛЬНОГО МЕДИЧНОГО ПОСТАЧАННЯ\"",
+      "edrpou": "02125740"
+    },
+    "value": {
+      "amount": 424000,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Оберемчук Дмитро Володимирович",
+      "email": "tendener522@gmail.com",
+      "telephone": "380672396837"
+    },
+    "documents": [
+      {
+        "id": "5b3e6a8b743e4010bc43d1731b98e3c4",
+        "title": "Проєкт договору (10).docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-08-13T13:26:16.040301+03:00"
+      },
+      {
+        "id": "2a5242f4425a4b3e8f833ed1b75eacd5",
+        "title": "ТД Послуги, пов’язані з програмним забезпеченням 1.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-13T13:26:16.040301+03:00"
+      },
+      {
+        "id": "d4d13724a83241808afd17d5cc90d36e",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-08-13T13:26:23.327940+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}

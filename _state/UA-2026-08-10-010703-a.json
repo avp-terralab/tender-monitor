@@ -1,13 +1,13 @@
 {
   "tender_id": "UA-2026-08-10-010703-a",
-  "saved_at": "2026-08-10T14:25:49.004Z",
+  "saved_at": "2026-08-12T14:55:58.070Z",
   "snapshot": {
     "tender_id": "UA-2026-08-10-010703-a",
     "title": "Послуги, пов'язані  з програмним забезпеченням",
     "status": "active.tendering",
-    "dateModified": "2026-08-10T16:51:25.524762+03:00",
+    "dateModified": "2026-08-12T17:45:17.676385+03:00",
     "tenderPeriod": {
-      "endDate": "2026-08-18T00:00:00+03:00"
+      "endDate": "2026-08-20T00:00:00+03:00"
     },
     "auctionPeriod": null,
     "procuringEntity": {
@@ -75,6 +75,42 @@
         "title": "sign.p7s",
         "documentType": "notice",
         "datePublished": "2026-08-10T16:51:25.145161+03:00"
+      },
+      {
+        "id": "8986cdd80ef04d10ad175de12d8bd746",
+        "title": "Протокол про внесення змін до тенд докум.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-12T17:28:01.332697+03:00"
+      },
+      {
+        "id": "1f476fdcccd243a5a2c9a83f04d16b95",
+        "title": "4.4. Додаток 4 Перелiк зм .docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-12T17:28:01.332697+03:00"
+      },
+      {
+        "id": "ad0b419a1b92425087dcb83589b3d183",
+        "title": "4. ТД послуги .doc",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-12T17:28:01.332697+03:00"
+      },
+      {
+        "id": "8986cdd80ef04d10ad175de12d8bd746",
+        "title": "Перелік змін до тенд. документ.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-12T17:30:43.877869+03:00"
+      },
+      {
+        "id": "6520a17bd356404481ef4a994a684457",
+        "title": "протокол.PDF",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-12T17:42:31.852852+03:00"
+      },
+      {
+        "id": "b4a6d98b29ab4dec8c1969f6bb804bf1",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-08-12T17:45:16.604783+03:00"
       }
     ],
     "questions": [],

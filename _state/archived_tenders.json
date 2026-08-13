@@ -3369,5 +3369,177 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-07-17-003154-a",
+    "notes": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ЛЮБОМЛЬСЬКЕ ТЕРИТОРІАЛЬНЕ МЕДИЧНЕ ОБ'ЄДНАННЯ\" ЛЮБОМЛЬСЬКОЇ МІСЬКОЇ РАДИ  — Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційн…",
+    "archived_at": "2026-08-12T12:55:47.400Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-07-17-003154-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії ",
+      "status": "complete",
+      "dateModified": "2026-08-12T15:28:06.458689+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-07-28T10:38:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"ЛЮБОМЛЬСЬКЕ ТЕРИТОРІАЛЬНЕ МЕДИЧНЕ ОБ'ЄДНАННЯ\" ЛЮБОМЛЬСЬКОЇ МІСЬКОЇ РАДИ ",
+        "edrpou": "37271416"
+      },
+      "value": {
+        "amount": 365000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Дмитро Сташевський",
+        "email": "zakupki_tmo_luboml@ukr.net",
+        "telephone": "+380975266574"
+      },
+      "documents": [
+        {
+          "id": "213232dc5dc046f1ab7c33ea893be92b",
+          "title": "ТД.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-07-17T11:12:39.042915+03:00"
+        },
+        {
+          "id": "9a03d8c53e844cb9bc7bfd91ede41633",
+          "title": "Кваліфікаційні критерії.docx",
+          "documentType": "eligibilityCriteria",
+          "datePublished": "2026-07-17T11:12:39.042915+03:00"
+        },
+        {
+          "id": "27ae27265317487b97e5059fe3a804d5",
+          "title": "Технічні вимоги.docx",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-07-17T11:12:39.042915+03:00"
+        },
+        {
+          "id": "8a16fdb0e7404a89a79391f6d2d3635f",
+          "title": "Проєкт договору.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-07-17T11:12:39.042915+03:00"
+        },
+        {
+          "id": "3b110bbbb0714444a9aa18ff37f939cd",
+          "title": "Тендерна пропозиція.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-07-17T11:12:39.042915+03:00"
+        },
+        {
+          "id": "7424936ea86d46d186f6e7a969d9d3dc",
+          "title": "Документи до ТД.docx",
+          "documentType": "eligibilityCriteria",
+          "datePublished": "2026-07-17T11:12:39.042915+03:00"
+        },
+        {
+          "id": "f2650a7d003d420c9de7ed4ccd771209",
+          "title": "Документи для переможця.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-07-17T11:12:39.042915+03:00"
+        },
+        {
+          "id": "71629119917649498b1027b2e06d12f5",
+          "title": "Інформація про Учасника.docx",
+          "documentType": "evaluationCriteria",
+          "datePublished": "2026-07-17T11:12:39.042915+03:00"
+        },
+        {
+          "id": "2fcfc6b6e1034453b0a14c7d4b255e9f",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-07-17T11:14:21.347346+03:00"
+        },
+        {
+          "id": "4fbb8da099344a3ba1f70ed2be72bf22",
+          "title": "Протокол 290.pdf",
+          "documentType": null,
+          "datePublished": "2026-07-17T14:00:52.091149+03:00"
+        },
+        {
+          "id": "3b110bbbb0714444a9aa18ff37f939cd",
+          "title": "Тендерна пропозиція.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-07-17T14:00:52.637305+03:00"
+        },
+        {
+          "id": "7424936ea86d46d186f6e7a969d9d3dc",
+          "title": "Документи до ТД.docx",
+          "documentType": "eligibilityCriteria",
+          "datePublished": "2026-07-17T14:00:53.395221+03:00"
+        },
+        {
+          "id": "2fcfc6b6e1034453b0a14c7d4b255e9f",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-07-17T14:01:54.323223+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "25918bfc7b624435860a4a97703b7b23",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"МАЙЛАБ\"",
+              "identifier": {
+                "id": "41087617"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "e12848052ad84eb794fb0efce490a8b8",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:ff572e5934bfcc4b586a3061c91fcd678bd9d334;SHA2-384:eaad46cb3cbac1fa8e0a1b3ffb060e4c3e031a9546671958173c60ec1d644923e65cfc4c9c57b193ac204cb0395b446c;Antivirus: ESET Antivirus",
+              "id": "fb2faeccdc1e46d3bdc987412e98dd8c",
+              "hash": "md5:72c33ec96ecf4363ac2d7b96f4ec09bc",
+              "title": "03 08  01.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/e12848052ad84eb794fb0efce490a8b8/documents/fb2faeccdc1e46d3bdc987412e98dd8c?download=b8e03c2c89f94810a365b4792e31206f",
+              "documentOf": "contract",
+              "datePublished": "2026-08-12T15:27:13.794432+03:00",
+              "dateModified": "2026-08-12T15:27:14.955792+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "61a522489825426e8dca133e061df95d",
+              "hash": "md5:52b114322546b6b1b8c587e526f3d0d2",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/e12848052ad84eb794fb0efce490a8b8/documents/61a522489825426e8dca133e061df95d?download=387b00ae04c64a6399bec9bdccceac0b",
+              "documentOf": "contract",
+              "datePublished": "2026-08-12T15:28:06.255116+03:00",
+              "dateModified": "2026-08-12T15:28:06.255116+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
