@@ -1,5 +1,3 @@
-import { companyForEdrpou, canUseAgent } from './commands.mjs';
-
 const ICONS = {
   monitoring_started: '🟢',
   deadline_changed: '📅',
@@ -524,12 +522,15 @@ async function sendOne({ token, chatId, fetch: fetchImpl = fetch }, text, replyM
   throw lastErr;
 }
 
-// Кнопка під «🏆 Учасника визнано переможцем» — лише коли переможець МИ і лише
-// для тих, хто взагалі може запускати агента. Повертає готовий ряд кнопок або
-// null, щоб виклик просто його не додавав.
-export function winnerButtonRow(tenderId, supplierEdrpou, role) {
-  if (!canUseAgent(role)) return null;
-  if (!companyForEdrpou(supplierEdrpou)) return null;
+// Кнопка під «🏆 Учасника визнано переможцем» — рядок додається лише коли
+// виклик уже визначив, що переможець це МИ (tenderId присутній у
+// winnerTenders — companyForEdrpou звіряється на боці викликача, в
+// monitor.mjs), і лише для тих, хто взагалі може запускати агента. Роль
+// перевіряється тут інлайн (як і сусідній agent-trigger рядок вище), а не
+// через canUseAgent з commands.mjs — щоб не створювати цикл імпортів
+// telegram.mjs ↔ commands.mjs.
+export function winnerButtonRow(tenderId, role) {
+  if (!(role === 'admin' || role === 'editor')) return null;
   return [{ text: '📄 Документи переможця', callback_data: `agent:winner:${tenderId}` }];
 }
 
@@ -555,9 +556,11 @@ export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, te
     // Winner-documents entry button (award_qualified events whose supplier is
     // one of ours) — independent of addButtonsForTenders since a winner
     // notification is for a tender already on the watchlist, not a new one.
-    for (const { tenderId, supplierEdrpou } of winnerTenders) {
+    // The caller (monitor.mjs) already resolved "is this ours" via
+    // companyForEdrpou before building winnerTenders.
+    for (const { tenderId } of winnerTenders) {
       if (!annotated.includes(tenderId)) continue;
-      const winRow = winnerButtonRow(tenderId, supplierEdrpou, role);
+      const winRow = winnerButtonRow(tenderId, role);
       if (winRow) rows.push(winRow);
     }
     const replyMarkup = rows.length > 0 ? { inline_keyboard: rows } : null;

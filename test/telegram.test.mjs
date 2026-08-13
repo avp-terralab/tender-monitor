@@ -760,21 +760,21 @@ test('broadcastDigest: admin and editor get the agent button, viewer gets no but
   assert.ok(!byChat['222'], 'viewer gets no action buttons at all');
 });
 
-test('winnerButtonRow: appears only for our EDRPOU and privileged roles', () => {
+// companyForEdrpou resolution now happens one layer up (monitor.mjs, before
+// winnerTenders is built) — telegram.mjs no longer knows about EDRPOU at
+// all. This function only gates on role and tenderId presence.
+test('winnerButtonRow: refuses a viewer role, produces agent:winner:<tenderId> for admin/editor', () => {
   assert.deepEqual(
-    winnerButtonRow('UA-1', '39376596', 'admin'),
+    winnerButtonRow('UA-1', 'admin'),
     [{ text: '📄 Документи переможця', callback_data: 'agent:winner:UA-1' }],
   );
-  assert.ok(winnerButtonRow('UA-1', '39376596', 'editor'));
-  // чужий переможець — кнопки немає
-  assert.equal(winnerButtonRow('UA-1', '12345678', 'admin'), null);
+  assert.ok(winnerButtonRow('UA-1', 'editor'));
   // viewer не запускає агента
-  assert.equal(winnerButtonRow('UA-1', '39376596', 'viewer'), null);
-  // ЄДРПОУ не приїхав
-  assert.equal(winnerButtonRow('UA-1', null, 'admin'), null);
+  assert.equal(winnerButtonRow('UA-1', 'viewer'), null);
+  assert.equal(winnerButtonRow('UA-1', null), null);
 });
 
-test('sendDigest: winnerTenders attaches the winner button for our EDRPOU + admin', async () => {
+test('sendDigest: renders the winner button for an entry in winnerTenders and not otherwise', async () => {
   const calls = [];
   const fakeFetch = async (url, opts) => {
     calls.push(opts.body.toString());
@@ -783,14 +783,14 @@ test('sendDigest: winnerTenders attaches the winner button for our EDRPOU + admi
   await sendDigest(
     { token: 'TOK', chatId: '1', fetch: fakeFetch },
     'UA-2026-05-14-008910-a here',
-    { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a', supplierEdrpou: '39376596' }], role: 'admin' },
+    { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a' }], role: 'admin' },
   );
   const body = decodeURIComponent(calls[0].replace(/\+/g, ' '));
   assert.match(body, /"callback_data":"agent:winner:UA-2026-05-14-008910-a"/);
   assert.match(body, /Документи переможця/);
 });
 
-test('sendDigest: winnerTenders for a competitor EDRPOU shows no winner button', async () => {
+test('sendDigest: winnerTenders entry for a tenderId absent from the text shows no winner button', async () => {
   const calls = [];
   const fakeFetch = async (url, opts) => {
     calls.push(opts.body.toString());
@@ -798,14 +798,14 @@ test('sendDigest: winnerTenders for a competitor EDRPOU shows no winner button',
   };
   await sendDigest(
     { token: 'TOK', chatId: '1', fetch: fakeFetch },
-    'UA-2026-05-14-008910-a here',
-    { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a', supplierEdrpou: '12345678' }], role: 'admin' },
+    'no tender ids in this body at all',
+    { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a' }], role: 'admin' },
   );
   assert.doesNotMatch(calls[0], /agent:winner/);
   assert.doesNotMatch(calls[0], /reply_markup/);
 });
 
-test('sendDigest: winnerTenders for our EDRPOU but viewer role shows no winner button', async () => {
+test('sendDigest: winnerTenders entry present but viewer role shows no winner button', async () => {
   const calls = [];
   const fakeFetch = async (url, opts) => {
     calls.push(opts.body.toString());
@@ -814,7 +814,7 @@ test('sendDigest: winnerTenders for our EDRPOU but viewer role shows no winner b
   await sendDigest(
     { token: 'TOK', chatId: '1', fetch: fakeFetch },
     'UA-2026-05-14-008910-a here',
-    { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a', supplierEdrpou: '39376596' }], role: 'viewer' },
+    { winnerTenders: [{ tenderId: 'UA-2026-05-14-008910-a' }], role: 'viewer' },
   );
   assert.doesNotMatch(calls[0], /agent:winner/);
   assert.doesNotMatch(calls[0], /reply_markup/);
