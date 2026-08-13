@@ -314,7 +314,19 @@ git commit -m "feat(job): is_winner predicate"
 - Consumes: нічого з попередніх завдань.
 - Produces:
   - `build_winner_prompt(link, company, winner_dir, td_requirements_path=None) -> str`
-  - `run_winner(link, company, winner_dir, timeout=2700, claude_bin="claude", log_path=None, runner=_default_runner) -> dict` з ключами `status`, `winner_dir`, `report_path`, `log_path`, `summary`.
+  - `run_winner(link, company, winner_dir, work_root=None, timeout=2700, claude_bin="claude", log_path=None, runner=_default_runner) -> dict` з ключами `status`, `winner_dir`, `report_path`, `log_path`, `n_docs`, `summary`.
+
+> **Виправлено 13.08.2026 після рев'ю.** Первинна редакція цього завдання виводила
+> шлях до кешу ТД із `winner_dir` (`os.path.dirname(os.path.dirname(...))`) — це
+> непрацездатно: `_td_requirements.json` лежить у **робочій** датованій теці
+> `Архів тендерних пропозицій\<ДД.ММ.РР Замовник>\`, а `winner_dir` — у геть іншому
+> дереві, в архіві відділу `ТЕНДЕРИ 2026\`. Жодна кількість `dirname()` туди не
+> веде, тож оптимізація була б мертвим кодом. Тому робоча тека передається
+> ЯВНО параметром `work_root`; коли її немає (перемога в тендері, який агент не
+> готував) — `work_root=None` і підказки про кеш у промпті немає.
+> Так само `run_winner` мусить повторювати `decide_status()`: таймаут обгортки
+> ПІСЛЯ збереження пакета — це `ok`, а не `timeout` (у headless-режимі верхній
+> `claude -p` регулярно зависає вже після запису документів).
 
 - [ ] **Step 1: Написати падаючий тест на промпт**
 
@@ -689,7 +701,13 @@ Expected: FAIL — `process_pending() got an unexpected keyword argument 'run_wi
         os.makedirs(winner_dir, exist_ok=True)
 
         set_status(name, job_lib.mark(job, "running", at=at))
-        result = run_winner(job["link"], job["company"], winner_dir)
+        # Кеш ТД лежить у РОБОЧІЙ датованій теці (батьківській до package_dir),
+        # а не десь над winner_dir — тому передаємо її явно. Немає target
+        # (агент цей тендер не готував) → work_root=None, кеш просто не шукаємо.
+        pkg = target.get("package_dir")
+        work_root = os.path.dirname(pkg.rstrip("/\\")) if pkg else None
+        result = run_winner(job["link"], job["company"], winner_dir,
+                            work_root=work_root)
 
         recipient = job.get("requested_by") or cfg.admin_chat_id
         if result.get("status") == "ok":
