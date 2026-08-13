@@ -7,7 +7,7 @@ import {
   handleArchive, handleArchiveDetail, handleUnarchive, buildArchiveMenu, handleArchiveNav,
   applyMutation, applyEntityMutation, applyInviteMutation, applyAllowedUsersMutation,
   applyArchiveMutation,
-  formatInfo, buildMonitorMenu, handleMonitorNav, buildHelpText, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD, mainKeyboard,
+  formatInfo, buildMonitorMenu, handleMonitorNav, buildHelpText, buildStartGreeting, BOT_COMMANDS_BY_ROLE, MAIN_KEYBOARD, mainKeyboard,
   TERMINAL_STATUSES, hydrateContractDocs,
   formatAuditMessage,
   sanitizeActor,
@@ -174,9 +174,7 @@ export async function runHandler({ update, env, deps = {} }) {
   // /start works for everyone — reveals chat_id; for allowed users, also seeds chat-scope command list.
   // /start <token> is handled in a later branch.
   if (typeof msg.text === 'string' && /^\/start(?:@\w+)?\s*$/i.test(msg.text)) {
-    const startReply = isAdmin
-      ? `👋 Привіт!\n\nТвій chat_id: <code>${chatId}</code>\n\n/help — список команд.`
-      : `👋 Привіт!\n\nЦе приватний бот. Твій chat_id: <code>${chatId}</code>\n\nНадішли цей id адміну, щоб отримати доступ.`;
+    const startReply = buildStartGreeting(chatId, role, isAllowed);
     try {
       await _sendReply({
         token: env.TELEGRAM_BOT_TOKEN,

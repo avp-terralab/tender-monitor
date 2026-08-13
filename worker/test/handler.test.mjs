@@ -201,6 +201,34 @@ test('runHandler: /start from allowed → friendly greeting with chat_id and /he
   assert.doesNotMatch(sent[0].text, /приватний бот/i);
 });
 
+test('runHandler: /start from allowed editor → access confirmed, no "ask the admin" wording', async () => {
+  const { deps, sent } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Olha', role: 'editor' }], sha: 's' }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/start', message_id: 6 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].chatId, 456);
+  assert.match(sent[0].text, /<code>456<\/code>/);
+  assert.doesNotMatch(sent[0].text, /Надішли цей id адміну/i);
+  assert.doesNotMatch(sent[0].text, /приватний бот/i);
+  assert.ok(sent[0].replyMarkup, 'allowed editor still gets the keyboard');
+});
+
+test('runHandler: /start from a stranger still asks them to send their chat_id to the admin', async () => {
+  const { deps, sent } = makeDeps();
+  await runHandler({
+    update: { message: { chat: { id: 999 }, text: '/start', message_id: 6 } },
+    env: ENV,
+    deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].text, /Надішли цей id адміну/i);
+});
+
 test('runHandler: /start@botusername variant works', async () => {
   const { deps, sent } = makeDeps();
   await runHandler({

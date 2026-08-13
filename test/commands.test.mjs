@@ -7,7 +7,7 @@ import {
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, handleWhoami, handleUsersList, handleInvitesList, HELP_TEXT,
-  buildHelpText, buildWelcomeText, buildRoleChangeNotice,
+  buildHelpText, buildWelcomeText, buildRoleChangeNotice, buildStartGreeting,
   applyArchiveMutation, handleArchive, handleArchiveDetail,
   handleUnarchive,
   BOT_COMMANDS_BY_ROLE,
@@ -2659,6 +2659,43 @@ test('buildRoleChangeNotice: viewer only sees view commands', () => {
   assert.match(text, /viewer/);
   assert.match(text, /\/info/);
   assert.doesNotMatch(text, /\/add\b/);
+});
+
+test('buildStartGreeting: admin — chat_id shown, points at the help keyboard button, no access-request wording', () => {
+  const text = buildStartGreeting('123', 'admin', true);
+  assert.match(text, /<code>123<\/code>/);
+  assert.match(text, /❓ Допомога/);
+  assert.doesNotMatch(text, /Надішли цей id адміну/);
+});
+
+test('buildStartGreeting: allowed editor — chat_id shown, names role, points at the help keyboard button, no access-request wording', () => {
+  const text = buildStartGreeting('456', 'editor', true);
+  assert.match(text, /<code>456<\/code>/);
+  assert.match(text, /редактор/i);
+  assert.match(text, /❓ Допомога/);
+  assert.doesNotMatch(text, /Надішли цей id адміну/);
+});
+
+test('buildStartGreeting: allowed viewer — chat_id shown, names role, points at the help keyboard button, no access-request wording', () => {
+  const text = buildStartGreeting('789', 'viewer', true);
+  assert.match(text, /<code>789<\/code>/);
+  assert.match(text, /переглядач/i);
+  assert.match(text, /❓ Допомога/);
+  assert.doesNotMatch(text, /Надішли цей id адміну/);
+});
+
+test('buildStartGreeting: not allowed — chat_id shown, keeps the access-request wording', () => {
+  const text = buildStartGreeting('999', 'viewer', false);
+  assert.match(text, /<code>999<\/code>/);
+  assert.match(text, /приватний бот/i);
+  assert.match(text, /Надішли цей id адміну/);
+});
+
+test('buildStartGreeting: all allowed cases mention /start restores the keyboard', () => {
+  for (const [chatId, role] of [['1', 'admin'], ['2', 'editor'], ['3', 'viewer']]) {
+    const text = buildStartGreeting(chatId, role, true);
+    assert.match(text, /клавіатур/i, `role ${role} missing keyboard-restore note`);
+  }
 });
 
 test('parseCommand: /whoami → cmd whoami', () => {

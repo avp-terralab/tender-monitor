@@ -1726,6 +1726,54 @@ export function buildWelcomeText(label, role) {
   ].join('\n');
 }
 
+// Bare /start greeting (no token). Three-way split, matching isAllowed/role
+// exactly — do NOT collapse back to a two-way isAdmin check: an allowed
+// non-admin (editor or viewer) has real access and must never be told to
+// request it. Only the not-allowed branch keeps the "send your chat_id to
+// the admin" wording; it's correct there and nowhere else. All allowed
+// branches mention that /start also restores the reply keyboard when it
+// disappears — see START_ONLY_COMMANDS below for why that matters now that
+// /start is the only entry left in the "/" menu.
+export function buildStartGreeting(chatId, role, isAllowed) {
+  const idLine = `Твій chat_id: <code>${escapeHtml(String(chatId))}</code>`;
+  const keyboardNote = 'ℹ️ /start також повертає клавіатуру знизу, якщо вона зникла.';
+
+  if (!isAllowed) {
+    return [
+      '👋 Привіт!',
+      '',
+      `Це приватний бот. ${idLine}`,
+      '',
+      'Надішли цей id адміну, щоб отримати доступ.',
+    ].join('\n');
+  }
+
+  if (role === 'admin') {
+    return [
+      '👋 Привіт!',
+      '',
+      idLine,
+      '',
+      '📋 Список команд — кнопка «❓ Допомога (список команд)» знизу (або /help).',
+      '',
+      keyboardNote,
+    ].join('\n');
+  }
+
+  const roleLabel = role === 'editor' ? 'редактор' : 'переглядач';
+  return [
+    '👋 Привіт!',
+    '',
+    `✅ У тебе є доступ (роль: ${roleLabel}).`,
+    '',
+    idLine,
+    '',
+    '📋 Список команд — кнопка «❓ Допомога (список команд)» знизу.',
+    '',
+    keyboardNote,
+  ].join('\n');
+}
+
 // Telegram's "/" autocomplete menu — deliberately ONE entry for every role.
 // Everything else is already reachable from the reply keyboard or from
 // «❓ Допомога», so a 6/11/18-command list was pure clutter. /start is the one
