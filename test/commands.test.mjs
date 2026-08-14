@@ -27,6 +27,8 @@ import {
   handleAgentMenuNav,
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   OUR_EDRPOU, companyForEdrpou, buildAgentWinnerJob, buildAgentWinnerConfirmText,
+  validateLetterDate, formatLetterDate, buildAgentSignJob,
+  buildAgentSignDateKeyboard, buildAgentSignConfirmText,
   monitorPhaseBuckets, buildMonitorMenu, renderMonitorPage, handleMonitorNav,
   buildWatchedEntityCard, handleWatchedNav,
   buildArgPrompt, commandFromReplyPrompt,
@@ -3853,6 +3855,154 @@ test('OUR_EDRPOU keys are strings, so a leading-zero code could never be mangled
   const block = src.slice(src.indexOf('export const OUR_EDRPOU'));
   const body = block.slice(0, block.indexOf('};'));
   assert.ok(!/^\s*\d+\s*:/m.test(body), 'OUR_EDRPOU must not use bare numeric keys');
+});
+
+// ── Task 7: підписання й архів — дата листа, job-білдер, кнопки ───────────────
+
+// Дата листа їде в КОЖЕН документ поданого пакета, тож валідатор — остання
+// лінія оборони: формат рівно ДД.ММ.РРРР, неможливих дат немає, вікно ±30 днів
+// ловить одрук у році, який інакше проїхав би непоміченим.
+test('validateLetterDate accepts a sane ДД.ММ.РРРР and rejects the rest', () => {
+  const today = new Date('2026-08-13T09:00:00Z');
+  assert.equal(validateLetterDate('13.08.2026', today), '13.08.2026');
+  assert.equal(validateLetterDate('  01.08.2026 ', today), '01.08.2026');
+  assert.equal(validateLetterDate('32.08.2026', today), null);   // немає такого дня
+  assert.equal(validateLetterDate('13/08/2026', today), null);   // не той роздільник
+  assert.equal(validateLetterDate('13.08.2126', today), null);   // одрук у році
+  assert.equal(validateLetterDate('01.01.2026', today), null);   // >30 днів у минулому
+  assert.equal(validateLetterDate('31.12.2026', today), null);   // >30 днів у майбутньому
+  assert.equal(validateLetterDate('', today), null);
+  assert.equal(validateLetterDate(null, today), null);
+  assert.equal(validateLetterDate(13.08, today), null);          // не рядок
+});
+
+// Date() мовчки «нормалізує» 31.02 у 03.03. Тут сьогодні — 01.03.2026, тож
+// підмінена дата потрапляє ВСЕРЕДИНУ вікна ±30 днів і перевіркою вікна не
+// ловиться — відсіяти може лише звірка дня/місяця з побудованою датою.
+test('validateLetterDate rejects an impossible day that Date would silently roll over', () => {
+  const today = new Date('2026-03-01T09:00:00Z');
+  assert.equal(validateLetterDate('31.02.2026', today), null);
+  assert.equal(validateLetterDate('30.02.2026', today), null);
+  assert.equal(validateLetterDate('00.03.2026', today), null);
+  assert.equal(validateLetterDate('01.13.2026', today), null);   // 13-го місяця немає
+  assert.equal(validateLetterDate('28.02.2026', today), '28.02.2026'); // існує → ок
+});
+
+test('validateLetterDate: exactly ±30 days is in, ±31 is out', () => {
+  const today = new Date('2026-08-13T00:00:00Z');
+  assert.equal(validateLetterDate('12.09.2026', today), '12.09.2026'); // +30
+  assert.equal(validateLetterDate('13.09.2026', today), null);         // +31
+  assert.equal(validateLetterDate('14.07.2026', today), '14.07.2026'); // −30
+  assert.equal(validateLetterDate('13.07.2026', today), null);         // −31
+});
+
+// Кнопка «Сьогодні» має показувати КИЇВСЬКИЙ день, а не UTC: власник працює
+// пізно ввечері, коли в Києві вже наступна доба (влітку UTC+3).
+test('formatLetterDate renders the Kyiv day, not the UTC one', () => {
+  assert.equal(formatLetterDate(new Date('2026-08-13T09:00:00Z')), '13.08.2026');
+  assert.equal(formatLetterDate(new Date('2026-08-13T21:30:00Z')), '14.08.2026');
+  assert.equal(formatLetterDate(new Date('2026-01-05T08:00:00Z')), '05.01.2026');
+});
+
+test('buildAgentSignJob carries the date and the package dir', () => {
+  const j = buildAgentSignJob({
+    tenderId: 'UA-1', company: 'МАЙЛАБ', letterDate: '13.08.2026',
+    target: { drive_link: 'https://d/1', package_dir: 'P' },
+    requestedBy: '555', createdAt: '2026-08-13T10:00:00.000Z',
+  });
+  assert.equal(j.job_type, 'sign');
+  assert.equal(j.letter_date, '13.08.2026');
+  assert.equal(j.target.package_dir, 'P');
+  assert.equal(j.link, 'https://prozorro.gov.ua/tender/UA-1');
+  assert.equal(j.price, undefined);
+  assert.ok(!('price' in j), 'a sign job never carries a price');
+  assert.equal(j.requested_by, '555');
+  assert.equal(j.status, 'pending');
+  assert.equal(j.created_at, '2026-08-13T10:00:00.000Z');
+});
+
+test('sign date keyboard offers today, a manual entry and cancel', () => {
+  const kb = buildAgentSignDateKeyboard('UA-1', '13.08.2026');
+  const flat = kb.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.callback_data === 'agent:signdate:UA-1:13.08.2026'));
+  assert.ok(flat.some((b) => b.callback_data === 'agent:signother:UA-1'));
+  assert.ok(flat.some((b) => b.callback_data === 'agent:cancel:UA-1'));
+  assert.ok(flat.some((b) => b.text.includes('13.08.2026')), 'the date is visible on the button');
+});
+
+test('buildAgentSignConfirmText shows tid, company and date, HTML-escaped', () => {
+  const t = buildAgentSignConfirmText({
+    tenderId: 'UA-1', company: 'ТОВ <А> & <Б>', letterDate: '13.08.2026',
+  });
+  assert.match(t, /UA-1/);
+  assert.match(t, /13\.08\.2026/);
+  assert.match(t, /&amp;/);
+  assert.match(t, /&lt;Б&gt;/);
+  assert.ok(!t.includes('<Б>'), 'raw angle brackets must not survive');
+});
+
+test('jobs page offers the sign button on a done proposal only', () => {
+  const view = buildAgentJobsPage({
+    jobs: [
+      { tender_id: 'UA-1', status: 'done', company: 'МАЙЛАБ', result: { drive_link: 'https://d/1' } },
+      { tender_id: 'UA-2', status: 'pending', company: 'МАЙЛАБ' },
+      { tender_id: 'UA-3', status: 'done', company: 'МАЙЛАБ', result: { winner_link: 'https://d/w' } },
+    ],
+  });
+  const flat = view.keyboard.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.callback_data === 'agent:sign:UA-1'));
+  assert.ok(!flat.some((b) => b.callback_data === 'agent:sign:UA-2'),
+    'nothing to sign before the proposal is prepared');
+  assert.ok(!flat.some((b) => b.callback_data === 'agent:sign:UA-3'),
+    'a winner-only job has no prepared package to sign');
+  // сусідні кнопки не постраждали
+  assert.ok(flat.some((b) => b.callback_data === 'agent:amend:UA-1'));
+  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-1'));
+});
+
+// Той самий урок, що й з кнопкою переможця (R1): кнопок на сторінці до шести,
+// підпис має називати свій тендер, інакше помилковий дотик мовчки підписує
+// ЧУЖИЙ пакет чужою датою.
+test('jobs page: each sign button names its own tender id', () => {
+  const view = buildAgentJobsPage({
+    jobs: [
+      { tender_id: 'UA-A', status: 'done', result: { drive_link: 'https://d/a' } },
+      { tender_id: 'UA-B', status: 'done', result: { drive_link: 'https://d/b' } },
+    ],
+  });
+  const signs = view.keyboard.inline_keyboard.flat()
+    .filter((b) => typeof b.callback_data === 'string' && b.callback_data.startsWith('agent:sign:'));
+  assert.equal(signs.length, 2);
+  assert.equal(new Set(signs.map((b) => b.text)).size, 2,
+    `sign labels must be distinct, got ${JSON.stringify(signs.map((b) => b.text))}`);
+});
+
+test('jobs page marks sign jobs with the 🖊 icon', () => {
+  const view = buildAgentJobsPage({
+    jobs: [{ tender_id: 'UA-9', status: 'running', job_type: 'sign' }],
+  });
+  assert.ok(view.text.includes('🖊'), view.text);
+  assert.ok(!view.text.includes('✏️'), 'must not be confused with the amend marker');
+  assert.ok(!view.text.includes('📄'), 'must not be confused with the winner marker');
+});
+
+test('admin notice mentions sign runs', () => {
+  const s = buildAgentAdminNotice({
+    kind: 'sign', actorName: 'Оксана', chatId: 555, tenderId: 'UA-1',
+  });
+  assert.ok(s.includes('підписання'), s);
+  assert.ok(s.includes('UA-1'));
+  assert.ok(!s.includes('запустив агента по'), 'must not fall through to the prepare wording');
+});
+
+test('admin notice: sign run shows the letter date and escapes the actor', () => {
+  const s = buildAgentAdminNotice({
+    kind: 'sign', actorName: '<b>Оксана</b>', chatId: 555, tenderId: 'UA-1',
+    letterDate: '13.08.2026', company: 'МАЙЛАБ',
+  });
+  assert.ok(s.includes('13.08.2026'), s);
+  assert.ok(s.includes('МАЙЛАБ'), s);
+  assert.ok(!s.includes('<b>'), 'actor name must be escaped');
 });
 
 test('buildArgPrompt: add → force_reply prompt + UA placeholder', () => {

@@ -1953,6 +1953,9 @@ export function buildAgentPickView({ tenders, page = 0 }) {
 }
 
 const AGENT_JOB_ICONS = { pending: '📋', running: '⏳', done: '✅', error: '❌' };
+// Job-type marker in front of the status icon. A plain `prepare` job has no
+// job_type at all → no marker, which is what `?? ''` covers.
+const AGENT_JOB_MARKS = { amend: '✏️ ', winner: '📄 ', sign: '🖊 ' };
 
 export function buildAgentJobsPage({ jobs, page = 0 }) {
   const list = jobs ?? [];
@@ -1967,7 +1970,7 @@ export function buildAgentJobsPage({ jobs, page = 0 }) {
   const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
   const body = slice.map((j) => {
     const icon = AGENT_JOB_ICONS[j.status] ?? '•';
-    const mark = j.job_type === 'amend' ? '✏️ ' : (j.job_type === 'winner' ? '📄 ' : '');
+    const mark = AGENT_JOB_MARKS[j.job_type] ?? '';
     const co = j.company ? ` · ${escapeHtml(j.company)}` : '';
     const tid = escapeHtml(j.tender_id ?? '');
     return `${mark}${icon} <a href="https://prozorro.gov.ua/tender/${tid}">${tid}</a>${co}`;
@@ -1997,6 +2000,16 @@ export function buildAgentJobsPage({ jobs, page = 0 }) {
     rows.push([
       { text: `📄 Документи переможця ${j.tender_id}`, callback_data: `agent:winner:${j.tender_id}` },
     ]);
+    // 🖊 — підписати й запакувати. Умова та сама, що й для ✏️ Доробити: підписують
+    // ГОТОВУ пропозицію (job-у sign потрібен target.package_dir із її результату),
+    // тож для winner-прогону без prepare чи для незавершеної задачі кнопки немає.
+    // Підпис називає свій тендер — на сторінці їх до шести, а помилковий дотик
+    // мовчки підписав би ЧУЖИЙ пакет (той самий урок, що й з кнопкою переможця).
+    if (prepared) {
+      rows.push([
+        { text: `🖊 Підписати й запакувати ${j.tender_id}`, callback_data: `agent:sign:${j.tender_id}` },
+      ]);
+    }
   }
   const nav = buildPageNavRow(p, pages, (x) => `agent:jobs:${x}`, 'agent:noop');
   if (nav) rows.push(nav);
@@ -2022,7 +2035,7 @@ export function buildAgentJob({ tenderId, link, company, price, requestedBy, cre
 // the agent's own result goes only to `requested_by`, so without this the admin
 // would never see that a run was started. Returns null when the actor IS the
 // admin (no self-notification). Free text (actor name) is HTML-escaped.
-export function buildAgentAdminNotice({ kind, actorName, chatId, tenderId, company, price, instruction }) {
+export function buildAgentAdminNotice({ kind, actorName, chatId, tenderId, company, price, instruction, letterDate }) {
   const who = `${escapeHtml(sanitizeActor(actorName))} (<code>${escapeHtml(String(chatId))}</code>)`;
   if (kind === 'winner') {
     // Компанія-переможець — головна річ, яку адміну варто бачити (від неї
@@ -2034,6 +2047,11 @@ export function buildAgentAdminNotice({ kind, actorName, chatId, tenderId, compa
   if (kind === 'amend') {
     const what = instruction ? `\n✏️ ${escapeHtml(instruction)}` : '';
     return `🤖 ${who} надіслав агенту доробку по ${escapeHtml(tenderId)}${what}`;
+  }
+  if (kind === 'sign') {
+    const co = company ? ` · ${escapeHtml(company)}` : '';
+    const dt = letterDate ? ` · дата ${escapeHtml(letterDate)}` : '';
+    return `🤖 ${who} запустив підписання по ${escapeHtml(tenderId)}${co}${dt}`;
   }
   const co = company ? ` · ${escapeHtml(company)}` : '';
   const pr = price ? ` · ${escapeHtml(String(price))}` : '';
@@ -2094,6 +2112,76 @@ export function buildAgentWinnerJob({ tenderId, company, target, requestedBy, cr
 export function buildAgentWinnerConfirmText({ tenderId, company, entityName }) {
   const ent = entityName ? `\nЗамовник: ${escapeHtml(entityName)}` : '';
   return `📄 Документи переможця\nТендер: ${escapeHtml(tenderId)}${ent}\nКомпанія: ${escapeHtml(company)}`;
+}
+
+// Дата листа для підписання. Вона підставляється в КОЖЕН лист пакета, який потім
+// іде замовнику, тож перевірок три, і кожна ловить свій клас помилки:
+//   1. формат рівно ДД.ММ.РРРР — «13/08/2026» чи «13.8.26» не проходять;
+//   2. дата має існувати — Date() мовчки «нормалізує» 31.02 у 03.03, тож день і
+//      місяць звіряються назад із побудованою датою (лише формату мало);
+//   3. вікно ±30 днів від сьогодні — ловить одрук у році («2126»), який формат
+//      і календар пропускають, а виправити його потім можна лише передачею.
+const LETTER_DATE_WINDOW_DAYS = 30;
+
+export function validateLetterDate(text, today = new Date()) {
+  if (typeof text !== 'string') return null;
+  const m = text.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  const d = new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd)));
+  if (isNaN(d)) return null;
+  // Відсіює 31.02, 00.03, 01.13 — усе, що Date() перекотила б на іншу дату.
+  if (d.getUTCDate() !== Number(dd)
+    || d.getUTCMonth() !== Number(mm) - 1
+    || d.getUTCFullYear() !== Number(yyyy)) return null;
+  const diffDays = Math.abs((d - today) / 86400000);
+  if (diffDays > LETTER_DATE_WINDOW_DAYS) return null;
+  return `${dd}.${mm}.${yyyy}`;
+}
+
+// Київський день, а не UTC: власник ставить задачі пізно ввечері, коли в Києві
+// вже наступна доба — кнопка «Сьогодні» з учорашньою датою підписала б увесь
+// пакет заднім числом.
+const LETTER_DATE_KYIV = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', year: 'numeric',
+});
+
+export function formatLetterDate(date) {
+  return LETTER_DATE_KYIV.format(date);
+}
+
+export function buildAgentSignDateKeyboard(tenderId, todayStr) {
+  return {
+    inline_keyboard: [
+      [{ text: `📅 Сьогодні — ${todayStr}`, callback_data: `agent:signdate:${tenderId}:${todayStr}` }],
+      [{ text: '✏️ Ввести іншу', callback_data: `agent:signother:${tenderId}` }],
+      [{ text: '✖ Скасувати', callback_data: `agent:cancel:${tenderId}` }],
+    ],
+  };
+}
+
+// Підтвердження підписання. Компанія приходить із pending-запису діалогу, тож
+// екранується так само, як у сусідніх buildAgent*Text (parse_mode завжди HTML).
+export function buildAgentSignConfirmText({ tenderId, company, letterDate }) {
+  const co = company ? `\nКомпанія: ${escapeHtml(company)}` : '';
+  return `🖊 Підписати й запакувати\nТендер: ${escapeHtml(tenderId)}${co}\nДата: ${escapeHtml(letterDate)}`;
+}
+
+// Sign job: проставити дату, накласти скан підпису, відрендерити PDF і зібрати
+// ZIP. Без `price`. `target.package_dir` ОБОВ'ЯЗКОВИЙ — саме його підписують,
+// тому кнопка й з'являється лише на готовій пропозиції.
+export function buildAgentSignJob({ tenderId, company, letterDate, target, requestedBy, createdAt }) {
+  return {
+    tender_id: tenderId,
+    link: `https://prozorro.gov.ua/tender/${tenderId}`,
+    job_type: 'sign',
+    company,
+    letter_date: letterDate,
+    target,
+    requested_by: requestedBy,
+    status: 'pending',
+    created_at: createdAt,
+  };
 }
 
 // Pure router for the agent MENU callbacks (menu/pick/jobs). Returns null for
