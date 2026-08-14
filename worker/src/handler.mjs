@@ -1666,6 +1666,14 @@ async function handleAgentCallback({
         target: {
           drive_link: prior.result.drive_link ?? null,
           package_dir: prior.result.package_dir,
+          // published_dir — саме та тека архіву відділу, куди поллер уже поклав
+          // пропозицію. Без неї він шукає теку ЗА НАЗВОЮ, а відділ теки
+          // перейменовує руками («79. КНП Локачинської СелР Локачинська
+          // лікарня» -> «79. Локачинська Лікарня»), тож підписаний пакет
+          // поїхав би в НОВУ нумеровану теку, з'ївши номер у чужій ручній
+          // послідовності й розчепивши один тендер надвоє. Winner-флоу
+          // передає це поле з тієї ж причини.
+          published_dir: prior.result.published_dir ?? null,
         },
         requestedBy: String(chatId),
         createdAt: _now().toISOString(),

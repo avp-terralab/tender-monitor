@@ -2169,7 +2169,10 @@ export function buildAgentSignConfirmText({ tenderId, company, letterDate }) {
 
 // Sign job: проставити дату, накласти скан підпису, відрендерити PDF і зібрати
 // ZIP. Без `price`. `target.package_dir` ОБОВ'ЯЗКОВИЙ — саме його підписують,
-// тому кнопка й з'являється лише на готовій пропозиції.
+// тому кнопка й з'являється лише на готовій пропозиції. `target.published_dir`
+// так само обов'язковий, коли пропозицію вже опубліковано: поллер віддає йому
+// пріоритет над пошуком теки замовника ЗА НАЗВОЮ, бо відділ перейменовує теки
+// вручну — і без цього поля підписаний пакет ліг би в нову нумеровану теку.
 export function buildAgentSignJob({ tenderId, company, letterDate, target, requestedBy, createdAt }) {
   return {
     tender_id: tenderId,

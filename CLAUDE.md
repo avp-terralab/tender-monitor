@@ -60,9 +60,12 @@ Cloudflare Worker + спільні pure-модулі. Стежить за тен
   `ТЕНДЕРИ 2026\<N>. <Замовник>\Документи переможця\`.
 - **`sign`** (`job_type:'sign'`) — підписання й архів, з 14.08.2026:
   `{ tender_id, link, job_type:'sign', company, letter_date:'ДД.ММ.РРРР',
-     target:{drive_link, package_dir}, requested_by, status:'pending', created_at }`
+     target:{drive_link, package_dir, published_dir}, requested_by, status:'pending',
+     created_at }`
   (БЕЗ `price`; `target.package_dir` ОБОВ'ЯЗКОВИЙ — саме його підписують, тому кнопка й
-  з'являється лише на готовій пропозиції) → поллер сам, синхронно, викликає
+  з'являється лише на готовій пропозиції; `target.published_dir` теж передається завжди,
+  коли пропозицію вже опубліковано — поллер віддає йому пріоритет над пошуком теки
+  замовника ЗА НАЗВОЮ, бо відділ перейменовує теки вручну) → поллер сам, синхронно, викликає
   `sign_lib.sign_package(...)` — **звичайний детермінований Python, БЕЗ `claude -p`**.
   Це свідоме рішення власника: у цій задачі немає жодного кроку, що потребує судження
   моделі (заміна дати за регексом, вставка картинки, рендер Word-ом, zip — усе механічне),
@@ -87,8 +90,11 @@ Cloudflare Worker + спільні pure-модулі. Стежить за тен
 `## Прострочене` і `## Відсутнє`), який поллер інлайнить у Telegram-повідомлення.
 
 Для `sign` у `result` додаються `zip_path`, `zip_link`, `signed_dir`, `letter_date`,
-`n_signed`, `n_pdf_total`, `unsigned` (список файлів пакета, де не знайшлось рядка
-підпису — це НЕ помилка, а звіт власнику, робота все одно `done`). **`drive_link`,
+`n_signed`, `n_pdf_total`/`n_pdf_expected`, `unsigned` + `unsigned_detail` (файли без
+підпису і ПРИЧИНА), `undated` (файли, що лишились зі СТАРОЮ датою — немає поля
+«Вих … від …»), `missing_pdf`/`fallback_pdf`, `superseded_zip`/`older_zip`. Усе це НЕ
+помилки, а звіт власнику — робота все одно `done`, і кожен із цих списків іде в
+Telegram-повідомлення нарівні з `unsigned`. **`drive_link`,
 `package_dir` і `published_dir` sign теж НЕ переозначує** — переносить їх з `target`
 без змін, тим самим принципом, що й `winner`.
 

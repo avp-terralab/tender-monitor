@@ -3907,12 +3907,14 @@ test('formatLetterDate renders the Kyiv day, not the UTC one', () => {
 test('buildAgentSignJob carries the date and the package dir', () => {
   const j = buildAgentSignJob({
     tenderId: 'UA-1', company: 'МАЙЛАБ', letterDate: '13.08.2026',
-    target: { drive_link: 'https://d/1', package_dir: 'P' },
+    target: { drive_link: 'https://d/1', package_dir: 'P', published_dir: 'ARCHIVE\\79. X' },
     requestedBy: '555', createdAt: '2026-08-13T10:00:00.000Z',
   });
   assert.equal(j.job_type, 'sign');
   assert.equal(j.letter_date, '13.08.2026');
   assert.equal(j.target.package_dir, 'P');
+  // тека замовника в архіві відділу їде як є — поллер не має шукати її за назвою
+  assert.equal(j.target.published_dir, 'ARCHIVE\\79. X');
   assert.equal(j.link, 'https://prozorro.gov.ua/tender/UA-1');
   assert.equal(j.price, undefined);
   assert.ok(!('price' in j), 'a sign job never carries a price');
