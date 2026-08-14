@@ -201,6 +201,48 @@ test('runHandler: /start from allowed → friendly greeting with chat_id and /he
   assert.doesNotMatch(sent[0].text, /приватний бот/i);
 });
 
+// Repeated /start taps (people re-checking their chat_id) used to pile up a
+// fresh "👋 Привіт!" every time — now it shares the same "one ephemeral view"
+// KV slot the view commands use, so the previous exchange gets deleted first.
+const fakeEphemeralKV = () => {
+  const store = new Map();
+  return { get: async (k) => store.get(k) ?? null, put: async (k, v) => { store.set(k, v); } };
+};
+
+test('runHandler: /start with an ephemeral KV configured → nothing to delete on the first tap', async () => {
+  const deleted = [];
+  let nextId = 100;
+  const { deps, sent } = makeDeps({
+    ephemeralKV: fakeEphemeralKV(),
+    sendReply: async (a) => { sent.push(a); return { result: { message_id: nextId++ } }; },
+    deleteMessage: async (a) => { deleted.push(a); return true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/start', message_id: 7 } }, env: ENV, deps,
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(deleted.length, 0, 'nothing to clean up yet');
+});
+
+test('runHandler: /start twice → the second tap deletes the first exchange (trigger + greeting)', async () => {
+  const deleted = [];
+  let nextId = 100;
+  const { deps, sent } = makeDeps({
+    ephemeralKV: fakeEphemeralKV(),
+    sendReply: async (a) => { sent.push(a); return { result: { message_id: nextId++ } }; },
+    deleteMessage: async (a) => { deleted.push(a); return true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/start', message_id: 7 } }, env: ENV, deps,
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/start', message_id: 8 } }, env: ENV, deps,
+  });
+  assert.equal(sent.length, 2);
+  assert.equal(deleted.length, 2, 'deletes both the earlier trigger and the earlier greeting');
+  assert.deepEqual(deleted.map((d) => d.messageId).sort((a, b) => a - b), [7, 100]);
+});
+
 test('runHandler: /start from allowed editor → access confirmed, no "ask the admin" wording', async () => {
   const { deps, sent } = makeDeps({
     loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Olha', role: 'editor' }], sha: 's' }),
@@ -2719,6 +2761,9 @@ const makeAgentDeps = (overrides = {}) => {
     loadAgentPending: async () => ({ pending: structuredClone(store.pending), sha: store.sha }),
     saveAgentPending: async (_e, pending) => { store.pending = structuredClone(pending); },
     saveAgentJob: async (_e, job) => { jobs.push(job); },
+    // agent:start now requires the tender to already be monitored (see the
+    // "не в моніторингу" tests below, which override this back to []).
+    loadWatchlist: async () => ({ watchlist: [{ tender_id: AGENT_TID, enabled: true }], sha: 'w-sha' }),
     now: () => new Date('2026-06-21T10:00:00.000Z'),
     ...overrides,
   }).deps;
@@ -2727,6 +2772,33 @@ const makeAgentDeps = (overrides = {}) => {
 
 const agentMsg = (text, chatId = 123) => ({
   message: { chat: { id: chatId }, from: { first_name: 'Андрій' }, text, message_id: 7 },
+});
+
+test('agent:start on a tender NOT in the watchlist → refused, no company keyboard', async () => {
+  const { deps, store, edits, acks } = makeAgentDeps({
+    loadWatchlist: async () => ({ watchlist: [], sha: 'w-sha' }),
+  });
+  await runHandler({ update: CB(`agent:start:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(edits.length, 0, 'no company keyboard for an unmonitored tender');
+  assert.equal(store.pending['123'], undefined, 'no dialog state written');
+  assert.equal(acks.length, 1);
+  assert.match(acks[0].text, /моніторинг/i);
+});
+
+test('agent:start on a tender that IS in the watchlist (even if disabled) → proceeds', async () => {
+  const { deps, edits } = makeAgentDeps({
+    loadWatchlist: async () => ({ watchlist: [{ tender_id: AGENT_TID, enabled: false }], sha: 'w-sha' }),
+  });
+  await runHandler({ update: CB(`agent:start:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(edits.length, 1, 'monitored-but-muted still counts as monitored');
+});
+
+test('agent:start watchlist lookup failure → fails open, does not block a legitimate start', async () => {
+  const { deps, edits } = makeAgentDeps({
+    loadWatchlist: async () => { throw new Error('gh down'); },
+  });
+  await runHandler({ update: CB(`agent:start:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(edits.length, 1, 'a watchlist-check failure must not block the picker');
 });
 
 test('agent:start (admin) → company keyboard shown', async () => {
@@ -2808,11 +2880,12 @@ test('admin confirm → job queued, but no self-notification', async () => {
 });
 
 test('agent:co:<tid>:maylab → pending saved with company МАЙЛАБ + price prompt', async () => {
-  const { deps, store, sent, acks } = makeAgentDeps();
+  const { deps, store, edits, acks } = makeAgentDeps();
   await runHandler({ update: CB(`agent:co:${AGENT_TID}:maylab`), env: ENV, deps });
-  assert.deepEqual(store.pending['123'], { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price', at: '2026-06-21T10:00:00.000Z' });
-  assert.equal(sent.length, 1);
-  assert.match(sent[0].text, /Введіть ціну/);
+  assert.deepEqual(store.pending['123'],
+    { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price', messageId: 9, at: '2026-06-21T10:00:00.000Z' });
+  assert.equal(edits.length, 1, 'edits the company-picker message in place, no new message');
+  assert.match(edits[0].text, /Введіть ціну/);
   assert.equal(acks.length, 1);
 });
 
@@ -2874,8 +2947,43 @@ test('agent empty instruction → stays at await_instruction, no advance', async
   assert.match(sent.at(-1).text, /Порожня інструкція/);
 });
 
+// A second confirm for the SAME tender while one is already in flight used to
+// silently overwrite the job file (one file per tender_id) — two "запустив
+// агента" admin notices a few minutes apart with no sign the second one did
+// nothing. Refuse outright instead.
+test('agent:confirm (prepare) when a job for this tender is already pending → refused, not re-queued', async () => {
+  const { deps, store, edits, jobs, acks } = makeAgentDeps({
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'pending', company: 'МАЙЛАБ', price: '181200' }),
+  });
+  store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', price: '181200', step: 'confirm' };
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 0, 'must not overwrite the in-flight job');
+  assert.equal(store.pending['123'], undefined, 'dialog cleared regardless');
+  assert.match(edits.at(-1).text, /вже в черзі/i);
+  assert.equal(acks.at(-1).text, '⚠️ Вже в черзі');
+});
+
+test('agent:confirm (prepare) when a job for this tender is already running → refused, distinct wording', async () => {
+  const { deps, store, jobs, edits } = makeAgentDeps({
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'running' }),
+  });
+  store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', price: '181200', step: 'confirm' };
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 0);
+  assert.match(edits.at(-1).text, /вже виконується/i);
+});
+
+test('agent:confirm (prepare) when the prior job is done/error → proceeds normally (not a duplicate)', async () => {
+  const { deps, store, jobs } = makeAgentDeps({
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'done' }),
+  });
+  store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', price: '181200', step: 'confirm' };
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 1, 'a finished prior job is not "in flight" — a fresh prepare is a normal re-run');
+});
+
 test('agent:confirm → saveAgentJob with contract-valid job, pending cleared, queued reply', async () => {
-  const { deps, store, sent, jobs, acks } = makeAgentDeps();
+  const { deps, store, edits, jobs, acks } = makeAgentDeps();
   store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', price: '181200', step: 'confirm' };
   await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
   assert.equal(jobs.length, 1);
@@ -2889,7 +2997,7 @@ test('agent:confirm → saveAgentJob with contract-valid job, pending cleared, q
     created_at: '2026-06-21T10:00:00.000Z',
   });
   assert.equal(store.pending['123'], undefined, 'pending cleared');
-  assert.match(sent.at(-1).text, /черг/i);
+  assert.match(edits.at(-1).text, /черг/i);
   assert.equal(acks.length, 1);
 });
 
@@ -2901,7 +3009,7 @@ test('agent:confirm without matching pending → no job, soft ack', async () => 
 });
 
 test('agent:confirm with kind=amend → amend job saved, target from prior done, pending cleared', async () => {
-  const { deps, store, sent, jobs, acks } = makeAgentDeps({
+  const { deps, store, edits, jobs, acks } = makeAgentDeps({
     loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'done', company: 'МАЙЛАБ', result: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg' } }),
   });
   store.pending['123'] = { tid: AGENT_TID, kind: 'amend', step: 'confirm', instruction: 'додай КВЕД', at: '2026-06-21T10:00:00.000Z' };
@@ -2919,7 +3027,7 @@ test('agent:confirm with kind=amend → amend job saved, target from prior done,
     created_at: '2026-06-21T10:00:00.000Z',
   });
   assert.equal(store.pending['123'], undefined, 'pending cleared');
-  assert.match(sent.at(-1).text, /доробку/);
+  assert.match(edits.at(-1).text, /доробку/);
   assert.equal(acks.length, 1);
 });
 
@@ -2959,22 +3067,23 @@ test('agent:retry on missing job → acks warning', async () => {
 });
 
 test('agent:cancel → pending cleared, Скасовано reply', async () => {
-  const { deps, store, sent, acks } = makeAgentDeps();
+  const { deps, store, edits, acks } = makeAgentDeps();
   store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' };
   await runHandler({ update: CB(`agent:cancel:${AGENT_TID}`), env: ENV, deps });
   assert.equal(store.pending['123'], undefined);
-  assert.match(sent.at(-1).text, /Скасовано/);
+  assert.match(edits.at(-1).text, /Скасовано/);
   assert.equal(acks.length, 1);
 });
 
 test('agent:amend on prepared tender → instruction dialog started', async () => {
-  const { deps, store, sent, acks } = makeAgentDeps({
+  const { deps, store, edits, acks } = makeAgentDeps({
     loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'done', company: 'МАЙЛАБ', result: { drive_link: 'https://drive/x' } }),
   });
   await runHandler({ update: CB(`agent:amend:${AGENT_TID}`), env: ENV, deps });
   assert.equal(store.pending['123'].step, 'await_instruction');
   assert.equal(store.pending['123'].kind, 'amend');
-  assert.match(sent.at(-1).text, /що доробити/);
+  assert.equal(store.pending['123'].messageId, 9);
+  assert.match(edits.at(-1).text, /що доробити/);
   assert.equal(acks.length, 1);
 });
 
@@ -2990,7 +3099,7 @@ test('agent:amend on not-prepared tender → rejected, no dialog', async () => {
 // ── Task 8: agent:winner callback + confirm ────────────────────────────────
 
 test('agent:winner with a done prior job → straight to confirm, company from prior job', async () => {
-  const { deps, store, sent, acks } = makeAgentDeps({
+  const { deps, store, edits, acks } = makeAgentDeps({
     loadAgentJob: async () => ({
       tender_id: AGENT_TID, status: 'done', company: 'МАЙЛАБ',
       result: { drive_link: 'https://drive/x', package_dir: 'P', published_dir: 'PUB' },
@@ -2998,24 +3107,24 @@ test('agent:winner with a done prior job → straight to confirm, company from p
   });
   await runHandler({ update: CB(`agent:winner:${AGENT_TID}`), env: ENV, deps });
   assert.deepEqual(store.pending['123'], {
-    tid: AGENT_TID, kind: 'winner', step: 'confirm', company: 'МАЙЛАБ', at: '2026-06-21T10:00:00.000Z',
+    tid: AGENT_TID, kind: 'winner', step: 'confirm', company: 'МАЙЛАБ', messageId: 9, at: '2026-06-21T10:00:00.000Z',
   });
-  assert.match(sent.at(-1).text, /Документи переможця/);
-  assert.match(sent.at(-1).text, /МАЙЛАБ/);
-  assert.match(JSON.stringify(sent.at(-1).replyMarkup), new RegExp(`agent:confirm:${AGENT_TID}`));
+  assert.match(edits.at(-1).text, /Документи переможця/);
+  assert.match(edits.at(-1).text, /МАЙЛАБ/);
+  assert.match(JSON.stringify(edits.at(-1).replyMarkup), new RegExp(`agent:confirm:${AGENT_TID}`));
   assert.equal(acks.length, 1);
 });
 
 test('agent:winner with no prior job at all → asks for company (not an error)', async () => {
   // Default loadAgentJob stub resolves to null: a winner run for a tender the
   // agent never prepared is a normal path, not a GitHub-unavailable error.
-  const { deps, store, sent, acks } = makeAgentDeps();
+  const { deps, store, edits, acks } = makeAgentDeps();
   await runHandler({ update: CB(`agent:winner:${AGENT_TID}`), env: ENV, deps });
   assert.deepEqual(store.pending['123'], {
-    tid: AGENT_TID, kind: 'winner', step: 'await_company', at: '2026-06-21T10:00:00.000Z',
+    tid: AGENT_TID, kind: 'winner', step: 'await_company', messageId: 9, at: '2026-06-21T10:00:00.000Z',
   });
-  assert.match(sent.at(-1).text, /Оберіть компанію-переможця/);
-  const kb = JSON.stringify(sent.at(-1).replyMarkup);
+  assert.match(edits.at(-1).text, /Оберіть компанію-переможця/);
+  const kb = JSON.stringify(edits.at(-1).replyMarkup);
   assert.match(kb, new RegExp(`agent:co:${AGENT_TID}:maylab`));
   assert.equal(acks.length, 1);
   assert.ok(!acks.some(a => /⚠️/.test(a.text ?? '')), 'no error ack for a missing prior job');
@@ -3027,7 +3136,7 @@ test('agent:winner with no prior job at all → asks for company (not an error)'
 // callback, must beat the job file.
 test('agent:winner with a slug in the callback → slug wins over a conflicting prior job', async () => {
   let loadedJob = false;
-  const { deps, store, sent } = makeAgentDeps({
+  const { deps, store, edits } = makeAgentDeps({
     loadAgentJob: async () => {
       loadedJob = true;
       return { tender_id: AGENT_TID, status: 'done', company: 'ТЕРРАЛАБ ПРО', result: { drive_link: 'https://d/x' } };
@@ -3037,91 +3146,91 @@ test('agent:winner with a slug in the callback → slug wins over a conflicting 
   assert.equal(store.pending['123'].company, 'МАЙЛАБ',
     'the awarded entity from the callback, not the prior job company');
   assert.equal(store.pending['123'].step, 'confirm');
-  assert.match(sent.at(-1).text, /МАЙЛАБ/);
-  assert.ok(!/ТЕРРАЛАБ ПРО/.test(sent.at(-1).text));
+  assert.match(edits.at(-1).text, /МАЙЛАБ/);
+  assert.ok(!/ТЕРРАЛАБ ПРО/.test(edits.at(-1).text));
   assert.equal(loadedJob, false, 'a known winner needs no job-file lookup at all');
 });
 
 test('agent:winner with an UNKNOWN slug → falls back to the prior job company', async () => {
-  const { deps, store, sent } = makeAgentDeps({
+  const { deps, store, edits } = makeAgentDeps({
     loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'done', company: 'ТЕРРАЛАБ ПРО' }),
   });
   await runHandler({ update: CB(`agent:winner:${AGENT_TID}:not_a_company`), env: ENV, deps });
   assert.equal(store.pending['123'].company, 'ТЕРРАЛАБ ПРО');
-  assert.match(sent.at(-1).text, /ТЕРРАЛАБ ПРО/);
+  assert.match(edits.at(-1).text, /ТЕРРАЛАБ ПРО/);
 });
 
 test('agent:winner from the jobs page (no slug, no prior job) → still falls back to the picker', async () => {
-  const { deps, store, sent } = makeAgentDeps();
+  const { deps, store, edits } = makeAgentDeps();
   await runHandler({ update: CB(`agent:winner:${AGENT_TID}`), env: ENV, deps });
   assert.equal(store.pending['123'].step, 'await_company');
-  assert.match(sent.at(-1).text, /Оберіть компанію-переможця/);
+  assert.match(edits.at(-1).text, /Оберіть компанію-переможця/);
 });
 
 // M2: the confirmation showed only a tender id and a company. The customer name
 // comes from the monitor's own saved snapshot — no Prozorro round-trip — and is
 // purely cosmetic (it gates nothing).
 test('agent:winner confirm text names the замовник when a saved snapshot has one', async () => {
-  const { deps, sent } = makeAgentDeps({
+  const { deps, edits } = makeAgentDeps({
     loadTenderState: async () => ({
       procuringEntity: { name: 'Комунальне некомерційне підприємство «Черкаська міська інфекційна лікарня»' },
     }),
   });
   await runHandler({ update: CB(`agent:winner:${AGENT_TID}:maylab`), env: ENV, deps });
-  assert.match(sent.at(-1).text, /Замовник: КНП «Черкаська міська інфекційна лікарня»/);
-  assert.match(sent.at(-1).text, /МАЙЛАБ/);
+  assert.match(edits.at(-1).text, /Замовник: КНП «Черкаська міська інфекційна лікарня»/);
+  assert.match(edits.at(-1).text, /МАЙЛАБ/);
 });
 
 test('agent:winner confirm text: no saved snapshot / lookup throws → id + company only, no crash', async () => {
-  const { deps, sent, acks } = makeAgentDeps({
+  const { deps, edits, acks } = makeAgentDeps({
     loadTenderState: async () => { throw new Error('gh down'); },
   });
   await runHandler({ update: CB(`agent:winner:${AGENT_TID}:maylab`), env: ENV, deps });
-  assert.match(sent.at(-1).text, /Документи переможця/);
-  assert.ok(!/Замовник:/.test(sent.at(-1).text));
+  assert.match(edits.at(-1).text, /Документи переможця/);
+  assert.ok(!/Замовник:/.test(edits.at(-1).text));
   assert.equal(acks.length, 1);
   assert.ok(!acks.some(a => /⚠️/.test(a.text ?? '')));
 });
 
 test('agent:co winner continuation also names the замовник', async () => {
-  const { deps, store, sent } = makeAgentDeps({
+  const { deps, store, edits } = makeAgentDeps({
     loadTenderState: async () => ({ procuringEntity: { name: 'КНП «Тестова лікарня»' } }),
   });
   store.pending['123'] = { tid: AGENT_TID, kind: 'winner', step: 'await_company', at: '2026-06-21T10:00:00.000Z' };
   await runHandler({ update: CB(`agent:co:${AGENT_TID}:maylab`), env: ENV, deps });
-  assert.match(sent.at(-1).text, /Замовник: КНП «Тестова лікарня»/);
+  assert.match(edits.at(-1).text, /Замовник: КНП «Тестова лікарня»/);
 });
 
 test('agent:winner when loadAgentJob throws → still asks for company, does not abort', async () => {
-  const { deps, store, sent, acks } = makeAgentDeps({
+  const { deps, store, edits, acks } = makeAgentDeps({
     loadAgentJob: async () => { throw new Error('boom'); },
   });
   await runHandler({ update: CB(`agent:winner:${AGENT_TID}`), env: ENV, deps });
   assert.equal(store.pending['123'].step, 'await_company');
-  assert.match(sent.at(-1).text, /Оберіть компанію-переможця/);
+  assert.match(edits.at(-1).text, /Оберіть компанію-переможця/);
   assert.equal(acks.length, 1);
   assert.ok(!acks.some(a => /⚠️/.test(a.text ?? '')), 'a thrown prior-job lookup must not surface as an error');
 });
 
 test('agent:co after agent:winner (await_company) → confirm shown directly, no price prompt', async () => {
-  const { deps, store, sent, acks } = makeAgentDeps();
+  const { deps, store, edits, acks } = makeAgentDeps();
   store.pending['123'] = { tid: AGENT_TID, kind: 'winner', step: 'await_company', at: '2026-06-21T10:00:00.000Z' };
   await runHandler({ update: CB(`agent:co:${AGENT_TID}:maylab`), env: ENV, deps });
   assert.deepEqual(store.pending['123'], {
-    tid: AGENT_TID, kind: 'winner', company: 'МАЙЛАБ', step: 'confirm', at: '2026-06-21T10:00:00.000Z',
+    tid: AGENT_TID, kind: 'winner', company: 'МАЙЛАБ', step: 'confirm', messageId: 9, at: '2026-06-21T10:00:00.000Z',
   });
-  assert.match(sent.at(-1).text, /Документи переможця/);
-  assert.ok(!/Введіть ціну/.test(sent.at(-1).text), 'winner co must not ask for a price');
+  assert.match(edits.at(-1).text, /Документи переможця/);
+  assert.ok(!/Введіть ціну/.test(edits.at(-1).text), 'winner co must not ask for a price');
   assert.equal(acks.length, 1);
 });
 
 test('agent:co WITHOUT a winner pending (plain prepare) → unaffected, still asks for price', async () => {
-  const { deps, store, sent } = makeAgentDeps();
+  const { deps, store, edits } = makeAgentDeps();
   await runHandler({ update: CB(`agent:co:${AGENT_TID}:maylab`), env: ENV, deps });
   assert.deepEqual(store.pending['123'], {
-    tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price', at: '2026-06-21T10:00:00.000Z',
+    tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price', messageId: 9, at: '2026-06-21T10:00:00.000Z',
   });
-  assert.match(sent.at(-1).text, /Введіть ціну/);
+  assert.match(edits.at(-1).text, /Введіть ціну/);
 });
 
 // Fix round 1: `co` must scope the winner-vs-prepare routing to the SAME tid
@@ -3131,14 +3240,14 @@ test('agent:co WITHOUT a winner pending (plain prepare) → unaffected, still as
 const AGENT_TID_B = 'UA-2026-05-01-010777-b';
 
 test('agent:co for tender B with a STALE winner pending from tender A → falls through to prepare (price prompt)', async () => {
-  const { deps, store, sent } = makeAgentDeps();
+  const { deps, store, edits } = makeAgentDeps();
   store.pending['123'] = { tid: AGENT_TID, kind: 'winner', step: 'await_company', at: '2026-06-21T10:00:00.000Z' };
   await runHandler({ update: CB(`agent:co:${AGENT_TID_B}:maylab`), env: ENV, deps });
   assert.deepEqual(store.pending['123'], {
-    tid: AGENT_TID_B, company: 'МАЙЛАБ', step: 'await_price', at: '2026-06-21T10:00:00.000Z',
+    tid: AGENT_TID_B, company: 'МАЙЛАБ', step: 'await_price', messageId: 9, at: '2026-06-21T10:00:00.000Z',
   }, 'pending is rewritten as an ordinary prepare dialog scoped to tender B, not carried over from A');
-  assert.match(sent.at(-1).text, /Введіть ціну/);
-  assert.ok(!/Документи переможця/.test(sent.at(-1).text), 'must not show the winner confirm for an unrelated tender');
+  assert.match(edits.at(-1).text, /Введіть ціну/);
+  assert.ok(!/Документи переможця/.test(edits.at(-1).text), 'must not show the winner confirm for an unrelated tender');
 });
 
 test('agent:co for tender B with stale winner pending from A, then price + confirm → ordinary job with price, no job_type winner', async () => {
@@ -3156,13 +3265,13 @@ test('agent:co for tender B with stale winner pending from A, then price + confi
 });
 
 test('agent:co with a SAME-tid winner pending → still routes to the winner confirmation (regression guard)', async () => {
-  const { deps, store, sent } = makeAgentDeps();
+  const { deps, store, edits } = makeAgentDeps();
   store.pending['123'] = { tid: AGENT_TID, kind: 'winner', step: 'await_company', at: '2026-06-21T10:00:00.000Z' };
   await runHandler({ update: CB(`agent:co:${AGENT_TID}:maylab`), env: ENV, deps });
   assert.deepEqual(store.pending['123'], {
-    tid: AGENT_TID, kind: 'winner', company: 'МАЙЛАБ', step: 'confirm', at: '2026-06-21T10:00:00.000Z',
+    tid: AGENT_TID, kind: 'winner', company: 'МАЙЛАБ', step: 'confirm', messageId: 9, at: '2026-06-21T10:00:00.000Z',
   });
-  assert.match(sent.at(-1).text, /Документи переможця/);
+  assert.match(edits.at(-1).text, /Документи переможця/);
 });
 
 // Fix round 2 (C1): the tid guard alone does NOT close the same-tender case.
@@ -3173,7 +3282,7 @@ test('agent:co with a SAME-tid winner pending → still routes to the winner con
 // job for a tender that was never awarded. Only `await_company` — the one step
 // from which `co` can legitimately continue a winner dialog — may continue it.
 test('agent:co with a SAME-tid winner pending stuck at step confirm → falls through to prepare, price asked', async () => {
-  const { deps, store, sent, jobs } = makeAgentDeps({
+  const { deps, store, edits, jobs } = makeAgentDeps({
     saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
   });
   store.pending['123'] = {
@@ -3181,10 +3290,10 @@ test('agent:co with a SAME-tid winner pending stuck at step confirm → falls th
   };
   await runHandler({ update: CB(`agent:start:${AGENT_TID}`), env: ENV, deps });
   await runHandler({ update: CB(`agent:co:${AGENT_TID}:terralab_pro`), env: ENV, deps });
-  assert.match(sent.at(-1).text, /Введіть ціну/, 'a fresh prepare must reach the price step');
-  assert.ok(!/Документи переможця/.test(sent.at(-1).text), 'stale same-tid winner pending must not hijack a prepare');
+  assert.match(edits.at(-1).text, /Введіть ціну/, 'a fresh prepare must reach the price step');
+  assert.ok(!/Документи переможця/.test(edits.at(-1).text), 'stale same-tid winner pending must not hijack a prepare');
   assert.deepEqual(store.pending['123'], {
-    tid: AGENT_TID, company: 'ТЕРРАЛАБ ПРО', step: 'await_price', at: '2026-06-21T10:00:00.000Z',
+    tid: AGENT_TID, company: 'ТЕРРАЛАБ ПРО', step: 'await_price', messageId: 9, at: '2026-06-21T10:00:00.000Z',
   });
   await runHandler({ update: agentMsg('50000'), env: ENV, deps });
   await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
@@ -3201,18 +3310,18 @@ test('agent:co with a SAME-tid winner pending stuck at step confirm → falls th
 // `agent:start`, which now clears a stale winner dialog for the SAME tender —
 // so `confirm` is a legitimate continuation step only when no start intervened.
 test('agent:co correcting a mis-tapped company (winner pending at confirm, no intervening start) → winner confirm again', async () => {
-  const { deps, store, sent, jobs } = makeAgentDeps({
+  const { deps, store, edits, jobs } = makeAgentDeps({
     saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
   });
   store.pending['123'] = {
     tid: AGENT_TID, kind: 'winner', step: 'confirm', company: 'МАЙЛАБ', at: '2026-06-21T09:00:00.000Z',
   };
   await runHandler({ update: CB(`agent:co:${AGENT_TID}:terralab_pro`), env: ENV, deps });
-  assert.match(sent.at(-1).text, /Документи переможця/, 'the winner confirmation must be shown again');
-  assert.match(sent.at(-1).text, /ТЕРРАЛАБ ПРО/, 'with the CORRECTED company');
-  assert.ok(!/Введіть ціну/.test(sent.at(-1).text), 'a correction must never ask for a price');
+  assert.match(edits.at(-1).text, /Документи переможця/, 'the winner confirmation must be shown again');
+  assert.match(edits.at(-1).text, /ТЕРРАЛАБ ПРО/, 'with the CORRECTED company');
+  assert.ok(!/Введіть ціну/.test(edits.at(-1).text), 'a correction must never ask for a price');
   assert.deepEqual(store.pending['123'], {
-    tid: AGENT_TID, kind: 'winner', company: 'ТЕРРАЛАБ ПРО', step: 'confirm', at: '2026-06-21T10:00:00.000Z',
+    tid: AGENT_TID, kind: 'winner', company: 'ТЕРРАЛАБ ПРО', step: 'confirm', messageId: 9, at: '2026-06-21T10:00:00.000Z',
   });
   await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
   assert.equal(jobs.length, 1);
@@ -3243,7 +3352,7 @@ test('agent:start for tender A leaves an in-flight amend dialog for tender B alo
 });
 
 test('agent:confirm with kind=winner → winner job saved, target from prior done job, price omitted', async () => {
-  const { deps, store, sent, jobs, acks } = makeAgentDeps({
+  const { deps, store, sent, edits, jobs, acks } = makeAgentDeps({
     loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Едітор', role: 'editor' }], sha: 's' }),
     saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
     loadAgentJob: async () => ({
@@ -3270,8 +3379,8 @@ test('agent:confirm with kind=winner → winner job saved, target from prior don
   assert.match(saved.opts.message, /^audit: agent_winner /);
   assert.match(saved.opts.message, /\[456\/editor\]/);
   assert.equal(store.pending['456'], undefined, 'pending cleared');
-  const toUser = sent.filter(s => String(s.chatId) === '456');
-  assert.equal(toUser.length, 1);
+  const toUser = edits.filter(e => String(e.chatId) === '456');
+  assert.equal(toUser.length, 1, 'edits the confirm message in place rather than sending a new one');
   assert.match(toUser[0].text, /поставлено в чергу/);
 
   const toAdmin = sent.filter(s => String(s.chatId) === String(ENV.ADMIN_CHAT_ID));
@@ -3313,16 +3422,16 @@ const DONE_PREPARED = {
 };
 
 test('agent:sign on a prepared proposal → date keyboard, pending at await_date', async () => {
-  const { deps, store, sent, acks } = makeAgentDeps({
+  const { deps, store, edits, acks } = makeAgentDeps({
     loadAgentJob: async () => structuredClone(DONE_PREPARED),
   });
   await runHandler({ update: CB(`agent:sign:${AGENT_TID}`), env: ENV, deps });
   assert.deepEqual(store.pending['123'], {
-    tid: AGENT_TID, kind: 'sign', step: 'await_date', company: 'МАЙЛАБ',
+    tid: AGENT_TID, kind: 'sign', step: 'await_date', company: 'МАЙЛАБ', messageId: 9,
     at: '2026-06-21T10:00:00.000Z',
   });
-  assert.match(sent.at(-1).text, /дату/i);
-  const kb = JSON.stringify(sent.at(-1).replyMarkup);
+  assert.match(edits.at(-1).text, /дату/i);
+  const kb = JSON.stringify(edits.at(-1).replyMarkup);
   assert.match(kb, new RegExp(`agent:signdate:${AGENT_TID}:21\\.06\\.2026`),
     'the «сьогодні» button carries the Kyiv date of the injected now');
   assert.match(kb, new RegExp(`agent:signother:${AGENT_TID}`));
@@ -3364,19 +3473,19 @@ test('agent:sign when loadAgentJob throws → soft ack, no dialog', async () => 
 });
 
 test('agent:signdate → date stored, sign confirmation shown', async () => {
-  const { deps, store, sent, acks } = makeAgentDeps();
+  const { deps, store, edits, acks } = makeAgentDeps();
   store.pending['123'] = {
     tid: AGENT_TID, kind: 'sign', step: 'await_date', company: 'МАЙЛАБ',
     at: '2026-06-21T10:00:00.000Z',
   };
   await runHandler({ update: CB(`agent:signdate:${AGENT_TID}:21.06.2026`), env: ENV, deps });
   assert.deepEqual(store.pending['123'], {
-    tid: AGENT_TID, kind: 'sign', step: 'confirm', company: 'МАЙЛАБ',
+    tid: AGENT_TID, kind: 'sign', step: 'confirm', company: 'МАЙЛАБ', messageId: 9,
     letterDate: '21.06.2026', at: '2026-06-21T10:00:00.000Z',
   });
-  assert.match(sent.at(-1).text, /Підписати й запакувати/);
-  assert.match(sent.at(-1).text, /21\.06\.2026/);
-  assert.match(JSON.stringify(sent.at(-1).replyMarkup), new RegExp(`agent:confirm:${AGENT_TID}`));
+  assert.match(edits.at(-1).text, /Підписати й запакувати/);
+  assert.match(edits.at(-1).text, /21\.06\.2026/);
+  assert.match(JSON.stringify(edits.at(-1).replyMarkup), new RegExp(`agent:confirm:${AGENT_TID}`));
   assert.equal(acks.length, 1);
 });
 
@@ -3394,7 +3503,7 @@ test('agent:signdate with a date outside the ±30-day window → rejected, dialo
 });
 
 test('agent:signother → dialog waits for a typed date', async () => {
-  const { deps, store, sent, acks } = makeAgentDeps();
+  const { deps, store, edits, acks } = makeAgentDeps();
   store.pending['123'] = {
     tid: AGENT_TID, kind: 'sign', step: 'await_date', company: 'МАЙЛАБ',
     at: '2026-06-21T10:00:00.000Z',
@@ -3402,7 +3511,8 @@ test('agent:signother → dialog waits for a typed date', async () => {
   await runHandler({ update: CB(`agent:signother:${AGENT_TID}`), env: ENV, deps });
   assert.equal(store.pending['123'].step, 'await_letter_date');
   assert.equal(store.pending['123'].kind, 'sign');
-  assert.match(sent.at(-1).text, /ДД\.ММ\.РРРР/);
+  assert.equal(store.pending['123'].messageId, 9);
+  assert.match(edits.at(-1).text, /ДД\.ММ\.РРРР/);
   assert.equal(acks.length, 1);
 });
 
@@ -3475,7 +3585,7 @@ test('agent:signdate with no pending at all → rejected, nothing written', asyn
 // Виправлення дати на тому самому, ще видимому повідомленні — звичайна дія, а не
 // перехоплення: тендер той самий, kind той самий, крок — із діалогу підписання.
 test('agent:signdate re-tapped after a date was already chosen → date corrected, still a sign dialog', async () => {
-  const { deps, store, sent } = makeAgentDeps();
+  const { deps, store, edits } = makeAgentDeps();
   store.pending['123'] = {
     tid: AGENT_TID, kind: 'sign', step: 'confirm', company: 'МАЙЛАБ',
     letterDate: '21.06.2026', at: '2026-06-21T10:00:00.000Z',
@@ -3484,17 +3594,17 @@ test('agent:signdate re-tapped after a date was already chosen → date correcte
   assert.equal(store.pending['123'].letterDate, '22.06.2026');
   assert.equal(store.pending['123'].kind, 'sign');
   assert.equal(store.pending['123'].step, 'confirm');
-  assert.match(sent.at(-1).text, /22\.06\.2026/);
+  assert.match(edits.at(-1).text, /22\.06\.2026/);
 });
 
 test('agent:signother while waiting for a typed date → still allowed (re-prompt)', async () => {
-  const { deps, store, sent } = makeAgentDeps();
+  const { deps, store, edits } = makeAgentDeps();
   store.pending['123'] = {
     tid: AGENT_TID, kind: 'sign', step: 'await_letter_date', at: '2026-06-21T10:00:00.000Z',
   };
   await runHandler({ update: CB(`agent:signother:${AGENT_TID}`), env: ENV, deps });
   assert.equal(store.pending['123'].step, 'await_letter_date');
-  assert.match(sent.at(-1).text, /ДД\.ММ\.РРРР/);
+  assert.match(edits.at(-1).text, /ДД\.ММ\.РРРР/);
 });
 
 // ── Typed date ────────────────────────────────────────────────────────────────
@@ -3649,13 +3759,13 @@ test('agent:confirm on a sign dialog still at await_date → no job', async () =
 });
 
 test('agent:cancel clears a sign dialog', async () => {
-  const { deps, store, sent } = makeAgentDeps();
+  const { deps, store, edits } = makeAgentDeps();
   store.pending['123'] = {
     tid: AGENT_TID, kind: 'sign', step: 'await_letter_date', at: '2026-06-21T10:00:00.000Z',
   };
   await runHandler({ update: CB(`agent:cancel:${AGENT_TID}`), env: ENV, deps });
   assert.equal(store.pending['123'], undefined);
-  assert.match(sent.at(-1).text, /Скасовано/);
+  assert.match(edits.at(-1).text, /Скасовано/);
 });
 
 // Наскрізний прохід: кнопка → дата → підтвердження → job у черзі.
@@ -3953,7 +4063,7 @@ test('runHandler: the sign button rendered on the jobs page opens the date dialo
   await runHandler({ update: CB(btn.callback_data), env: ENV, deps });
   assert.equal(store.pending['123'].kind, 'sign');
   assert.equal(store.pending['123'].step, 'await_date');
-  assert.match(sent.at(-1).text, /дату/i);
+  assert.match(edits.at(-1).text, /дату/i);
 });
 
 test('runHandler: agent:pick:0 → tender picker, active.tendering only', async () => {

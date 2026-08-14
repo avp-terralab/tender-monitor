@@ -167,7 +167,7 @@ export async function runHandler({ update, env, deps = {} }) {
   // before command parsing. Admin + editor (the dialog can only be opened by them).
   if (isEditor && typeof msg.text === 'string' && !msg.text.startsWith('/')) {
     const handled = await handleAgentTextReply({
-      env, chatId, msg, _sendReply,
+      env, chatId, msg, _sendReply, _editMessageText,
       _loadAgentPending, _saveAgentPending, _now,
     });
     if (handled) return;
@@ -177,16 +177,39 @@ export async function runHandler({ update, env, deps = {} }) {
   // /start <token> is handled in a later branch.
   if (typeof msg.text === 'string' && /^\/start(?:@\w+)?\s*$/i.test(msg.text)) {
     const startReply = buildStartGreeting(chatId, role, isAllowed);
+    // Same "one ephemeral view at a time" slot the view commands share below —
+    // repeated /start taps (people re-checking their chat_id) used to pile up
+    // a fresh "👋 Привіт!" every time. Best-effort; never blocks the reply.
+    if (_ephemeralKV) {
+      try {
+        const prevIds = await loadEphemeral(_ephemeralKV, chatId);
+        for (const id of prevIds) {
+          await _deleteMessage({ token: env.TELEGRAM_BOT_TOKEN, chatId, messageId: id });
+        }
+      } catch (err) {
+        console.error('worker: start ephemeral cleanup failed:', err.message);
+      }
+    }
+    let botReplyId;
     try {
-      await _sendReply({
+      const resp = await _sendReply({
         token: env.TELEGRAM_BOT_TOKEN,
         chatId: msg.chat.id,
         text: startReply,
         replyToMessageId: msg.message_id,
         replyMarkup: isAllowed ? mainKeyboard(role) : undefined,
       });
+      botReplyId = resp?.result?.message_id;
     } catch (err) {
       console.error('worker: sendReply /start failed:', err.message);
+    }
+    if (_ephemeralKV) {
+      try {
+        const ids = [msg.message_id, botReplyId].filter((x) => x != null);
+        await saveEphemeral(_ephemeralKV, chatId, ids);
+      } catch (err) {
+        console.error('worker: start ephemeral save failed:', err.message);
+      }
     }
     if (isAllowed) {
       // Fire-and-forget; logs but doesn't block.
@@ -1185,6 +1208,30 @@ async function notifyAdminAgentRun({
   }
 }
 
+// Every step of the agent dialog originates from a tap on a message WE sent
+// (the company picker, the price prompt, the confirm buttons) — so instead of
+// piling up a new message per step, edit that same message in place. Falls
+// back to a fresh send only if the edit itself fails (e.g. the message is too
+// old for Telegram to edit), and returns whichever message id now carries the
+// dialog so the caller can persist it for the next step.
+async function editOrSend({ _editMessageText, _sendReply, env, chatId, messageId, text, replyMarkup }) {
+  if (messageId != null) {
+    try {
+      await _editMessageText({
+        token: env.TELEGRAM_BOT_TOKEN, chatId, messageId, text,
+        replyMarkup: replyMarkup ?? undefined,
+      });
+      return messageId;
+    } catch (err) {
+      console.error('worker: agent dialog edit failed, sending new message:', err.message);
+    }
+  }
+  const resp = await _sendReply({
+    token: env.TELEGRAM_BOT_TOKEN, chatId: Number(chatId), text, replyMarkup,
+  });
+  return resp?.result?.message_id ?? null;
+}
+
 // Drives the agent-trigger dialog for admin + editor (start → pick company →
 // enter price → confirm). State between the company tap and the price text lives in
 // _state/agent_pending.json keyed by chatId (the Worker is stateless across
@@ -1201,10 +1248,6 @@ async function handleAgentCallback({
   const parts = data.split(':'); // agent:<action>:<tid>[:<slug>]
   const action = parts[1];
   const tid = parts[2] ?? '';
-
-  const sendNew = (text, replyMarkup) => _sendReply({
-    token: env.TELEGRAM_BOT_TOKEN, chatId: Number(chatId), text, replyMarkup,
-  });
 
   // Customer name for the winner confirmation, from the monitor's own saved
   // snapshot (_state/<tid>.json) — no Prozorro round-trip, and null whenever the
@@ -1283,18 +1326,17 @@ async function handleAgentCallback({
       return;
     }
     try {
+      const newId = await editOrSend({
+        _editMessageText, _sendReply, env, chatId, messageId,
+        text: `✏️ Напиши, що доробити в пропозиції ${tid} (одним повідомленням):`,
+      });
       const { pending, sha } = await _loadAgentPending(env);
-      pending[chatId] = { tid, kind: 'amend', step: 'await_instruction', at: _now().toISOString() };
+      pending[chatId] = { tid, kind: 'amend', step: 'await_instruction', messageId: newId, at: _now().toISOString() };
       await _saveAgentPending(env, pending, sha);
     } catch (err) {
       console.error('worker: agent amend save pending failed:', err.message);
       await ack('⚠️ Помилка, спробуй ще раз', true);
       return;
-    }
-    try {
-      await sendNew(`✏️ Напиши, що доробити в пропозиції ${tid} (одним повідомленням):`);
-    } catch (err) {
-      console.error('worker: agent amend prompt send failed:', err.message);
     }
     await ack();
     return;
@@ -1317,14 +1359,17 @@ async function handleAgentCallback({
       return;
     }
     try {
+      const newId = await editOrSend({
+        _editMessageText, _sendReply, env, chatId, messageId,
+        text: 'Яку дату проставити в документах?',
+        replyMarkup: buildAgentSignDateKeyboard(tid, formatLetterDate(_now())),
+      });
       const { pending, sha } = await _loadAgentPending(env);
       pending[chatId] = {
-        tid, kind: 'sign', step: 'await_date',
+        tid, kind: 'sign', step: 'await_date', messageId: newId,
         company: prior.company ?? null, at: _now().toISOString(),
       };
       await _saveAgentPending(env, pending, sha);
-      await sendNew('Яку дату проставити в документах?',
-        buildAgentSignDateKeyboard(tid, formatLetterDate(_now())));
     } catch (err) {
       console.error('worker: agent sign date prompt failed:', err.message);
       await ack('⚠️ Помилка, спробуй ще раз', true);
@@ -1358,10 +1403,13 @@ async function handleAgentCallback({
     }
     if (action === 'signother') {
       try {
+        const newId = await editOrSend({
+          _editMessageText, _sendReply, env, chatId, messageId,
+          text: 'Надішли дату у форматі ДД.ММ.РРРР (напр. 13.08.2026):',
+        });
         const { pending, sha } = await _loadAgentPending(env);
-        pending[chatId] = { ...entry, step: 'await_letter_date', at: _now().toISOString() };
+        pending[chatId] = { ...entry, step: 'await_letter_date', messageId: newId, at: _now().toISOString() };
         await _saveAgentPending(env, pending, sha);
-        await sendNew('Надішли дату у форматі ДД.ММ.РРРР (напр. 13.08.2026):');
       } catch (err) {
         console.error('worker: agent signother failed:', err.message);
         await ack('⚠️ Помилка, спробуй ще раз', true);
@@ -1373,13 +1421,14 @@ async function handleAgentCallback({
     const letterDate = validateLetterDate(parts[3] ?? '', _now());
     if (!letterDate) { await ack('❌ Невірна дата', true); return; }
     try {
+      const newId = await editOrSend({
+        _editMessageText, _sendReply, env, chatId, messageId,
+        text: buildAgentSignConfirmText({ tenderId: tid, company: entry.company, letterDate }),
+        replyMarkup: buildAgentConfirmKeyboard(tid),
+      });
       const { pending, sha } = await _loadAgentPending(env);
-      pending[chatId] = { ...entry, step: 'confirm', letterDate };
+      pending[chatId] = { ...entry, step: 'confirm', letterDate, messageId: newId };
       await _saveAgentPending(env, pending, sha);
-      await sendNew(
-        buildAgentSignConfirmText({ tenderId: tid, company: entry.company, letterDate }),
-        buildAgentConfirmKeyboard(tid),
-      );
     } catch (err) {
       console.error('worker: agent signdate confirm failed:', err.message);
       await ack('⚠️ Помилка, спробуй ще раз', true);
@@ -1417,10 +1466,13 @@ async function handleAgentCallback({
       // Company unknown — ask with the same picker `prepare` uses, then land
       // on the winner confirm (not the price step; see the `co` branch below).
       try {
+        const newId = await editOrSend({
+          _editMessageText, _sendReply, env, chatId, messageId,
+          text: 'Оберіть компанію-переможця:', replyMarkup: buildAgentCompanyKeyboard(tid),
+        });
         const { pending, sha } = await _loadAgentPending(env);
-        pending[chatId] = { tid, kind: 'winner', step: 'await_company', at: _now().toISOString() };
+        pending[chatId] = { tid, kind: 'winner', step: 'await_company', messageId: newId, at: _now().toISOString() };
         await _saveAgentPending(env, pending, sha);
-        await sendNew('Оберіть компанію-переможця:', buildAgentCompanyKeyboard(tid));
       } catch (err) {
         console.error('worker: agent winner company prompt failed:', err.message);
         await ack('⚠️ Помилка, спробуй ще раз', true);
@@ -1431,13 +1483,14 @@ async function handleAgentCallback({
     }
     const entityName = await winnerEntityName();
     try {
+      const newId = await editOrSend({
+        _editMessageText, _sendReply, env, chatId, messageId,
+        text: buildAgentWinnerConfirmText({ tenderId: tid, company, entityName }),
+        replyMarkup: buildAgentConfirmKeyboard(tid),
+      });
       const { pending, sha } = await _loadAgentPending(env);
-      pending[chatId] = { tid, kind: 'winner', step: 'confirm', company, at: _now().toISOString() };
+      pending[chatId] = { tid, kind: 'winner', step: 'confirm', company, messageId: newId, at: _now().toISOString() };
       await _saveAgentPending(env, pending, sha);
-      await sendNew(
-        buildAgentWinnerConfirmText({ tenderId: tid, company, entityName }),
-        buildAgentConfirmKeyboard(tid),
-      );
     } catch (err) {
       console.error('worker: agent winner confirm prompt failed:', err.message);
       await ack('⚠️ Помилка, спробуй ще раз', true);
@@ -1448,6 +1501,20 @@ async function handleAgentCallback({
   }
 
   if (action === 'start') {
+    // A tender the owner isn't monitoring has no one watching for the award,
+    // deadline changes or amendments once the agent prepares a proposal for
+    // it — so require «Додати в моніторинг» first. Best-effort: a watchlist
+    // load failure must not block an otherwise legitimate start (fail open,
+    // same as the status/pending checks right below).
+    try {
+      const { watchlist } = await _loadWatchlist(env);
+      if (!watchlist.some((r) => r.tender_id === tid)) {
+        await ack('🚫 Спершу додай тендер у моніторинг («➕ Додати в моніторинг»), тоді агент буде доступний', true);
+        return;
+      }
+    } catch (err) {
+      console.error('worker: agent start watchlist check failed:', err.message);
+    }
     // Authoritative gate (covers /agent, /info and digest buttons): the agent
     // runs only while the tender is accepting proposals (active.tendering).
     try {
@@ -1478,18 +1545,12 @@ async function handleAgentCallback({
       console.error('worker: agent start clear stale winner pending failed:', err.message);
     }
     try {
-      await _editMessageText({
-        token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
-        text: 'Оберіть компанію-учасника:',
-        replyMarkup: buildAgentCompanyKeyboard(tid),
+      await editOrSend({
+        _editMessageText, _sendReply, env, chatId, messageId,
+        text: 'Оберіть компанію-учасника:', replyMarkup: buildAgentCompanyKeyboard(tid),
       });
     } catch (err) {
       console.error('worker: agent start edit failed:', err.message);
-      try {
-        await sendNew('Оберіть компанію-учасника:', buildAgentCompanyKeyboard(tid));
-      } catch (err2) {
-        console.error('worker: agent start send failed:', err2.message);
-      }
     }
     await ack();
     return;
@@ -1534,12 +1595,13 @@ async function handleAgentCallback({
     if (isWinnerContinuation) {
       const entityName = await winnerEntityName();
       try {
-        pending[chatId] = { tid, kind: 'winner', company, step: 'confirm', at: _now().toISOString() };
+        const newId = await editOrSend({
+          _editMessageText, _sendReply, env, chatId, messageId,
+          text: buildAgentWinnerConfirmText({ tenderId: tid, company, entityName }),
+          replyMarkup: buildAgentConfirmKeyboard(tid),
+        });
+        pending[chatId] = { tid, kind: 'winner', company, step: 'confirm', messageId: newId, at: _now().toISOString() };
         await _saveAgentPending(env, pending, sha);
-        await sendNew(
-          buildAgentWinnerConfirmText({ tenderId: tid, company, entityName }),
-          buildAgentConfirmKeyboard(tid),
-        );
       } catch (err) {
         console.error('worker: agent winner co save pending failed:', err.message);
         await ack('⚠️ Помилка, спробуй ще раз', true);
@@ -1550,17 +1612,16 @@ async function handleAgentCallback({
     }
 
     try {
-      pending[chatId] = { tid, company, step: 'await_price', at: _now().toISOString() };
+      const newId = await editOrSend({
+        _editMessageText, _sendReply, env, chatId, messageId,
+        text: 'Введіть ціну пропозиції (грн) або «auto»:',
+      });
+      pending[chatId] = { tid, company, step: 'await_price', messageId: newId, at: _now().toISOString() };
       await _saveAgentPending(env, pending, sha);
     } catch (err) {
       console.error('worker: agent co save pending failed:', err.message);
       await ack('⚠️ Помилка, спробуй ще раз', true);
       return;
-    }
-    try {
-      await sendNew('Введіть ціну пропозиції (грн) або «auto»:');
-    } catch (err) {
-      console.error('worker: agent co prompt send failed:', err.message);
     }
     await ack();
     return;
@@ -1620,7 +1681,10 @@ async function handleAgentCallback({
       }
       await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
       try {
-        await sendNew('✅ Підписання поставлено в чергу. Сповіщу, коли буде готово.');
+        await editOrSend({
+          _editMessageText, _sendReply, env, chatId, messageId,
+          text: '✅ Підписання поставлено в чергу. Сповіщу, коли буде готово.',
+        });
       } catch (err) {
         console.error('worker: agent sign confirm reply failed:', err.message);
       }
@@ -1668,7 +1732,10 @@ async function handleAgentCallback({
       }
       await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
       try {
-        await sendNew('✅ Документи переможця поставлено в чергу. Сповіщу, коли буде готово.');
+        await editOrSend({
+          _editMessageText, _sendReply, env, chatId, messageId,
+          text: '✅ Документи переможця поставлено в чергу. Сповіщу, коли буде готово.',
+        });
       } catch (err) {
         console.error('worker: agent winner confirm reply failed:', err.message);
       }
@@ -1711,7 +1778,10 @@ async function handleAgentCallback({
       }
       await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
       try {
-        await sendNew('✅ Завдання на доробку поставлено в чергу. Сповіщу, коли буде готово.');
+        await editOrSend({
+          _editMessageText, _sendReply, env, chatId, messageId,
+          text: '✅ Завдання на доробку поставлено в чергу. Сповіщу, коли буде готово.',
+        });
       } catch (err) {
         console.error('worker: agent amend confirm reply failed:', err.message);
       }
@@ -1725,6 +1795,31 @@ async function handleAgentCallback({
 
     // Prepare (existing): requires a price.
     if (!entry.price) { await ack('⚠️ Немає активного запиту'); return; }
+    // A pending/running job for this tender is already in flight. Queuing a
+    // second one silently overwrites the file the first run reads its status
+    // back into (one file per tender_id, see saveAgentJob) — two "запустив
+    // агента" admin notices a few minutes apart with no sign that the second
+    // one did nothing useful. Refuse outright instead of re-queuing.
+    let existingJob = null;
+    try {
+      existingJob = await _loadAgentJob(env, tid);
+    } catch (err) {
+      console.error('worker: agent prepare dedup check failed:', err.message);
+    }
+    if (existingJob && (existingJob.status === 'pending' || existingJob.status === 'running')) {
+      await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
+      const verb = existingJob.status === 'running' ? 'вже виконується' : 'вже в черзі';
+      try {
+        await editOrSend({
+          _editMessageText, _sendReply, env, chatId, messageId,
+          text: `⚠️ Підготовку для ${tid} ${verb} — дочекайся результату, перш ніж запускати знову.`,
+        });
+      } catch (err) {
+        console.error('worker: agent prepare dup reply failed:', err.message);
+      }
+      await ack('⚠️ Вже в черзі');
+      return;
+    }
     const link = `https://prozorro.gov.ua/tender/${tid}`;
     const job = buildAgentJob({
       tenderId: tid, link, company: entry.company, price: entry.price,
@@ -1741,7 +1836,10 @@ async function handleAgentCallback({
     }
     await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
     try {
-      await sendNew('✅ Завдання поставлено в чергу. Сповіщу, коли буде готово.');
+      await editOrSend({
+        _editMessageText, _sendReply, env, chatId, messageId,
+        text: '✅ Завдання поставлено в чергу. Сповіщу, коли буде готово.',
+      });
     } catch (err) {
       console.error('worker: agent confirm reply failed:', err.message);
     }
@@ -1781,7 +1879,7 @@ async function handleAgentCallback({
   if (action === 'cancel') {
     await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
     try {
-      await sendNew('Скасовано.');
+      await editOrSend({ _editMessageText, _sendReply, env, chatId, messageId, text: 'Скасовано.' });
     } catch (err) {
       console.error('worker: agent cancel reply failed:', err.message);
     }
@@ -1812,7 +1910,7 @@ async function clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPen
 // consumed the message (so the caller stops), false if there was no matching
 // pending step (caller continues normal parsing).
 async function handleAgentTextReply({
-  env, chatId, msg, _sendReply, _loadAgentPending, _saveAgentPending, _now,
+  env, chatId, msg, _sendReply, _editMessageText, _loadAgentPending, _saveAgentPending, _now,
 }) {
   let pending, sha, entry;
   try {
@@ -1839,57 +1937,60 @@ async function handleAgentTextReply({
     return false; // treat as no pending → normal handling proceeds
   }
 
-  const send = (text, replyMarkup) => _sendReply({
-    token: env.TELEGRAM_BOT_TOKEN, chatId: msg.chat.id, text,
-    replyToMessageId: msg.message_id, replyMarkup,
+  // The prompt this reply is answering lives in ONE message (edited in place at
+  // every step since the company picker was tapped — see editOrSend). Update
+  // it rather than replying with a new message, so an invalid retry doesn't
+  // leave a trail of "Введіть ціну…" copies in the chat. Falls back to a fresh
+  // reply (with no persisted id to fall back to, or if the edit itself fails).
+  const update = (text, replyMarkup) => editOrSend({
+    _editMessageText, _sendReply, env, chatId: msg.chat.id, messageId: entry.messageId,
+    text, replyMarkup,
   });
 
   if (entry.step === 'await_letter_date') {
     const letterDate = validateLetterDate(msg.text, now);
     if (!letterDate) {
       try {
-        await send('❌ Дата має бути у форматі ДД.ММ.РРРР і в межах ±30 днів. Спробуй ще раз:');
+        await update('❌ Дата має бути у форматі ДД.ММ.РРРР і в межах ±30 днів. Спробуй ще раз:');
       } catch (err) { console.error('worker: agent invalid-date reply failed:', err.message); }
       return true;
     }
+    let newId;
     try {
-      pending[chatId] = { ...entry, letterDate, step: 'confirm' };
-      await _saveAgentPending(env, pending, sha);
-    } catch (err) {
-      console.error('worker: agent letter-date save pending failed:', err.message);
-      try { await send('⚠️ Помилка, спробуй ще раз.'); } catch {}
-      return true;
-    }
-    try {
-      await send(
+      newId = await update(
         buildAgentSignConfirmText({ tenderId: entry.tid, company: entry.company, letterDate }),
         buildAgentConfirmKeyboard(entry.tid),
       );
     } catch (err) { console.error('worker: agent sign confirm prompt failed:', err.message); }
+    try {
+      pending[chatId] = { ...entry, letterDate, step: 'confirm', messageId: newId ?? entry.messageId };
+      await _saveAgentPending(env, pending, sha);
+    } catch (err) {
+      console.error('worker: agent letter-date save pending failed:', err.message);
+    }
     return true;
   }
 
   if (entry.step === 'await_instruction') {
     const instruction = validateInstruction(msg.text);
     if (instruction === null) {
-      try { await send('Порожня інструкція. Напиши текстом, що доробити.'); }
+      try { await update('Порожня інструкція. Напиши текстом, що доробити.'); }
       catch (err) { console.error('worker: agent empty-instruction reply failed:', err.message); }
       return true; // consumed; stay at await_instruction
     }
+    let newId;
     try {
-      pending[chatId] = { ...entry, instruction, step: 'confirm' };
-      await _saveAgentPending(env, pending, sha);
-    } catch (err) {
-      console.error('worker: agent instruction save pending failed:', err.message);
-      try { await send('⚠️ Помилка, спробуй ще раз.'); } catch {}
-      return true;
-    }
-    try {
-      await send(
+      newId = await update(
         buildAgentAmendConfirmText({ tenderId: entry.tid, instruction }),
         buildAgentConfirmKeyboard(entry.tid),
       );
     } catch (err) { console.error('worker: agent amend confirm prompt failed:', err.message); }
+    try {
+      pending[chatId] = { ...entry, instruction, step: 'confirm', messageId: newId ?? entry.messageId };
+      await _saveAgentPending(env, pending, sha);
+    } catch (err) {
+      console.error('worker: agent instruction save pending failed:', err.message);
+    }
     return true;
   }
 
@@ -1900,7 +2001,7 @@ async function handleAgentTextReply({
     && parseFloat(price.replace(/\s/g, '').replace(',', '.')) === 0;
   if (price === null || isZero) {
     try {
-      await send('Невірна ціна. Введіть число (грн) або «auto».');
+      await update('Невірна ціна. Введіть число (грн) або «auto».');
     } catch (err) {
       console.error('worker: agent invalid-price reply failed:', err.message);
     }
@@ -1908,23 +2009,20 @@ async function handleAgentTextReply({
   }
 
   // Advance to confirm.
+  let newId;
   try {
-    pending[chatId] = { ...entry, price, step: 'confirm' };
-    await _saveAgentPending(env, pending, sha);
-  } catch (err) {
-    console.error('worker: agent price save pending failed:', err.message);
-    try {
-      await send('⚠️ Помилка, спробуй ще раз.');
-    } catch {}
-    return true;
-  }
-  try {
-    await send(
+    newId = await update(
       buildAgentConfirmText({ company: entry.company, price, tenderId: entry.tid }),
       buildAgentConfirmKeyboard(entry.tid),
     );
   } catch (err) {
     console.error('worker: agent confirm prompt failed:', err.message);
+  }
+  try {
+    pending[chatId] = { ...entry, price, step: 'confirm', messageId: newId ?? entry.messageId };
+    await _saveAgentPending(env, pending, sha);
+  } catch (err) {
+    console.error('worker: agent price save pending failed:', err.message);
   }
   return true;
 }
