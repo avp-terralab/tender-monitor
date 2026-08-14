@@ -1855,25 +1855,6 @@ export function canUseAgent(role) {
   return role === 'admin' || role === 'editor';
 }
 
-// /agent — on-demand picker: one button per ENABLED watched tender, labelled by
-// its notes (or the id), callback agent:start:<tid>. Returns an inline_keyboard
-// or null when there are no active tenders. Admin/editor (gated by the caller).
-export function buildAgentTenderListKeyboard(watchlist) {
-  const rows = [];
-  for (const r of (watchlist ?? [])) {
-    if (!r || !r.enabled || !r.tender_id) continue;
-    const note = (r.notes ?? '').trim();
-    const label = note ? abbreviateLegalForm(note).slice(0, 72) : r.tender_id;
-    rows.push([{ text: `🤖 ${label}`, callback_data: `agent:start:${r.tender_id}` }]);
-    // If a proposal was already prepared for this tender, surface a clickable
-    // link (⬆️ points at the tender button above) straight to its Drive folder.
-    if (r.preparedUrl) {
-      rows.push([{ text: '⬆️ Тендерна пропозиція підготовлена ✅', url: r.preparedUrl }]);
-    }
-  }
-  return rows.length ? { inline_keyboard: rows } : null;
-}
-
 // Step 1: pick the company. One button per company (1–2 per row) + cancel.
 // callback_data: agent:co:<tenderId>:<slug> — ASCII slug keeps it ≤ 64 bytes.
 export function buildAgentCompanyKeyboard(tenderId) {
@@ -1921,100 +1902,107 @@ export function buildAgentConfirmText({ company, price, tenderId, entityName }) 
 }
 
 
-export function buildAgentMenu() {
-  return {
-    text: '🤖 <b>Агент</b>',
-    keyboard: { inline_keyboard: [
-      [{ text: '🚀 Надіслати тендер агенту', callback_data: 'agent:pick:0' }],
-      [{ text: '📊 Останні задачі', callback_data: 'agent:jobs:0' }],
-    ] },
-  };
-}
-
-// Paginated tender picker. Reuses buildAgentTenderListKeyboard for the per-page
-// slice (keeps the 🤖 + prepared-link rows), adds nav + ⬅ back to the agent menu.
-export function buildAgentPickView({ tenders, page = 0 }) {
-  const list = tenders ?? [];
-  if (list.length === 0) {
-    return {
-      text: '📭 Немає тендерів у статусі «Приймання пропозицій».',
-      keyboard: { inline_keyboard: [[{ text: '⬅ Назад', callback_data: 'agent:menu' }]] },
-    };
-  }
-  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
-  const p = Math.min(Math.max(0, page | 0), pages - 1);
-  const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
-  const kb = buildAgentTenderListKeyboard(slice);
-  const rows = kb ? [...kb.inline_keyboard] : [];
-  const nav = buildPageNavRow(p, pages, (x) => `agent:pick:${x}`, 'agent:noop');
-  if (nav) rows.push(nav);
-  rows.push([{ text: '⬅ Назад', callback_data: 'agent:menu' }]);
-  return { text: '🤖 Оберіть тендер (приймання пропозицій):', keyboard: { inline_keyboard: rows } };
-}
-
 const AGENT_JOB_ICONS = { pending: '📋', running: '⏳', done: '✅', error: '❌' };
 // Job-type marker in front of the status icon. A plain `prepare` job has no
 // job_type at all → no marker, which is what `?? ''` covers.
 const AGENT_JOB_MARKS = { amend: '✏️ ', winner: '📄 ', sign: '🖊 ' };
 
-export function buildAgentJobsPage({ jobs, page = 0 }) {
-  const list = jobs ?? [];
-  if (list.length === 0) {
-    return {
-      text: '📭 Ще немає задач агента.',
-      keyboard: { inline_keyboard: [[{ text: '⬅ Назад', callback_data: 'agent:menu' }]] },
-    };
+// Merged 2026-08-14: this used to be two separate screens — "🚀 Надіслати
+// тендер агенту" (watchlist tenders with no job yet) and "📊 Останні задачі"
+// (job history) — showing the SAME tenders twice with no way to tell which
+// customer a bare tender_id even belonged to. One list now, driven by the
+// watchlist (so every row has a name from `.notes`), with a 🆕 marker for
+// tenders the agent hasn't touched yet. The buttons ARE the list — no
+// separate text body repeating the same rows underneath it.
+export function buildAgentUnifiedList({ watchlist, jobs, page = 0 }) {
+  const jobByTid = new Map((jobs ?? []).filter((j) => j?.tender_id).map((j) => [j.tender_id, j]));
+  const entries = (watchlist ?? []).filter((r) => r && r.enabled && r.tender_id);
+  if (entries.length === 0) {
+    return { text: '📭 Немає тендерів у моніторингу — спершу «➕ Додати в моніторинг».', keyboard: { inline_keyboard: [] } };
   }
+  // Tenders with a job float to the top (most recent activity first, same
+  // ordering /agent's job history always had); untouched (🆕) ones follow in
+  // watchlist order — nothing to sort them by yet.
+  const withJob = [];
+  const withoutJob = [];
+  for (const r of entries) {
+    const job = jobByTid.get(r.tender_id) ?? null;
+    (job ? withJob : withoutJob).push({ entry: r, job });
+  }
+  withJob.sort((a, b) => String(b.job.created_at ?? '').localeCompare(String(a.job.created_at ?? '')));
+  const list = [...withJob, ...withoutJob];
+
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
   const p = Math.min(Math.max(0, page | 0), pages - 1);
   const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
-  const body = slice.map((j) => {
-    const icon = AGENT_JOB_ICONS[j.status] ?? '•';
-    const mark = AGENT_JOB_MARKS[j.job_type] ?? '';
-    const co = j.company ? ` · ${escapeHtml(j.company)}` : '';
-    const tid = escapeHtml(j.tender_id ?? '');
-    return `${mark}${icon} <a href="https://prozorro.gov.ua/tender/${tid}">${tid}</a>${co}`;
-  }).join('\n');
-  const rows = [];
-  for (const j of slice) {
-    if (!j.tender_id) continue;
-    // 📁 — тека з результатом. Для готової ПРОПОЗИЦІЇ це result.drive_link; для
-    // тендера, який ми виграли, але НЕ готували (winner-прогін без попереднього
-    // prepare), drive_link порожній, зате є result.winner_link — інакше папку з
-    // документами переможця не дістати взагалі, а строк подання типово 4 робочі
-    // дні. ✏️ Доробити лишається ЛИШЕ для готової пропозиції: доробляти нічого,
-    // якщо пропозиції не було.
-    const prepared = j.status === 'done' && j.result?.drive_link;
-    const folderUrl = j.result?.drive_link ?? j.result?.winner_link ?? null;
-    const row = [];
-    if (folderUrl) row.push({ text: `📁 ${j.tender_id}`, url: folderUrl });
-    if (prepared) row.push({ text: '✏️ Доробити', callback_data: `agent:amend:${j.tender_id}` });
-    if (row.length > 0) rows.push(row);
-    // Кнопка переможця виводиться для КОЖНОЇ задачі з tender_id, тож у межах
-    // сторінки (PAGE_SIZE) їх може бути до шести. Раніше підпис був сталою
-    // «📄 Документи переможця», а тендер жив лише в callback_data — поруч
-    // виходили візуально НЕВІДРІЗНЯЛЬНІ кнопки (для pending/running/error рядка
-    // з 📁 над ними немає, отже й сусідство не ідентифікує). Помилковий дотик
-    // мовчки запускає прогін агента, який пише в спільний ручний архів ЧУЖОГО
-    // тендера, тож підпис має називати свій тендер сам.
-    rows.push([
-      { text: `📄 Документи переможця ${j.tender_id}`, callback_data: `agent:winner:${j.tender_id}` },
-    ]);
-    // 🖊 — підписати й запакувати. Умова та сама, що й для ✏️ Доробити: підписують
-    // ГОТОВУ пропозицію (job-у sign потрібен target.package_dir із її результату),
-    // тож для winner-прогону без prepare чи для незавершеної задачі кнопки немає.
-    // Підпис називає свій тендер — на сторінці їх до шести, а помилковий дотик
-    // мовчки підписав би ЧУЖИЙ пакет (той самий урок, що й з кнопкою переможця).
-    if (prepared) {
-      rows.push([
-        { text: `🖊 Підписати й запакувати ${j.tender_id}`, callback_data: `agent:sign:${j.tender_id}` },
-      ]);
-    }
-  }
+
+  const rows = slice.map(({ entry, job }) => {
+    const icon = job ? (AGENT_JOB_ICONS[job.status] ?? '•') : '🆕';
+    const mark = job ? (AGENT_JOB_MARKS[job.job_type] ?? '') : '';
+    const note = (entry.notes ?? '').trim();
+    const label = note ? abbreviateLegalForm(note) : entry.tender_id;
+    return [{ text: truncate(`${mark}${icon} ${label}`, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
+  });
   const nav = buildPageNavRow(p, pages, (x) => `agent:jobs:${x}`, 'agent:noop');
   if (nav) rows.push(nav);
-  rows.push([{ text: '⬅ Назад', callback_data: 'agent:menu' }]);
-  return { text: `📊 <b>Останні задачі агента</b>\n\n${body}`, keyboard: { inline_keyboard: rows } };
+  return { text: '🤖 <b>Агент</b>', keyboard: { inline_keyboard: rows } };
+}
+
+// Drill-down for ONE tender, reached by tapping its row in buildAgentUnifiedList.
+// Only this tender's own actions are shown, so labels no longer need to repeat
+// the tender_id to stay unambiguous (the old flat list's reason for it — see
+// git history — no longer applies once there's only one tender on screen).
+export function buildAgentTenderDetail({ tenderId, entry, job, page = 0 }) {
+  const note = (entry?.notes ?? '').trim();
+  const name = note ? abbreviateLegalForm(note) : null;
+  const header = name ? `🏢 ${escapeHtml(name)}\n${escapeHtml(tenderId)}` : `📄 ${escapeHtml(tenderId)}`;
+  const back = { text: '⬅ До списку', callback_data: `agent:jobs:${page}` };
+  // Winner docs need no prior prepare at all (see buildAgentAdminNotice /
+  // job_type:'winner'), so this row is offered regardless of job state.
+  const winnerRow = [{ text: '📄 Документи переможця', callback_data: `agent:winner:${tenderId}` }];
+
+  if (!job) {
+    return {
+      text: `${header}\n\n🆕 Агент ще не готував пропозицію.`,
+      keyboard: { inline_keyboard: [
+        [{ text: '🚀 Підготувати пропозицію', callback_data: `agent:start:${tenderId}` }],
+        winnerRow,
+        [back],
+      ] },
+    };
+  }
+
+  const co = job.company ? `\n🏭 ${escapeHtml(job.company)}` : '';
+
+  if (job.status === 'error') {
+    const detail = job.result?.detail ? `\n⚠️ ${escapeHtml(truncate(job.result.detail, 300))}` : '';
+    return {
+      text: `${header}${co}\n❌ Помилка${detail}`,
+      keyboard: { inline_keyboard: [
+        [{ text: '♻️ Повторити', callback_data: `agent:retry:${tenderId}` }],
+        winnerRow,
+        [back],
+      ] },
+    };
+  }
+  if (job.status !== 'done') {
+    const statusText = job.status === 'running' ? '⏳ Виконується' : '📋 У черзі';
+    return { text: `${header}${co}\n${statusText}`, keyboard: { inline_keyboard: [winnerRow, [back]] } };
+  }
+
+  // 📁 — тека з результатом. Для готової ПРОПОЗИЦІЇ це result.drive_link; для
+  // тендера, який ми виграли, але НЕ готували (winner-прогін без попереднього
+  // prepare), drive_link порожній, зате є result.winner_link. ✏️ Доробити й
+  // 🖊 Підписати лишаються ЛИШЕ для готової пропозиції.
+  const prepared = job.status === 'done' && job.result?.drive_link;
+  const folderUrl = job.result?.drive_link ?? job.result?.winner_link ?? null;
+  const rows = [];
+  if (folderUrl) rows.push([{ text: '📁 Відкрити теку', url: folderUrl }]);
+  if (prepared) rows.push([{ text: '✏️ Доробити', callback_data: `agent:amend:${tenderId}` }]);
+  rows.push(winnerRow);
+  if (prepared) rows.push([{ text: '🖊 Підписати й запакувати', callback_data: `agent:sign:${tenderId}` }]);
+  rows.push([back]);
+  return { text: `${header}${co}\n✅ Готово`, keyboard: { inline_keyboard: rows } };
 }
 
 // The job record handed to the offline agent. Shape matches the integration
@@ -2187,15 +2175,18 @@ export function buildAgentSignJob({ tenderId, company, letterDate, target, reque
   };
 }
 
-// Pure router for the agent MENU callbacks (menu/pick/jobs). Returns null for
-// agent:noop AND for the dialog actions (start/co/confirm/cancel) — those stay
-// in the Worker's handleAgentCallback.
-export function handleAgentMenuNav({ tenders, jobs, data }) {
+// Pure router for the agent LIST callbacks. `menu`, `jobs` and the legacy
+// `pick` (kept as an alias so an already-open old-style keyboard from before
+// 2026-08-14 still resolves to something, rather than a dead button) all
+// render the same merged list — see buildAgentUnifiedList. Returns null for
+// agent:noop AND for the dialog actions (start/co/confirm/cancel/view) —
+// those stay in the Worker's handleAgentCallback.
+export function handleAgentMenuNav({ watchlist, jobs, data }) {
   if (data === 'agent:noop') return null;
   const parts = data.split(':'); // agent:<action>[:<arg>]
-  if (parts[1] === 'menu') return buildAgentMenu();
-  if (parts[1] === 'pick') return buildAgentPickView({ tenders, page: Number(parts[2] ?? 0) });
-  if (parts[1] === 'jobs') return buildAgentJobsPage({ jobs, page: Number(parts[2] ?? 0) });
+  if (parts[1] === 'menu') return buildAgentUnifiedList({ watchlist, jobs, page: 0 });
+  if (parts[1] === 'pick') return buildAgentUnifiedList({ watchlist, jobs, page: Number(parts[2] ?? 0) });
+  if (parts[1] === 'jobs') return buildAgentUnifiedList({ watchlist, jobs, page: Number(parts[2] ?? 0) });
   return null;
 }
 

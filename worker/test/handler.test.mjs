@@ -3861,15 +3861,15 @@ test('non-admin text while no pending → normal handling (price step not trigge
 });
 
 
-test('runHandler: /agent (admin) → action menu (pick + jobs)', async () => {
+test('runHandler: /agent (admin) → unified list, one row per watched tender', async () => {
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true, notes: 'Тест' }], sha: 's' }),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
   assert.equal(sent.length, 1);
   const cbs = JSON.stringify(sent[0].replyMarkup);
-  assert.match(cbs, /agent:pick:0/);
-  assert.match(cbs, /agent:jobs:0/);
+  assert.match(cbs, new RegExp(`agent:view:${ID}:0`));
+  assert.match(sent[0].text, /Агент/);
 });
 
 test('runHandler: /agent for non-admin → no reply', async () => {
@@ -3891,33 +3891,19 @@ test('runHandler: /info <id> (admin) attaches the «Надіслати аген�
 });
 
 
-test('runHandler: /agent (admin, multiple watchlist entries) → menu (filtering moves to pick callback)', async () => {
+test('runHandler: /agent (admin, multiple watchlist entries) → one row each, regardless of live Prozorro status', async () => {
   const OTHER = 'UA-2026-04-30-088888-b';
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [
       { tender_id: ID, enabled: true, notes: 'Тендеринг' },
       { tender_id: OTHER, enabled: true, notes: 'Розгляд' },
     ], sha: 's' }),
-    fetchTender: async (id) => id === ID
-      ? RAW_OK
-      : { data: { ...RAW_OK.data, tenderID: OTHER, status: 'active.qualification' } },
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
   assert.equal(sent.length, 1);
   const cbs = JSON.stringify(sent[0].replyMarkup);
-  assert.match(cbs, /agent:pick:0/);
-});
-
-test('runHandler: /agent with none in tendering → menu shown (pick button shows empty in T6)', async () => {
-  const { deps, sent } = makeDeps({
-    loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true }], sha: 's' }),
-    fetchTender: async () => ({ data: { ...RAW_OK.data, status: 'active.qualification' } }),
-  });
-  await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
-  assert.equal(sent.length, 1);
-  const cbs = JSON.stringify(sent[0].replyMarkup);
-  assert.match(cbs, /agent:pick:0/);
-  assert.match(cbs, /agent:jobs:0/);
+  assert.match(cbs, new RegExp(`agent:view:${ID}:0`));
+  assert.match(cbs, new RegExp(`agent:view:${OTHER}:0`));
 });
 
 test('runHandler: /info <id> for non-tendering tender → no agent button', async () => {
@@ -3931,29 +3917,30 @@ test('runHandler: /info <id> for non-tendering tender → no agent button', asyn
 });
 
 
-test('runHandler: /agent with a done job → menu shown (done-job link moves to pick view in T6)', async () => {
+test('runHandler: /agent with a done job → ✅ icon on that tender\'s row', async () => {
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true, notes: 'КНП «Х»' }], sha: 's' }),
-    loadAgentJob: async () => ({ tender_id: ID, status: 'done', result: { drive_link: 'https://drive.google.com/drive/folders/REAL' } }),
+    listAgentJobs: async () => ([{ tender_id: ID, status: 'done', created_at: '2026-06-01T00:00:00Z',
+      result: { drive_link: 'https://drive.google.com/drive/folders/REAL' } }]),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
   assert.equal(sent.length, 1);
-  const cbs = JSON.stringify(sent[0].replyMarkup);
-  assert.match(cbs, /agent:pick:0/);
-  assert.match(cbs, /agent:jobs:0/);
+  assert.match(sent[0].replyMarkup.inline_keyboard[0][0].text, /^✅ КНП «Х»/);
+  assert.match(JSON.stringify(sent[0].replyMarkup), new RegExp(`agent:view:${ID}:0`));
 });
 
-test('runHandler: /agent (admin) → menu with pick + jobs buttons', async () => {
+test('runHandler: /agent (admin) → unified list via the 🤖 Агент button alias', async () => {
   const sent = [];
   await runHandler({
     update: { message: { chat: { id: 123 }, message_id: 7, text: '🤖 Агент', from: { id: 123 } } },
     env: ENV,
-    deps: { ...makeDeps().deps, sendReply: async (a) => sent.push(a) },
+    deps: {
+      ...makeDeps({ loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true }], sha: 's' }) }).deps,
+      sendReply: async (a) => sent.push(a),
+    },
   });
   assert.equal(sent.length, 1);
-  const cbs = JSON.stringify(sent[0].replyMarkup);
-  assert.match(cbs, /agent:pick:0/);
-  assert.match(cbs, /agent:jobs:0/);
+  assert.match(JSON.stringify(sent[0].replyMarkup), new RegExp(`agent:view:${ID}:0`));
 });
 
 test('runHandler: /info (no id) → single menu message with mon:ph button', async () => {
@@ -4080,45 +4067,57 @@ test('runHandler: wat:e for a viewer → card has NO manage buttons', async () =
   assert.match(cbs, /wat:menu:0/);
 });
 
-test('runHandler: agent:jobs:0 → edits to jobs page', async () => {
+test('runHandler: agent:jobs:0 → edits to the unified list, ✅ row for the done tender', async () => {
   const edits = []; const acks = [];
   await runHandler({
     update: { callback_query: { id: 'ca1', data: 'agent:jobs:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
     env: ENV,
     deps: {
-      ...makeDeps({}).deps,
+      ...makeDeps({
+        loadWatchlist: async () => ({ watchlist: [{ tender_id: 'UA-2026-06-01-000002-a', enabled: true, notes: 'ТОВ' }], sha: 's' }),
+      }).deps,
       listAgentJobs: async () => ([{ tender_id: 'UA-2026-06-01-000002-a', status: 'done', company: 'ТОВ', created_at: '2026-06-20T10:00:00Z', result: { drive_link: 'https://drive/x' } }]),
       editMessageText: async (a) => edits.push(a),
       answerCallbackQuery: async (a) => acks.push(a),
     },
   });
   assert.equal(edits.length, 1);
-  assert.match(edits[0].text, /Останні задачі/);
-  assert.match(JSON.stringify(edits[0].replyMarkup), /drive\/x/);
+  assert.match(edits[0].text, /Агент/);
+  assert.match(edits[0].replyMarkup.inline_keyboard[0][0].text, /^✅/);
+  assert.match(JSON.stringify(edits[0].replyMarkup), /agent:view:UA-2026-06-01-000002-a:0/);
 });
 
 // Замикає ланцюг: кнопка, яку РЕАЛЬНО малює сторінка задач, має вести саме в ту
 // гілку, що відкриває вибір дати. Без цієї перевірки фіча може бути готовою і
 // водночас недосяжною — жодна кнопка на неї не веде.
-test('runHandler: the sign button rendered on the jobs page opens the date dialog', async () => {
-  const { deps, store, sent, edits } = makeAgentDeps({
+test('runHandler: the sign button reached via list → drill-down opens the date dialog', async () => {
+  const { deps, store, edits } = makeAgentDeps({
     listAgentJobs: async () => ([structuredClone(DONE_PREPARED)]),
     loadAgentJob: async () => structuredClone(DONE_PREPARED),
   });
   await runHandler({ update: CB('agent:jobs:0'), env: ENV, deps });
-  const kb = JSON.parse(JSON.stringify(edits.at(-1).replyMarkup));
-  const btn = kb.inline_keyboard.flat()
-    .find((b) => typeof b.callback_data === 'string' && b.callback_data.startsWith('agent:sign:'));
-  assert.ok(btn, `no sign button on the jobs page: ${JSON.stringify(kb)}`);
-  assert.equal(btn.callback_data, `agent:sign:${AGENT_TID}`);
+  const listKb = JSON.parse(JSON.stringify(edits.at(-1).replyMarkup));
+  const viewBtn = listKb.inline_keyboard.flat()
+    .find((b) => typeof b.callback_data === 'string' && b.callback_data.startsWith('agent:view:'));
+  assert.ok(viewBtn, `no row for the done tender on the list: ${JSON.stringify(listKb)}`);
 
-  await runHandler({ update: CB(btn.callback_data), env: ENV, deps });
+  await runHandler({ update: CB(viewBtn.callback_data), env: ENV, deps });
+  const detailKb = JSON.parse(JSON.stringify(edits.at(-1).replyMarkup));
+  const signBtn = detailKb.inline_keyboard.flat()
+    .find((b) => typeof b.callback_data === 'string' && b.callback_data.startsWith('agent:sign:'));
+  assert.ok(signBtn, `no sign button in the detail view: ${JSON.stringify(detailKb)}`);
+  assert.equal(signBtn.callback_data, `agent:sign:${AGENT_TID}`);
+
+  await runHandler({ update: CB(signBtn.callback_data), env: ENV, deps });
   assert.equal(store.pending['123'].kind, 'sign');
   assert.equal(store.pending['123'].step, 'await_date');
   assert.match(edits.at(-1).text, /дату/i);
 });
 
-test('runHandler: agent:pick:0 → tender picker, active.tendering only', async () => {
+// 'pick' is kept only as an ALIAS for the merged list (an already-open pre-
+// 2026-08-14 keyboard must still resolve to something) — it no longer filters
+// by live Prozorro status; the whole watchlist shows, regardless of status.
+test('runHandler: agent:pick:0 (legacy alias) → same unified list as agent:jobs', async () => {
   const edits = [];
   await runHandler({
     update: { callback_query: { id: 'ca2', data: 'agent:pick:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
@@ -4129,37 +4128,39 @@ test('runHandler: agent:pick:0 → tender picker, active.tendering only', async 
           { tender_id: 'UA-2026-06-01-000002-a', enabled: true, notes: 'КНП' },
           { tender_id: 'UA-2026-06-01-000003-a', enabled: true, notes: 'Other' },
         ], sha: 's' }),
-        fetchTender: async (id) => ({ data: { status: id.includes('000002') ? 'active.tendering' : 'complete' } }),
       }).deps,
       editMessageText: async (a) => edits.push(a),
       answerCallbackQuery: async () => {},
     },
   });
-  assert.match(edits[0].text, /Оберіть тендер/);
+  assert.match(edits[0].text, /Агент/);
   const cbs = JSON.stringify(edits[0].replyMarkup);
-  assert.match(cbs, /agent:start:UA-2026-06-01-000002-a/);
-  assert.ok(!cbs.includes('UA-2026-06-01-000003-a'), 'non-tendering tender excluded');
+  assert.match(cbs, /agent:view:UA-2026-06-01-000002-a:0/);
+  assert.match(cbs, /agent:view:UA-2026-06-01-000003-a:0/);
 });
 
-test('runHandler: agent:menu → edits back to menu', async () => {
+test('runHandler: agent:menu → edits back to the unified list', async () => {
   const edits = [];
   await runHandler({
     update: { callback_query: { id: 'ca3', data: 'agent:menu', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
     env: ENV,
-    deps: { ...makeDeps({}).deps, editMessageText: async (a) => edits.push(a), answerCallbackQuery: async () => {} },
+    deps: {
+      ...makeDeps({ loadWatchlist: async () => ({ watchlist: [{ tender_id: 'UA-2026-06-01-000002-a', enabled: true }], sha: 's' }) }).deps,
+      editMessageText: async (a) => edits.push(a),
+      answerCallbackQuery: async () => {},
+    },
   });
-  assert.match(JSON.stringify(edits[0].replyMarkup), /agent:pick:0/);
+  assert.match(JSON.stringify(edits[0].replyMarkup), /agent:view:UA-2026-06-01-000002-a:0/);
 });
 
-test('runHandler: agent:pick:0 → prepared drive_link surfaces as a url button', async () => {
+test('runHandler: agent:view → prepared drive_link surfaces as a url button in the detail view', async () => {
   const edits = [];
   await runHandler({
-    update: { callback_query: { id: 'ca5', data: 'agent:pick:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
+    update: { callback_query: { id: 'ca5', data: 'agent:view:UA-2026-06-01-000002-a:0', from: { id: 123 }, message: { chat: { id: 123 }, message_id: 42 } } },
     env: ENV,
     deps: {
       ...makeDeps({
         loadWatchlist: async () => ({ watchlist: [{ tender_id: 'UA-2026-06-01-000002-a', enabled: true, notes: 'КНП' }], sha: 's' }),
-        fetchTender: async () => ({ data: { status: 'active.tendering' } }),
         loadAgentJob: async () => ({ tender_id: 'UA-2026-06-01-000002-a', status: 'done', result: { drive_link: 'https://drive/prepared' } }),
       }).deps,
       editMessageText: async (a) => edits.push(a),
@@ -4226,7 +4227,33 @@ test('runHandler: a VIEW command deletes the previous view + records the new one
   assert.equal(kvStore['eph:123'], JSON.stringify([7, 555]), 'new ids = [trigger, reply]');
 });
 
-test('runHandler: a non-VIEW (action) command does NOT delete or record', async () => {
+// Almost every recognized command is now a "view" for ephemeral purposes (admin
+// utility commands — /log, /notify, /add, /invite, etc. — joined the original
+// 8 on 2026-08-14 so THEY stop piling up too). What's left un-ephemeral is
+// unrecognized input: no `cmd.cmd` at all, so there is nothing to look up in
+// EPHEMERAL_VIEW_CMDS and the exchange is simply left in the chat.
+test('runHandler: unrecognized text does NOT delete or record (no cmd to classify)', async () => {
+  const deleted = [];
+  const kvStore = { 'eph:123': JSON.stringify([100]) };
+  const kv = {
+    get: async (k) => (k in kvStore ? kvStore[k] : null),
+    put: async (k, v) => { kvStore[k] = v; },
+    delete: async (k) => { delete kvStore[k]; },
+  };
+  await runHandler({
+    update: { message: { chat: { id: 123 }, message_id: 8, text: 'привіт боте', from: { id: 123 } } },
+    env: { ...ENV, EPHEMERAL_KV: kv },
+    deps: {
+      ...makeDeps().deps,
+      deleteMessage: async ({ messageId }) => { deleted.push(messageId); return true; },
+      sendReply: async () => ({ ok: true, result: { message_id: 999 } }),
+    },
+  });
+  assert.equal(deleted.length, 0, 'no deletions for unrecognized text');
+  assert.equal(kvStore['eph:123'], JSON.stringify([100]), 'ephemeral state unchanged');
+});
+
+test('runHandler: /notify is now an ephemeral view too — deletes the previous exchange', async () => {
   const deleted = [];
   const kvStore = { 'eph:123': JSON.stringify([100]) };
   const kv = {
@@ -4243,8 +4270,8 @@ test('runHandler: a non-VIEW (action) command does NOT delete or record', async 
       sendReply: async () => ({ ok: true, result: { message_id: 999 } }),
     },
   });
-  assert.equal(deleted.length, 0, 'no deletions for an action command');
-  assert.equal(kvStore['eph:123'], JSON.stringify([100]), 'ephemeral state unchanged');
+  assert.deepEqual(deleted, [100], 'the previous exchange is cleaned up');
+  assert.equal(kvStore['eph:123'], JSON.stringify([8, 999]), 'new ids = [trigger, reply]');
 });
 
 test('runHandler: bare /add (editor) → force_reply prompt, no mutation', async () => {

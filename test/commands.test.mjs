@@ -21,9 +21,9 @@ import {
   groupArchiveByYear, buildArchiveYearList, buildArchiveMonthList, renderArchivePage, handleArchiveNav,
   AGENT_COMPANIES, companyForSlug, slugForCompany,
   agentTriggerButtonRow, canUseAgent, buildAgentAdminNotice,
-  buildAgentTenderListKeyboard, buildAgentCompanyKeyboard, validateAgentPrice,
+  buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentJob, buildAgentConfirmText,
-  buildAgentMenu, buildAgentPickView, buildAgentJobsPage,
+  buildAgentUnifiedList, buildAgentTenderDetail,
   handleAgentMenuNav,
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   OUR_EDRPOU, companyForEdrpou, buildAgentWinnerJob, buildAgentWinnerConfirmText,
@@ -298,6 +298,27 @@ test('abbreviateLegalForm: ФОП (з тире)', () => {
   assert.equal(
     abbreviateLegalForm('Фізична особа-підприємець Іван Петренко'),
     'ФОП Іван Петренко'
+  );
+});
+
+test('abbreviateLegalForm: ДНТ', () => {
+  assert.equal(
+    abbreviateLegalForm('Державне некомерційне товариство «Тест»'),
+    'ДНТ «Тест»'
+  );
+});
+
+test('abbreviateLegalForm: ДНТ — accepts "некомерцийне" typo, same as КНП', () => {
+  assert.equal(
+    abbreviateLegalForm('Державне некомерцийне товариство «Тест»'),
+    'ДНТ «Тест»'
+  );
+});
+
+test('abbreviateLegalForm: КДЦ facility phrase inside the name', () => {
+  assert.equal(
+    abbreviateLegalForm('Комунальне некомерційне підприємство «Консультативно-діагностичний центр» Одеської міської ради'),
+    'КНП «КДЦ» Одеської МР'
   );
 });
 
@@ -3195,30 +3216,13 @@ test('parseCommand: /agent', () => {
   assert.deepEqual(parseCommand('/agent@terralab_tenders_bot'), { cmd: 'agent' });
 });
 
-test('buildAgentTenderListKeyboard: one agent:start button per enabled tender', () => {
-  const kb = buildAgentTenderListKeyboard([
-    { tender_id: 'UA-2026-01-01-000001-a', enabled: true, notes: 'Херсон ОНКО' },
-    { tender_id: 'UA-2026-01-01-000002-a', enabled: false },
-    { tender_id: 'UA-2026-01-01-000003-a', enabled: true },
-  ]);
-  assert.equal(kb.inline_keyboard.length, 2);
-  assert.equal(kb.inline_keyboard[0][0].callback_data, 'agent:start:UA-2026-01-01-000001-a');
-  assert.match(kb.inline_keyboard[0][0].text, /Херсон ОНКО/);
-  assert.match(kb.inline_keyboard[1][0].text, /UA-2026-01-01-000003-a/);
-  assert.equal(buildAgentTenderListKeyboard([]), null);
-  assert.equal(buildAgentTenderListKeyboard([{ tender_id: 'x', enabled: false }]), null);
-});
-
-
-test('abbreviateLegalForm / buildAgentTenderListKeyboard: abbreviates the legal form', () => {
+test('abbreviateLegalForm: abbreviates the legal form', () => {
   assert.match(abbreviateLegalForm('КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Херсонський»'), /^КНП «Херсонський»/);
   assert.equal(abbreviateLegalForm('КОМУНАЛЬНИЙ ЗАКЛАД Київ').startsWith('КЗ '), true);
-  const kb = buildAgentTenderListKeyboard([
-    { tender_id: 'UA-2026-01-01-000009-a', enabled: true,
-      notes: 'КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Дніпро»' },
-  ]);
-  assert.match(kb.inline_keyboard[0][0].text, /КНП «Дніпро»/);
-  assert.doesNotMatch(kb.inline_keyboard[0][0].text, /КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ/);
+  assert.match(
+    abbreviateLegalForm('КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Дніпро»'),
+    /КНП «Дніпро»/,
+  );
 });
 
 
@@ -3264,21 +3268,6 @@ test('mainKeyboard / 🤖 Агент alias: admin and editor get the agent butto
   assert.deepEqual(parseCommand('🤖 Агент'), { cmd: 'agent' });
 });
 
-
-test('buildAgentTenderListKeyboard: prepared tender gets a clickable Drive-link row', () => {
-  const kb = buildAgentTenderListKeyboard([
-    { tender_id: 'UA-2026-01-01-000007-a', enabled: true, notes: 'КНП «Готовий»',
-      preparedUrl: 'https://drive.google.com/drive/folders/ABC' },
-    { tender_id: 'UA-2026-01-01-000008-a', enabled: true, notes: 'КНП «Новий»' },
-  ]);
-  // tender1: agent button + prepared link; tender2: agent button only
-  assert.equal(kb.inline_keyboard.length, 3);
-  assert.equal(kb.inline_keyboard[0][0].callback_data, 'agent:start:UA-2026-01-01-000007-a');
-  assert.match(kb.inline_keyboard[1][0].text, /^⬆️ Тендерна пропозиція підготовлена ✅$/);
-  assert.equal(kb.inline_keyboard[1][0].url, 'https://drive.google.com/drive/folders/ABC');
-  assert.equal(kb.inline_keyboard[2][0].callback_data, 'agent:start:UA-2026-01-01-000008-a');
-  assert.equal(kb.inline_keyboard[2][0].url, undefined);
-});
 
 
 // ── Archive grouped + paginated navigation ──────────────────────────────────
@@ -3579,69 +3568,172 @@ test('handleWatchedNav: wat:e with page → card back button returns to that pag
   assert.equal(back.find((b) => b.callback_data.startsWith('wat:menu')).callback_data, 'wat:menu:2');
 });
 
-const pickTender = (id, notes, preparedUrl) => ({ tender_id: id, enabled: true, notes, preparedUrl });
+const watchEntry = (id, notes) => ({ tender_id: id, enabled: true, notes });
+const job = (tender_id, status, extra = {}) => ({ tender_id, status, company: 'ТОВ Тест', created_at: '2026-06-20T10:00:00Z', ...extra });
 
-test('buildAgentMenu: two action buttons', () => {
-  const m = buildAgentMenu();
-  const cbs = m.keyboard.inline_keyboard.flat().map((b) => b.callback_data);
-  assert.deepEqual(cbs, ['agent:pick:0', 'agent:jobs:0']);
+// ── Merged /agent list (buildAgentUnifiedList) — 2026-08-14 redesign ─────────
+// The list IS the keyboard now (no separate text body repeating the same
+// tenders), driven by the watchlist so every row has a real name from
+// `.notes`, with a 🆕 marker for tenders the agent has never touched.
+
+test('buildAgentUnifiedList: empty watchlist → empty-state text, no buttons', () => {
+  const v = buildAgentUnifiedList({ watchlist: [], jobs: [], page: 0 });
+  assert.match(v.text, /моніторинг/);
+  assert.deepEqual(v.keyboard.inline_keyboard, []);
 });
 
-test('buildAgentPickView: empty → back to menu only', () => {
-  const v = buildAgentPickView({ tenders: [], page: 0 });
-  assert.match(v.text, /Немає тендерів/);
-  assert.equal(v.keyboard.inline_keyboard[0][0].callback_data, 'agent:menu');
+test('buildAgentUnifiedList: disabled watchlist entries are excluded', () => {
+  const v = buildAgentUnifiedList({
+    watchlist: [{ tender_id: 'UA-1', enabled: false, notes: 'КНП' }], jobs: [], page: 0,
+  });
+  assert.deepEqual(v.keyboard.inline_keyboard, []);
 });
 
-test('buildAgentPickView: tender buttons + back row', () => {
-  const v = buildAgentPickView({ tenders: [pickTender('UA-2026-06-01-000002-a', 'КНП')], page: 0 });
-  const cbs = JSON.stringify(v.keyboard.inline_keyboard);
-  assert.match(cbs, /agent:start:UA-2026-06-01-000002-a/);
-  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'agent:menu');
+test('buildAgentUnifiedList: no job yet → 🆕 marker, label from abbreviated notes', () => {
+  const v = buildAgentUnifiedList({
+    watchlist: [watchEntry('UA-2026-06-01-000002-a', 'КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «Дніпро»')],
+    jobs: [], page: 0,
+  });
+  const btn = v.keyboard.inline_keyboard[0][0];
+  assert.match(btn.text, /^🆕 КНП «Дніпро»/);
+  assert.equal(btn.callback_data, 'agent:view:UA-2026-06-01-000002-a:0');
 });
 
-test('buildAgentPickView: 6/page nav arrows', () => {
-  const tenders = Array.from({ length: 8 }, (_, i) => pickTender(`UA-2026-06-01-00000${i}-a`, `n${i}`));
-  const r0 = buildAgentPickView({ tenders, page: 0 }).keyboard.inline_keyboard;
-  const nav0 = r0.find((row) => row.some((b) => b.callback_data === 'agent:noop'));
-  assert.ok(nav0.some((b) => b.text === 'Далі ▶' && b.callback_data === 'agent:pick:1'));
+test('buildAgentUnifiedList: no notes → falls back to the bare tender_id', () => {
+  const v = buildAgentUnifiedList({
+    watchlist: [{ tender_id: 'UA-2026-06-01-000003-a', enabled: true }], jobs: [], page: 0,
+  });
+  assert.match(v.keyboard.inline_keyboard[0][0].text, /UA-2026-06-01-000003-a/);
+});
+
+test('buildAgentUnifiedList: job status icons (pending/running/done/error) + job_type marker', () => {
+  const watchlist = [
+    watchEntry('UA-1', 'A'), watchEntry('UA-2', 'B'), watchEntry('UA-3', 'C'), watchEntry('UA-4', 'D'),
+  ];
+  const jobs = [
+    job('UA-1', 'pending'), job('UA-2', 'running'),
+    job('UA-3', 'done'), job('UA-4', 'error', { job_type: 'sign' }),
+  ];
+  const v = buildAgentUnifiedList({ watchlist, jobs, page: 0 });
+  const texts = v.keyboard.inline_keyboard.map((r) => r[0].text);
+  assert.ok(texts.some((t) => t.startsWith('📋 ')));
+  assert.ok(texts.some((t) => t.startsWith('⏳ ')));
+  assert.ok(texts.some((t) => t.startsWith('✅ ')));
+  assert.ok(texts.some((t) => t.startsWith('🖊 ❌ ')), 'job_type marker precedes the status icon');
+});
+
+test('buildAgentUnifiedList: jobbed entries sort by created_at desc, then 🆕 entries after', () => {
+  const watchlist = [watchEntry('UA-OLD', 'Old'), watchEntry('UA-NEW', 'New'), watchEntry('UA-NONE', 'None')];
+  const jobs = [
+    job('UA-OLD', 'done', { created_at: '2026-01-01T00:00:00Z' }),
+    job('UA-NEW', 'done', { created_at: '2026-06-01T00:00:00Z' }),
+  ];
+  const v = buildAgentUnifiedList({ watchlist, jobs, page: 0 });
+  const order = v.keyboard.inline_keyboard.map((r) => r[0].callback_data);
+  assert.deepEqual(order, ['agent:view:UA-NEW:0', 'agent:view:UA-OLD:0', 'agent:view:UA-NONE:0']);
+});
+
+test('buildAgentUnifiedList: 6/page pagination, nav callback stays on agent:jobs', () => {
+  const watchlist = Array.from({ length: 8 }, (_, i) => watchEntry(`UA-2026-06-01-00000${i}-a`, `n${i}`));
+  const v0 = buildAgentUnifiedList({ watchlist, jobs: [], page: 0 });
+  const nav0 = v0.keyboard.inline_keyboard.find((row) => row.some((b) => b.callback_data === 'agent:noop'));
+  assert.equal(v0.keyboard.inline_keyboard.length, 7, '6 rows + 1 nav row');
+  assert.ok(nav0.some((b) => b.text === 'Далі ▶' && b.callback_data === 'agent:jobs:1'));
   assert.ok(nav0.some((b) => b.text === '1/2'));
 });
 
-const job = (tender_id, status, extra = {}) => ({ tender_id, status, company: 'ТОВ Тест', created_at: '2026-06-20T10:00:00Z', ...extra });
+// ── Per-tender drill-down (buildAgentTenderDetail) ────────────────────────────
+// Reached by tapping a row above; only THIS tender's actions are shown, so
+// labels no longer need to repeat the tender_id to stay unambiguous.
 
-test('buildAgentJobsPage: empty → back only', () => {
-  const v = buildAgentJobsPage({ jobs: [], page: 0 });
-  assert.match(v.text, /Ще немає задач/);
-  assert.equal(v.keyboard.inline_keyboard[0][0].callback_data, 'agent:menu');
+test('buildAgentTenderDetail: no job yet → prepare + winner-docs + back', () => {
+  const v = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП «Х»'), job: null, page: 1,
+  });
+  assert.match(v.text, /🏢 КНП «Х»/);
+  assert.match(v.text, /🆕/);
+  const cbs = v.keyboard.inline_keyboard.map((r) => r[0].callback_data);
+  assert.deepEqual(cbs, ['agent:start:UA-1', 'agent:winner:UA-1', 'agent:jobs:1']);
 });
 
-test('buildAgentJobsPage: status icons + drive button for done', () => {
-  const v = buildAgentJobsPage({ jobs: [
-    job('UA-2026-06-01-000001-a', 'running'),
-    job('UA-2026-06-01-000002-a', 'done', { result: { drive_link: 'https://drive/x' } }),
-  ], page: 0 });
-  assert.match(v.text, /⏳/);
-  assert.match(v.text, /✅/);
-  assert.match(v.text, /prozorro\.gov\.ua\/tender\/UA-2026-06-01-000002-a/);
-  const urlBtn = v.keyboard.inline_keyboard.flat().find((b) => b.url === 'https://drive/x');
-  assert.ok(urlBtn, 'done job exposes a Drive link button');
-  assert.equal(v.keyboard.inline_keyboard.at(-1)[0].callback_data, 'agent:menu');
+test('buildAgentTenderDetail: no watchlist entry (entry=null) → falls back to bare tender_id header', () => {
+  const v = buildAgentTenderDetail({ tenderId: 'UA-1', entry: null, job: null, page: 0 });
+  assert.match(v.text, /^📄 UA-1/);
 });
 
-test('buildAgentJobsPage: 6/page nav', () => {
-  const jobs = Array.from({ length: 8 }, (_, i) => job(`UA-2026-06-01-00000${i}-a`, 'pending'));
-  const nav = buildAgentJobsPage({ jobs, page: 0 }).keyboard.inline_keyboard.find((row) => row.some((b) => b.callback_data === 'agent:noop'));
-  assert.ok(nav.some((b) => b.callback_data === 'agent:jobs:1'));
+test('buildAgentTenderDetail: done + drive_link → folder, доробити, winner docs, sign, back', () => {
+  const v = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
+    job: job('UA-1', 'done', { result: { drive_link: 'https://d/1' } }), page: 0,
+  });
+  const cbs = v.keyboard.inline_keyboard.map((r) => r[0].callback_data ?? r[0].url);
+  assert.deepEqual(cbs, ['https://d/1', 'agent:amend:UA-1', 'agent:winner:UA-1', 'agent:sign:UA-1', 'agent:jobs:0']);
+  assert.match(v.text, /✅ Готово/);
 });
 
-test('handleAgentMenuNav: noop→null; menu/pick/jobs routing; other→null', () => {
-  const args = { tenders: [pickTender('UA-2026-06-01-000002-a', 'КНП')], jobs: [job('UA-2026-06-01-000002-a', 'done')] };
+// I5: a tender we WON but never prepared has no prepare job, so result.drive_link
+// is null — but result.winner_link points straight at the archive folder.
+test('buildAgentTenderDetail: winner-only (no drive_link) → 📁 from winner_link, no ✏️/🖊', () => {
+  const v = buildAgentTenderDetail({
+    tenderId: 'UA-7', entry: watchEntry('UA-7', 'МАЙЛАБ'),
+    job: job('UA-7', 'done', { job_type: 'winner', result: { winner_link: 'https://d/win' } }), page: 0,
+  });
+  const flat = v.keyboard.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.url === 'https://d/win'));
+  assert.ok(!flat.some((b) => b.callback_data === 'agent:amend:UA-7'));
+  assert.ok(!flat.some((b) => b.callback_data === 'agent:sign:UA-7'));
+  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-7'));
+});
+
+test('buildAgentTenderDetail: drive_link wins over winner_link when both present', () => {
+  const v = buildAgentTenderDetail({
+    tenderId: 'UA-8', entry: null,
+    job: job('UA-8', 'done', { result: { drive_link: 'https://d/prep', winner_link: 'https://d/win' } }), page: 0,
+  });
+  const flat = v.keyboard.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.url === 'https://d/prep'));
+  assert.ok(!flat.some((b) => b.url === 'https://d/win'));
+});
+
+test('buildAgentTenderDetail: done job with no result at all → only winner docs, no folder/amend/sign', () => {
+  const v = buildAgentTenderDetail({
+    tenderId: 'UA-6', entry: null, job: job('UA-6', 'done'), page: 0,
+  });
+  const flat = v.keyboard.inline_keyboard.flat();
+  assert.ok(!flat.some((b) => b.url));
+  assert.ok(!flat.some((b) => b.callback_data === 'agent:amend:UA-6'));
+  assert.ok(!flat.some((b) => b.callback_data === 'agent:sign:UA-6'));
+  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-6'));
+});
+
+test('buildAgentTenderDetail: pending/running → status text, only winner docs + back', () => {
+  const running = buildAgentTenderDetail({ tenderId: 'UA-1', entry: null, job: job('UA-1', 'running'), page: 0 });
+  assert.match(running.text, /⏳ Виконується/);
+  assert.deepEqual(running.keyboard.inline_keyboard.map((r) => r[0].callback_data),
+    ['agent:winner:UA-1', 'agent:jobs:0']);
+  const pending = buildAgentTenderDetail({ tenderId: 'UA-2', entry: null, job: job('UA-2', 'pending'), page: 0 });
+  assert.match(pending.text, /📋 У черзі/);
+});
+
+test('buildAgentTenderDetail: error → detail text, retry + winner docs + back', () => {
+  const v = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: null,
+    job: job('UA-1', 'error', { result: { detail: 'no .docx generated' } }), page: 2,
+  });
+  assert.match(v.text, /❌ Помилка/);
+  assert.match(v.text, /no \.docx generated/);
+  assert.deepEqual(v.keyboard.inline_keyboard.map((r) => r[0].callback_data),
+    ['agent:retry:UA-1', 'agent:winner:UA-1', 'agent:jobs:2']);
+});
+
+test('handleAgentMenuNav: noop→null; menu/pick/jobs route to the unified list; dialog actions→null', () => {
+  const args = { watchlist: [watchEntry('UA-2026-06-01-000002-a', 'КНП')], jobs: [job('UA-2026-06-01-000002-a', 'done')] };
   assert.equal(handleAgentMenuNav({ ...args, data: 'agent:noop' }), null);
   assert.match(handleAgentMenuNav({ ...args, data: 'agent:menu' }).text, /Агент/);
-  assert.match(handleAgentMenuNav({ ...args, data: 'agent:pick:0' }).text, /Оберіть тендер/);
-  assert.match(handleAgentMenuNav({ ...args, data: 'agent:jobs:0' }).text, /Останні задачі/);
+  assert.match(handleAgentMenuNav({ ...args, data: 'agent:pick:0' }).text, /Агент/);
+  assert.match(handleAgentMenuNav({ ...args, data: 'agent:jobs:0' }).text, /Агент/);
   assert.equal(handleAgentMenuNav({ ...args, data: 'agent:start:UA-2026-06-01-000002-a' }), null);
+  assert.equal(handleAgentMenuNav({ ...args, data: 'agent:view:UA-2026-06-01-000002-a:0' }), null);
 });
 
 test('validateInstruction: trims, empty→null, non-string→null, caps 4096', () => {
@@ -3677,23 +3769,13 @@ test('buildAgentAmendConfirmText: shows tid + HTML-escaped instruction', () => {
   assert.match(t, /&lt; 5 &amp; більше/);
 });
 
-test('buildAgentJobsPage: done+drive_link row gets 📁 + ✏️ Доробити; others do not', () => {
-  const v = buildAgentJobsPage({ jobs: [
-    job('UA-2026-06-01-000002-a', 'done', { result: { drive_link: 'https://drive/x' } }),
-    job('UA-2026-06-01-000003-a', 'pending'),
-    job('UA-2026-06-01-000004-a', 'error'),
-  ], page: 0 });
-  const cbs = JSON.stringify(v.keyboard.inline_keyboard);
-  assert.match(cbs, /agent:amend:UA-2026-06-01-000002-a/);
-  assert.ok(!cbs.includes('agent:amend:UA-2026-06-01-000003-a'));
-  assert.ok(!cbs.includes('agent:amend:UA-2026-06-01-000004-a'));
-});
-
-test('buildAgentJobsPage: amend job shows ✏️ marker in its line', () => {
-  const v = buildAgentJobsPage({ jobs: [
-    job('UA-2026-06-01-000002-a', 'running', { job_type: 'amend' }),
-  ], page: 0 });
-  assert.match(v.text, /✏️/);
+test('buildAgentUnifiedList: amend job shows ✏️ marker in its line', () => {
+  const v = buildAgentUnifiedList({
+    watchlist: [watchEntry('UA-2026-06-01-000002-a', 'Х')],
+    jobs: [job('UA-2026-06-01-000002-a', 'running', { job_type: 'amend' })],
+    page: 0,
+  });
+  assert.match(v.keyboard.inline_keyboard[0][0].text, /✏️/);
 });
 
 test('OUR_EDRPOU maps our codes to AGENT_COMPANIES names', () => {
@@ -3734,23 +3816,13 @@ test('buildAgentWinnerJob omits target when there is no prior job', () => {
   assert.ok(!('target' in job));
 });
 
-test('jobs page shows the winner button on a done proposal', () => {
-  const jobs = [{
-    tender_id: 'UA-1', status: 'done', company: 'МАЙЛАБ',
-    result: { drive_link: 'https://d/1' },
-  }];
-  const view = buildAgentJobsPage({ jobs });
-  const flat = view.keyboard.inline_keyboard.flat();
-  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-1'));
-  // наявна кнопка доробки лишилась
-  assert.ok(flat.some((b) => b.callback_data === 'agent:amend:UA-1'));
-});
-
-test('jobs page marks winner jobs with an icon', () => {
-  const view = buildAgentJobsPage({
-    jobs: [{ tender_id: 'UA-9', status: 'running', job_type: 'winner' }],
+test('buildAgentUnifiedList: marks winner jobs with the 📄 icon', () => {
+  const v = buildAgentUnifiedList({
+    watchlist: [watchEntry('UA-9', 'Х')],
+    jobs: [{ tender_id: 'UA-9', status: 'running', job_type: 'winner', created_at: '2026-06-20T10:00:00Z' }],
+    page: 0,
   });
-  assert.ok(view.text.includes('📄'));
+  assert.match(v.keyboard.inline_keyboard[0][0].text, /📄/);
 });
 
 test('admin notice mentions winner runs', () => {
@@ -3773,74 +3845,6 @@ test('admin notice: winner run names the company, and omits it cleanly when abse
     kind: 'winner', actorName: 'Оксана', chatId: 555, tenderId: 'UA-1', company: null,
   });
   assert.ok(!noCo.includes('·'), noCo);
-});
-
-// I5: a tender we WON but never prepared has no prepare job, so result.drive_link
-// is null — but result.winner_link points straight at the archive folder. Without
-// this the page rendered only ⬅ Назад and the package was unreachable.
-test('jobs page: winner-only job (no drive_link) still exposes 📁 from winner_link, no ✏️', () => {
-  const view = buildAgentJobsPage({
-    jobs: [{
-      tender_id: 'UA-7', status: 'done', job_type: 'winner', company: 'МАЙЛАБ',
-      result: { winner_link: 'https://d/win', winner_dir: 'G:\\x' },
-    }],
-  });
-  const flat = view.keyboard.inline_keyboard.flat();
-  assert.ok(flat.some((b) => b.url === 'https://d/win'), 'winner_link renders as a 📁 button');
-  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-7'));
-  assert.ok(!flat.some((b) => b.callback_data === 'agent:amend:UA-7'),
-    '✏️ Доробити still requires a prepared proposal');
-});
-
-test('jobs page: drive_link wins over winner_link when both are present, ✏️ stays', () => {
-  const view = buildAgentJobsPage({
-    jobs: [{
-      tender_id: 'UA-8', status: 'done', company: 'МАЙЛАБ',
-      result: { drive_link: 'https://d/prep', winner_link: 'https://d/win' },
-    }],
-  });
-  const flat = view.keyboard.inline_keyboard.flat();
-  assert.ok(flat.some((b) => b.url === 'https://d/prep'));
-  assert.ok(!flat.some((b) => b.url === 'https://d/win'));
-  assert.ok(flat.some((b) => b.callback_data === 'agent:amend:UA-8'));
-});
-
-test('jobs page: winner button offered for a job with no result at all', () => {
-  const view = buildAgentJobsPage({
-    jobs: [{ tender_id: 'UA-6', status: 'error', company: 'МАЙЛАБ' }],
-  });
-  const flat = view.keyboard.inline_keyboard.flat();
-  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-6'));
-  assert.ok(!flat.some((b) => b.callback_data === 'agent:amend:UA-6'));
-  assert.ok(!flat.some((b) => b.url));
-});
-
-// R1: the winner row is emitted for EVERY job with a tender_id, but its label
-// used to be the bare constant `📄 Документи переможця` — the tender id lived
-// only in callback_data. A page of pending/running/error jobs (PAGE_SIZE is 6)
-// therefore rendered up to six visually identical, unidentifiable buttons, and
-// tapping the wrong one silently starts an agent run that writes into a
-// hand-maintained shared archive for the WRONG tender. Each winner button must
-// name its own tender.
-test('jobs page: each winner button names its own tender id (3 jobs → 3 distinct labels)', () => {
-  const view = buildAgentJobsPage({
-    jobs: [
-      { tender_id: 'UA-A', status: 'pending' },
-      { tender_id: 'UA-B', status: 'running' },
-      { tender_id: 'UA-C', status: 'error' },
-    ],
-  });
-  const winners = view.keyboard.inline_keyboard.flat()
-    .filter((b) => typeof b.callback_data === 'string' && b.callback_data.startsWith('agent:winner:'));
-  assert.equal(winners.length, 3);
-  for (const tid of ['UA-A', 'UA-B', 'UA-C']) {
-    const btn = winners.find((b) => b.callback_data === `agent:winner:${tid}`);
-    assert.ok(btn, `no winner button for ${tid}`);
-    assert.ok(btn.text.includes(tid),
-      `winner button for ${tid} must be self-identifying, got ${JSON.stringify(btn.text)}`);
-  }
-  assert.equal(new Set(winners.map((b) => b.text)).size, 3,
-    `winner labels must be distinct, got ${JSON.stringify(winners.map((b) => b.text))}`);
 });
 
 // T6b: a Ukrainian ЄДРПОУ with a leading zero is ordinary (this repo's fixtures
@@ -3943,49 +3947,16 @@ test('buildAgentSignConfirmText shows tid, company and date, HTML-escaped', () =
   assert.ok(!t.includes('<Б>'), 'raw angle brackets must not survive');
 });
 
-test('jobs page offers the sign button on a done proposal only', () => {
-  const view = buildAgentJobsPage({
-    jobs: [
-      { tender_id: 'UA-1', status: 'done', company: 'МАЙЛАБ', result: { drive_link: 'https://d/1' } },
-      { tender_id: 'UA-2', status: 'pending', company: 'МАЙЛАБ' },
-      { tender_id: 'UA-3', status: 'done', company: 'МАЙЛАБ', result: { winner_link: 'https://d/w' } },
-    ],
+test('buildAgentUnifiedList: marks sign jobs with the 🖊 icon', () => {
+  const v = buildAgentUnifiedList({
+    watchlist: [watchEntry('UA-9', 'Х')],
+    jobs: [{ tender_id: 'UA-9', status: 'running', job_type: 'sign', created_at: '2026-06-20T10:00:00Z' }],
+    page: 0,
   });
-  const flat = view.keyboard.inline_keyboard.flat();
-  assert.ok(flat.some((b) => b.callback_data === 'agent:sign:UA-1'));
-  assert.ok(!flat.some((b) => b.callback_data === 'agent:sign:UA-2'),
-    'nothing to sign before the proposal is prepared');
-  assert.ok(!flat.some((b) => b.callback_data === 'agent:sign:UA-3'),
-    'a winner-only job has no prepared package to sign');
-  // сусідні кнопки не постраждали
-  assert.ok(flat.some((b) => b.callback_data === 'agent:amend:UA-1'));
-  assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-1'));
-});
-
-// Той самий урок, що й з кнопкою переможця (R1): кнопок на сторінці до шести,
-// підпис має називати свій тендер, інакше помилковий дотик мовчки підписує
-// ЧУЖИЙ пакет чужою датою.
-test('jobs page: each sign button names its own tender id', () => {
-  const view = buildAgentJobsPage({
-    jobs: [
-      { tender_id: 'UA-A', status: 'done', result: { drive_link: 'https://d/a' } },
-      { tender_id: 'UA-B', status: 'done', result: { drive_link: 'https://d/b' } },
-    ],
-  });
-  const signs = view.keyboard.inline_keyboard.flat()
-    .filter((b) => typeof b.callback_data === 'string' && b.callback_data.startsWith('agent:sign:'));
-  assert.equal(signs.length, 2);
-  assert.equal(new Set(signs.map((b) => b.text)).size, 2,
-    `sign labels must be distinct, got ${JSON.stringify(signs.map((b) => b.text))}`);
-});
-
-test('jobs page marks sign jobs with the 🖊 icon', () => {
-  const view = buildAgentJobsPage({
-    jobs: [{ tender_id: 'UA-9', status: 'running', job_type: 'sign' }],
-  });
-  assert.ok(view.text.includes('🖊'), view.text);
-  assert.ok(!view.text.includes('✏️'), 'must not be confused with the amend marker');
-  assert.ok(!view.text.includes('📄'), 'must not be confused with the winner marker');
+  const text = v.keyboard.inline_keyboard[0][0].text;
+  assert.match(text, /🖊/);
+  assert.ok(!text.includes('✏️'), 'must not be confused with the amend marker');
+  assert.ok(!text.includes('📄'), 'must not be confused with the winner marker');
 });
 
 test('admin notice mentions sign runs', () => {

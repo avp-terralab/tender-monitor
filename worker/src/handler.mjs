@@ -13,7 +13,7 @@ import {
   sanitizeActor,
   parseAuditCommit,
   formatAuditLog,
-  companyForSlug, agentTriggerButtonRow, buildAgentTenderListKeyboard,
+  companyForSlug, agentTriggerButtonRow,
   buildAgentCompanyKeyboard, validateAgentPrice,
   buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
   buildAgentAdminNotice,
@@ -21,7 +21,7 @@ import {
   buildAgentWinnerJob, buildAgentWinnerConfirmText,
   validateLetterDate, formatLetterDate, buildAgentSignJob,
   buildAgentSignDateKeyboard, buildAgentSignConfirmText,
-  buildAgentMenu, buildAgentPickView, buildAgentJobsPage, handleAgentMenuNav,
+  buildAgentUnifiedList, buildAgentTenderDetail, handleAgentMenuNav,
   buildHistoryCalendar, handleHistoryNav,
   abbreviateLegalForm,
 } from '../../commands.mjs';
@@ -52,7 +52,14 @@ const BOT_USERNAME = 'terralab_tenders_bot';
 
 // Commands whose reply is an on-demand "view": the bot keeps only the latest one
 // in the chat (deletes the previous view + its trigger on the next view command).
-const EPHEMERAL_VIEW_CMDS = new Set(['info', 'watched', 'archive', 'agent', 'help', 'status', 'whoami', 'history']);
+// Covers every recognized command except /start (its own namespace — see
+// ephemeral.mjs) and force-reply follow-ups, which reuse whichever command
+// they complete (e.g. a typed tender_id after /add lands back as 'add').
+const EPHEMERAL_VIEW_CMDS = new Set([
+  'info', 'watched', 'archive', 'agent', 'help', 'status', 'whoami', 'history',
+  'add', 'remove', 'watch', 'unarchive', 'unwatch_removed',
+  'invite', 'invites', 'revoke', 'role', 'users', 'log', 'notify',
+]);
 
 const GH_UNAVAILABLE = '⚠️ GitHub тимчасово недоступний, спробуй за хвилину';
 // Callback toasts are plain text and capped by Telegram at 200 chars, so they
@@ -731,9 +738,15 @@ export async function runHandler({ update, env, deps = {} }) {
     }
   } else if (cmd.cmd === 'agent') {
     if (!isEditor) return;
-    const menu = buildAgentMenu();
-    reply = menu.text;
-    agentReplyMarkup = menu.keyboard;
+    try {
+      const [{ watchlist }, jobs] = await Promise.all([_loadWatchlist(env), _listAgentJobs(env)]);
+      const view = buildAgentUnifiedList({ watchlist, jobs, page: 0 });
+      reply = view.text;
+      agentReplyMarkup = view.keyboard;
+    } catch (err) {
+      console.error('worker: /agent failed:', err.message);
+      reply = githubUnavailableText(err, isAdmin);
+    }
   } else if (cmd.cmd === 'unknown') {
     reply = '❓ Не розумію. /help';
   } else {
@@ -1273,35 +1286,16 @@ async function handleAgentCallback({
   // Menu-level navigation (edit-in-place). Dialog actions fall through below.
   if (action === 'noop') { await ack(); return; }
   if (action === 'menu' || action === 'pick' || action === 'jobs') {
-    let tenders = [];
+    let watchlist = [];
     let jobs = [];
     try {
-      if (action === 'pick') {
-        const { watchlist } = await _loadWatchlist(env);
-        const checked = await Promise.all(
-          watchlist.filter((r) => r.enabled).map(async (r) => {
-            try {
-              const snap = _extractSnapshot(await _fetchTender(r.tender_id));
-              if (snap.status !== 'active.tendering') return null;
-              let preparedUrl = null;
-              try {
-                const j = await _loadAgentJob(env, r.tender_id);
-                if (j && j.status === 'done' && j.result?.drive_link) preparedUrl = j.result.drive_link;
-              } catch { /* link optional */ }
-              return { ...r, preparedUrl };
-            } catch { return null; }
-          }),
-        );
-        tenders = checked.filter(Boolean);
-      } else if (action === 'jobs') {
-        jobs = await _listAgentJobs(env);
-      }
+      [{ watchlist }, jobs] = await Promise.all([_loadWatchlist(env), _listAgentJobs(env)]);
     } catch (err) {
       console.error('worker: agent menu nav load failed:', err.message);
       await ack(githubUnavailableAck(err, isAdmin, '⚠️ Prozorro/GitHub тимчасово недоступний'), true);
       return;
     }
-    const view = handleAgentMenuNav({ tenders, jobs, data });
+    const view = handleAgentMenuNav({ watchlist, jobs, data });
     if (view) {
       try {
         await _editMessageText({
@@ -1311,6 +1305,34 @@ async function handleAgentCallback({
       } catch (err) {
         console.error('worker: agent menu nav edit failed:', err.message);
       }
+    }
+    await ack();
+    return;
+  }
+
+  // Drill-down for one tender, reached by tapping its row in the merged list.
+  // agent:view:<tid>:<page> — page carries back where "⬅ До списку" returns to.
+  if (action === 'view') {
+    const backPage = Number(parts[3] ?? 0);
+    let entry = null;
+    let job = null;
+    try {
+      const [{ watchlist }, loadedJob] = await Promise.all([_loadWatchlist(env), _loadAgentJob(env, tid)]);
+      entry = watchlist.find((r) => r.tender_id === tid) ?? null;
+      job = loadedJob;
+    } catch (err) {
+      console.error('worker: agent view load failed:', err.message);
+      await ack(githubUnavailableAck(err, isAdmin, '⚠️ Prozorro/GitHub тимчасово недоступний'), true);
+      return;
+    }
+    const detail = buildAgentTenderDetail({ tenderId: tid, entry, job, page: backPage });
+    try {
+      await _editMessageText({
+        token: env.TELEGRAM_BOT_TOKEN, chatId, messageId,
+        text: detail.text, replyMarkup: detail.keyboard ?? undefined,
+      });
+    } catch (err) {
+      console.error('worker: agent view edit failed:', err.message);
     }
     await ack();
     return;
