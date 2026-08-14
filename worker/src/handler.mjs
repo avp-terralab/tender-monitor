@@ -19,6 +19,8 @@ import {
   buildAgentAdminNotice,
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   buildAgentWinnerJob, buildAgentWinnerConfirmText,
+  validateLetterDate, formatLetterDate, buildAgentSignJob,
+  buildAgentSignDateKeyboard, buildAgentSignConfirmText,
   buildAgentMenu, buildAgentPickView, buildAgentJobsPage, handleAgentMenuNav,
   buildHistoryCalendar, handleHistoryNav,
   abbreviateLegalForm,
@@ -1157,20 +1159,26 @@ async function handleCallbackQuery({
 // is not swallowed as the stale tender's price.
 const AGENT_PENDING_TTL_MS = 15 * 60 * 1000;
 
+// Кроки, з яких дотик по клавіатурі дати може ПРОДОВЖИТИ діалог підписання.
+// `confirm` і `await_letter_date` тут не зайві: повідомлення з кнопками дати
+// лишається у чаті після вибору, тож «обрав не ту дату → обираю іншу» — це
+// звичайне виправлення, а не новий діалог.
+const SIGN_CONTINUE_STEPS = new Set(['await_date', 'await_letter_date', 'confirm']);
+
 // Tells the admin that someone ELSE queued an agent run. The agent's result goes
 // only to `requested_by`, so without this the admin would never learn about it.
 // No-op when the actor is the admin, when no admin chat is configured, or when
 // Telegram rejects the send (best effort — must never fail the queued job).
 async function notifyAdminAgentRun({
   env, isAdmin, adminChatId, _sendReply,
-  kind, actorName, chatId, tenderId, company, price, instruction,
+  kind, actorName, chatId, tenderId, company, price, instruction, letterDate,
 }) {
   if (isAdmin || !adminChatId) return;
   try {
     await _sendReply({
       token: env.TELEGRAM_BOT_TOKEN,
       chatId: Number(adminChatId),
-      text: buildAgentAdminNotice({ kind, actorName, chatId, tenderId, company, price, instruction }),
+      text: buildAgentAdminNotice({ kind, actorName, chatId, tenderId, company, price, instruction, letterDate }),
     });
   } catch (err) {
     console.error('worker: agent admin notice failed:', err.message);
@@ -1287,6 +1295,95 @@ async function handleAgentCallback({
       await sendNew(`✏️ Напиши, що доробити в пропозиції ${tid} (одним повідомленням):`);
     } catch (err) {
       console.error('worker: agent amend prompt send failed:', err.message);
+    }
+    await ack();
+    return;
+  }
+
+  // Підписання й архів. На відміну від winner, тут ОБОВ'ЯЗКОВО потрібна готова
+  // пропозиція: підписують теку `result.package_dir`, і без неї агенту нічого
+  // відкривати. Тому кнопка й живе лише на готовій задачі в «📊 Останні задачі».
+  if (action === 'sign') {
+    let prior;
+    try {
+      prior = await _loadAgentJob(env, tid);
+    } catch (err) {
+      console.error('worker: agent sign load job failed:', err.message);
+      await ack(githubUnavailableAck(err, isAdmin), true);
+      return;
+    }
+    if (!prior || prior.status !== 'done' || !prior.result?.package_dir) {
+      await ack('🚫 Пропозиція ще не готова', true);
+      return;
+    }
+    try {
+      const { pending, sha } = await _loadAgentPending(env);
+      pending[chatId] = {
+        tid, kind: 'sign', step: 'await_date',
+        company: prior.company ?? null, at: _now().toISOString(),
+      };
+      await _saveAgentPending(env, pending, sha);
+      await sendNew('Яку дату проставити в документах?',
+        buildAgentSignDateKeyboard(tid, formatLetterDate(_now())));
+    } catch (err) {
+      console.error('worker: agent sign date prompt failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
+    }
+    await ack();
+    return;
+  }
+
+  if (action === 'signdate' || action === 'signother') {
+    let entry;
+    try {
+      const loaded = await _loadAgentPending(env);
+      entry = loaded.pending?.[chatId];
+    } catch (err) {
+      console.error('worker: agent signdate load pending failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
+    }
+    // Звіряються ВСІ ТРИ поля — kind, tid і step. Урок гілки `co` з winner-флоу:
+    // коли гілка дивиться лише на одне поле, покинутий діалог перехоплює пізніший
+    // дотик. Тут ціна помилки більша за незручність: дотик по старій кнопці дати
+    // інакше вписав би `letterDate` у чужий pending-запис (winner/amend того ж
+    // чату) або проставив дату тендера A в діалог тендера B — а дата їде в кожен
+    // лист поданого пакета. Кнопки не мають TTL (він працює лише для текстових
+    // кроків), тож такий запис може лежати скільки завгодно.
+    if (!entry || entry.kind !== 'sign' || entry.tid !== tid
+      || !SIGN_CONTINUE_STEPS.has(entry.step)) {
+      await ack('⚠️ Немає активного запиту');
+      return;
+    }
+    if (action === 'signother') {
+      try {
+        const { pending, sha } = await _loadAgentPending(env);
+        pending[chatId] = { ...entry, step: 'await_letter_date', at: _now().toISOString() };
+        await _saveAgentPending(env, pending, sha);
+        await sendNew('Надішли дату у форматі ДД.ММ.РРРР (напр. 13.08.2026):');
+      } catch (err) {
+        console.error('worker: agent signother failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+      await ack();
+      return;
+    }
+    const letterDate = validateLetterDate(parts[3] ?? '', _now());
+    if (!letterDate) { await ack('❌ Невірна дата', true); return; }
+    try {
+      const { pending, sha } = await _loadAgentPending(env);
+      pending[chatId] = { ...entry, step: 'confirm', letterDate };
+      await _saveAgentPending(env, pending, sha);
+      await sendNew(
+        buildAgentSignConfirmText({ tenderId: tid, company: entry.company, letterDate }),
+        buildAgentConfirmKeyboard(tid),
+      );
+    } catch (err) {
+      console.error('worker: agent signdate confirm failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
     }
     await ack();
     return;
@@ -1484,6 +1581,58 @@ async function handleAgentCallback({
       return;
     }
 
+    // Sign: job_type:'sign' із датою листа й текою готового пакета. Без ціни.
+    if (entry.kind === 'sign') {
+      // Без обраної дати підписувати нічого не можна: вона підставляється в
+      // КОЖЕН лист пакета, тож «порожня дата» — це не дефолт, а зупинка.
+      if (!entry.letterDate) { await ack('⚠️ Немає активного запиту'); return; }
+      let prior;
+      try {
+        prior = await _loadAgentJob(env, tid);
+      } catch (err) {
+        console.error('worker: agent sign confirm load job failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+      // Перевіряється ще раз, а не лише на кнопці: між відкриттям діалогу і
+      // підтвердженням job-файл могли переписати (повторний prepare), і тоді
+      // теки, яку збиралися підписувати, вже немає.
+      if (!prior?.result?.package_dir) { await ack('🚫 Пропозиція ще не готова', true); return; }
+      const job = buildAgentSignJob({
+        tenderId: tid,
+        company: entry.company ?? prior.company ?? null,
+        letterDate: entry.letterDate,
+        target: {
+          drive_link: prior.result.drive_link ?? null,
+          package_dir: prior.result.package_dir,
+        },
+        requestedBy: String(chatId),
+        createdAt: _now().toISOString(),
+      });
+      try {
+        await _saveAgentJob(env, job, {
+          message: formatAuditMessage({ action: 'agent_sign', target: tid, actor: actorName, chatId, role }),
+        });
+      } catch (err) {
+        console.error('worker: saveAgentJob (sign) failed:', err.message);
+        await ack('⚠️ Не зміг поставити в чергу, спробуй ще раз', true);
+        return;
+      }
+      await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
+      try {
+        await sendNew('✅ Підписання поставлено в чергу. Сповіщу, коли буде готово.');
+      } catch (err) {
+        console.error('worker: agent sign confirm reply failed:', err.message);
+      }
+      await notifyAdminAgentRun({
+        env, isAdmin, adminChatId, _sendReply,
+        kind: 'sign', actorName, chatId, tenderId: tid,
+        company: job.company, letterDate: job.letter_date,
+      });
+      await ack('✅ В черзі');
+      return;
+    }
+
     // Winner: build a job_type:'winner' record. No price. `target` carries the
     // prior done job's Drive folders unchanged when one exists — omitted
     // entirely otherwise (a winner run needs no prior prepare/agent job).
@@ -1658,10 +1807,10 @@ async function clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPen
 }
 
 // Handles a plain text message from an admin who is mid-agent-dialog awaiting a
-// free-text reply — the price (await_price) or the amend instruction
-// (await_instruction). Returns true if it consumed the message (so the caller
-// stops), false if there was no matching pending step (caller continues normal
-// parsing).
+// free-text reply — the price (await_price), the amend instruction
+// (await_instruction) or the letter date (await_letter_date). Returns true if it
+// consumed the message (so the caller stops), false if there was no matching
+// pending step (caller continues normal parsing).
 async function handleAgentTextReply({
   env, chatId, msg, _sendReply, _loadAgentPending, _saveAgentPending, _now,
 }) {
@@ -1673,7 +1822,9 @@ async function handleAgentTextReply({
     console.error('worker: agent text-reply load pending failed:', err.message);
     return false; // can't verify state → let normal handling proceed
   }
-  if (!entry || (entry.step !== 'await_price' && entry.step !== 'await_instruction')) return false;
+  if (!entry || (entry.step !== 'await_price'
+    && entry.step !== 'await_instruction'
+    && entry.step !== 'await_letter_date')) return false;
 
   // Expire an abandoned dialog: if the price step was opened long ago and never
   // finished, do not consume an unrelated number as the stale tender's price.
@@ -1692,6 +1843,31 @@ async function handleAgentTextReply({
     token: env.TELEGRAM_BOT_TOKEN, chatId: msg.chat.id, text,
     replyToMessageId: msg.message_id, replyMarkup,
   });
+
+  if (entry.step === 'await_letter_date') {
+    const letterDate = validateLetterDate(msg.text, now);
+    if (!letterDate) {
+      try {
+        await send('❌ Дата має бути у форматі ДД.ММ.РРРР і в межах ±30 днів. Спробуй ще раз:');
+      } catch (err) { console.error('worker: agent invalid-date reply failed:', err.message); }
+      return true;
+    }
+    try {
+      pending[chatId] = { ...entry, letterDate, step: 'confirm' };
+      await _saveAgentPending(env, pending, sha);
+    } catch (err) {
+      console.error('worker: agent letter-date save pending failed:', err.message);
+      try { await send('⚠️ Помилка, спробуй ще раз.'); } catch {}
+      return true;
+    }
+    try {
+      await send(
+        buildAgentSignConfirmText({ tenderId: entry.tid, company: entry.company, letterDate }),
+        buildAgentConfirmKeyboard(entry.tid),
+      );
+    } catch (err) { console.error('worker: agent sign confirm prompt failed:', err.message); }
+    return true;
+  }
 
   if (entry.step === 'await_instruction') {
     const instruction = validateInstruction(msg.text);
