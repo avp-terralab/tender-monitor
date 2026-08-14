@@ -3558,7 +3558,7 @@ test('agent:confirm with kind=sign → sign job saved with an agent_sign audit, 
     job_type: 'sign',
     company: 'МАЙЛАБ',
     letter_date: '21.06.2026',
-    target: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg' },
+    target: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg', published_dir: null },
     requested_by: '456',
     status: 'pending',
     created_at: '2026-06-21T10:00:00.000Z',
@@ -3572,6 +3572,37 @@ test('agent:confirm with kind=sign → sign job saved with an agent_sign audit, 
   assert.match(toAdmin[0].text, /підписання/);
   assert.match(toAdmin[0].text, /21\.06\.2026/);
   assert.equal(acks.at(-1).text, '✅ В черзі');
+});
+
+// Тека замовника в архіві відділу приходить із ГОТОВОЇ пропозиції, а не
+// підбирається за назвою: відділ перейменовує теки руками («79. КНП
+// Локачинської СелР Локачинська лікарня» -> «79. Локачинська Лікарня»), і без
+// цього поля поллер завів би підписаний пакет у НОВУ нумеровану теку, з'ївши
+// номер у чужій ручній послідовності. Winner-флоу передає це поле так само.
+test('agent:confirm with kind=sign carries published_dir into the job target', async () => {
+  const { deps, store, jobs } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+    loadAgentJob: async () => ({
+      tender_id: AGENT_TID, status: 'done', company: 'МАЙЛАБ',
+      result: {
+        drive_link: 'https://drive/x',
+        package_dir: 'G:\\pkg',
+        published_dir: 'G:\\ТЕНДЕРИ 2026\\79. КНП Локачинської СелР Локачинська лікарня',
+      },
+    }),
+  });
+  store.pending['123'] = {
+    tid: AGENT_TID, kind: 'sign', step: 'confirm', company: 'МАЙЛАБ',
+    letterDate: '21.06.2026', at: '2026-06-21T10:00:00.000Z',
+  };
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+
+  assert.equal(jobs.length, 1);
+  assert.deepEqual(jobs[0].job.target, {
+    drive_link: 'https://drive/x',
+    package_dir: 'G:\\pkg',
+    published_dir: 'G:\\ТЕНДЕРИ 2026\\79. КНП Локачинської СелР Локачинська лікарня',
+  });
 });
 
 test('agent:confirm with kind=sign but no chosen date → no job, soft ack', async () => {
