@@ -122,6 +122,19 @@ git commit -m "feat(job): is_sign predicate"
   - `LETTER_DATE_RE` — скомпільований регекс дати `ДД.ММ.РРРР` (та варіанти з підкресленнями).
   - `replace_letter_date(paragraph_texts, new_date, scan_paragraphs=8) -> (list_of_new_texts, replaced_index_or_None)` — чиста функція над списком рядків.
 
+> **Виправлено 14.08.2026 після реалізації.** Шипнутий `replace_letter_date` НЕ шукає
+> «перший рядок, схожий на дату» — саме такий наївний підхід у попередній версії коду
+> реально переписав «Протоколу Загальних зборів учасників №24/10/2024» на нову дату
+> листа, тобто зробив документ, що йде замовнику, неправдивим. Натомість дата
+> заміняється ТІЛЬКИ коли в тому самому блоці є якір «Вих[ідний]. №…» одразу перед
+> нею (`_VYKH_RE` + `_FROM_DATE_RE`, дата саме після слова «від»). Крім того, шапка
+> листа в наших шаблонах — це TABLE, а `doc.paragraphs` у python-docx текст із таблиць
+> НЕ повертає взагалі; тому шиплено функція `_header_blocks` спершу сканує перший
+> рядок(и) першої таблиці (`DEFAULT_SCAN_TABLES=1`, `DEFAULT_SCAN_TABLE_ROWS=2`) і лише
+> потім абзаци як fallback — версія плану, яка дивилась тільки в `doc.paragraphs`,
+> на реальному шаблоні не знайшла б дату НІКОЛИ. `LETTER_DATE_RE` як окремий
+> публічний символ не існує — є `letter_date_in`/`_FROM_DATE_RE`/`_VYKH_RE`.
+
 - [ ] **Step 1: Написати падаючі тести — спершу на те, що НЕ можна змінювати**
 
 Створити `tests/test_sign_lib.py`:
@@ -256,6 +269,19 @@ git commit -m "feat(sign): replace only the letter's own date, never body dates"
   - `find_signature_index(paragraph_texts) -> int | None`
   - `signature_png_for(company, assets_root) -> str | None`
   - `stamp_docx(docx_path, out_path, new_date, png_path) -> dict` з ключами `dated` (bool), `signed` (bool), `old_date` (str|None), `new_date`.
+
+> **Виправлено 14.08.2026 після реалізації.** `signature_png_for` шипнута геть інакше,
+> ніж описано вище й нижче в кроках. План очікував ПІДТЕКУ на кожну компанію
+> (`assets_root/<company>/Підпис і печатка/`) і повертав перший-ліпший PNG звідти.
+> Реальна структура «Активи компаній» — ОДНА спільна тека на всі компанії,
+> `Підписи з печатками\`, з нерегулярними назвами файлів («Ай Ті Парасина підпис та
+> печатка.png»), тож шипнутий код шукає файл за КЛЮЧОВИМ СЛОВОМ компанії
+> (`COMPANY_SIGNATURE_KEYWORDS`, ціле слово, не підрядок — «про» в «суПРОвід» інакше
+> підставило б чужий підпис) і повертає `(path, detail)`, а не голий `str | None`:
+> нуль збігів і кілька збігів — це РІЗНІ, окремо пояснені помилки (а не мовчазний
+> `None`), бо підписати документ ЧУЖИМ підписом — найгірший можливий наслідок
+> здогадки. Геометрія відбитка (крок 11 нижче й Task 10) теж не збіглася з фінальними
+> числами — див. примітку в Task 5.
 
 - [ ] **Step 1: Написати падаючі тести на пошук абзацу підпису**
 
@@ -637,6 +663,19 @@ git commit -m "feat(sign): flat zip packing with a department-friendly name"
 - Consumes: `stamp_docx`, `signature_png_for`, `zip_name`, `pack_zip` (Tasks 2-4); `word_export.docx_to_pdf_batch`.
 - Produces: `sign_package(package_dir, out_dir, company, letter_date, short_entity, assets_root, render=None) -> dict` із ключами `status`, `zip_path`, `signed_dir`, `n_signed`, `n_pdf_total`, `unsigned`, `dates`, `detail`.
 
+> **Виправлено 14.08.2026 після реалізації.** Три речі відрізняються від плану:
+> (1) `result` шипнутого `sign_package` має ще й ключ `undated` — список docx, де НЕ
+> знайшлось поля «Вих. № … від …» (окремо від `unsigned`, бо один документ може бути
+> без дати, але з підписом, і навпаки); (2) `_package_files`/`pack_zip` пропускають
+> `job_lib.is_junk_file` (`desktop.ini`, `Thumbs.db`, `.DS_Store`…) — Google Drive
+> Desktop кладе їх у кожну синхронізовану теку сам, і без фільтра вони поїхали б у ZIP
+> замовнику; (3) геометрія відбитка НЕ ті три хардкод-числа з кроку 11 нижче
+> (`WIDTH=5.0`, `OFFSET_X=4.5`, `OFFSET_Y=-1.2`) — фінальні, ЗАТВЕРДЖЕНІ власником
+> 14.08.2026 на реальному листі значення: `SIGNATURE_WIDTH_CM=6.5`,
+> `SIGNATURE_OFFSET_X_CM=7.0` (обидва — константи), а вертикальний зсув
+> ВИВОДИТЬСЯ з пропорцій конкретного PNG-скана (`signature_offset_y_cm`), а не є
+> третьою константою — Task 10 передбачав підбір «на око», а не формулу.
+
 - [ ] **Step 1: Написати падаючі тести**
 
 ```python
@@ -782,6 +821,27 @@ git commit -m "feat(sign): sign_package orchestration, originals untouched"
 **Interfaces:**
 - Consumes: `job_lib.is_sign` (Task 1), `sign_lib.sign_package` (Task 5), `resolve_drive_item`/`make_resolve_drive_item` (Task 1 плану winner).
 - Produces: `_sign_keyboard(zip_url, folder_url) -> dict | None`; гілка в `process_pending` з новим інжектованим параметром `sign_package=None`.
+
+> **Виправлено 14.08.2026 після реалізації — найбільша розбіжність у цьому плані.**
+> Псевдокод кроку 7 нижче викликає `sign_package(package_dir, out_dir, ...)` де
+> `out_dir` — тека замовника ПРЯМО В АРХІВІ ВІДДІЛУ (`cfg.publish_root/<folder>`), тобто
+> план дає моделі право писати прямо в «ТЕНДЕРИ 2026». Шипнутий код цього НІКОЛИ не
+> робить: `sign_package` пише у ВЛАСНУ робочу теку агента —
+> `<drive_root>\...\Підписаний пакет\` (`SIGN_STAGING_SUBDIR`), і лише ОКРЕМИЙ крок
+> ПІСЛЯ успіху (новий `make_publish_signed`, якого в плані немає взагалі) копіює готове
+> у `publish_root`: ZIP плоско в теку замовника, PDF — у підтеку `Підписані PDF\`. Той
+> самий поділ «стейджинг агента / публікація поллера», що й для `winner` — свідома
+> вимога власника (13.08.2026): дозволити моделі шаблонний доступ до `ТЕНДЕРИ 2026`
+> означало б дати їй право правити будь-який із ~80 давно завершених тендерів.
+> Також гілка `is_sign` у шипнутому `process_pending` значно повніша за псевдокод
+> нижче: `sign_package=None` дає `error`, а не тихий `return name`; OSError (Drive не
+> змонтовано) і будь-яка інша помилка Word COM ловляться ОКРЕМО й обидві прибирають
+> порожні теки, які встигли створитись (`_prune_if_empty`); `_sign_failed` завжди
+> переносить `drive_link`/`package_dir`/`published_dir` з `target` у результат
+> помилки — без цього невдале підписання стирало б кнопки готової пропозиції
+> (`buildAgentJobsPage` гейтить рядок на `result.drive_link`); відсутність
+> `letter_date` — окрема рання помилка, бо `None` поїхав би в назву кожного файлу й
+> архіву. `_sign_keyboard` і базова структура гілки — як у плані.
 
 - [ ] **Step 1: Написати падаючі тести на клавіатуру**
 
@@ -1031,6 +1091,20 @@ git commit -m "feat(poller): sign job branch with zip + folder buttons"
   - `buildAgentSignDateKeyboard(tenderId, todayStr) -> object`
   - `buildAgentSignConfirmText({ tenderId, company, letterDate }) -> string`
 
+> **Виправлено 14.08.2026 після реалізації.** Три відхилення від коду кроку 3 нижче:
+> (1) `validateLetterDate` шипнута з ДВОМА додатковими перевірками, яких немає в
+> псевдокоді — `isNaN(d)` і `d.getUTCFullYear() !== Number(yyyy)` — без другої
+> `31.02.2026` міг би непомітно пройти через нормалізацію `Date`; (2) `formatLetterDate`
+> НЕ форматує UTC-компоненти переданої дати вручну — використовує
+> `Intl.DateTimeFormat` із зафіксованим `timeZone: 'Europe/Kyiv'`, бо власник ставить
+> задачі пізно ввечері, коли в Києві вже наступна доба, і кнопка «Сьогодні» з UTC-датою
+> підписала б пакет заднім числом; (3) кнопка `🖊 Підписати й запакувати` в
+> `buildAgentJobsPage` (крок нижче) несе в тексті СВІЙ `tender_id`
+> (`` `🖊 Підписати й запакувати ${j.tender_id}` ``), а не статичний підпис із плану —
+> на сторінці до шести задач одразу, і без ідентифікатора в підписі помилковий дотик
+> мовчки підписав би ЧУЖИЙ пакет (той самий урок, що вже застосований до кнопки
+> `📄 Документи переможця`).
+
 - [ ] **Step 1: Написати падаючі тести**
 
 ```javascript
@@ -1193,6 +1267,18 @@ git commit -m "feat(bot): letter-date validation, sign job builder and button"
 **Interfaces:**
 - Consumes: `validateLetterDate`, `formatLetterDate`, `buildAgentSignJob`, `buildAgentSignDateKeyboard`, `buildAgentSignConfirmText`, `buildAgentConfirmKeyboard` (Task 7).
 - Produces: колбеки `agent:sign:<tid>` → вибір дати; `agent:signdate:<tid>:<ДД.ММ.РРРР>` → підтвердження; `agent:signother:<tid>` → очікування тексту; гілка `confirm` із `entry.kind === 'sign'`; крок `await_letter_date` у `handleAgentTextReply`.
+
+> **Виправлено 14.08.2026 після реалізації.** Гілки `signdate`/`signother` шипнуто зі
+> строгішою перевіркою pending-запису, ніж у кроці 3 нижче: замість
+> `!entry || entry.tid !== tid || entry.kind !== 'sign'` код звіряє ще й КРОК
+> (`SIGN_CONTINUE_STEPS = new Set(['await_date', 'await_letter_date', 'confirm'])`)
+> — урок із гілки `co` winner-флоу: коли перевіряється лише `kind`+`tid`, покинутий
+> діалог на невідповідному кроці перехоплює пізніший дотик по застарілій кнопці
+> («дотик по старій кнопці дати вписав би `letterDate` у чужий pending-запис» —
+> коментар у коді). Крім того, `notifyAdminAgentRun` у гілці `confirm` (крок 4)
+> передає ще й `letterDate: job.letter_date`, а `buildAgentAdminNotice` для
+> `kind: 'sign'` (Task 7 факту, не плану) відповідно показує дату в сповіщенні
+> адміну — цього немає в псевдокоді Task 7 плану.
 
 - [ ] **Step 1: Написати падаючий тест на постановку задачі**
 
