@@ -177,12 +177,16 @@ export async function runHandler({ update, env, deps = {} }) {
   // /start <token> is handled in a later branch.
   if (typeof msg.text === 'string' && /^\/start(?:@\w+)?\s*$/i.test(msg.text)) {
     const startReply = buildStartGreeting(chatId, role, isAllowed);
-    // Same "one ephemeral view at a time" slot the view commands share below —
-    // repeated /start taps (people re-checking their chat_id) used to pile up
-    // a fresh "👋 Привіт!" every time. Best-effort; never blocks the reply.
+    // OWN namespace, deliberately NOT the shared view-command slot below: this
+    // is the one message that carries the persistent ReplyKeyboardMarkup, and
+    // none of the other view replies re-attach it (most show an inline
+    // keyboard instead). Sharing the slot meant the very next /info, /agent,
+    // /watched etc. deleted THIS message as "the previous ephemeral view" and
+    // silently dropped the persistent keyboard off the chat. Best-effort;
+    // never blocks the reply.
     if (_ephemeralKV) {
       try {
-        const prevIds = await loadEphemeral(_ephemeralKV, chatId);
+        const prevIds = await loadEphemeral(_ephemeralKV, chatId, 'start');
         for (const id of prevIds) {
           await _deleteMessage({ token: env.TELEGRAM_BOT_TOKEN, chatId, messageId: id });
         }
@@ -206,7 +210,7 @@ export async function runHandler({ update, env, deps = {} }) {
     if (_ephemeralKV) {
       try {
         const ids = [msg.message_id, botReplyId].filter((x) => x != null);
-        await saveEphemeral(_ephemeralKV, chatId, ids);
+        await saveEphemeral(_ephemeralKV, chatId, ids, 'start');
       } catch (err) {
         console.error('worker: start ephemeral save failed:', err.message);
       }

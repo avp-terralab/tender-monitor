@@ -243,6 +243,27 @@ test('runHandler: /start twice → the second tap deletes the first exchange (tr
   assert.deepEqual(deleted.map((d) => d.messageId).sort((a, b) => a - b), [7, 100]);
 });
 
+// Regression: /start used to share the SAME ephemeral slot as /help and the
+// other view commands, so the very next unrelated view command deleted the
+// /start reply — the one message carrying the persistent ReplyKeyboardMarkup
+// — off the chat. /start now has its own namespace (see ephemeral.test.mjs).
+test('runHandler: /start then /help → /help does NOT delete the /start greeting (separate slots)', async () => {
+  const deleted = [];
+  let nextId = 100;
+  const { deps, sent } = makeDeps({
+    ephemeralKV: fakeEphemeralKV(),
+    sendReply: async (a) => { sent.push(a); return { result: { message_id: nextId++ } }; },
+    deleteMessage: async (a) => { deleted.push(a); return true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/start', message_id: 7 } }, env: ENV, deps,
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/help', message_id: 9 } }, env: ENV, deps,
+  });
+  assert.equal(deleted.length, 0, 'the /start greeting must survive an unrelated view command');
+});
+
 test('runHandler: /start from allowed editor → access confirmed, no "ask the admin" wording', async () => {
   const { deps, sent } = makeDeps({
     loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Olha', role: 'editor' }], sha: 's' }),
