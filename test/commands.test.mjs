@@ -3715,6 +3715,75 @@ test('buildAgentTenderDetail: pending/running → status text, only winner docs 
   assert.match(pending.text, /📋 У черзі/);
 });
 
+// ── Live stage reporting (job.stages, written by run_agent.py on the desktop) ─
+
+test('buildAgentUnifiedList: summary line — running job with elapsed minutes', () => {
+  const watchlist = [watchEntry('UA-1', 'КНП «Обласна лікарня»')];
+  const jobs = [job('UA-1', 'running', { updated_at: '2026-08-16T12:00:00Z' })];
+  const now = new Date('2026-08-16T12:08:00Z');
+  const v = buildAgentUnifiedList({ watchlist, jobs, page: 0, now });
+  assert.match(v.text, /🏃 Зараз: КНП «Обласна лікарня» · 8 хв/);
+});
+
+test('buildAgentUnifiedList: summary line — no running job, some pending → queue count', () => {
+  const watchlist = [watchEntry('UA-1', 'A'), watchEntry('UA-2', 'B')];
+  const jobs = [job('UA-1', 'pending'), job('UA-2', 'pending')];
+  const v = buildAgentUnifiedList({ watchlist, jobs, page: 0 });
+  assert.match(v.text, /📋 У черзі: 2/);
+});
+
+test('buildAgentUnifiedList: summary line — nothing running or pending → idle', () => {
+  const watchlist = [watchEntry('UA-1', 'A')];
+  const jobs = [job('UA-1', 'done')];
+  const v = buildAgentUnifiedList({ watchlist, jobs, page: 0 });
+  assert.match(v.text, /🟢 Черга порожня/);
+});
+
+test('buildAgentTenderDetail: running + stages → stacked log replaces the plain status line', () => {
+  const v = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: null,
+    job: job('UA-1', 'running', {
+      stages: [
+        { stage: 'analyzing', at: '2026-08-16T12:09:00Z' },
+        { stage: 'packaging', count: 7, at: '2026-08-16T12:13:00Z' },
+      ],
+    }),
+    page: 0,
+    now: new Date('2026-08-16T12:14:00Z'),
+  });
+  assert.match(v.text, /🔎 Аналізує документацію тендера/);
+  assert.match(v.text, /📦 Готує пакет документів \(7\)/);
+  assert.doesNotMatch(v.text, /⏳ Виконується/);
+});
+
+test('buildAgentTenderDetail: running + stale last stage → adds a "можливо завис" warning', () => {
+  const v = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: null,
+    job: job('UA-1', 'running', {
+      stages: [{ stage: 'validating', at: '2026-08-16T12:00:00Z' }],
+    }),
+    page: 0,
+    now: new Date('2026-08-16T12:25:00Z'), // 25 min later, past the 20-min threshold
+  });
+  assert.match(v.text, /🧪 Перевіряє валідатором/);
+  assert.match(v.text, /можливо, завис/);
+});
+
+test('buildAgentTenderDetail: running + unrecognised stage key → skipped, never leaks the raw key', () => {
+  const v = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: null,
+    job: job('UA-1', 'running', { stages: [{ stage: 'some_future_key', at: '2026-08-16T12:00:00Z' }] }),
+    page: 0,
+  });
+  assert.doesNotMatch(v.text, /some_future_key/);
+  assert.match(v.text, /⏳ Виконується/); // falls back — nothing recognisable to show
+});
+
+test('buildAgentTenderDetail: running with no stages yet → unchanged plain status (back-compat)', () => {
+  const v = buildAgentTenderDetail({ tenderId: 'UA-1', entry: null, job: job('UA-1', 'running'), page: 0 });
+  assert.match(v.text, /⏳ Виконується/);
+});
+
 test('buildAgentTenderDetail: error → detail text, retry + winner docs + back', () => {
   const v = buildAgentTenderDetail({
     tenderId: 'UA-1', entry: null,

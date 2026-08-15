@@ -1914,7 +1914,39 @@ const AGENT_JOB_MARKS = { amend: '✏️ ', winner: '📄 ', sign: '🖊 ' };
 // watchlist (so every row has a name from `.notes`), with a 🆕 marker for
 // tenders the agent hasn't touched yet. The buttons ARE the list — no
 // separate text body repeating the same rows underneath it.
-export function buildAgentUnifiedList({ watchlist, jobs, page = 0 }) {
+// Minutes between an ISO timestamp and `now` — null on anything unparsable, so
+// callers can just skip the "· N хв" suffix instead of showing "· NaN хв".
+function _minutesSince(iso, now) {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  const mins = Math.round((now.getTime() - t) / 60000);
+  return mins >= 0 ? mins : null;
+}
+
+function _agentRowLabel(tenderId, watchlist) {
+  const entry = (watchlist ?? []).find((r) => r.tender_id === tenderId);
+  const note = (entry?.notes ?? '').trim();
+  return note ? abbreviateLegalForm(note) : tenderId;
+}
+
+// One-line "what's happening right now" summary for the top of the list — the
+// poller only ever runs ONE job at a time (Task Scheduler IgnoreNew), so at
+// most one job here is ever 'running'.
+function _agentSummaryLine({ jobs, watchlist, now }) {
+  const list = jobs ?? [];
+  const running = list.find((j) => j?.status === 'running');
+  if (running) {
+    const label = escapeHtml(_agentRowLabel(running.tender_id, watchlist));
+    const mins = _minutesSince(running.updated_at, now);
+    return `🏃 Зараз: ${label}${mins != null ? ` · ${mins} хв` : ''}`;
+  }
+  const pending = list.filter((j) => j?.status === 'pending').length;
+  if (pending > 0) return `📋 У черзі: ${pending}`;
+  return '🟢 Черга порожня';
+}
+
+export function buildAgentUnifiedList({ watchlist, jobs, page = 0, now = new Date() }) {
   const jobByTid = new Map((jobs ?? []).filter((j) => j?.tender_id).map((j) => [j.tender_id, j]));
   const entries = (watchlist ?? []).filter((r) => r && r.enabled && r.tender_id);
   if (entries.length === 0) {
@@ -1945,14 +1977,52 @@ export function buildAgentUnifiedList({ watchlist, jobs, page = 0 }) {
   });
   const nav = buildPageNavRow(p, pages, (x) => `agent:jobs:${x}`, 'agent:noop');
   if (nav) rows.push(nav);
-  return { text: '🤖 <b>Агент</b>', keyboard: { inline_keyboard: rows } };
+  const summary = _agentSummaryLine({ jobs, watchlist, now });
+  return { text: `🤖 <b>Агент</b>\n${summary}`, keyboard: { inline_keyboard: rows } };
+}
+
+// Stage keys are exactly the ones run_agent.py's on_stage() emits
+// (analyzing/packaging/validating) — never shown to the owner as raw text; an
+// unrecognised key is simply skipped rather than leaking an internal key into
+// the chat. Purely observational on the desktop side (see run_agent.py) — this
+// side only renders whatever showed up in job.stages.
+const _STAGE_TEXT = {
+  analyzing: () => '🔎 Аналізує документацію тендера',
+  packaging: (s) => `📦 Готує пакет документів${s.count ? ` (${s.count})` : ''}`,
+  validating: () => '🧪 Перевіряє валідатором',
+};
+
+// A running job whose last stage hasn't moved in this long probably means the
+// PC went to sleep or the run died — worth a visible nudge instead of a
+// calm-looking status that quietly keeps saying "still going".
+const STALE_STAGE_MINUTES = 20;
+
+// Stacked stage log for a job still in flight — replaces the plain "⏳
+// Виконується" line when there's something to show. Returns null (caller
+// falls back to the plain text) for a job with no stages yet, e.g. one the
+// poller only just picked up, or a laptop with stage_reporting still off.
+function _renderStageLog(stages, now) {
+  const rows = (stages ?? [])
+    .map((s) => {
+      const fn = _STAGE_TEXT[s?.stage];
+      return fn ? `▫️ ${fn(s)}` : null;
+    })
+    .filter(Boolean);
+  if (rows.length === 0) return null;
+  const last = stages[stages.length - 1];
+  const mins = _minutesSince(last?.at, now);
+  let text = rows.join('\n');
+  if (mins != null && mins >= STALE_STAGE_MINUTES) {
+    text += `\n⚠️ На цьому кроці вже ${mins} хв — можливо, завис`;
+  }
+  return text;
 }
 
 // Drill-down for ONE tender, reached by tapping its row in buildAgentUnifiedList.
 // Only this tender's own actions are shown, so labels no longer need to repeat
 // the tender_id to stay unambiguous (the old flat list's reason for it — see
 // git history — no longer applies once there's only one tender on screen).
-export function buildAgentTenderDetail({ tenderId, entry, job, page = 0 }) {
+export function buildAgentTenderDetail({ tenderId, entry, job, page = 0, now = new Date() }) {
   const note = (entry?.notes ?? '').trim();
   const name = note ? abbreviateLegalForm(note) : null;
   const header = name ? `🏢 ${escapeHtml(name)}\n${escapeHtml(tenderId)}` : `📄 ${escapeHtml(tenderId)}`;
@@ -1986,7 +2056,11 @@ export function buildAgentTenderDetail({ tenderId, entry, job, page = 0 }) {
     };
   }
   if (job.status !== 'done') {
-    const statusText = job.status === 'running' ? '⏳ Виконується' : '📋 У черзі';
+    let statusText = job.status === 'running' ? '⏳ Виконується' : '📋 У черзі';
+    if (job.status === 'running') {
+      const log = _renderStageLog(job.stages, now);
+      if (log) statusText = log;
+    }
     return { text: `${header}${co}\n${statusText}`, keyboard: { inline_keyboard: [winnerRow, [back]] } };
   }
 
