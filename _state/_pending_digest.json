@@ -1,0 +1,88 @@
+{
+  "items": {
+    "UA-2026-08-07-004306-a": {
+      "tender_id": "UA-2026-08-07-004306-a",
+      "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії",
+      "status": "active.qualification",
+      "deadline": "2026-08-17T00:00:00+03:00",
+      "procuring_entity": {
+        "name": "Комунальне підприємство \"Рівненська обласна дитяча лікарня\" Рівненської обласної ради",
+        "edrpou": "03067009"
+      },
+      "value": {
+        "amount": 237433.33,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurement_method_type": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "contact": {
+        "name": "Вознюк Назар Віталійович",
+        "email": "rodl.zakup@gmail.com",
+        "telephone": "380975832051"
+      },
+      "prozorro_url": "https://prozorro.gov.ua/tender/UA-2026-08-07-004306-a",
+      "events": [
+        {
+          "type": "qualification_started",
+          "old": "active.tendering",
+          "new": "active.qualification"
+        },
+        {
+          "type": "award_created",
+          "supplier_name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+          "supplier_edrpou": "39376596"
+        }
+      ],
+      "first_fired_at": "2026-08-16T21:18:22.087Z",
+      "last_fired_at": "2026-08-16T21:18:22.087Z"
+    },
+    "UA-2026-08-07-009770-a": {
+      "tender_id": "UA-2026-08-07-009770-a",
+      "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії за кодом ДК 021:2015:72260000-5 Послуги, пов’язані з програмним забезпеченням",
+      "status": "active.qualification",
+      "deadline": "2026-08-17T00:00:00+03:00",
+      "procuring_entity": {
+        "name": "Комунальне некомерційне підприємство \"Миколаївська обласна станція переливання крові\" Миколаївської обласної ради",
+        "edrpou": "05483339"
+      },
+      "value": {
+        "amount": 170000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurement_method_type": "aboveThreshold",
+      "classification": {
+        "id": "72268000-1",
+        "description": "Послуги з постачання програмного забезпечення",
+        "scheme": "ДК021"
+      },
+      "contact": {
+        "name": "Гриненко Яна Вікторівна",
+        "email": "mospk@ukr.net",
+        "telephone": "+380512709453"
+      },
+      "prozorro_url": "https://prozorro.gov.ua/tender/UA-2026-08-07-009770-a",
+      "events": [
+        {
+          "type": "qualification_started",
+          "old": "active.tendering",
+          "new": "active.qualification"
+        },
+        {
+          "type": "award_created",
+          "supplier_name": "ТОВ \"МАЙЛАБ\"",
+          "supplier_edrpou": "41087617"
+        }
+      ],
+      "first_fired_at": "2026-08-16T21:18:22.087Z",
+      "last_fired_at": "2026-08-16T21:18:22.087Z"
+    }
+  },
+  "archived": [],
+  "errors": []
+}
