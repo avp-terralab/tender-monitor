@@ -2053,14 +2053,24 @@ export function buildAgentUnifiedList({ watchlist, jobs, page = 0, now = new Dat
     if (!job) {
       return [{ text: truncate(`🆕 ${label}`, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
     }
-    // mark — яка дія це (за job_type). statusIcon — стан ЦІЄЇ дії, пропущений
-    // для done («✅ Готово» вже сказано значками нижче). glyphs — усе, що з
-    // трьох етапів УЖЕ зроблено для цього тендера коли-небудь, накопичувально
-    // (issue 17.08.2026), а не лише те, що стосується останньої дії.
+    // glyphs — усе, що з трьох етапів УЖЕ зроблено для цього тендера коли-
+    // небудь, у порядку самого процесу (ТП -> переможець -> подача), а не
+    // лише те, що стосується останньої дії (issue 17.08.2026). Ідуть ПЕРШИМИ
+    // — власник прямо попросив 17.08.2026: «спершу галочка, далі лист»,
+    // тобто порядок читання має йти за ходом самого процесу.
+    //
+    // mark — яка дія це (за job_type); statusIcon — стан ЦІЄЇ дії. Для
+    // winner/sign мітка — той самий емодзі, що й відповідний значок етапу
+    // (📄/🖊), тож коли ця дія вже done, значок ВЖЕ в glyphs — показувати
+    // мітку окремо було б буквальним дублем («📄 ✅📄», один і той самий 📄
+    // двічі). Показуємо її, лише поки саме ця дія ще НЕ завершена (значок
+    // етапу для неї ще не з'явився) — або для amend, у якого власного
+    // значка етапу взагалі нема (це не окремий етап, а переробка першого).
     const mark = AGENT_JOB_MARKS[job.job_type] ?? null;
+    const markIsRedundant = job.status === 'done' && job.job_type !== 'amend';
     const statusIcon = job.status === 'done' ? null : (AGENT_JOB_ICONS[job.status] ?? '•');
     const glyphs = _milestoneGlyphs(job) || null;
-    const text = [mark, statusIcon, glyphs, label].filter(Boolean).join(' ');
+    const text = [glyphs, markIsRedundant ? null : mark, statusIcon, label].filter(Boolean).join(' ');
     return [{ text: truncate(text, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
   });
   const nav = buildPageNavRow(p, pages, (x) => `agent:jobs:${x}`, 'agent:noop');

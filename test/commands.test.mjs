@@ -3634,7 +3634,9 @@ test('buildAgentUnifiedList: a pre-milestones job still shows ✅ from result.dr
     })],
     page: 0,
   });
-  assert.match(v.keyboard.inline_keyboard[0][0].text, /^📄 ✅📄 /);
+  // Значки йдуть першими (порядок процесу), а мітка дії (📄) для WINNER,
+  // коли дія вже done, не дублюється — той самий емодзі вже є серед значків.
+  assert.match(v.keyboard.inline_keyboard[0][0].text, /^✅📄 /);
 });
 
 test('buildAgentTenderDetail: a pre-milestones "sign" job shows ✅ (prepared) even without milestones', () => {
@@ -3681,7 +3683,7 @@ test('buildAgentUnifiedList: no notes → falls back to the bare tender_id', () 
   assert.match(v.keyboard.inline_keyboard[0][0].text, /UA-2026-06-01-000003-a/);
 });
 
-test('buildAgentUnifiedList: job_type mark + status icon + milestone glyphs; done drops the status icon; no placeholders', () => {
+test('buildAgentUnifiedList: glyphs (process order) first, then a non-redundant action mark, then status; no placeholders', () => {
   const watchlist = [
     watchEntry('UA-1', 'A'), watchEntry('UA-2', 'B'), watchEntry('UA-3', 'C'), watchEntry('UA-4', 'D'),
   ];
@@ -3699,9 +3701,11 @@ test('buildAgentUnifiedList: job_type mark + status icon + milestone glyphs; don
   assert.ok(texts.some((t) => t.startsWith('⏳ B')));
   // done: статус-іконку прибрано — саму лише «✅» (без плейсхолдерів) каже значок.
   assert.ok(texts.some((t) => t.startsWith('✅ C')));
-  // error на sign-дії — позначка типу дії (🖊) ПЕРЕД статус-іконкою (❌), а
-  // накопичені раніше значки (✅📄) — після неї.
-  assert.ok(texts.some((t) => t.startsWith('🖊 ❌ ✅📄 D')));
+  // error на sign-дії, ще НЕ done — мітка дії (🖊) інформативна (значка
+  // «signed» серед glyphs ще нема), тож іде за вже накопиченими значками
+  // (✅📄) і статус-іконкою помилки (власник 17.08.2026: спершу процес,
+  // потім поточна дія — «спершу галочка, далі лист»).
+  assert.ok(texts.some((t) => t.startsWith('✅📄 🖊 ❌ D')));
   assert.ok(!texts.some((t) => t.includes('▫️')), 'no gray placeholder squares anywhere');
 });
 
@@ -3714,7 +3718,8 @@ test('buildAgentUnifiedList: milestone glyphs accumulate across a job_type chang
     jobs: [job('UA-9', 'done', { job_type: 'winner', milestones: { prepared: true, winner: true } })],
     page: 0,
   });
-  assert.match(v.keyboard.inline_keyboard[0][0].text, /^📄 ✅📄 /);
+  // done winner -> мітка 📄 не дублюється поряд із тим самим значком у glyphs.
+  assert.match(v.keyboard.inline_keyboard[0][0].text, /^✅📄 /);
 });
 
 test('buildAgentUnifiedList: text carries the milestone legend', () => {
@@ -3976,7 +3981,9 @@ test('buildAgentUnifiedList: an in-flight amend shows its ✏️ mark AND keeps 
                { job_type: 'amend', milestones: { prepared: true } })],
     page: 0,
   });
-  assert.match(v.keyboard.inline_keyboard[0][0].text, /^✏️ ⏳ ✅ /);
+  // Значок (✅) — процес, першим; мітка дії (✏️, amend не має власного
+  // значка етапу) і статус (⏳) — після нього.
+  assert.match(v.keyboard.inline_keyboard[0][0].text, /^✅ ✏️ ⏳ /);
 });
 
 test('OUR_EDRPOU maps our codes to AGENT_COMPANIES names', () => {
