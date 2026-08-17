@@ -665,7 +665,10 @@ export async function runHandler({ update, env, deps = {} }) {
       const { archive } = await _loadArchivedTenders(env);
       if (cmd.tender_id) {
         reply = await handleArchiveDetail(
-          { archive, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot, fetchContract: _fetchContract },
+          {
+            archive, fetchTender: _fetchTender, extractSnapshot: _extractSnapshot, fetchContract: _fetchContract,
+            loadAgentJob: (tid) => _loadAgentJob(env, tid), role,
+          },
           cmd,
         );
       } else {

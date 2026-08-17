@@ -1339,6 +1339,43 @@ test('runHandler: /archive UA-... uses fresh fetchTender for contracts', async (
   assert.match(sent[0].text, /📄 Договір/);
 });
 
+test('runHandler: /archive UA-... (admin) shows the agent line when a job exists', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a', archived_at: '2026-05-12T08:30:00Z', final_status: 'complete',
+    final_snapshot: { procuringEntity: { name: 'КНП' } },
+  }];
+  const { deps, sent } = makeDeps({
+    loadArchivedTenders: async () => ({ archive, sha: 'sha-arch' }),
+    fetchTender: async () => ({ data: { contracts: [] } }),
+    loadAgentJob: async (_env, tid) => (tid === 'UA-2026-04-30-010542-a'
+      ? { milestones: { prepared: true, winner: true, signed: true }, result: { drive_link: 'https://drive/x' } }
+      : null),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/archive UA-2026-04-30-010542-a', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.match(sent[0].text, /🤖 Агент: ✅📄🖊 · <a href="https:\/\/drive\/x">Відкрити теку<\/a>/);
+});
+
+test('runHandler: /archive UA-... (viewer, not editor/admin) never sees the agent line', async () => {
+  const archive = [{
+    tender_id: 'UA-2026-04-30-010542-a', archived_at: '2026-05-12T08:30:00Z', final_status: 'complete',
+    final_snapshot: { procuringEntity: { name: 'КНП' } },
+  }];
+  const { deps, sent } = makeDeps({
+    loadArchivedTenders: async () => ({ archive, sha: 'sha-arch' }),
+    fetchTender: async () => ({ data: { contracts: [] } }),
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '999', label: 'Guest', role: 'viewer' }], sha: 's' }),
+    loadAgentJob: async () => ({ milestones: { prepared: true }, result: { drive_link: 'https://drive/x' } }),
+  });
+  await runHandler({
+    update: { message: { chat: { id: 999 }, text: '/archive UA-2026-04-30-010542-a', message_id: 1 } },
+    env: ENV, deps,
+  });
+  assert.doesNotMatch(sent[0].text, /🤖 Агент/);
+});
+
 test('runHandler: /unarchive deletes from archive (no watchlist re-add)', async () => {
   const archive = [{
     tender_id: 'UA-2026-04-30-010542-a',

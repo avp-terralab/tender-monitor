@@ -1948,6 +1948,52 @@ test('handleArchiveDetail: cancelled — no contract section', async () => {
   assert.doesNotMatch(reply, /📄 Договір/);
 });
 
+// Owner report 17.08.2026: a tender that went through all agent stages just
+// vanishes from "🤖 Агент" once the monitor archives it (terminal Prozorro
+// status) — this is the one place left to find the folder, gated to people
+// who can actually use the agent feature (editors/admin), not every viewer
+// browsing the archive.
+const ARCHIVE_ENTRY_UA1 = [{
+  tender_id: 'UA-1', archived_at: '2026-08-17T08:00:00Z', final_status: 'complete',
+  final_snapshot: { procuringEntity: { name: 'КНП Х' } },
+}];
+const noFreshFetch = { fetchTender: async () => { throw new Error('offline'); }, extractSnapshot: () => ({}) };
+
+test('handleArchiveDetail: agent line shows milestone glyphs + folder link for an editor', async () => {
+  const reply = await handleArchiveDetail({
+    archive: ARCHIVE_ENTRY_UA1, ...noFreshFetch, role: 'editor',
+    loadAgentJob: async (tid) => (tid === 'UA-1'
+      ? { milestones: { prepared: true, winner: true }, result: { drive_link: 'https://drive/x' } }
+      : null),
+  }, { tender_id: 'UA-1' });
+  assert.match(reply, /🤖 Агент: ✅📄 · <a href="https:\/\/drive\/x">Відкрити теку<\/a>/);
+});
+
+test('handleArchiveDetail: no agent line for a viewer, even though a job exists', async () => {
+  const reply = await handleArchiveDetail({
+    archive: ARCHIVE_ENTRY_UA1, ...noFreshFetch, role: 'viewer',
+    loadAgentJob: async () => ({ milestones: { prepared: true }, result: { drive_link: 'https://drive/x' } }),
+  }, { tender_id: 'UA-1' });
+  assert.doesNotMatch(reply, /🤖 Агент/);
+});
+
+test('handleArchiveDetail: no agent line when there is no job for this tender', async () => {
+  const reply = await handleArchiveDetail({
+    archive: ARCHIVE_ENTRY_UA1, ...noFreshFetch, role: 'admin',
+    loadAgentJob: async () => null,
+  }, { tender_id: 'UA-1' });
+  assert.doesNotMatch(reply, /🤖 Агент/);
+});
+
+test('handleArchiveDetail: agent line degrades gracefully if the job lookup throws', async () => {
+  const reply = await handleArchiveDetail({
+    archive: ARCHIVE_ENTRY_UA1, ...noFreshFetch, role: 'admin',
+    loadAgentJob: async () => { throw new Error('GitHub GET 503'); },
+  }, { tender_id: 'UA-1' });
+  assert.doesNotMatch(reply, /🤖 Агент/);
+  assert.match(reply, /КНП Х/); // сама картка все одно відповіла
+});
+
 test('handleArchiveDetail: fresh fetch fails — show frozen, no contracts section', async () => {
   const archive = [{
     tender_id: 'UA-2026-05-01-000003-a',

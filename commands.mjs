@@ -1321,7 +1321,7 @@ export async function hydrateContractDocs(contracts, fetchContract) {
 }
 
 export async function handleArchiveDetail(deps, { tender_id }) {
-  const { archive, fetchTender, extractSnapshot, fetchContract } = deps;
+  const { archive, fetchTender, extractSnapshot, fetchContract, loadAgentJob, role } = deps;
   const entry = archive.find(a => a.tender_id === tender_id);
   if (!entry) return `❓ ${tender_id} не в архіві`;
   const snap = entry.final_snapshot ?? {};
@@ -1348,6 +1348,26 @@ export async function handleArchiveDetail(deps, { tender_id }) {
   }
   lines.push(`ℹ️ Статус: ${fmtStatus(entry.final_status)}`);
   lines.push(`📦 Архівовано: ${fmtArchivedDate(entry.archived_at)}`);
+  // Робота агента по цій закупівлі (issue 17.08.2026: тендер зникає зі списку
+  // «🤖 Агент», щойно монітор архівує його — це єдине місце, де можна ще
+  // знайти теку). Лише тим, хто взагалі має доступ до агента (canUseAgent) —
+  // не всі, хто дивиться архів закупівель, мають бачити внутрішню роботу
+  // агента. loadAgentJob не інжектнуто -> секцію просто пропускаємо (так
+  // тести й не чіпають реальний job-стан, як і з fetchContract вище).
+  if (canUseAgent(role) && loadAgentJob) {
+    try {
+      const job = await loadAgentJob(tender_id);
+      const glyphs = job ? _milestoneGlyphs(job.milestones) : '';
+      const folderUrl = job ? (job.result?.drive_link ?? job.result?.winner_link ?? null) : null;
+      if (glyphs || folderUrl) {
+        let agentLine = `🤖 Агент: ${glyphs || '—'}`;
+        if (folderUrl) agentLine += ` · <a href="${escapeHtml(folderUrl)}">Відкрити теку</a>`;
+        lines.push(agentLine);
+      }
+    } catch (err) {
+      console.error('handleArchiveDetail: agent job lookup failed:', err.message);
+    }
+  }
   // Fresh contract fetch — only meaningful for complete tenders.
   if (entry.final_status === 'complete') {
     try {
