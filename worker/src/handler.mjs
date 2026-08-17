@@ -20,7 +20,7 @@ import {
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   buildAgentWinnerJob, buildAgentWinnerConfirmText,
   validateLetterDate, formatLetterDate, buildAgentSignJob,
-  buildAgentSignDateKeyboard, buildAgentSignConfirmText,
+  buildAgentSignDateKeyboard, buildAgentSignConfirmText, buildAgentCancelKeyboard,
   buildAgentUnifiedList, buildAgentTenderDetail, handleAgentMenuNav,
   buildHistoryCalendar, handleHistoryNav,
   abbreviateLegalForm,
@@ -199,6 +199,22 @@ export async function runHandler({ update, env, deps = {} }) {
         }
       } catch (err) {
         console.error('worker: start ephemeral cleanup failed:', err.message);
+      }
+      // «Меню» (Telegram's own menu button) is the one command registered via
+      // setMyCommands, and it sends exactly this /start — the owner expects it
+      // to act like "go home", overwriting whatever screen was open (agent
+      // card, /info, /watched …), not stack a greeting on top of it. That
+      // screen lives in the SHARED view slot below (own reasoning in
+      // ephemeral.mjs — /start keeps its own slot only so a LATER /info etc.
+      // doesn't delete the greeting's persistent keyboard; deleting the
+      // shared slot's message here doesn't touch that).
+      try {
+        const prevViewIds = await loadEphemeral(_ephemeralKV, chatId);
+        for (const id of prevViewIds) {
+          await _deleteMessage({ token: env.TELEGRAM_BOT_TOKEN, chatId, messageId: id });
+        }
+      } catch (err) {
+        console.error('worker: start shared-view cleanup failed:', err.message);
       }
     }
     let botReplyId;
@@ -1355,6 +1371,7 @@ async function handleAgentCallback({
       const newId = await editOrSend({
         _editMessageText, _sendReply, env, chatId, messageId,
         text: `✏️ Напиши, що доробити в пропозиції ${tid} (одним повідомленням):`,
+        replyMarkup: buildAgentCancelKeyboard(tid),
       });
       const { pending, sha } = await _loadAgentPending(env);
       pending[chatId] = { tid, kind: 'amend', step: 'await_instruction', messageId: newId, at: _now().toISOString() };

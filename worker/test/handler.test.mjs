@@ -243,6 +243,31 @@ test('runHandler: /start twice → the second tap deletes the first exchange (tr
   assert.deepEqual(deleted.map((d) => d.messageId).sort((a, b) => a - b), [7, 100]);
 });
 
+// Owner report 17.08.2026: tapping Telegram's own "Menu" button (the single
+// registered command is /start, "Головне меню") left whatever screen was open
+// (the agent card, /info, …) sitting in the chat instead of being replaced by
+// the greeting. /start's own 'start' slot only ever cleaned up EARLIER /start
+// exchanges — this also clears the shared view slot other commands write to.
+test('runHandler: /start also deletes whatever shared-view screen (e.g. /agent) was open', async () => {
+  const deleted = [];
+  let nextId = 100;
+  const { deps, sent } = makeDeps({
+    ephemeralKV: fakeEphemeralKV(),
+    loadWatchlist: async () => ({ watchlist: [], sha: 's' }),
+    sendReply: async (a) => { sent.push(a); return { result: { message_id: nextId++ } }; },
+    deleteMessage: async (a) => { deleted.push(a); return true; },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/agent', message_id: 5 } }, env: ENV, deps,
+  });
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/start', message_id: 7 } }, env: ENV, deps,
+  });
+  // /agent's own trigger+reply (5, 100) get deleted, alongside /start having
+  // nothing of its OWN to clean up yet.
+  assert.deepEqual(deleted.map((d) => d.messageId).sort((a, b) => a - b), [5, 100]);
+});
+
 // Regression: /start used to share the SAME ephemeral slot as /help and the
 // other view commands, so the very next unrelated view command deleted the
 // /start reply — the one message carrying the persistent ReplyKeyboardMarkup
@@ -3110,6 +3135,11 @@ test('agent:amend on prepared tender → instruction dialog started', async () =
   assert.equal(store.pending['123'].kind, 'amend');
   assert.equal(store.pending['123'].messageId, 9);
   assert.match(edits.at(-1).text, /що доробити/);
+  // Owner report 17.08.2026: this free-text prompt had no way back except
+  // typing something.
+  assert.deepEqual(edits.at(-1).replyMarkup, {
+    inline_keyboard: [[{ text: '✖ Скасувати', callback_data: `agent:cancel:${AGENT_TID}` }]],
+  });
   assert.equal(acks.length, 1);
 });
 

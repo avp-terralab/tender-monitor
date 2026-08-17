@@ -1855,6 +1855,14 @@ export function canUseAgent(role) {
   return role === 'admin' || role === 'editor';
 }
 
+// A bare "✖ Скасувати" row — for free-text prompts (amend instruction, a
+// typed sign date) that otherwise leave the user with no way back except
+// typing something. agent:cancel re-renders the tender's own card (see
+// worker/src/handler.mjs), so this is never a true dead end.
+export function buildAgentCancelKeyboard(tenderId) {
+  return { inline_keyboard: [[{ text: '✖ Скасувати', callback_data: `agent:cancel:${tenderId}` }]] };
+}
+
 // Step 1: pick the company. One button per company (1–2 per row) + cancel.
 // callback_data: agent:co:<tenderId>:<slug> — ASCII slug keeps it ≤ 64 bytes.
 export function buildAgentCompanyKeyboard(tenderId) {
@@ -1903,6 +1911,13 @@ export function buildAgentConfirmText({ company, price, tenderId, entityName }) 
 
 
 const AGENT_JOB_ICONS = { pending: '📋', running: '⏳', done: '✅', error: '❌' };
+// Job-type marker — what the CURRENT (or last) job on this tender_id actually
+// is (a plain `prepare` job has no job_type, hence no marker). Brought back
+// 17.08.2026 after removing it turned out to lose real information: unlike
+// milestones (below, what's ever been COMPLETED), this says what's being
+// worked on right now — e.g. an in-flight "sign" reads ⏳ alone without it,
+// with no hint that it's specifically a signing run and not another prepare.
+const AGENT_JOB_MARKS = { amend: '✏️', winner: '📄', sign: '🖊' };
 
 // Три етапи, які агент може пройти для одного тендера — НЕЗАЛЕЖНО від того,
 // яка дія була ОСТАННЬОЮ (job_type самого job-запису переписується щоразу,
@@ -1991,15 +2006,14 @@ export function buildAgentUnifiedList({ watchlist, jobs, page = 0, now = new Dat
     if (!job) {
       return [{ text: truncate(`🆕 ${label}`, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
     }
-    // Значки етапів (issue 17.08.2026) — що з трьох дій уже зроблено для
-    // цього тендера коли-небудь, а не лише стан ОСТАННЬОЇ (те, що раніше
-    // показував AGENT_JOB_MARKS за job_type — воно зникало щойно job_type
-    // мінявся на наступну дію). Поточний прогрес/помилку останньої дії
-    // лишаємо окремим префіксом лише для НЕзавершеного стану — «✅ Готово»
-    // сама по собі вже сказана значками.
+    // mark — яка дія це (за job_type). statusIcon — стан ЦІЄЇ дії, пропущений
+    // для done («✅ Готово» вже сказано значками нижче). glyphs — усе, що з
+    // трьох етапів УЖЕ зроблено для цього тендера коли-небудь, накопичувально
+    // (issue 17.08.2026), а не лише те, що стосується останньої дії.
+    const mark = AGENT_JOB_MARKS[job.job_type] ?? null;
     const statusIcon = job.status === 'done' ? null : (AGENT_JOB_ICONS[job.status] ?? '•');
     const glyphs = _milestoneGlyphs(job.milestones) || null;
-    const text = [statusIcon, glyphs, label].filter(Boolean).join(' ');
+    const text = [mark, statusIcon, glyphs, label].filter(Boolean).join(' ');
     return [{ text: truncate(text, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
   });
   const nav = buildPageNavRow(p, pages, (x) => `agent:jobs:${x}`, 'agent:noop');
