@@ -3617,6 +3617,35 @@ test('handleWatchedNav: wat:e with page → card back button returns to that pag
 const watchEntry = (id, notes) => ({ tender_id: id, enabled: true, notes });
 const job = (tender_id, status, extra = {}) => ({ tender_id, status, company: 'ТОВ Тест', created_at: '2026-06-20T10:00:00Z', ...extra });
 
+// Owner report 17.08.2026: tenders whose proposal was prepared BEFORE
+// job.milestones existed show no ✅ at all — that job was marked "done" long
+// ago and will never run again to get a real with_milestone() stamp. The
+// glyph functions must infer from the result fields the old completed run
+// actually left behind, not just the (absent) milestones field.
+test('buildAgentUnifiedList: a pre-milestones job still shows ✅ from result.drive_link alone', () => {
+  const v = buildAgentUnifiedList({
+    watchlist: [watchEntry('UA-9', 'Х')],
+    // last action was 'winner', run before job.milestones existed — no
+    // milestones field at all, but drive_link (from the original prepare)
+    // and winner_link (from that winner run) both survived into result.
+    jobs: [job('UA-9', 'done', {
+      job_type: 'winner',
+      result: { drive_link: 'https://d/1', winner_link: 'https://d/2' },
+    })],
+    page: 0,
+  });
+  assert.match(v.keyboard.inline_keyboard[0][0].text, /^📄 ✅📄 /);
+});
+
+test('buildAgentTenderDetail: a pre-milestones "sign" job shows ✅ (prepared) even without milestones', () => {
+  const v = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
+    job: job('UA-1', 'done', { job_type: 'sign', result: { drive_link: 'https://d/1', zip_link: 'https://d/1.zip' } }),
+    page: 0,
+  });
+  assert.match(v.text, /✅🖊/);
+});
+
 // ── Merged /agent list (buildAgentUnifiedList) — 2026-08-14 redesign ─────────
 // The list IS the keyboard now (no separate text body repeating the same
 // tenders), driven by the watchlist so every row has a real name from

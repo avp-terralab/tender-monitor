@@ -1357,7 +1357,7 @@ export async function handleArchiveDetail(deps, { tender_id }) {
   if (canUseAgent(role) && loadAgentJob) {
     try {
       const job = await loadAgentJob(tender_id);
-      const glyphs = job ? _milestoneGlyphs(job.milestones) : '';
+      const glyphs = job ? _milestoneGlyphs(job) : '';
       const folderUrl = job ? (job.result?.drive_link ?? job.result?.winner_link ?? null) : null;
       if (glyphs || folderUrl) {
         let agentLine = `🤖 Агент: ${glyphs || '—'}`;
@@ -1949,13 +1949,40 @@ const MILESTONE_ICONS = { prepared: '✅', winner: '📄', signed: '🖊' };
 const MILESTONE_LEGEND =
   '✅ підготовлена ТП · 📄 документи переможця · 🖊 документи для подачі';
 
+// Job-и, завершені ДО того, як з'явилось job.milestones (17.08.2026), не
+// мають цього поля взагалі — і показували порожній рядок значків, хоча ТП чи
+// документи переможця для них цілком реально готові (реальна скарга власника
+// 17.08.2026: «по цих готувалася пропозиція, але галочки нема»). Тому для
+// кожного етапу, якого явно немає в job.milestones, ще й здогадуємось за
+// полями result, які та дія лишає по собі:
+//   prepared — result.drive_link / package_dir: єдине, що НАДІЙНО дожило до
+//              будь-якої пізнішої дії — agent_poller.py явно переносить його
+//              з target у кожен наступний job_type (prepare/winner/sign/amend).
+//   winner   — result.winner_link / winner_dir: НЕ переносяться в подальший
+//              sign-прогін (target несе лише drive_link/package_dir/
+//              published_dir) — тож здогад пропустить «переможця», якщо після
+//              нього ще й підписували. Це стеля точності старих записів без
+//              milestones, а не помилка цієї функції.
+//   signed   — result.zip_link / zip_path / signed_dir.
+// Обидва джерела ЙДУТЬ РАЗОМ (true від будь-якого) — реальний job.milestones
+// (коли є) тільки ДОДАЄ впевненості, ніколи не гасить те, що вже здогадались.
+function _effectiveMilestones(job) {
+  const explicit = job?.milestones ?? {};
+  const result = job?.result ?? {};
+  return {
+    prepared: !!(result.drive_link || result.package_dir) || !!explicit.prepared,
+    winner: !!(result.winner_link || result.winner_dir) || !!explicit.winner,
+    signed: !!(result.zip_link || result.zip_path || result.signed_dir) || !!explicit.signed,
+  };
+}
+
 // «✅📄» — лише етапи, які СПРАВДІ зроблено, у фіксованому порядку; для
 // нічого-ще-не-зробленого job-а — порожній рядок (без сірих плейсхолдерів —
 // власник прямо попросив прибрати їх 17.08.2026: рядок росте, а не «мигає»
 // заповненою рамкою з трьох клітинок). Без job-а взагалі (тендер, якого
 // агент ще не торкався) викликач лишає окремий 🆕-маркер — сюди не заходить.
-function _milestoneGlyphs(milestones) {
-  const m = milestones ?? {};
+function _milestoneGlyphs(job) {
+  const m = _effectiveMilestones(job);
   return MILESTONE_ORDER.filter((k) => m[k]).map((k) => MILESTONE_ICONS[k]).join('');
 }
 
@@ -2032,7 +2059,7 @@ export function buildAgentUnifiedList({ watchlist, jobs, page = 0, now = new Dat
     // (issue 17.08.2026), а не лише те, що стосується останньої дії.
     const mark = AGENT_JOB_MARKS[job.job_type] ?? null;
     const statusIcon = job.status === 'done' ? null : (AGENT_JOB_ICONS[job.status] ?? '•');
-    const glyphs = _milestoneGlyphs(job.milestones) || null;
+    const glyphs = _milestoneGlyphs(job) || null;
     const text = [mark, statusIcon, glyphs, label].filter(Boolean).join(' ');
     return [{ text: truncate(text, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
   });
@@ -2107,7 +2134,7 @@ export function buildAgentTenderDetail({ tenderId, entry, job, page = 0, now = n
   // Значки етапів (issue 17.08.2026) — накопичені за весь час роботи над цим
   // тендером, а не лише стан ОСТАННЬОЇ дії; розшифровку значків дає
   // buildAgentUnifiedList (початковий екран), тут — лише самі значки.
-  const milestoneGlyphs = _milestoneGlyphs(job.milestones);
+  const milestoneGlyphs = _milestoneGlyphs(job);
   const milestoneLine = milestoneGlyphs ? `\n${milestoneGlyphs}` : '';
 
   if (job.status === 'error') {
