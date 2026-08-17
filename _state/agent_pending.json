@@ -1,10 +1,9 @@
 {
   "1744078008": {
     "tid": "UA-2026-08-07-009770-a",
-    "kind": "winner",
-    "step": "confirm",
-    "company": "МАЙЛАБ",
+    "kind": "amend",
+    "step": "await_instruction",
     "messageId": 4133,
-    "at": "2026-08-17T18:05:03.256Z"
+    "at": "2026-08-17T18:05:12.627Z"
   }
 }
