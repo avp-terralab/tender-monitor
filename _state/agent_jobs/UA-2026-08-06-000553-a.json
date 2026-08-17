@@ -4,6 +4,7 @@
   "job_type": "winner",
   "company": "ТЕРРАЛАБ АЙ ТІ",
   "requested_by": "7321709183",
-  "status": "pending",
-  "created_at": "2026-08-17T06:27:15.389Z"
+  "status": "running",
+  "created_at": "2026-08-17T06:27:15.389Z",
+  "updated_at": "2026-08-17T06:28:23.712959+00:00"
 }
