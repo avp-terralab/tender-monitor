@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-08-07-009770-a",
-  "saved_at": "2026-08-16T21:18:28.471Z",
+  "saved_at": "2026-08-17T14:25:41.526Z",
   "snapshot": {
     "tender_id": "UA-2026-08-07-009770-a",
     "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії за кодом ДК 021:2015:72260000-5 Послуги, пов’язані з програмним забезпеченням",
-    "status": "active.qualification",
-    "dateModified": "2026-08-17T00:00:38.395859+03:00",
+    "status": "active.awarded",
+    "dateModified": "2026-08-17T17:03:35.544893+03:00",
     "tenderPeriod": {
       "endDate": "2026-08-17T00:00:00+03:00"
     },
@@ -81,7 +81,7 @@
     "awards": [
       {
         "id": "81f5f3ac6da74322bcf9e5fa728ebd37",
-        "status": "pending",
+        "status": "active",
         "suppliers": [
           {
             "name": "ТОВ \"МАЙЛАБ\"",
@@ -93,7 +93,13 @@
         "complaints": []
       }
     ],
-    "contracts": [],
+    "contracts": [
+      {
+        "id": "6ad907e7c93f43a9b04e30c47716dc5c",
+        "status": "pending",
+        "documents": []
+      }
+    ],
     "cancellations": [],
     "_notifiedDeadlines": [
       "24h"
