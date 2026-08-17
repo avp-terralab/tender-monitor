@@ -4,11 +4,12 @@
   "job_type": "winner",
   "company": "МАЙЛАБ",
   "requested_by": "7321709183",
-  "status": "pending",
+  "status": "running",
   "created_at": "2026-08-17T14:26:03.967Z",
   "target": {
     "drive_link": "https://drive.google.com/drive/folders/1toj7o9bpe3Z_FznOOfYAZyuAm0bXgYpU",
     "package_dir": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій\\08.08.26 КНП Миколаївської ОР Миколаївська обласна станція переливання крові\\Тендерна пропозиція",
     "published_dir": null
-  }
+  },
+  "updated_at": "2026-08-17T14:26:23.634543+00:00"
 }
