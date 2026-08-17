@@ -3606,7 +3606,7 @@ test('buildAgentUnifiedList: no notes → falls back to the bare tender_id', () 
   assert.match(v.keyboard.inline_keyboard[0][0].text, /UA-2026-06-01-000003-a/);
 });
 
-test('buildAgentUnifiedList: status icon precedes milestone glyphs; done drops the status icon', () => {
+test('buildAgentUnifiedList: status icon precedes milestone glyphs; done drops the status icon; no placeholders', () => {
   const watchlist = [
     watchEntry('UA-1', 'A'), watchEntry('UA-2', 'B'), watchEntry('UA-3', 'C'), watchEntry('UA-4', 'D'),
   ];
@@ -3617,11 +3617,14 @@ test('buildAgentUnifiedList: status icon precedes milestone glyphs; done drops t
   ];
   const v = buildAgentUnifiedList({ watchlist, jobs, page: 0 });
   const texts = v.keyboard.inline_keyboard.map((r) => r[0].text);
-  assert.ok(texts.some((t) => t.startsWith('📋 ▫️▫️▫️ ')));
-  assert.ok(texts.some((t) => t.startsWith('⏳ ▫️▫️▫️ ')));
-  // done: status icon dropped — the milestone glyphs alone say "done".
-  assert.ok(texts.some((t) => t.startsWith('✅▫️▫️ ')));
-  assert.ok(texts.some((t) => t.startsWith('❌ ▫️▫️▫️ ')));
+  // Нічого ще не зроблено — жодного значка, жодного сірого плейсхолдера
+  // (власник прямо попросив прибрати їх 17.08.2026): статус-іконка й одразу назва.
+  assert.ok(texts.some((t) => t.startsWith('📋 A')));
+  assert.ok(texts.some((t) => t.startsWith('⏳ B')));
+  // done: статус-іконку прибрано — саму лише «✅» (без плейсхолдерів) каже значок.
+  assert.ok(texts.some((t) => t.startsWith('✅ C')));
+  assert.ok(texts.some((t) => t.startsWith('❌ D')));
+  assert.ok(!texts.some((t) => t.includes('▫️')), 'no gray placeholder squares anywhere');
 });
 
 test('buildAgentUnifiedList: milestone glyphs accumulate across a job_type change, not just the last one', () => {
@@ -3633,7 +3636,7 @@ test('buildAgentUnifiedList: milestone glyphs accumulate across a job_type chang
     jobs: [job('UA-9', 'done', { job_type: 'winner', milestones: { prepared: true, winner: true } })],
     page: 0,
   });
-  assert.match(v.keyboard.inline_keyboard[0][0].text, /^✅📄▫️ /);
+  assert.match(v.keyboard.inline_keyboard[0][0].text, /^✅📄 /);
 });
 
 test('buildAgentUnifiedList: text carries the milestone legend', () => {
@@ -3690,22 +3693,32 @@ test('buildAgentTenderDetail: done + drive_link → folder, доробити, wi
   const cbs = v.keyboard.inline_keyboard.map((r) => r[0].callback_data ?? r[0].url);
   assert.deepEqual(cbs, ['https://d/1', 'agent:amend:UA-1', 'agent:winner:UA-1', 'agent:sign:UA-1', 'agent:jobs:0']);
   // "✅ Готово" text is gone — the milestone glyphs (legend on the list screen) say it now.
-  assert.match(v.text, /✅▫️▫️/);
+  assert.match(v.text, /✅/);
+  assert.doesNotMatch(v.text, /▫️/);
 });
 
-test('buildAgentTenderDetail: milestone glyphs show for in-flight and errored jobs too, no legend', () => {
+test('buildAgentTenderDetail: milestone glyphs show for in-flight and errored jobs too, no legend, no placeholders', () => {
   const running = buildAgentTenderDetail({
     tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
     job: job('UA-1', 'running', { milestones: { prepared: true } }), page: 0,
   });
-  assert.match(running.text, /✅▫️▫️/);
+  assert.match(running.text, /✅/);
+  assert.doesNotMatch(running.text, /▫️/);
   assert.doesNotMatch(running.text, /цей етап ще не зроблено/);  // легенда — тільки на списку
 
   const errored = buildAgentTenderDetail({
     tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
     job: job('UA-1', 'error', { milestones: { prepared: true, winner: true } }), page: 0,
   });
-  assert.match(errored.text, /✅📄▫️/);
+  assert.match(errored.text, /✅📄/);
+  assert.doesNotMatch(errored.text, /▫️/);
+
+  // Ще нічого не зроблено взагалі — рядок значків не з'являється як порожній.
+  const fresh = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
+    job: job('UA-1', 'running', {}), page: 0,
+  });
+  assert.doesNotMatch(fresh.text, /▫️/);
 });
 
 // I5: a tender we WON but never prepared has no prepare job, so result.drive_link
@@ -3885,7 +3898,7 @@ test('buildAgentUnifiedList: an in-flight amend keeps showing the earlier "prepa
                { job_type: 'amend', milestones: { prepared: true } })],
     page: 0,
   });
-  assert.match(v.keyboard.inline_keyboard[0][0].text, /⏳ ✅▫️▫️/);
+  assert.match(v.keyboard.inline_keyboard[0][0].text, /^⏳ ✅ /);
 });
 
 test('OUR_EDRPOU maps our codes to AGENT_COMPANIES names', () => {

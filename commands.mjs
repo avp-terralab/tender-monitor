@@ -1911,17 +1911,17 @@ const AGENT_JOB_ICONS = { pending: '📋', running: '⏳', done: '✅', error: '
 // підготовленої ТП зникав із рядка (issue 17.08.2026).
 const MILESTONE_ORDER = ['prepared', 'winner', 'signed'];
 const MILESTONE_ICONS = { prepared: '✅', winner: '📄', signed: '🖊' };
-const MILESTONE_PLACEHOLDER = '▫️';
 const MILESTONE_LEGEND =
-  '✅ підготовлена ТП · 📄 документи переможця · 🖊 документи для подачі\n' +
-  `${MILESTONE_PLACEHOLDER} — цей етап ще не зроблено`;
+  '✅ підготовлена ТП · 📄 документи переможця · 🖊 документи для подачі';
 
-// «✅📄▫️» — по одному символу на етап, завжди в тому самому порядку, тьмяний
-// плейсхолдер там, де етапу ще не було. Без job-а взагалі (тендер, якого
+// «✅📄» — лише етапи, які СПРАВДІ зроблено, у фіксованому порядку; для
+// нічого-ще-не-зробленого job-а — порожній рядок (без сірих плейсхолдерів —
+// власник прямо попросив прибрати їх 17.08.2026: рядок росте, а не «мигає»
+// заповненою рамкою з трьох клітинок). Без job-а взагалі (тендер, якого
 // агент ще не торкався) викликач лишає окремий 🆕-маркер — сюди не заходить.
 function _milestoneGlyphs(milestones) {
   const m = milestones ?? {};
-  return MILESTONE_ORDER.map((k) => (m[k] ? MILESTONE_ICONS[k] : MILESTONE_PLACEHOLDER)).join('');
+  return MILESTONE_ORDER.filter((k) => m[k]).map((k) => MILESTONE_ICONS[k]).join('');
 }
 
 // Merged 2026-08-14: this used to be two separate screens — "🚀 Надіслати
@@ -1997,9 +1997,10 @@ export function buildAgentUnifiedList({ watchlist, jobs, page = 0, now = new Dat
     // мінявся на наступну дію). Поточний прогрес/помилку останньої дії
     // лишаємо окремим префіксом лише для НЕзавершеного стану — «✅ Готово»
     // сама по собі вже сказана значками.
-    const statusPrefix = job.status === 'done' ? '' : `${AGENT_JOB_ICONS[job.status] ?? '•'} `;
-    const glyphs = _milestoneGlyphs(job.milestones);
-    return [{ text: truncate(`${statusPrefix}${glyphs} ${label}`, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
+    const statusIcon = job.status === 'done' ? null : (AGENT_JOB_ICONS[job.status] ?? '•');
+    const glyphs = _milestoneGlyphs(job.milestones) || null;
+    const text = [statusIcon, glyphs, label].filter(Boolean).join(' ');
+    return [{ text: truncate(text, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
   });
   const nav = buildPageNavRow(p, pages, (x) => `agent:jobs:${x}`, 'agent:noop');
   if (nav) rows.push(nav);
@@ -2072,7 +2073,8 @@ export function buildAgentTenderDetail({ tenderId, entry, job, page = 0, now = n
   // Значки етапів (issue 17.08.2026) — накопичені за весь час роботи над цим
   // тендером, а не лише стан ОСТАННЬОЇ дії; розшифровку значків дає
   // buildAgentUnifiedList (початковий екран), тут — лише самі значки.
-  const milestoneLine = `\n${_milestoneGlyphs(job.milestones)}`;
+  const milestoneGlyphs = _milestoneGlyphs(job.milestones);
+  const milestoneLine = milestoneGlyphs ? `\n${milestoneGlyphs}` : '';
 
   if (job.status === 'error') {
     const detail = job.result?.detail ? `\n⚠️ ${escapeHtml(truncate(job.result.detail, 300))}` : '';
