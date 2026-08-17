@@ -1903,9 +1903,26 @@ export function buildAgentConfirmText({ company, price, tenderId, entityName }) 
 
 
 const AGENT_JOB_ICONS = { pending: '📋', running: '⏳', done: '✅', error: '❌' };
-// Job-type marker in front of the status icon. A plain `prepare` job has no
-// job_type at all → no marker, which is what `?? ''` covers.
-const AGENT_JOB_MARKS = { amend: '✏️ ', winner: '📄 ', sign: '🖊 ' };
+
+// Три етапи, які агент може пройти для одного тендера — НЕЗАЛЕЖНО від того,
+// яка дія була ОСТАННЬОЮ (job_type самого job-запису переписується щоразу,
+// див. job.milestones/job_lib.with_milestone на боці поллера). Без цього
+// список показував стан лише останньої дії: після «Документи переможця» факт
+// підготовленої ТП зникав із рядка (issue 17.08.2026).
+const MILESTONE_ORDER = ['prepared', 'winner', 'signed'];
+const MILESTONE_ICONS = { prepared: '✅', winner: '📄', signed: '🖊' };
+const MILESTONE_PLACEHOLDER = '▫️';
+const MILESTONE_LEGEND =
+  '✅ підготовлена ТП · 📄 документи переможця · 🖊 документи для подачі\n' +
+  `${MILESTONE_PLACEHOLDER} — цей етап ще не зроблено`;
+
+// «✅📄▫️» — по одному символу на етап, завжди в тому самому порядку, тьмяний
+// плейсхолдер там, де етапу ще не було. Без job-а взагалі (тендер, якого
+// агент ще не торкався) викликач лишає окремий 🆕-маркер — сюди не заходить.
+function _milestoneGlyphs(milestones) {
+  const m = milestones ?? {};
+  return MILESTONE_ORDER.map((k) => (m[k] ? MILESTONE_ICONS[k] : MILESTONE_PLACEHOLDER)).join('');
+}
 
 // Merged 2026-08-14: this used to be two separate screens — "🚀 Надіслати
 // тендер агенту" (watchlist tenders with no job yet) and "📊 Останні задачі"
@@ -1969,16 +1986,25 @@ export function buildAgentUnifiedList({ watchlist, jobs, page = 0, now = new Dat
   const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
 
   const rows = slice.map(({ entry, job }) => {
-    const icon = job ? (AGENT_JOB_ICONS[job.status] ?? '•') : '🆕';
-    const mark = job ? (AGENT_JOB_MARKS[job.job_type] ?? '') : '';
     const note = (entry.notes ?? '').trim();
     const label = note ? abbreviateLegalForm(note) : entry.tender_id;
-    return [{ text: truncate(`${mark}${icon} ${label}`, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
+    if (!job) {
+      return [{ text: truncate(`🆕 ${label}`, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
+    }
+    // Значки етапів (issue 17.08.2026) — що з трьох дій уже зроблено для
+    // цього тендера коли-небудь, а не лише стан ОСТАННЬОЇ (те, що раніше
+    // показував AGENT_JOB_MARKS за job_type — воно зникало щойно job_type
+    // мінявся на наступну дію). Поточний прогрес/помилку останньої дії
+    // лишаємо окремим префіксом лише для НЕзавершеного стану — «✅ Готово»
+    // сама по собі вже сказана значками.
+    const statusPrefix = job.status === 'done' ? '' : `${AGENT_JOB_ICONS[job.status] ?? '•'} `;
+    const glyphs = _milestoneGlyphs(job.milestones);
+    return [{ text: truncate(`${statusPrefix}${glyphs} ${label}`, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
   });
   const nav = buildPageNavRow(p, pages, (x) => `agent:jobs:${x}`, 'agent:noop');
   if (nav) rows.push(nav);
   const summary = _agentSummaryLine({ jobs, watchlist, now });
-  return { text: `🤖 <b>Агент</b>\n${summary}`, keyboard: { inline_keyboard: rows } };
+  return { text: `🤖 <b>Агент</b>\n${summary}\n\n${MILESTONE_LEGEND}`, keyboard: { inline_keyboard: rows } };
 }
 
 // Stage keys are exactly the ones run_agent.py's on_stage() emits
@@ -2043,11 +2069,15 @@ export function buildAgentTenderDetail({ tenderId, entry, job, page = 0, now = n
   }
 
   const co = job.company ? `\n🏭 ${escapeHtml(job.company)}` : '';
+  // Значки етапів (issue 17.08.2026) — накопичені за весь час роботи над цим
+  // тендером, а не лише стан ОСТАННЬОЇ дії; розшифровку значків дає
+  // buildAgentUnifiedList (початковий екран), тут — лише самі значки.
+  const milestoneLine = `\n${_milestoneGlyphs(job.milestones)}`;
 
   if (job.status === 'error') {
     const detail = job.result?.detail ? `\n⚠️ ${escapeHtml(truncate(job.result.detail, 300))}` : '';
     return {
-      text: `${header}${co}\n❌ Помилка${detail}`,
+      text: `${header}${co}${milestoneLine}\n❌ Помилка${detail}`,
       keyboard: { inline_keyboard: [
         [{ text: '♻️ Повторити', callback_data: `agent:retry:${tenderId}` }],
         winnerRow,
@@ -2061,7 +2091,7 @@ export function buildAgentTenderDetail({ tenderId, entry, job, page = 0, now = n
       const log = _renderStageLog(job.stages, now);
       if (log) statusText = log;
     }
-    return { text: `${header}${co}\n${statusText}`, keyboard: { inline_keyboard: [winnerRow, [back]] } };
+    return { text: `${header}${co}${milestoneLine}\n${statusText}`, keyboard: { inline_keyboard: [winnerRow, [back]] } };
   }
 
   // 📁 — тека з результатом. Для готової ПРОПОЗИЦІЇ це result.drive_link; для
@@ -2076,13 +2106,13 @@ export function buildAgentTenderDetail({ tenderId, entry, job, page = 0, now = n
   rows.push(winnerRow);
   if (prepared) rows.push([{ text: '🖊 Підписати й запакувати', callback_data: `agent:sign:${tenderId}` }]);
   rows.push([back]);
-  return { text: `${header}${co}\n✅ Готово`, keyboard: { inline_keyboard: rows } };
+  return { text: `${header}${co}${milestoneLine}`, keyboard: { inline_keyboard: rows } };
 }
 
 // The job record handed to the offline agent. Shape matches the integration
 // contract (snake_case keys, status 'pending'). `company` is the full name.
-export function buildAgentJob({ tenderId, link, company, price, requestedBy, createdAt }) {
-  return {
+export function buildAgentJob({ tenderId, link, company, price, requestedBy, createdAt, milestones }) {
+  const job = {
     tender_id: tenderId,
     link,
     company,
@@ -2091,6 +2121,8 @@ export function buildAgentJob({ tenderId, link, company, price, requestedBy, cre
     status: 'pending',
     created_at: createdAt,
   };
+  if (milestones) job.milestones = milestones;
+  return job;
 }
 
 // Heads-up sent to the admin when SOMEONE ELSE (an editor) fires the agent —
@@ -2133,8 +2165,8 @@ export function validateInstruction(text) {
 // Amend job: re-work an already-prepared proposal per a free-text instruction.
 // Overwrites _state/agent_jobs/<tid>.json. `target` carries the prior result so
 // the offline agent knows WHERE to amend. No `price` — amend does not reprice.
-export function buildAgentAmendJob({ tenderId, instruction, company, target, requestedBy, createdAt }) {
-  return {
+export function buildAgentAmendJob({ tenderId, instruction, company, target, requestedBy, createdAt, milestones }) {
+  const job = {
     tender_id: tenderId,
     link: `https://prozorro.gov.ua/tender/${tenderId}`,
     job_type: 'amend',
@@ -2145,6 +2177,8 @@ export function buildAgentAmendJob({ tenderId, instruction, company, target, req
     status: 'pending',
     created_at: createdAt,
   };
+  if (milestones) job.milestones = milestones;
+  return job;
 }
 
 // Confirm prompt for an amend. Instruction is user free text → HTML-escaped
@@ -2157,7 +2191,7 @@ export function buildAgentAmendConfirmText({ tenderId, instruction }) {
 // Winner job: заповнити проєкт договору й зібрати документи переможця.
 // Без `price`. `target` переноситься з попереднього job-а, коли він є; якщо
 // агент цей тендер не готував — поля немає взагалі.
-export function buildAgentWinnerJob({ tenderId, company, target, requestedBy, createdAt }) {
+export function buildAgentWinnerJob({ tenderId, company, target, requestedBy, createdAt, milestones }) {
   const job = {
     tender_id: tenderId,
     link: `https://prozorro.gov.ua/tender/${tenderId}`,
@@ -2168,6 +2202,7 @@ export function buildAgentWinnerJob({ tenderId, company, target, requestedBy, cr
     created_at: createdAt,
   };
   if (target) job.target = target;
+  if (milestones) job.milestones = milestones;
   return job;
 }
 
@@ -2235,8 +2270,8 @@ export function buildAgentSignConfirmText({ tenderId, company, letterDate }) {
 // так само обов'язковий, коли пропозицію вже опубліковано: поллер віддає йому
 // пріоритет над пошуком теки замовника ЗА НАЗВОЮ, бо відділ перейменовує теки
 // вручну — і без цього поля підписаний пакет ліг би в нову нумеровану теку.
-export function buildAgentSignJob({ tenderId, company, letterDate, target, requestedBy, createdAt }) {
-  return {
+export function buildAgentSignJob({ tenderId, company, letterDate, target, requestedBy, createdAt, milestones }) {
+  const job = {
     tender_id: tenderId,
     link: `https://prozorro.gov.ua/tender/${tenderId}`,
     job_type: 'sign',
@@ -2247,6 +2282,8 @@ export function buildAgentSignJob({ tenderId, company, letterDate, target, reque
     status: 'pending',
     created_at: createdAt,
   };
+  if (milestones) job.milestones = milestones;
+  return job;
 }
 
 // Pure router for the agent LIST callbacks. `menu`, `jobs` and the legacy

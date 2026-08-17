@@ -1689,6 +1689,7 @@ async function handleAgentCallback({
         tenderId: tid,
         company: entry.company ?? prior.company ?? null,
         letterDate: entry.letterDate,
+        milestones: prior.milestones,
         target: {
           drive_link: prior.result.drive_link ?? null,
           package_dir: prior.result.package_dir,
@@ -1754,6 +1755,7 @@ async function handleAgentCallback({
         target,
         requestedBy: String(chatId),
         createdAt: _now().toISOString(),
+        milestones: prior?.milestones,
       });
       try {
         await _saveAgentJob(env, job, {
@@ -1800,6 +1802,7 @@ async function handleAgentCallback({
         target: { drive_link: prior?.result?.drive_link ?? null, package_dir: prior?.result?.package_dir ?? null },
         requestedBy: String(chatId),
         createdAt: _now().toISOString(),
+        milestones: prior?.milestones,
       });
       try {
         await _saveAgentJob(env, job, {
@@ -1858,6 +1861,7 @@ async function handleAgentCallback({
     const job = buildAgentJob({
       tenderId: tid, link, company: entry.company, price: entry.price,
       requestedBy: String(chatId), createdAt: _now().toISOString(),
+      milestones: existingJob?.milestones,
     });
     try {
       await _saveAgentJob(env, job, {
@@ -1912,8 +1916,26 @@ async function handleAgentCallback({
 
   if (action === 'cancel') {
     await clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPending });
+    // Повертаємось на картку тендера (як «⬅ До списку»/agent:view), а не
+    // лишаємо голе «Скасовано.» без жодної кнопки — інакше єдиний шлях назад
+    // був заново шукати цей тендер у списку (реальна скарга власника
+    // 17.08.2026). Без tid (теоретично можливо для старих кнопок) — той самий
+    // текст, що й раніше, як безпечний фолбек.
+    let text = 'Скасовано.';
+    let replyMarkup;
+    if (tid) {
+      try {
+        const [{ watchlist }, job] = await Promise.all([_loadWatchlist(env), _loadAgentJob(env, tid)]);
+        const entry = watchlist.find((r) => r.tender_id === tid) ?? null;
+        const detail = buildAgentTenderDetail({ tenderId: tid, entry, job, page: 0 });
+        text = detail.text;
+        replyMarkup = detail.keyboard ?? undefined;
+      } catch (err) {
+        console.error('worker: agent cancel detail reload failed:', err.message);
+      }
+    }
     try {
-      await editOrSend({ _editMessageText, _sendReply, env, chatId, messageId, text: 'Скасовано.' });
+      await editOrSend({ _editMessageText, _sendReply, env, chatId, messageId, text, replyMarkup });
     } catch (err) {
       console.error('worker: agent cancel reply failed:', err.message);
     }

@@ -3606,20 +3606,41 @@ test('buildAgentUnifiedList: no notes → falls back to the bare tender_id', () 
   assert.match(v.keyboard.inline_keyboard[0][0].text, /UA-2026-06-01-000003-a/);
 });
 
-test('buildAgentUnifiedList: job status icons (pending/running/done/error) + job_type marker', () => {
+test('buildAgentUnifiedList: status icon precedes milestone glyphs; done drops the status icon', () => {
   const watchlist = [
     watchEntry('UA-1', 'A'), watchEntry('UA-2', 'B'), watchEntry('UA-3', 'C'), watchEntry('UA-4', 'D'),
   ];
   const jobs = [
     job('UA-1', 'pending'), job('UA-2', 'running'),
-    job('UA-3', 'done'), job('UA-4', 'error', { job_type: 'sign' }),
+    job('UA-3', 'done', { milestones: { prepared: true } }),
+    job('UA-4', 'error', { job_type: 'sign' }),
   ];
   const v = buildAgentUnifiedList({ watchlist, jobs, page: 0 });
   const texts = v.keyboard.inline_keyboard.map((r) => r[0].text);
-  assert.ok(texts.some((t) => t.startsWith('📋 ')));
-  assert.ok(texts.some((t) => t.startsWith('⏳ ')));
-  assert.ok(texts.some((t) => t.startsWith('✅ ')));
-  assert.ok(texts.some((t) => t.startsWith('🖊 ❌ ')), 'job_type marker precedes the status icon');
+  assert.ok(texts.some((t) => t.startsWith('📋 ▫️▫️▫️ ')));
+  assert.ok(texts.some((t) => t.startsWith('⏳ ▫️▫️▫️ ')));
+  // done: status icon dropped — the milestone glyphs alone say "done".
+  assert.ok(texts.some((t) => t.startsWith('✅▫️▫️ ')));
+  assert.ok(texts.some((t) => t.startsWith('❌ ▫️▫️▫️ ')));
+});
+
+test('buildAgentUnifiedList: milestone glyphs accumulate across a job_type change, not just the last one', () => {
+  // Реальний кейс 17.08.2026: після «Документи переможця» факт підготовленої
+  // ТП більше не мав губитись — job_type самого запису змінюється на
+  // 'winner', а milestones накопичують ОБИДВА факти.
+  const v = buildAgentUnifiedList({
+    watchlist: [watchEntry('UA-9', 'Х')],
+    jobs: [job('UA-9', 'done', { job_type: 'winner', milestones: { prepared: true, winner: true } })],
+    page: 0,
+  });
+  assert.match(v.keyboard.inline_keyboard[0][0].text, /^✅📄▫️ /);
+});
+
+test('buildAgentUnifiedList: text carries the milestone legend', () => {
+  const v = buildAgentUnifiedList({ watchlist: [watchEntry('UA-1', 'A')], jobs: [], page: 0 });
+  assert.match(v.text, /підготовлена ТП/);
+  assert.match(v.text, /документи переможця/);
+  assert.match(v.text, /документи для подачі/);
 });
 
 test('buildAgentUnifiedList: jobbed entries sort by created_at desc, then 🆕 entries after', () => {
@@ -3664,11 +3685,27 @@ test('buildAgentTenderDetail: no watchlist entry (entry=null) → falls back to 
 test('buildAgentTenderDetail: done + drive_link → folder, доробити, winner docs, sign, back', () => {
   const v = buildAgentTenderDetail({
     tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
-    job: job('UA-1', 'done', { result: { drive_link: 'https://d/1' } }), page: 0,
+    job: job('UA-1', 'done', { result: { drive_link: 'https://d/1' }, milestones: { prepared: true } }), page: 0,
   });
   const cbs = v.keyboard.inline_keyboard.map((r) => r[0].callback_data ?? r[0].url);
   assert.deepEqual(cbs, ['https://d/1', 'agent:amend:UA-1', 'agent:winner:UA-1', 'agent:sign:UA-1', 'agent:jobs:0']);
-  assert.match(v.text, /✅ Готово/);
+  // "✅ Готово" text is gone — the milestone glyphs (legend on the list screen) say it now.
+  assert.match(v.text, /✅▫️▫️/);
+});
+
+test('buildAgentTenderDetail: milestone glyphs show for in-flight and errored jobs too, no legend', () => {
+  const running = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
+    job: job('UA-1', 'running', { milestones: { prepared: true } }), page: 0,
+  });
+  assert.match(running.text, /✅▫️▫️/);
+  assert.doesNotMatch(running.text, /цей етап ще не зроблено/);  // легенда — тільки на списку
+
+  const errored = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
+    job: job('UA-1', 'error', { milestones: { prepared: true, winner: true } }), page: 0,
+  });
+  assert.match(errored.text, /✅📄▫️/);
 });
 
 // I5: a tender we WON but never prepared has no prepare job, so result.drive_link
@@ -3838,13 +3875,17 @@ test('buildAgentAmendConfirmText: shows tid + HTML-escaped instruction', () => {
   assert.match(t, /&lt; 5 &amp; більше/);
 });
 
-test('buildAgentUnifiedList: amend job shows ✏️ marker in its line', () => {
+// job_type больше не keeps a per-line marker (it changes every time a new
+// action runs) — the "prepared" milestone earned by an earlier prepare is
+// what a currently-running amend job's row should still show.
+test('buildAgentUnifiedList: an in-flight amend keeps showing the earlier "prepared" glyph', () => {
   const v = buildAgentUnifiedList({
     watchlist: [watchEntry('UA-2026-06-01-000002-a', 'Х')],
-    jobs: [job('UA-2026-06-01-000002-a', 'running', { job_type: 'amend' })],
+    jobs: [job('UA-2026-06-01-000002-a', 'running',
+               { job_type: 'amend', milestones: { prepared: true } })],
     page: 0,
   });
-  assert.match(v.keyboard.inline_keyboard[0][0].text, /✏️/);
+  assert.match(v.keyboard.inline_keyboard[0][0].text, /⏳ ✅▫️▫️/);
 });
 
 test('OUR_EDRPOU maps our codes to AGENT_COMPANIES names', () => {
@@ -3885,10 +3926,11 @@ test('buildAgentWinnerJob omits target when there is no prior job', () => {
   assert.ok(!('target' in job));
 });
 
-test('buildAgentUnifiedList: marks winner jobs with the 📄 icon', () => {
+test('buildAgentUnifiedList: the 📄 glyph reflects the "winner" milestone, once earned', () => {
   const v = buildAgentUnifiedList({
     watchlist: [watchEntry('UA-9', 'Х')],
-    jobs: [{ tender_id: 'UA-9', status: 'running', job_type: 'winner', created_at: '2026-06-20T10:00:00Z' }],
+    jobs: [{ tender_id: 'UA-9', status: 'done', job_type: 'winner',
+            milestones: { winner: true }, created_at: '2026-06-20T10:00:00Z' }],
     page: 0,
   });
   assert.match(v.keyboard.inline_keyboard[0][0].text, /📄/);
@@ -4016,10 +4058,11 @@ test('buildAgentSignConfirmText shows tid, company and date, HTML-escaped', () =
   assert.ok(!t.includes('<Б>'), 'raw angle brackets must not survive');
 });
 
-test('buildAgentUnifiedList: marks sign jobs with the 🖊 icon', () => {
+test('buildAgentUnifiedList: the 🖊 glyph reflects the "signed" milestone, once earned', () => {
   const v = buildAgentUnifiedList({
     watchlist: [watchEntry('UA-9', 'Х')],
-    jobs: [{ tender_id: 'UA-9', status: 'running', job_type: 'sign', created_at: '2026-06-20T10:00:00Z' }],
+    jobs: [{ tender_id: 'UA-9', status: 'done', job_type: 'sign',
+            milestones: { signed: true }, created_at: '2026-06-20T10:00:00Z' }],
     page: 0,
   });
   const text = v.keyboard.inline_keyboard[0][0].text;

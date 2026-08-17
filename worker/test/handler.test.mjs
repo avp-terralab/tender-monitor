@@ -3087,12 +3087,17 @@ test('agent:retry on missing job → acks warning', async () => {
   assert.match(acks[0].text, /не знайдено/i);
 });
 
-test('agent:cancel → pending cleared, Скасовано reply', async () => {
+test('agent:cancel → pending cleared, returns to the tender card (not a dead end)', async () => {
   const { deps, store, edits, acks } = makeAgentDeps();
   store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' };
   await runHandler({ update: CB(`agent:cancel:${AGENT_TID}`), env: ENV, deps });
   assert.equal(store.pending['123'], undefined);
-  assert.match(edits.at(-1).text, /Скасовано/);
+  // Раніше тут було голе «Скасовано.» без жодної кнопки (реальна скарга
+  // власника 17.08.2026) — тепер повертає ту саму картку тендера, з якої
+  // й почали, з робочою клавіатурою.
+  assert.match(edits.at(-1).text, new RegExp(AGENT_TID));
+  assert.ok(edits.at(-1).replyMarkup, 'tender card keyboard is back');
+  assert.match(acks[0].text, /Скасовано/);
   assert.equal(acks.length, 1);
 });
 
@@ -3811,13 +3816,14 @@ test('agent:confirm on a sign dialog still at await_date → no job', async () =
 });
 
 test('agent:cancel clears a sign dialog', async () => {
-  const { deps, store, edits } = makeAgentDeps();
+  const { deps, store, edits, acks } = makeAgentDeps();
   store.pending['123'] = {
     tid: AGENT_TID, kind: 'sign', step: 'await_letter_date', at: '2026-06-21T10:00:00.000Z',
   };
   await runHandler({ update: CB(`agent:cancel:${AGENT_TID}`), env: ENV, deps });
   assert.equal(store.pending['123'], undefined);
-  assert.match(edits.at(-1).text, /Скасовано/);
+  assert.match(edits.at(-1).text, new RegExp(AGENT_TID));
+  assert.match(acks[0].text, /Скасовано/);
 });
 
 // Наскрізний прохід: кнопка → дата → підтвердження → job у черзі.
@@ -3921,11 +3927,12 @@ test('runHandler: /agent with a done job → ✅ icon on that tender\'s row', as
   const { deps, sent } = makeDeps({
     loadWatchlist: async () => ({ watchlist: [{ tender_id: ID, enabled: true, notes: 'КНП «Х»' }], sha: 's' }),
     listAgentJobs: async () => ([{ tender_id: ID, status: 'done', created_at: '2026-06-01T00:00:00Z',
+      milestones: { prepared: true },
       result: { drive_link: 'https://drive.google.com/drive/folders/REAL' } }]),
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
   assert.equal(sent.length, 1);
-  assert.match(sent[0].replyMarkup.inline_keyboard[0][0].text, /^✅ КНП «Х»/);
+  assert.match(sent[0].replyMarkup.inline_keyboard[0][0].text, /^✅▫️▫️ КНП «Х»/);
   assert.match(JSON.stringify(sent[0].replyMarkup), new RegExp(`agent:view:${ID}:0`));
 });
 
@@ -4076,7 +4083,7 @@ test('runHandler: agent:jobs:0 → edits to the unified list, ✅ row for the do
       ...makeDeps({
         loadWatchlist: async () => ({ watchlist: [{ tender_id: 'UA-2026-06-01-000002-a', enabled: true, notes: 'ТОВ' }], sha: 's' }),
       }).deps,
-      listAgentJobs: async () => ([{ tender_id: 'UA-2026-06-01-000002-a', status: 'done', company: 'ТОВ', created_at: '2026-06-20T10:00:00Z', result: { drive_link: 'https://drive/x' } }]),
+      listAgentJobs: async () => ([{ tender_id: 'UA-2026-06-01-000002-a', status: 'done', company: 'ТОВ', created_at: '2026-06-20T10:00:00Z', milestones: { prepared: true }, result: { drive_link: 'https://drive/x' } }]),
       editMessageText: async (a) => edits.push(a),
       answerCallbackQuery: async (a) => acks.push(a),
     },
