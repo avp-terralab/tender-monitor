@@ -1,0 +1,22 @@
+{
+  "tender_id": "UA-2026-08-07-004306-a",
+  "link": "https://prozorro.gov.ua/tender/UA-2026-08-07-004306-a",
+  "job_type": "winner",
+  "company": "ТЕРРАЛАБ АЙ ТІ",
+  "requested_by": "7321709183",
+  "status": "done",
+  "created_at": "2026-08-18T09:26:40.345Z",
+  "milestones": {
+    "winner": true
+  },
+  "updated_at": "2026-08-18T09:28:27.734988+00:00",
+  "result": {
+    "winner_dir": "G:\\Мій диск\\ТЕНДЕРИ 2021-2025\\ТЕНДЕРИ 2026\\77. Рівне обласна дитяча лікарня\\Документи переможця",
+    "winner_link": "https://drive.google.com/drive/folders/1Ev9ZPTmMmMT3yxEaHhxtH_VPDF__ppAr",
+    "report_path": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій\\18.08.26 КП Рівненської ОР Рівненська обласна дитяча лікарня\\Документи переможця\\_ЗВІТ ПЕРЕМОЖЦЯ.md",
+    "n_docs": 6,
+    "drive_link": null,
+    "package_dir": null,
+    "published_dir": null
+  }
+}
