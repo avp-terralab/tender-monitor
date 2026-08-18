@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-08-07-004306-a",
-  "saved_at": "2026-08-16T21:18:28.471Z",
+  "saved_at": "2026-08-18T09:25:47.165Z",
   "snapshot": {
     "tender_id": "UA-2026-08-07-004306-a",
     "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії",
-    "status": "active.qualification",
-    "dateModified": "2026-08-17T00:01:33.416242+03:00",
+    "status": "active.awarded",
+    "dateModified": "2026-08-18T12:03:12.015320+03:00",
     "tenderPeriod": {
       "endDate": "2026-08-17T00:00:00+03:00"
     },
@@ -58,7 +58,7 @@
     "awards": [
       {
         "id": "33a97de614ea454b8d1b7a57115d52c7",
-        "status": "pending",
+        "status": "active",
         "suppliers": [
           {
             "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
@@ -70,7 +70,13 @@
         "complaints": []
       }
     ],
-    "contracts": [],
+    "contracts": [
+      {
+        "id": "a7e524cb55a14d73afcefa23b6b2cec9",
+        "status": "pending",
+        "documents": []
+      }
+    ],
     "cancellations": [],
     "_notifiedDeadlines": [
       "24h"
