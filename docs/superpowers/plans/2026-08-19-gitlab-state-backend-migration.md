@@ -1108,7 +1108,6 @@ monitor-staging:
 
 deploy-production:
   stage: deploy
-  when: manual
   script:
     - cd worker && npm install --no-save wrangler@^3 && npx wrangler deploy --env production
   rules:
