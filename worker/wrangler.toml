@@ -5,3 +5,15 @@ compatibility_date = "2026-05-01"
 [[kv_namespaces]]
 binding = "EPHEMERAL_KV"
 id = "f9c6d80922f24615ab394d3cc1aa7251"   # KV namespace "tender-monitor-ephemeral"
+
+[env.staging]
+name = "tender-monitor-bot-staging"
+vars = { STATE_BACKEND = "gitlab", GITLAB_PROJECT_ID = "14", GITLAB_REF = "staging-state" }
+
+[[env.staging.kv_namespaces]]
+binding = "EPHEMERAL_KV"
+id = "197ecb4e174848aa8efed56ffffa8698"   # staging KV namespace
+
+[env.production]
+name = "tender-monitor-bot"
+vars = { STATE_BACKEND = "github" }
