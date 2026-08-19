@@ -17,3 +17,7 @@ id = "197ecb4e174848aa8efed56ffffa8698"   # staging KV namespace
 [env.production]
 name = "tender-monitor-bot"
 vars = { STATE_BACKEND = "github" }
+
+[[env.production.kv_namespaces]]
+binding = "EPHEMERAL_KV"
+id = "f9c6d80922f24615ab394d3cc1aa7251"   # KV namespace "tender-monitor-ephemeral"
