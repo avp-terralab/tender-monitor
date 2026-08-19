@@ -53,8 +53,14 @@
 - **`_state/<tender_id>.json`** (без підтеки `agent_jobs`) — знімок стану тендеру для порівняння між прогонами моніторингу (публічні дані з Prozorro, не пов'язано з чергою задач)
 
 Плюс службові: `_agent_health_alerted.json`, `_heartbeat.json`, `_watched_feed_cursor.json`,
-`_watched_seen.json`, `agent_pending.json` (стан діалогу `/agent` у Telegram),
-`allowed_users.json`, `archived_tenders.json`, `invites.json`, `notification_history.json`.
+`_watched_seen.json`, `allowed_users.json`, `archived_tenders.json`, `invites.json`,
+`notification_history.json`.
+
+⚠️ **`agent_pending.json` (стан діалогу `/agent`) тут БІЛЬШЕ НЕМАЄ** — переїхав у
+Cloudflare KV 2026-08-19 (`worker/src/ephemeral.mjs`), бо це єдиний файл із цієї
+теки, який чіпає ТІЛЬКИ Worker (не `ci.mjs`, не Python-поллер). Решта файлів вище
+лишається в git саме тому, що до них потрібен доступ більш ніж з одного середовища
+виконання. Деталі — `docs/superpowers/plans/2026-08-19-agent-pending-to-kv.md`.
 
 ## Конфіг стеження (корінь репо)
 

@@ -27,7 +27,7 @@ import {
 } from '../../commands.mjs';
 import { fetchTender, extractSnapshot, fetchTendersFeed, fetchContract, searchTenderByEdrpou } from '../../prozorro.mjs';
 import { sendReply, editMessageReplyMarkup, editMessageText, answerCallbackQuery, setMyCommands, deleteMessage, escapeHtml, truncate } from '../../telegram.mjs';
-import { loadEphemeral, saveEphemeral } from './ephemeral.mjs';
+import { loadEphemeral, saveEphemeral, loadAgentPending, saveAgentPending } from './ephemeral.mjs';
 import {
   loadWatchlist, saveWatchlist,
   loadWatchedEntities, saveWatchedEntities,
@@ -37,7 +37,7 @@ import {
   loadArchivedTenders, saveArchivedTenders,
   loadPendingDigest, loadTenderState, fetchLatestDeployCommit,
   fetchAuditLog,
-  loadAgentPending, saveAgentPending, saveAgentJob, loadAgentJob,
+  saveAgentJob, loadAgentJob,
   listAgentJobs,
   loadNotificationHistory,
   ConflictError,

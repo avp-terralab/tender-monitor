@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers, loadArchivedTenders, fetchAuditLog, fetchLatestDeployCommit, saveAgentJob, loadAgentPending, saveAgentPending, listAgentJobs, loadNotificationHistory } from '../src/github.mjs';
+import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers, loadArchivedTenders, fetchAuditLog, fetchLatestDeployCommit, saveAgentJob, listAgentJobs, loadNotificationHistory } from '../src/github.mjs';
 
 const ENV = { GITHUB_PAT: 'PAT_VALUE' };
 
@@ -392,30 +392,8 @@ test('saveAgentJob: includes sha when the job file already exists (update)', asy
   assert.equal(JSON.parse(put.opts.body).sha, 'oldSha');
 });
 
-test('loadAgentPending: 404 → empty object + null sha', async () => {
-  const fakeFetch = async () => ({ ok: false, status: 404, text: async () => '' });
-  const { pending, sha } = await loadAgentPending(ENV, { fetch: fakeFetch });
-  assert.deepEqual(pending, {});
-  assert.equal(sha, null);
-});
-
-test('loadAgentPending: parses keyed-by-chatId object', async () => {
-  const state = { '123': { tid: 'UA-X', company: 'МАЙЛАБ', step: 'await_price' } };
-  const content = Buffer.from(JSON.stringify(state), 'utf8').toString('base64');
-  const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ({ content, sha: 'sha-p' }) });
-  const { pending, sha } = await loadAgentPending(ENV, { fetch: fakeFetch });
-  assert.deepEqual(pending, state);
-  assert.equal(sha, 'sha-p');
-});
-
-test('saveAgentPending: PUTs to _state/agent_pending.json', async () => {
-  const calls = [];
-  const fakeFetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 200, json: async () => ({}) }; };
-  await saveAgentPending(ENV, { '123': { tid: 'UA-X', step: 'confirm', price: '1', company: 'МАЙЛАБ' } }, 'sha-p', { fetch: fakeFetch });
-  assert.match(calls[0].url, /_state\/agent_pending\.json/);
-  assert.equal(calls[0].opts.method, 'PUT');
-  assert.equal(JSON.parse(calls[0].opts.body).sha, 'sha-p');
-});
+// agent_pending moved to Cloudflare KV 2026-08-19 — tests now live in
+// worker/test/ephemeral.test.mjs, alongside the implementation.
 
 test('fetchLatestDeployCommit: skips audit: commits', async () => {
   const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ([

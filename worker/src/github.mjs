@@ -250,25 +250,11 @@ export async function loadTenderState(env, tenderId, opts = {}) {
   }
 }
 
-const AGENT_PENDING_FILE = '_state/agent_pending.json';
-
-// Pending agent-trigger dialog state, keyed by chatId. Survives between the
-// company-pick button tap and the next text message (Worker is stateless across
-// invocations, so this lives in the repo like the other _state files).
-export async function loadAgentPending(env, opts = {}) {
-  const { content, sha } = await loadFile(env, AGENT_PENDING_FILE, opts);
-  if (content === null) return { pending: {}, sha: null };
-  try {
-    return { pending: JSON.parse(content), sha };
-  } catch {
-    return { pending: {}, sha };
-  }
-}
-
-export async function saveAgentPending(env, pending, sha, opts = {}) {
-  const text = JSON.stringify(pending, null, 2) + '\n';
-  return saveFile(env, AGENT_PENDING_FILE, text, sha, opts);
-}
+// agent_pending.json moved to Cloudflare KV 2026-08-19 — see
+// worker/src/ephemeral.mjs (loadAgentPending/saveAgentPending) and
+// docs/superpowers/plans/2026-08-19-agent-pending-to-kv.md. It was the only
+// _state file exclusively owned by the Worker; everything else here stays on
+// GitHub because ci.mjs and/or the Python poller also need to reach it.
 
 // Persists a single agent job for the offline poller to pick up. One file per
 // tender at _state/agent_jobs/<tender_id>.json. Mirrors saveWatchlist's PUT
