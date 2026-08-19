@@ -2,18 +2,13 @@ stages:
   - test
   - deploy
 
+default:
+  before_script:
+    - export PATH="$HOME/.local/node-v22.23.2-linux-x64/bin:$PATH"
+
 test:
   stage: test
   script:
-    - echo "PATH=$PATH"
-    - whoami
-    - which node || echo "no node in PATH"
-    - which nvm || echo "no nvm in PATH"
-    - ls -la /usr/local/bin 2>/dev/null | grep -i node || true
-    - ls -la /usr/bin 2>/dev/null | grep -i node || true
-    - ls -la ~/.nvm/versions/node 2>/dev/null || true
-    - ls -la /opt 2>/dev/null || true
-    - find / -maxdepth 6 -iname "node" -type f 2>/dev/null || true
     - node --test test/*.test.mjs worker/test/*.test.mjs
 
 deploy-staging:
