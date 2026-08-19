@@ -45,6 +45,7 @@ test('saveWatchlist: builds PUT with last_commit_id and correct body', async () 
   const body = JSON.parse(calls[0].opts.body);
   assert.equal(body.last_commit_id, 'oldCommit');
   assert.equal(body.branch, 'main');
+  assert.equal(body.encoding, 'base64');
   const decoded = atob(body.content);
   assert.deepEqual(JSON.parse(decoded), wl);
 });
@@ -71,6 +72,17 @@ test('saveWatchlist: throws plain Error on unrelated 400 (not a conflict)', asyn
   );
 });
 
+test('saveWatchlist: throws plain Error on 400 with plain-text (non-JSON) body', async () => {
+  const fakeFetch = async () => ({
+    ok: false, status: 400,
+    text: async () => 'Bad Request',
+  });
+  await assert.rejects(
+    () => saveWatchlist(ENV, [], 'sha', { fetch: fakeFetch }),
+    (err) => err instanceof Error && !(err instanceof ConflictError)
+  );
+});
+
 test('loadWatchedEntities: 404 returns empty array (goes through tolerant loadFile)', async () => {
   const fakeFetch = async () => ({ ok: false, status: 404, text: async () => 'Not Found' });
   const result = await loadWatchedEntities(ENV, { fetch: fakeFetch });
@@ -83,7 +95,9 @@ test('saveWatchedEntities: POSTs (create) when sha is null', async () => {
   const fakeFetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 201, json: async () => ({}) }; };
   await saveWatchedEntities(ENV, [{ edrpou: '1' }], null, { fetch: fakeFetch });
   assert.equal(calls[0].opts.method, 'POST');
-  assert.equal(JSON.parse(calls[0].opts.body).last_commit_id, undefined);
+  const body = JSON.parse(calls[0].opts.body);
+  assert.equal(body.last_commit_id, undefined);
+  assert.equal(body.encoding, 'base64');
 });
 
 test('saveWatchedEntities: PUTs (update) with last_commit_id when sha present', async () => {
@@ -91,7 +105,9 @@ test('saveWatchedEntities: PUTs (update) with last_commit_id when sha present', 
   const fakeFetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 200, json: async () => ({}) }; };
   await saveWatchedEntities(ENV, [{ edrpou: '1' }], 'commitAbc', { fetch: fakeFetch });
   assert.equal(calls[0].opts.method, 'PUT');
-  assert.equal(JSON.parse(calls[0].opts.body).last_commit_id, 'commitAbc');
+  const body = JSON.parse(calls[0].opts.body);
+  assert.equal(body.last_commit_id, 'commitAbc');
+  assert.equal(body.encoding, 'base64');
 });
 
 test('loadInvites: 404 → empty list + null sha', async () => {

@@ -87,6 +87,7 @@ export async function saveWatchlist(env, watchlist, sha, { fetch: fetchImpl = fe
   const body = {
     commit_message: message ?? `bot: update watchlist ${new Date().toISOString()}`,
     content: base64,
+    encoding: 'base64',
     last_commit_id: sha,
     branch: ref(env),
   };
@@ -119,6 +120,7 @@ async function saveFile(env, filePath, text, sha, { fetch: fetchImpl = fetch, me
   const body = {
     branch: ref(env),
     content: base64,
+    encoding: 'base64',
     commit_message: message ?? `bot: update ${filePath} ${new Date().toISOString()}`,
   };
   const method = sha != null ? 'PUT' : 'POST';
