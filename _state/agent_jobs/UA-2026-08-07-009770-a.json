@@ -4,6 +4,7 @@
   "job_type": "winner",
   "company": "МАЙЛАБ",
   "requested_by": "1744078008",
-  "status": "pending",
-  "created_at": "2026-08-19T00:01:35.642Z"
+  "status": "running",
+  "created_at": "2026-08-19T00:01:35.642Z",
+  "updated_at": "2026-08-19T00:02:26.819741+00:00"
 }
