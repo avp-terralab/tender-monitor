@@ -1,0 +1,29 @@
+stages:
+  - test
+  - deploy
+
+test:
+  stage: test
+  script:
+    - node --test test/*.test.mjs worker/test/*.test.mjs
+
+deploy-staging:
+  stage: deploy
+  when: manual
+  script:
+    - cd worker && npm install --no-save wrangler@^3 && npx wrangler deploy --env staging
+
+monitor-staging:
+  stage: test
+  script:
+    - node ci.mjs
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TARGET == "staging"'
+
+deploy-production:
+  stage: deploy
+  script:
+    - cd worker && npm install --no-save wrangler@^3 && npx wrangler deploy --env production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
