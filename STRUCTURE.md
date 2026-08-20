@@ -35,15 +35,24 @@
 |---|---|
 | `src/index.mjs` | Точка входу Worker — приймає Telegram-вебхук |
 | `src/handler.mjs` | Маршрутизація команд і callback-кнопок |
-| `src/github.mjs` | Читання/запис `watchlist.json`, `watched_entities.json`, черги `_state/agent_jobs/` — усе через **GitHub Contents API**, не git |
+| `src/state.mjs` | Диспетчер стану — вибирає `github.mjs` чи `gitlab.mjs` за `env.STATE_BACKEND` (`handler.mjs` імпортує лише звідси, самі бекенди не напряму) |
+| `src/github.mjs` | Читання/запис `watchlist.json`, `watched_entities.json`, черги `_state/agent_jobs/` — усе через **GitHub Contents API**, не git. Типовий бекенд (production) |
+| `src/gitlab.mjs` | Той самий набір read/save, але через **GitLab Repository Files API**. Бекенд для staging (`STATE_BACKEND=gitlab` у `wrangler.toml`) |
+| `src/state-errors.mjs` | Спільні для обох бекендів типи помилок (`ConflictError` — одночасний запис). Живуть окремо, щоб `handler.mjs` розпізнавав їх, не знаючи, який бекенд активний |
 | `src/ephemeral.mjs` | Видаляє попереднє повідомлення-перегляд перед показом нового (Cloudflare KV) |
-| `wrangler.toml` | Конфігурація деплою Cloudflare |
+| `wrangler.toml` | Конфігурація деплою Cloudflare — тут і живе `STATE_BACKEND` для кожного `env.*` |
 
-## Розгортання (`.github/workflows/`)
+## Розгортання (`.github/workflows/` і `.gitlab-ci.yml`)
 
 - `worker-deploy.yml` — деплой Worker на push у `main` (тільки якщо змінились `worker/**`, `commands.mjs`, `telegram.mjs`, `prozorro.mjs`)
 - `monitor.yml` — щогодинний cron, викликає `ci.mjs`, комітить стан
-- `test.yml` — тести на кожен push/PR
+- `test.yml` — тести на `pull_request` і ручний `workflow_dispatch` (на push у `main` **не** біжить)
+- `.gitlab-ci.yml` — дзеркальний GitLab-бік: `test` (на кожен пуш, на відміну від `test.yml`),
+  `monitor-staging` за розкладом (гілка `staging-state`, `SCHEDULE_TARGET=staging`),
+  ручні `deploy-staging` / `deploy-production` через `wrangler`.
+  ⚠️ GitLab-бекенд стану вмикає лише **staging**: `deploy-production` викочує
+  `[env.production]`, а там `STATE_BACKEND=github`. Тобто «деплой із GitLab» ≠ «стан у GitLab».
+  Список потрібних CI-змінних (усі unprotected, бо `staging-state` не захищена) — у `README.md`
 
 ## Стан і черга (`_state/`)
 

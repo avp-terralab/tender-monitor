@@ -4,6 +4,13 @@ import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveW
 
 const ENV = { GITHUB_PAT: 'PAT_VALUE' };
 
+test('ConflictError: has status 409 and is instanceof Error', () => {
+  const e = new ConflictError('conflict on x');
+  assert.ok(e instanceof Error);
+  assert.equal(e.status, 409);
+  assert.equal(e.name, 'ConflictError');
+});
+
 test('loadWatchlist: builds correct GET request', async () => {
   const calls = [];
   const fakeFetch = async (url, opts) => {

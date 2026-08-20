@@ -1,16 +1,12 @@
+import { ConflictError } from './state-errors.mjs';
+
 const REPO = 'avp-terralab/tender-monitor';
 const WATCHLIST_FILE = 'watchlist.json';
 const ENTITIES_FILE = 'watched_entities.json';
 const SEEN_FILE = '_state/_watched_seen.json';
 const API_BASE = 'https://api.github.com';
 
-export class ConflictError extends Error {
-  constructor(msg) {
-    super(msg);
-    this.name = 'ConflictError';
-    this.status = 409;
-  }
-}
+export { ConflictError };
 
 // Every GitHub failure used to reach the user as the same "temporarily
 // unavailable" line, with the status visible only in the Worker logs — an

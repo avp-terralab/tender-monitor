@@ -10,11 +10,20 @@ Cloudflare Worker + спільні pure-модулі. Стежить за тен
 
 ## Стек і робота
 - Node ESM. Pure-модулі в корені: `commands.mjs` (логіка команд/inline-меню), `telegram.mjs`,
-  `prozorro.mjs`, `monitor.mjs`. Worker (Telegram webhook): `worker/src/{index,handler,github}.mjs`.
+  `prozorro.mjs`, `monitor.mjs`. Worker (Telegram webhook): `worker/src/{index,handler,state,github,gitlab}.mjs`
+  — `state.mjs` це диспетчер, що вибирає `github.mjs` чи `gitlab.mjs` за `env.STATE_BACKEND`
+  (два взаємозамінні бекенди стану, `handler.mjs` імпортує лише зі `state.mjs`).
 - Тести: `node --test test/*.test.mjs worker/test/*.test.mjs`.
 - Деплой: GHA `.github/workflows/worker-deploy.yml` — **авто на push у `main`**
   (paths: `worker/**`, `commands.mjs`, `telegram.mjs`, `prozorro.mjs`) → `wrangler deploy`.
-  Без KV — навігація меню працює stateless (re-fetch).
+  Без KV — навігація меню працює stateless (re-fetch). Є й `.gitlab-ci.yml` для
+  GitLab-боку (`test`, `monitor-staging` за розкладом, ручні `deploy-staging` /
+  `deploy-production`). ⚠️ GitLab-бекенд стану вмикає **лише staging**:
+  `deploy-production` викочує `[env.production]`, а там `STATE_BACKEND=github` —
+  тобто «деплой із GitLab» і «стан у GitLab» це дві різні речі, і зараз збігається
+  лише перша. Перемикання прода — окрема відкладена дія (Task 10 плану міграції).
+  Потрібні CI-змінні проєкту перелічені в `README.md`; **усі unprotected**, бо
+  розклад іде на незахищену `staging-state`.
 - Деталі: `README.md`, `worker/README.md`. Специфікації/плани: `docs/superpowers/`.
 
 ## Два моніторинги і перехід між ними
@@ -158,8 +167,9 @@ Telegram-повідомлення нарівні з `unsigned`. **`drive_link`,
   гілка `co` продовжує winner-діалог лише коли pending-запис має `kind:'winner'` **і** той
   самий `tid`, інакше падає в звичайний prepare; гілки `sign`/`signdate`/`signother` та
   `SIGN_CONTINUE_STEPS` для sign-діалогу, гілка `entry.kind === 'sign'` у `confirm`, крок
-  `await_letter_date` у `handleAgentTextReply`), `worker/src/github.mjs` (`saveAgentJob`,
-  `loadAgentJob`, `listAgentJobs`).
+  `await_letter_date` у `handleAgentTextReply`), `worker/src/state.mjs` (`saveAgentJob`,
+  `loadAgentJob`, `listAgentJobs` — тонкі обгортки, що диспетчерять у `github.mjs` чи
+  `gitlab.mjs` за `STATE_BACKEND`; саме звідси їх імпортує `handler.mjs`).
 - Агент: `scripts/agent_poller.py` (`process_pending` — гілкує `prepare`/`amend`/`winner`/`sign`;
   `resolve_drive_item`/`make_resolve_drive_item` резолвлять `winner_link` через Drive API;
   гілка `is_sign` — стейджинг у `SIGN_STAGING_SUBDIR`, `_sign_failed`, потім

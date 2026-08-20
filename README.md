@@ -35,7 +35,47 @@ Set in repo Settings → Secrets and variables → Actions:
 | `TELEGRAM_CHAT_ID` | admin numeric chat id |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | for `worker-deploy.yml` |
 
-The Cloudflare Worker has its own secrets (set via `cd worker && npx wrangler secret put <NAME>`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `GITHUB_PAT` (fine-grained, Contents R+W), `ADMIN_CHAT_ID`.
+The Cloudflare Worker has its own secrets (set via `cd worker && npx wrangler secret put <NAME>`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `ADMIN_CHAT_ID`, plus one per state backend — `GITHUB_PAT` (fine-grained, Contents R+W) for the GitHub backend, `GITLAB_TOKEN` (project access token, `api` scope) for the GitLab one.
+
+### Бекенд стану (`STATE_BACKEND`)
+
+Стан бота (`watchlist.json`, `watched_entities.json`, `_state/**`) зберігається у
+git-репозиторії через API хостингу, не через сам git. Бекендів два, і вони
+взаємозамінні:
+
+| `STATE_BACKEND` | Модуль | API | Де використовується |
+|---|---|---|---|
+| не задано / `github` | `worker/src/github.mjs` | GitHub Contents API | **production** — типовий шлях |
+| `gitlab` | `worker/src/gitlab.mjs` | GitLab Repository Files API | staging |
+
+Вибір робить диспетчер `worker/src/state.mjs`; `handler.mjs` імпортує читання й
+запис **лише зі `state.mjs`** і про самі бекенди не знає. Значення задане в
+`worker/wrangler.toml` окремо для кожного `[env.*]`, поруч із `GITLAB_PROJECT_ID`
+і `GITLAB_REF` для GitLab-шляху. Спільні для обох бекендів помилки (зокрема
+конфлікт одночасного запису) живуть у `worker/src/state-errors.mjs`.
+
+Перемикання production на GitLab — окрема свідомо відкладена дія (Task 10 плану
+`docs/superpowers/plans/2026-08-19-gitlab-state-backend-migration.md`), а не
+наслідок мерджу цієї роботи.
+
+### GitLab CI (`.gitlab-ci.yml`)
+
+Дзеркало GitHub-боку для GitLab-проєкту `terralab-manual/tender-monitor` (id 14):
+`test` на кожен пуш, `monitor-staging` за розкладом (гілка `staging-state`,
+змінна розкладу `SCHEDULE_TARGET=staging`), ручні `deploy-staging` /
+`deploy-production`. Потрібні CI/CD-змінні проєкту:
+
+| Змінна | Прапорці | Для чого |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN_STAGING` | masked, **unprotected** | `ci.mjs` у `monitor-staging` |
+| `TELEGRAM_CHAT_ID_STAGING` | unprotected | те саме |
+| `GITLAB_TOKEN` | masked, **unprotected** | пуш стану назад у `staging-state` |
+| `CLOUDFLARE_API_TOKEN` | masked, unprotected | `deploy-*` |
+| `CLOUDFLARE_ACCOUNT_ID` | unprotected | `deploy-*` |
+
+⚠️ `protected=true` тут зламало б усе мовчки: розклад іде на `staging-state`, а
+захищена лише `main` — protected-змінна до джоби просто не доїде, і виглядатиме
+це як «токена немає». Те саме правило описане в `CLAUDE.md` флоту.
 
 ### Bot commands
 

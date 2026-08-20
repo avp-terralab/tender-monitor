@@ -1,0 +1,113 @@
+stages:
+  - test
+  - deploy
+
+default:
+  before_script:
+    - export PATH="$HOME/.local/node-v22.23.2-linux-x64/bin:$PATH"
+
+test:
+  stage: test
+  script:
+    - node --test test/*.test.mjs worker/test/*.test.mjs
+
+deploy-staging:
+  stage: deploy
+  when: manual
+  script:
+    - cd worker && npm install --no-save wrangler@^3 && npx wrangler deploy --env staging
+
+monitor-staging:
+  stage: test
+  script:
+    - export TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN_STAGING"
+    - export TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID_STAGING"
+    - node ci.mjs
+    - |
+      set -e
+      # ci.mjs writes _state/ + watchlist.json into the working copy of whatever
+      # ref this pipeline checked out. For the staging schedule that's the
+      # staging-state branch (the pipeline schedule's target ref, configured in
+      # GitLab, mirrors GITLAB_REF="staging-state" in worker/wrangler.toml) — so
+      # unlike monitor.yml's main, we must commit+push there explicitly. GitLab
+      # CI checks out a detached HEAD regardless of ref type, so plain `git push`
+      # / `git pull --rebase` (which rely on a tracking branch) won't work here;
+      # every push/rebase below names the branch explicitly.
+      STATE_BRANCH="staging-state"
+
+      git config user.name "gitlab-ci"
+      git config user.email "ci@cl-gl.listerralab.com"
+
+      # Токен НЕ осідає на машині збірки. `git remote set-url` із креденшелами
+      # в URL записав би його в .git/config білд-каталогу shell-раннера, а той
+      # переживає джобу — це рівно те, що правило флоту забороняє («на машину
+      # збірки секрет не кладуть файлом»). `git -c` діє на один виклик і
+      # нікуди не пишеться; заразом URL лишається без креденшелів, тож git не
+      # покаже токен у тексті помилки.
+      PUSH_URL="https://${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      PUSH_AUTH="Authorization: Basic $(printf 'oauth2:%s' "${GITLAB_TOKEN}" | base64 -w0)"
+
+      git add _state/ watchlist.json
+      if git diff --staged --quiet; then
+        echo "No state changes to commit."
+        exit 0
+      fi
+
+      # Same debounce as monitor.yml: _watched_feed_cursor.json drifts every run
+      # even when nothing changed, so a cursor-only diff is committed at most
+      # once every ~6h; any other state file forces an immediate commit.
+      SIGNIFICANT=$(git diff --staged --name-only \
+        | grep -v -E '^_state/_watched_feed_cursor\.json$' || true)
+
+      if [ -z "$SIGNIFICANT" ]; then
+        LAST_CURSOR_TS=$(git log -1 --format=%ct --grep='^monitor: cursor sync' 2>/dev/null || echo 0)
+        LAST_CURSOR_TS=${LAST_CURSOR_TS:-0}
+        NOW=$(date +%s)
+        AGE=$((NOW - LAST_CURSOR_TS))
+        if [ "$AGE" -lt 21600 ]; then
+          echo "Cursor-only diff; last sync ${AGE}s ago (<6h). Skipping commit."
+          git reset
+          exit 0
+        fi
+        MSG="monitor: cursor sync $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      else
+        MSG="monitor: state update $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      fi
+
+      git commit -m "$MSG"
+      # Retry with rebase if staging-state moved during the run (concurrent
+      # push from another schedule tick or manual commit). State files are
+      # append-only / merge-friendly, so rebase is usually clean — but two
+      # runs computing near-identical state (e.g. cursor timestamps) moments
+      # apart can produce a genuine line-level conflict git can't auto-merge.
+      # In that case the concurrent run's own commit already captured
+      # equivalent state, so it's safe to drop this run's commit rather than
+      # hard-fail.
+      for attempt in 1 2 3; do
+        if git -c http.extraHeader="${PUSH_AUTH}" push "$PUSH_URL" "HEAD:${STATE_BRANCH}"; then
+          echo "Pushed on attempt $attempt"
+          exit 0
+        fi
+        echo "Push attempt $attempt failed; fetching + rebasing onto ${STATE_BRANCH} and retrying..."
+        # FETCH_HEAD, а не origin/$STATE_BRANCH: remote-tracking ref з'являється
+        # лише якщо в remote.origin.fetch налаштований відповідний refspec, а ми
+        # ремоут навмисно не переписуємо. FETCH_HEAD пише сам `git fetch`.
+        git fetch origin "$STATE_BRANCH"
+        if ! git rebase FETCH_HEAD; then
+          echo "Rebase conflict (concurrent state update) — aborting rebase and skipping this commit."
+          git rebase --abort
+          exit 0
+        fi
+      done
+      echo "Push failed after 3 attempts"
+      exit 1
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TARGET == "staging"'
+
+deploy-production:
+  stage: deploy
+  script:
+    - cd worker && npm install --no-save wrangler@^3 && npx wrangler deploy --env production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual

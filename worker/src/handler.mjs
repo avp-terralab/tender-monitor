@@ -41,7 +41,7 @@ import {
   listAgentJobs,
   loadNotificationHistory,
   ConflictError,
-} from './github.mjs';
+} from './state.mjs';
 
 // Module-scope 60-second cache for /status responses, keyed by chatId string.
 // Survives across invocations within the same CF Worker instance; cleared on cold start.
