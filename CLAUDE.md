@@ -17,8 +17,13 @@ Cloudflare Worker + спільні pure-модулі. Стежить за тен
 - Деплой: GHA `.github/workflows/worker-deploy.yml` — **авто на push у `main`**
   (paths: `worker/**`, `commands.mjs`, `telegram.mjs`, `prozorro.mjs`) → `wrangler deploy`.
   Без KV — навігація меню працює stateless (re-fetch). Є й `.gitlab-ci.yml` для
-  GitLab-боку (staging/production через GitLab-бекенд стану) — поки не жива:
-  прод і далі типово на `STATE_BACKEND=github`.
+  GitLab-боку (`test`, `monitor-staging` за розкладом, ручні `deploy-staging` /
+  `deploy-production`). ⚠️ GitLab-бекенд стану вмикає **лише staging**:
+  `deploy-production` викочує `[env.production]`, а там `STATE_BACKEND=github` —
+  тобто «деплой із GitLab» і «стан у GitLab» це дві різні речі, і зараз збігається
+  лише перша. Перемикання прода — окрема відкладена дія (Task 10 плану міграції).
+  Потрібні CI-змінні проєкту перелічені в `README.md`; **усі unprotected**, бо
+  розклад іде на незахищену `staging-state`.
 - Деталі: `README.md`, `worker/README.md`. Специфікації/плани: `docs/superpowers/`.
 
 ## Два моніторинги і перехід між ними
