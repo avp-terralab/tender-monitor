@@ -1,0 +1,121 @@
+{
+  "tender_id": "UA-2026-08-20-002934-a",
+  "saved_at": "2026-08-20T08:25:40.723Z",
+  "snapshot": {
+    "tender_id": "UA-2026-08-20-002934-a",
+    "title": " Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії.",
+    "status": "active.tendering",
+    "dateModified": "2026-08-20T10:53:02.140918+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-08-31T00:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \"КОНСУЛЬТАТИВНО-ДІАГНОСТИЧНИЙ ЦЕНТР\" СЄВЄРОДОНЕЦЬКОЇ МІСЬКОЇ РАДИ",
+      "edrpou": "42853384"
+    },
+    "value": {
+      "amount": 452500,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72253000-3",
+      "description": "Послуги з підтримки користувачів та з технічної підтримки",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72253000-3",
+      "72253000-3",
+      "72253000-3",
+      "72253000-3",
+      "72253000-3",
+      "72253000-3"
+    ],
+    "contact": {
+      "name": "Сергій  Роззувайло",
+      "email": "knpsever1@ukr.net",
+      "telephone": "+0675671700"
+    },
+    "documents": [
+      {
+        "id": "ebef6b8800de4769864149dbe2ad28e2",
+        "title": "Додаток 1_Тендерна пропозиція.docx",
+        "documentType": "billOfQuantity",
+        "datePublished": "2026-08-20T10:50:46.058437+03:00"
+      },
+      {
+        "id": "49001fa1254b4043a188469336975c3a",
+        "title": "Додаток 2_Про відсутніть підстав _22 зм_1178_ для в_дмови учаснику в участі у прцедурі закпівілі, передбачен_ пуктом 47 Особливостей.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-08-20T10:50:46.058437+03:00"
+      },
+      {
+        "id": "7f449b0e2b674f58a29665e76537c52f",
+        "title": "Додаток 3 Кваліфікаційні критерії.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-08-20T10:50:46.058437+03:00"
+      },
+      {
+        "id": "f0c0a69602ed41779de433da787516fe",
+        "title": "Додаток 4 Лабораторна_інформаційна_система.docx",
+        "documentType": "technicalSpecifications",
+        "datePublished": "2026-08-20T10:50:46.058437+03:00"
+      },
+      {
+        "id": "52a8c4472ce94dda8e3dc255665ea54c",
+        "title": "Додаток 5_Згальні відомості.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-08-20T10:50:46.058437+03:00"
+      },
+      {
+        "id": "1b4baca6416d43098501bfa6bf0d931c",
+        "title": "Додаток 6_Обробка персональних даних.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-08-20T10:50:46.058437+03:00"
+      },
+      {
+        "id": "190c9c5d9c3d4719abafb408313fcf5a",
+        "title": "Додаток 7 КДЦ (лабораторія).docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-08-20T10:50:46.058437+03:00"
+      },
+      {
+        "id": "ef58c619e2734060b38e1e81e6a43334",
+        "title": "Додаток 8_Інші докумени, що вимагаються Замовником.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-08-20T10:50:46.058437+03:00"
+      },
+      {
+        "id": "5c5f3c0a1e7d4eeab64516d9faa88e29",
+        "title": "Додаток 9_Перелік документів та_або інформації які подаються Учасником процедури закупівлі у складі тендерної пропозиції.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-08-20T10:50:46.058437+03:00"
+      },
+      {
+        "id": "da3cbabe4d7143e18236c12d9586fa6b",
+        "title": "Додаток 10_Перелік документів та_або інформації які подаються Переможцем.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-08-20T10:50:46.058437+03:00"
+      },
+      {
+        "id": "e326f5a514144223a96a146d3e78fc91",
+        "title": "ТД__Послуги лабораторій (аналізи).doc",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-20T10:50:46.058437+03:00"
+      },
+      {
+        "id": "42c5be35ba6f4562a3a135bb86b3cb9f",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-08-20T10:53:01.731138+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
