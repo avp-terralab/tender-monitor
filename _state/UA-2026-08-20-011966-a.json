@@ -1,0 +1,62 @@
+{
+  "tender_id": "UA-2026-08-20-011966-a",
+  "saved_at": "2026-08-20T13:55:36.041Z",
+  "snapshot": {
+    "tender_id": "UA-2026-08-20-011966-a",
+    "title": "ДК 021:2015 - 72260000-5 - Послуги, пов’язані з програмним забезпеченням (Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії)",
+    "status": "active.tendering",
+    "dateModified": "2026-08-20T16:33:20.684038+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-08-28T09:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "Комунальне некомерційне медичне підприємство \"Лікарня інтенсивного лікування \" Кременчуцька\"",
+      "edrpou": "41318879"
+    },
+    "value": {
+      "amount": 181250,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Казарова Світлана Володимирівна",
+      "email": "swetlyachek@ukr.net",
+      "telephone": "+380962388264"
+    },
+    "documents": [
+      {
+        "id": "ae4e6412560e4d06940ea72d74e576dc",
+        "title": "ТД  Послуги з постачання та налаштування ПЗ ЛІС.doc",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-20T16:30:36.806072+03:00"
+      },
+      {
+        "id": "aeb8d16178474900b72966a00a658191",
+        "title": "Проект договору.doc",
+        "documentType": "contractProforma",
+        "datePublished": "2026-08-20T16:30:36.806072+03:00"
+      },
+      {
+        "id": "7761ec81896a41cba26c732345ef5c30",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-08-20T16:33:14.860757+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
