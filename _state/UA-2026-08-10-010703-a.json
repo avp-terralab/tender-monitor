@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-08-10-010703-a",
-  "saved_at": "2026-08-19T21:23:48.171Z",
+  "saved_at": "2026-08-20T14:55:37.391Z",
   "snapshot": {
     "tender_id": "UA-2026-08-10-010703-a",
     "title": "Послуги, пов'язані  з програмним забезпеченням",
-    "status": "active.qualification",
-    "dateModified": "2026-08-20T00:00:57.096636+03:00",
+    "status": "active.awarded",
+    "dateModified": "2026-08-20T17:37:00.537981+03:00",
     "tenderPeriod": {
       "endDate": "2026-08-20T00:00:00+03:00"
     },
@@ -118,7 +118,7 @@
     "awards": [
       {
         "id": "c966154804844c63bbee9bbc6ba13eee",
-        "status": "pending",
+        "status": "active",
         "suppliers": [
           {
             "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
@@ -130,7 +130,13 @@
         "complaints": []
       }
     ],
-    "contracts": [],
+    "contracts": [
+      {
+        "id": "221e04f678e74e558ed5af82372637ec",
+        "status": "pending",
+        "documents": []
+      }
+    ],
     "cancellations": [],
     "_notifiedDeadlines": [
       "24h"
