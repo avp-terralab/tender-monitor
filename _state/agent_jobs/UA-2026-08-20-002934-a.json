@@ -4,6 +4,7 @@
   "company": "ТЕРРАЛАБ ПРО",
   "price": "435000",
   "requested_by": "7321709183",
-  "status": "pending",
-  "created_at": "2026-08-20T07:57:42.694Z"
+  "status": "running",
+  "created_at": "2026-08-20T07:57:42.694Z",
+  "updated_at": "2026-08-20T07:58:27.610699+00:00"
 }
