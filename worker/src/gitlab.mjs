@@ -234,7 +234,7 @@ export async function loadAgentJob(env, tenderId, { fetch: fetchImpl = fetch } =
 
 export async function listAgentJobs(env, { fetch: fetchImpl = fetch } = {}) {
   const res = await fetchImpl(
-    `${projectUrl(env)}/repository/tree?path=_state/agent_jobs&ref=${ref(env)}`,
+    `${projectUrl(env)}/repository/tree?path=_state/agent_jobs&ref=${ref(env)}&per_page=100`,
     { headers: authHeaders(env) }
   );
   if (res.status === 404) return [];

@@ -153,6 +153,25 @@ test('listAgentJobs: lists tree, filters .json blobs, sorts desc, caps 20', asyn
   assert.equal(jobs[0].tender_id, 'UA-2'); // newest first
 });
 
+test('listAgentJobs: requests per_page=100 on the tree endpoint (job files are never deleted, tree is sorted by name — a bare default 20-per-page cuts off the newest UA-YYYY-MM-DD-* jobs)', async () => {
+  const treeUrls = [];
+  const entries = Array.from({ length: 25 }, (_, i) => {
+    const tid = `UA-2026-08-${String(i + 1).padStart(2, '0')}-000001-a`;
+    return { name: `${tid}.json`, path: `_state/agent_jobs/${tid}.json`, type: 'blob' };
+  });
+  const fakeFetch = async (url) => {
+    if (/repository\/tree\?path=_state\/agent_jobs/.test(url)) {
+      treeUrls.push(url);
+      return { ok: true, status: 200, json: async () => entries };
+    }
+    const job = { tender_id: 'UA-X', status: 'pending', created_at: '2026-08-01T00:00:00Z' };
+    return { ok: true, status: 200, json: async () => ({ content: Buffer.from(JSON.stringify(job)).toString('base64'), last_commit_id: 's' }) };
+  };
+  await listAgentJobs(ENV, { fetch: fakeFetch });
+  assert.equal(treeUrls.length, 1);
+  assert.match(treeUrls[0], /per_page=100/);
+});
+
 test('listAgentJobs: 404 (missing tree) → empty array', async () => {
   const fakeFetch = async () => ({ ok: false, status: 404, text: async () => 'Not Found' });
   assert.deepEqual(await listAgentJobs(ENV, { fetch: fakeFetch }), []);
