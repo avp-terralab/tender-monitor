@@ -172,6 +172,40 @@ test('listAgentJobs: requests per_page=100 on the tree endpoint (job files are n
   assert.match(treeUrls[0], /per_page=100/);
 });
 
+// Сторінка дерева обмежена сотнею записів, і GitLab сортує імена за зростанням,
+// тобто перша сторінка — найдавніші завдання. Без проходу по сторінках
+// per_page=100 лише відсуває той самий обрив, а не знімає його.
+test('listAgentJobs: проходить сторінки дерева і повертає найновіші, а не найдавніші', async () => {
+  const mkEntry = (tid) => ({ name: `${tid}.json`, path: `_state/agent_jobs/${tid}.json`, type: 'blob' });
+  // 150 завдань: сторінка 1 — найдавніші сто, сторінка 2 — найновіші п'ятдесят.
+  const all = Array.from({ length: 150 }, (_, i) => `UA-2026-08-01-${String(i + 1).padStart(6, '0')}-a`);
+  const pages = [all.slice(0, 100), all.slice(100)];
+  const treeUrls = [];
+  const fetched = [];
+  const fakeFetch = async (url) => {
+    if (/repository\/tree\?path=_state\/agent_jobs/.test(url)) {
+      treeUrls.push(url);
+      const page = Number(/[?&]page=(\d+)/.exec(url)[1]);
+      const items = (pages[page - 1] ?? []).map(mkEntry);
+      const next = page < pages.length ? String(page + 1) : '';
+      return { ok: true, status: 200, headers: { get: (h) => (h === 'x-next-page' ? next : null) }, json: async () => items };
+    }
+    const tid = /agent_jobs%2F(.+?)\.json/.exec(url)[1];
+    fetched.push(tid);
+    const job = { tender_id: tid, status: 'pending', created_at: `2026-08-01T00:00:${String(all.indexOf(tid) % 60).padStart(2, '0')}Z` };
+    return { ok: true, status: 200, json: async () => ({ content: Buffer.from(JSON.stringify(job)).toString('base64'), last_commit_id: 's' }) };
+  };
+
+  const jobs = await listAgentJobs(ENV, { fetch: fakeFetch });
+
+  assert.equal(treeUrls.length, 2, 'обидві сторінки дерева прочитані');
+  // Зріз до двадцяти робиться ДО читання файлів: інакше кожен зайвий файл —
+  // окремий підзапит, а стеля Cloudflare 50 на виклик.
+  assert.equal(fetched.length, 20, 'читаємо рівно двадцять файлів, не всі сто п’ятдесят');
+  assert.equal(jobs.length, 20);
+  assert.deepEqual(fetched.slice().sort(), all.slice(-20).slice().sort(), 'взято саме найновіші двадцять');
+});
+
 test('listAgentJobs: 404 (missing tree) → empty array', async () => {
   const fakeFetch = async () => ({ ok: false, status: 404, text: async () => 'Not Found' });
   assert.deepEqual(await listAgentJobs(ENV, { fetch: fakeFetch }), []);

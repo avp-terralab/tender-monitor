@@ -232,23 +232,55 @@ export async function loadAgentJob(env, tenderId, { fetch: fetchImpl = fetch } =
   try { return JSON.parse(content); } catch { return null; }
 }
 
+// Скільки останніх завдань показуємо і скільки сторінок дерева заради цього
+// готові пройти. Стеля Cloudflare — 50 підзапитів на виклик Worker'а, тож
+// числа тут свідомі: 20 сторінок дерева + 20 читань файлів = 40 < 50.
+// 20 сторінок по 100 імен — це 2000 завдань, за нинішнього темпу роки.
+const AGENT_JOBS_LIMIT = 20;
+const AGENT_JOBS_MAX_TREE_PAGES = 20;
+
+// Дерево GitLab віддає щонайбільше 100 записів на сторінку й сортує імена
+// **за зростанням**, а файли завдань не видаляються ніколи. Тобто зупинитись
+// на першій сторінці означає з часом показувати найдавніші двадцять замість
+// найновіших — рівно той самий баг, що й дефолтні 20 на сторінку, лише
+// відкладений. Сторінки дерева — це самі лише імена (дешево); підзапит на
+// вміст іде вже тільки за відібраними двадцятьма.
+async function listAgentJobIds(env, fetchImpl) {
+  const names = [];
+  for (let page = 1; page <= AGENT_JOBS_MAX_TREE_PAGES; page += 1) {
+    const res = await fetchImpl(
+      `${projectUrl(env)}/repository/tree?path=_state/agent_jobs&ref=${ref(env)}&per_page=100&page=${page}`,
+      { headers: authHeaders(env) }
+    );
+    if (res.status === 404) return [];
+    if (!res.ok) throw glError(`GitLab GET ${res.status}: list agent_jobs`, res.status);
+    const items = await res.json();
+    if (!Array.isArray(items) || items.length === 0) break;
+    for (const it of items) {
+      if (it.type === 'blob' && it.name.endsWith('.json')) {
+        names.push(it.name.replace(/\.json$/, ''));
+      }
+    }
+    // GitLab називає наступну сторінку заголовком `x-next-page`; порожній —
+    // сторінок більше немає. Заголовків може не бути взагалі (інший fetch) —
+    // тоді теж зупиняємось: неповна сторінка вже означала б кінець.
+    if (!res.headers?.get?.('x-next-page')) break;
+  }
+  return names;
+}
+
 export async function listAgentJobs(env, { fetch: fetchImpl = fetch } = {}) {
-  const res = await fetchImpl(
-    `${projectUrl(env)}/repository/tree?path=_state/agent_jobs&ref=${ref(env)}&per_page=100`,
-    { headers: authHeaders(env) }
-  );
-  if (res.status === 404) return [];
-  if (!res.ok) throw glError(`GitLab GET ${res.status}: list agent_jobs`, res.status);
-  const items = await res.json();
-  if (!Array.isArray(items)) return [];
-  const tids = items
-    .filter((it) => it.type === 'blob' && it.name.endsWith('.json'))
-    .map((it) => it.name.replace(/\.json$/, ''));
+  const tids = (await listAgentJobIds(env, fetchImpl))
+    // tender_id має вигляд UA-РРРР-ММ-ДД-…, тож лексикографічний порядок
+    // збігається з хронологічним: спадне сортування дає найновіші зверху.
+    // Зрізаємо ДО завантаження, а не після — інакше кожен зайвий файл коштує
+    // окремого підзапиту.
+    .sort((a, b) => b.localeCompare(a))
+    .slice(0, AGENT_JOBS_LIMIT);
   const jobs = await Promise.all(tids.map((tid) => loadAgentJob(env, tid, { fetch: fetchImpl })));
   return jobs
     .filter(Boolean)
-    .sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')))
-    .slice(0, 20);
+    .sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
 }
 
 export async function fetchLatestDeployCommit(env, { fetch: fetchImpl = fetch } = {}) {
