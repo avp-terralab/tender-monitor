@@ -8,6 +8,16 @@ default:
 
 test:
   stage: test
+  # Не бігати на `staging-state`. Ця гілка — сховище стану: `monitor-staging`
+  # комітить туди щоразу, коли знайшов зміни, і кожен такий коміт інакше тягнув
+  # би повний суїт. При розкладі кожні 15 хв це до ~96 прогонів на добу на
+  # спільному раннері з `concurrent = 1` — черга росла б і затримувала наступний
+  # тік монітора. Код на `staging-state` усе одно приїжджає мерджем із `main`,
+  # де тести вже пройшли.
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "staging-state"'
+      when: never
+    - when: always
   script:
     - node --test test/*.test.mjs worker/test/*.test.mjs
 
@@ -19,6 +29,19 @@ deploy-staging:
 
 monitor-staging:
   stage: test
+  # Відповідник `concurrency: {group: tender-monitor}` із monitor.yml: два тіки
+  # не мають накладатись. Цикл ходить у Prozorro й комітить стан, тож паралельні
+  # запуски або конфліктували б на пуші, або дублювали сповіщення. Ребейс-ретрай
+  # нижче це пом'якшує, але не запобігає — а його гілка з конфліктом виходить
+  # зеленою, відкинувши свій коміт, тобто наклад був би тихим.
+  resource_group: monitor-staging
+  variables:
+    # Дефолтне мілке клонування (GIT_DEPTH=20) ламає два місця: `git rebase` у
+    # прищепленому репозиторії може не знайти спільного предка, а дебаунс
+    # курсора шукає `git log --grep` на 6 годин назад і впирався б у стелю з
+    # 20 комітів. Shell-раннер перевикористовує робочу теку, тож повна глибина
+    # коштує один раз.
+    GIT_DEPTH: 0
   script:
     - export TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN_STAGING"
     - export TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID_STAGING"
