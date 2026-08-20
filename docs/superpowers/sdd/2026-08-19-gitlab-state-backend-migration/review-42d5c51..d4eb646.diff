@@ -1,0 +1,84 @@
+# Review package: 42d5c51..d4eb646
+
+## Commits
+d4eb646 worker: extract ConflictError into shared state-errors.mjs
+
+## Files changed
+ worker/src/github.mjs       | 10 +++-------
+ worker/src/state-errors.mjs |  7 +++++++
+ worker/test/github.test.mjs |  7 +++++++
+ 3 files changed, 17 insertions(+), 7 deletions(-)
+
+## Diff
+diff --git a/worker/src/github.mjs b/worker/src/github.mjs
+index d81f501..0f191c6 100644
+--- a/worker/src/github.mjs
++++ b/worker/src/github.mjs
+@@ -1,23 +1,19 @@
++import { ConflictError } from './state-errors.mjs';
++
+ const REPO = 'avp-terralab/tender-monitor';
+ const WATCHLIST_FILE = 'watchlist.json';
+ const ENTITIES_FILE = 'watched_entities.json';
+ const SEEN_FILE = '_state/_watched_seen.json';
+ const API_BASE = 'https://api.github.com';
+ 
+-export class ConflictError extends Error {
+-  constructor(msg) {
+-    super(msg);
+-    this.name = 'ConflictError';
+-    this.status = 409;
+-  }
+-}
++export { ConflictError };
+ 
+ // Every GitHub failure used to reach the user as the same "temporarily
+ // unavailable" line, with the status visible only in the Worker logs — an
+ // expired PAT looked exactly like a real outage. Carrying the status on the
+ // error lets the handler name the cause for the admin.
+ function ghError(message, status) {
+   const err = new Error(message);
+   err.status = status;
+   return err;
+ }
+diff --git a/worker/src/state-errors.mjs b/worker/src/state-errors.mjs
+new file mode 100644
+index 0000000..3f90bbe
+--- /dev/null
++++ b/worker/src/state-errors.mjs
+@@ -0,0 +1,7 @@
++export class ConflictError extends Error {
++  constructor(msg) {
++    super(msg);
++    this.name = 'ConflictError';
++    this.status = 409;
++  }
++}
+diff --git a/worker/test/github.test.mjs b/worker/test/github.test.mjs
+index 39639c1..1dca98d 100644
+--- a/worker/test/github.test.mjs
++++ b/worker/test/github.test.mjs
+@@ -1,16 +1,23 @@
+ import { test } from 'node:test';
+ import assert from 'node:assert/strict';
+ import { loadWatchlist, ConflictError, saveWatchlist, loadWatchedEntities, saveWatchedEntities, loadWatchedSeen, saveWatchedSeen, loadInvites, saveInvites, loadAllowedUsers, saveAllowedUsers, loadArchivedTenders, fetchAuditLog, fetchLatestDeployCommit, saveAgentJob, listAgentJobs, loadNotificationHistory } from '../src/github.mjs';
+ 
+ const ENV = { GITHUB_PAT: 'PAT_VALUE' };
+ 
++test('ConflictError: has status 409 and is instanceof Error', () => {
++  const e = new ConflictError('conflict on x');
++  assert.ok(e instanceof Error);
++  assert.equal(e.status, 409);
++  assert.equal(e.name, 'ConflictError');
++});
++
+ test('loadWatchlist: builds correct GET request', async () => {
+   const calls = [];
+   const fakeFetch = async (url, opts) => {
+     calls.push({ url, opts });
+     const json = JSON.stringify([{ tender_id: 'UA-X', enabled: true }]);
+     const content = Buffer.from(json).toString('base64');
+     return {
+       ok: true,
+       status: 200,
+       json: async () => ({ content, sha: 'abc123' }),

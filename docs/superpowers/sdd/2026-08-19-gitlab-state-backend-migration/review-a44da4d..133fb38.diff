@@ -1,0 +1,144 @@
+# Review package: a44da4d..133fb38
+
+## Commits
+133fb38 worker: fix gitlab.mjs writes missing encoding=base64 (silent data corruption)
+
+## Files changed
+ worker/src/gitlab.mjs       |  2 ++
+ worker/test/gitlab.test.mjs | 20 ++++++++++++++++++--
+ 2 files changed, 20 insertions(+), 2 deletions(-)
+
+## Diff
+diff --git a/worker/src/gitlab.mjs b/worker/src/gitlab.mjs
+index cb63644..8fbf2b0 100644
+--- a/worker/src/gitlab.mjs
++++ b/worker/src/gitlab.mjs
+@@ -80,20 +80,21 @@ export async function loadWatchlist(env, { fetch: fetchImpl = fetch } = {}) {
+   return { watchlist: JSON.parse(text), sha: last_commit_id };
+ }
+ 
+ export async function saveWatchlist(env, watchlist, sha, { fetch: fetchImpl = fetch, message } = {}) {
+   const json = JSON.stringify(watchlist, null, 2) + '\n';
+   const bytes = new TextEncoder().encode(json);
+   const base64 = btoa(String.fromCharCode(...bytes));
+   const body = {
+     commit_message: message ?? `bot: update watchlist ${new Date().toISOString()}`,
+     content: base64,
++    encoding: 'base64',
+     last_commit_id: sha,
+     branch: ref(env),
+   };
+   const res = await fetchImpl(
+     `${projectUrl(env)}/repository/files/${encodeFilePath(WATCHLIST_FILE)}`,
+     { method: 'PUT', headers: authHeaders(env, { 'Content-Type': 'application/json' }), body: JSON.stringify(body) }
+   );
+   await throwOnBadResponse(res, 'PUT', WATCHLIST_FILE);
+   return res.json();
+ }
+@@ -112,20 +113,21 @@ async function loadFile(env, filePath, { fetch: fetchImpl = fetch } = {}) {
+ }
+ 
+ // sha == null → file doesn't exist yet → POST (create).
+ // sha present → PUT with last_commit_id (update, conflict-checked).
+ async function saveFile(env, filePath, text, sha, { fetch: fetchImpl = fetch, message } = {}) {
+   const bytes = new TextEncoder().encode(text);
+   const base64 = btoa(String.fromCharCode(...bytes));
+   const body = {
+     branch: ref(env),
+     content: base64,
++    encoding: 'base64',
+     commit_message: message ?? `bot: update ${filePath} ${new Date().toISOString()}`,
+   };
+   const method = sha != null ? 'PUT' : 'POST';
+   if (sha != null) body.last_commit_id = sha;
+   const res = await fetchImpl(
+     `${projectUrl(env)}/repository/files/${encodeFilePath(filePath)}`,
+     { method, headers: authHeaders(env, { 'Content-Type': 'application/json' }), body: JSON.stringify(body) }
+   );
+   await throwOnBadResponse(res, method, filePath);
+   return res.json();
+diff --git a/worker/test/gitlab.test.mjs b/worker/test/gitlab.test.mjs
+index d0244be..e25c3b1 100644
+--- a/worker/test/gitlab.test.mjs
++++ b/worker/test/gitlab.test.mjs
+@@ -38,20 +38,21 @@ test('saveWatchlist: builds PUT with last_commit_id and correct body', async ()
+     return { ok: true, status: 200, json: async () => ({}) };
+   };
+   const wl = [{ tender_id: 'UA-X', enabled: true }];
+   await saveWatchlist(ENV, wl, 'oldCommit', { fetch: fakeFetch });
+   assert.equal(calls.length, 1);
+   assert.match(calls[0].url, /repository\/files\/watchlist\.json$/);
+   assert.equal(calls[0].opts.method, 'PUT');
+   const body = JSON.parse(calls[0].opts.body);
+   assert.equal(body.last_commit_id, 'oldCommit');
+   assert.equal(body.branch, 'main');
++  assert.equal(body.encoding, 'base64');
+   const decoded = atob(body.content);
+   assert.deepEqual(JSON.parse(decoded), wl);
+ });
+ 
+ test('saveWatchlist: throws ConflictError on 400 with "changed since" message', async () => {
+   const fakeFetch = async () => ({
+     ok: false, status: 400,
+     text: async () => JSON.stringify({ message: 'You are attempting to update a file that has changed since you started editing it.' }),
+   });
+   await assert.rejects(
+@@ -64,41 +65,56 @@ test('saveWatchlist: throws plain Error on unrelated 400 (not a conflict)', asyn
+   const fakeFetch = async () => ({
+     ok: false, status: 400,
+     text: async () => JSON.stringify({ message: 'branch is invalid' }),
+   });
+   await assert.rejects(
+     () => saveWatchlist(ENV, [], 'sha', { fetch: fakeFetch }),
+     (err) => err instanceof Error && !(err instanceof ConflictError)
+   );
+ });
+ 
++test('saveWatchlist: throws plain Error on 400 with plain-text (non-JSON) body', async () => {
++  const fakeFetch = async () => ({
++    ok: false, status: 400,
++    text: async () => 'Bad Request',
++  });
++  await assert.rejects(
++    () => saveWatchlist(ENV, [], 'sha', { fetch: fakeFetch }),
++    (err) => err instanceof Error && !(err instanceof ConflictError)
++  );
++});
++
+ test('loadWatchedEntities: 404 returns empty array (goes through tolerant loadFile)', async () => {
+   const fakeFetch = async () => ({ ok: false, status: 404, text: async () => 'Not Found' });
+   const result = await loadWatchedEntities(ENV, { fetch: fakeFetch });
+   assert.deepEqual(result.entities, []);
+   assert.equal(result.sha, null);
+ });
+ 
+ test('saveWatchedEntities: POSTs (create) when sha is null', async () => {
+   const calls = [];
+   const fakeFetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 201, json: async () => ({}) }; };
+   await saveWatchedEntities(ENV, [{ edrpou: '1' }], null, { fetch: fakeFetch });
+   assert.equal(calls[0].opts.method, 'POST');
+-  assert.equal(JSON.parse(calls[0].opts.body).last_commit_id, undefined);
++  const body = JSON.parse(calls[0].opts.body);
++  assert.equal(body.last_commit_id, undefined);
++  assert.equal(body.encoding, 'base64');
+ });
+ 
+ test('saveWatchedEntities: PUTs (update) with last_commit_id when sha present', async () => {
+   const calls = [];
+   const fakeFetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 200, json: async () => ({}) }; };
+   await saveWatchedEntities(ENV, [{ edrpou: '1' }], 'commitAbc', { fetch: fakeFetch });
+   assert.equal(calls[0].opts.method, 'PUT');
+-  assert.equal(JSON.parse(calls[0].opts.body).last_commit_id, 'commitAbc');
++  const body = JSON.parse(calls[0].opts.body);
++  assert.equal(body.last_commit_id, 'commitAbc');
++  assert.equal(body.encoding, 'base64');
+ });
+ 
+ test('loadInvites: 404 → empty list + null sha', async () => {
+   const fakeFetch = async () => ({ ok: false, status: 404, text: async () => '' });
+   const { invites, sha } = await loadInvites(ENV, { fetch: fakeFetch });
+   assert.deepEqual(invites, []);
+   assert.equal(sha, null);
+ });
+ 
+ test('saveAgentJob: existence GET (404) then POST create', async () => {

@@ -1,0 +1,46 @@
+# Review package: a25f8d5..ce99b87
+
+## Commits
+ce99b87 poller: add missing test for GitLab set_status create/404 path
+
+## Files changed
+ tests/test_agent_poller.py | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+## Diff
+diff --git a/tests/test_agent_poller.py b/tests/test_agent_poller.py
+index 2615b4d..824b781 100644
+--- a/tests/test_agent_poller.py
++++ b/tests/test_agent_poller.py
+@@ -1989,10 +1989,31 @@ def test_make_set_status_gitlab_backend_update(monkeypatch):
+         captured["method"] = method
+         return {}
+ 
+     monkeypatch.setattr(ap, "_gl_request", fake_gl_request)
+     set_status = ap.make_set_status(cfg)
+     set_status("UA-1.json", {"tender_id": "UA-1", "status": "done", "_sha": "old-commit"})
+     assert captured["method"] == "PUT"
+     assert captured["payload"]["last_commit_id"] == "old-commit"
+     assert "_sha" not in json.loads(base64.b64decode(captured["payload"]["content"]))
+     print("OK make_set_status_gitlab_backend_update")
++
++
++def test_make_set_status_gitlab_backend_create(monkeypatch):
++    cfg = ap.Config(repo="r", github_pat="x", telegram_bot_token="y", admin_chat_id="42",
++                    backend="gitlab", gitlab_token="glpat-x",
++                    gitlab_project_id="99", gitlab_ref="main")
++    captured = {}
++
++    def fake_gl_request(url, token, *, method="GET", payload=None):
++        if method == "GET":
++            return None  # 404 — _gl_request already turns that into None
++        captured["payload"] = payload
++        captured["method"] = method
++        return {}
++
++    monkeypatch.setattr(ap, "_gl_request", fake_gl_request)
++    set_status = ap.make_set_status(cfg)
++    set_status("UA-2.json", {"tender_id": "UA-2", "status": "pending"})
++    assert captured["method"] == "POST"
++    assert "last_commit_id" not in captured["payload"]
++    print("OK make_set_status_gitlab_backend_create")

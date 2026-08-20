@@ -1,0 +1,34 @@
+# Review package: 5260946..b341425
+
+## Commits
+b341425 worker: add staging/production environments to wrangler.toml
+
+## Files changed
+ worker/wrangler.toml | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+## Diff
+diff --git a/worker/wrangler.toml b/worker/wrangler.toml
+index 498c89c..da0056b 100644
+--- a/worker/wrangler.toml
++++ b/worker/wrangler.toml
+@@ -1,7 +1,19 @@
+ name = "tender-monitor-bot"
+ main = "src/index.mjs"
+ compatibility_date = "2026-05-01"
+ 
+ [[kv_namespaces]]
+ binding = "EPHEMERAL_KV"
+ id = "f9c6d80922f24615ab394d3cc1aa7251"   # KV namespace "tender-monitor-ephemeral"
++
++[env.staging]
++name = "tender-monitor-bot-staging"
++vars = { STATE_BACKEND = "gitlab", GITLAB_PROJECT_ID = "14", GITLAB_REF = "staging-state" }
++
++[[env.staging.kv_namespaces]]
++binding = "EPHEMERAL_KV"
++id = "197ecb4e174848aa8efed56ffffa8698"   # staging KV namespace
++
++[env.production]
++name = "tender-monitor-bot"
++vars = { STATE_BACKEND = "github" }

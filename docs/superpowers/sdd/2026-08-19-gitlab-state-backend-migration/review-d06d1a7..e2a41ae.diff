@@ -1,0 +1,51 @@
+# Review package: d06d1a7..e2a41ae
+
+## Commits
+e2a41ae ci: fix PATH for node on shared shell-executor runner
+115a096 ci: diagnose node availability on shared runner (temporary)
+8829141 ci: add GitLab CI (test, staging schedule, staging/prod deploy)
+
+## Files changed
+ .gitlab-ci.yml | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+## Diff
+diff --git a/.gitlab-ci.yml b/.gitlab-ci.yml
+new file mode 100644
+index 0000000..dd52fe6
+--- /dev/null
++++ b/.gitlab-ci.yml
+@@ -0,0 +1,33 @@
++stages:
++  - test
++  - deploy
++
++default:
++  before_script:
++    - export PATH="$HOME/.local/node-v22.23.2-linux-x64/bin:$PATH"
++
++test:
++  stage: test
++  script:
++    - node --test test/*.test.mjs worker/test/*.test.mjs
++
++deploy-staging:
++  stage: deploy
++  when: manual
++  script:
++    - cd worker && npm install --no-save wrangler@^3 && npx wrangler deploy --env staging
++
++monitor-staging:
++  stage: test
++  script:
++    - node ci.mjs
++  rules:
++    - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TARGET == "staging"'
++
++deploy-production:
++  stage: deploy
++  script:
++    - cd worker && npm install --no-save wrangler@^3 && npx wrangler deploy --env production
++  rules:
++    - if: '$CI_COMMIT_BRANCH == "main"'
++      when: manual

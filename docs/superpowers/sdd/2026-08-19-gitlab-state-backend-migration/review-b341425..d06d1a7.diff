@@ -1,0 +1,29 @@
+# Review package: b341425..d06d1a7
+
+## Commits
+d06d1a7 worker: add production KV namespace binding to wrangler.toml
+
+## Files changed
+ worker/wrangler.toml | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+## Diff
+diff --git a/worker/wrangler.toml b/worker/wrangler.toml
+index da0056b..6273c97 100644
+--- a/worker/wrangler.toml
++++ b/worker/wrangler.toml
+@@ -10,10 +10,14 @@ id = "f9c6d80922f24615ab394d3cc1aa7251"   # KV namespace "tender-monitor-ephemer
+ name = "tender-monitor-bot-staging"
+ vars = { STATE_BACKEND = "gitlab", GITLAB_PROJECT_ID = "14", GITLAB_REF = "staging-state" }
+ 
+ [[env.staging.kv_namespaces]]
+ binding = "EPHEMERAL_KV"
+ id = "197ecb4e174848aa8efed56ffffa8698"   # staging KV namespace
+ 
+ [env.production]
+ name = "tender-monitor-bot"
+ vars = { STATE_BACKEND = "github" }
++
++[[env.production.kv_namespaces]]
++binding = "EPHEMERAL_KV"
++id = "f9c6d80922f24615ab394d3cc1aa7251"   # KV namespace "tender-monitor-ephemeral"

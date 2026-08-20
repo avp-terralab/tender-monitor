@@ -1,0 +1,497 @@
+# Review package: effe9f4..HEAD
+
+## Commits
+e8881c3 Таймаут 45→60 хв і правило про запозичений шаблон зі схемою
+b09445f merge: pull in main's Bash(python:*) permission fix (effe9f4)
+ce99b87 poller: add missing test for GitLab set_status create/404 path
+a25f8d5 poller: add GitLab backend to make_list_jobs/make_set_status
+
+## Files changed
+ .claude/skills/tender-proposal-prepare/SKILL.md |   1 +
+ _secrets/agent_poller.example.json              |   7 +-
+ memory/tender-package-structure.md              |   2 +-
+ scripts/agent_poller.py                         | 100 ++++++++++++++++++++++--
+ scripts/run_agent.py                            |   8 +-
+ tests/test_agent_poller.py                      |  68 +++++++++++++++-
+ 6 files changed, 174 insertions(+), 12 deletions(-)
+
+## Diff
+diff --git a/.claude/skills/tender-proposal-prepare/SKILL.md b/.claude/skills/tender-proposal-prepare/SKILL.md
+index ed3be24..a2f176a 100644
+--- a/.claude/skills/tender-proposal-prepare/SKILL.md
++++ b/.claude/skills/tender-proposal-prepare/SKILL.md
+@@ -33,20 +33,21 @@ You are an expert preparer of Ukrainian Prozorro tender proposals for LIS **Terr
+ 
+ **Формат:**
+ 13. **Механіку макета робить `tender_lib` — не переробляй її вручну.** Твоє — судження за рендером: пагінація, осиротілий підпис, ширини колонок під текст, розмір шрифту. → `tender-formatting-rules` §1 (що вже в коді) і §2 (що вирішуєш ти)
+ 14. **`_ЗВІТ.md` — РІВНО ОДИН**, у датованій КОРЕНЕВІЙ теці `<ДД.ММ.РР Замовник>\`. → `tender-formatting-rules` §4
+ 15. **НЕ ганяй згенеровані .docx через MS Word** (зсуває підложку, обфускує шрифти). Шаблони власника теж бувають зі зсунутим бланком — рендер-перевіряй основу. → §7
+ 16. **Чинність постійних документів перевіряй УВАЖНО:** ISO 25051 — тільки чинна редакція; висновок ТЗІ чинний за прикріпленим листом Держспецзв'язку. Перш ніж писати «прострочено» — перевір новішу редакцію в активах і листи-продовження. → `document-validity`
+ 
+ **Постійні PDF і шаблони з картинками:**
+ 17. **Ліцензійні договори — ТІЛЬКИ повна редакція** (договір + Дод.1 Свідоцтво + Дод.2 із зафарбованими сумами + усі ДУ): файл `N. Ліцензійний_договір_…`; «СТАРА РЕДАКЦІЯ (не подавати)» — ніколи. Самоперевірка: повний ≥7 стор. Після копіювання PDF — `ls` теки і звірка з реєстром. → §1.2a
+ 18. **Документи з КАРТИНКАМИ (схема інтеграції з МІС) — бери шаблон ЯК ФАЙЛ** (`Document(шаблон)`, зміни лише адресата/Вих.№/дату). `build_letter` на чистому бланку губить зображення схем. → §1.2b
++19. **Немає власного шаблону з картинкою в компанії — НЕ бери шаблон сусідньої компанії мовчки.** Урок 20.08.2026 (Городоцька ЦРЛ, ТЕРРАЛАБ АЙ ТІ): узятий шаблон іншої компанії дав порожній колонтитул на першій сторінці (бланк-донора прибрали, свій не підставили) — `validate_package.py` це ловить (#2), але тільки постфактум. Якщо шаблону немає — **зупинись і повідом власнику**, а не адаптуй чужий на льоту: бланк і watermark у колонтитулі копіюються рядок-у-рядок з `templates/bases/<company>_base.docx` (той самий текст, що й на решті документів пакета), а не лишаються порожніми чи чужими.
+ 
+ ## Inputs (the brief)
+ 
+ You receive a brief of the form:
+ 
+ `(Prozorro link or tenderID, bidder company, price [or "auto"])`
+ 
+ - **Prozorro link or tenderID** — e.g. `https://prozorro.gov.ua/tender/UA-2026-06-18-014256-a` or `UA-2026-06-18-014256-a`.
+ - **bidder company** — one of: МАЙЛАБ, ТЕРРАЛАБ АЙ ТІ, ТЕРРАЛАБ КОНСАЛТИНГ, ТЕРРАЛАБ СУПРОВІД, ТЕРРАЛАБ ПРО.
+ - **price** — a total figure in UAH, or `"auto"` (derive from the pricing reference + the tender's quantities).
+diff --git a/_secrets/agent_poller.example.json b/_secrets/agent_poller.example.json
+index d10f6ad..4d76312 100644
+--- a/_secrets/agent_poller.example.json
++++ b/_secrets/agent_poller.example.json
+@@ -3,12 +3,17 @@
+   "github_pat": "github_pat_…",
+   "telegram_bot_token": "123456:ABC…",
+   "admin_chat_id": "0000000000",
+   "drive_root": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій",
+   "drive_link": "",
+   "drive_sa_key": "_secrets/drive_sa.json",
+   "drive_parent_id": "1ndl0hSGEPfsnZYkPY_i7B7lXpWgYRzLJ",
+   "publish_root": "G:\\Мій диск\\ТЕНДЕРИ 2021-2026\\ТЕНДЕРИ 2026",
+   "publish_parent_id": "1G3D4Hwq4nU1K9luwgJk0Gu3uxuT9uok9",
+   "repo": "avp-terralab/tender-monitor",
+-  "poll_interval": 120
++  "poll_interval": 120,
++  "backend": "github",
++  "_backend_comment": "State backend for the job queue: 'github' (default, backward-compatible) or 'gitlab'. When 'gitlab', the fields below select the target project instead of repo/branch/github_pat.",
++  "gitlab_token": "glpat-…",
++  "gitlab_project_id": "99",
++  "gitlab_ref": "main"
+ }
+diff --git a/memory/tender-package-structure.md b/memory/tender-package-structure.md
+index 023538e..35e836b 100644
+--- a/memory/tender-package-structure.md
++++ b/memory/tender-package-structure.md
+@@ -38,21 +38,21 @@ metadata:
+ - **Після копіювання PDF — `ls` теки і звірка з реєстром.** *Урок Миколаївська СПК 08.08.2026: у реєстрі й `_ЗВІТ.md` ліц. договори числились як №5/№6, а файли в теку взагалі не потрапили — власник докладав руками перед поданням.* Це ловить `validate_package.py` (блок `[ПАКЕТ]`).
+ 
+ **1.2b. Документи з КАРТИНКАМИ — копіювати файл шаблону, не перегенеровувати текстом.** «ПРИКЛАД ЗАГАЛЬНОЇ СХЕМИ ІНТЕГРАЦІЇ ІЗ МІС» та будь-який інший шаблон із вкладеними зображеннями брати як ФАЙЛ: `Document(<шаблон із «Шаблони листів (docx)»>)` → змінити ЛИШЕ адресата / Вих.№ / дату → зберегти. **`build_letter` на чистому бланку для них НЕ використовувати** — переноситься тільки текст, а `word/media/image2,3.png` (самі схеми) зникають, лишається саме лого бланку. *Урок Миколаївська СПК 08.08.2026: пішла «схема інтеграції» з 1 картинкою замість 3; власник замінив файл вручну.* Машинна перевірка — `validate_package.py --templates "<тека Шаблони листів (docx)>"`.
+ 
+ **1.3. Додаткові типи** (залежно від вимог замовника):
+ - Калькуляція вартості згідно технічної специфікації (розшифровка ціни)
+ - Гарантійний лист щодо надання послуг відповідно до графіку
+ - Гарантійний/довідка щодо захисту довкілля (екологічні вимоги)
+ - Довідка щодо системи оподаткування; Довідка про відсутність оперативно-госп. санкцій (ст. 236 ГКУ)
+ - Довідка про відповідність ЗУ 1207-VII (ТОТ); Інформація про учасника (форма-таблиця, Додаток замовника)
+-- ПРИКЛАД схеми інтеграції з МІС (детальний опис інтеграції LIMS TerraLab; є у файлах-шаблонах)
++- ПРИКЛАД схеми інтеграції з МІС (детальний опис інтеграції LIMS TerraLab; є у файлах-шаблонах усіх п'яти компаній — 20.08.2026 додано власний для ТЕРРАЛАБ АЙ ТІ, файл `9.`, до цього його не було)
+ - Значний правочин (якщо ціна > 50% чистих активів ТОВ): Рішення/Протокол загальних зборів про згоду + Фінзвіт за минулий рік + Довідка про повноваження
+ - Лист підтвердження видачі бланку результату (COVID-19) + інструкція модуля (специфічні замовники)
+ 
+ ## 2. Обов'язкові в КОЖНІЙ закупівлі
+ 
+ Загальне правило для ВСІХ пакетів і ВСІХ юросіб (запроваджено 28.07.2026). Додавати завжди — окрім тих, що ТД прямо звільняє фактом подання/самодекларуванням:
+ 
+ 1. Довідка про повноваження на підписання пропозиції
+ 2. Протокол Загальних зборів учасників
+ 3. Довідка-пояснення щодо ліцензування діяльності
+diff --git a/scripts/agent_poller.py b/scripts/agent_poller.py
+index 3610348..d1dae58 100644
+--- a/scripts/agent_poller.py
++++ b/scripts/agent_poller.py
+@@ -15,20 +15,21 @@ import os
+ import re
+ import sys
+ import html
+ import json
+ import time
+ import shutil
+ import base64
+ import datetime
+ import urllib.request
+ import urllib.error
++import urllib.parse
+ from dataclasses import dataclass
+ 
+ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+ import job_lib
+ 
+ 
+ # --------------------------------------------------------------------------- #
+ # Config
+ # --------------------------------------------------------------------------- #
+ 
+@@ -61,21 +62,30 @@ class Config:
+     telegram_bot_token: str
+     admin_chat_id: str
+     drive_root: str = DEFAULT_DRIVE_ROOT
+     drive_link: str = ""          # fallback parent-folder share link (optional)
+     drive_sa_key: str = ""        # path to a Google service-account JSON key
+     drive_parent_id: str = ""     # Drive id of the output root «Архів тендерних пропозицій»
+     publish_root: str = DEFAULT_PUBLISH_ROOT        # архів тендерного відділу
+     publish_parent_id: str = DEFAULT_PUBLISH_PARENT_ID  # його Drive-id (для посилання)
+     assets_root: str = DEFAULT_ASSETS_ROOT          # активи компаній (скани підписів)
+     branch: str = "main"
+-    timeout: int = 2700
++    # 20.08.2026: піднято з 2700 — реальний прогін на 22 документи (Городоцька
++    # центральна лікарня) не встиг дописати _ЗВІТ.md за 45 хв, хоча всі
++    # документи вже були готові. 3600 дає запас на пакети такого розміру.
++    timeout: int = 3600
++    # State-backend selector: "github" (default, backward-compatible) or
++    # "gitlab". The GitLab fields below are only consumed when backend=="gitlab".
++    backend: str = "github"
++    gitlab_token: str = ""
++    gitlab_project_id: str = ""
++    gitlab_ref: str = "main"
+     # Kill-switch for live stage reporting (agent_poller.py:_agent_status).
+     # Defaults OFF: opt in explicitly by setting "stage_reporting": true in
+     # _secrets/agent_poller.json once a first few real runs look sane.
+     stage_reporting: bool = False
+ 
+ 
+ # --------------------------------------------------------------------------- #
+ # Pure orchestration
+ # --------------------------------------------------------------------------- #
+ 
+@@ -994,22 +1004,71 @@ def _gh_request(url, pat, *, method="GET", payload=None):
+     try:
+         with urllib.request.urlopen(req, timeout=60) as resp:
+             body = resp.read().decode("utf-8")
+             return json.loads(body) if body else None
+     except urllib.error.HTTPError as e:
+         if e.code == 404:
+             return None
+         raise
+ 
+ 
++_GL_API = "https://cl-gl.listerralab.com/api/v4"
++
++
++def _gl_request(url, token, *, method="GET", payload=None):
++    """Issue an authenticated GitLab API request; return parsed JSON or None."""
++    data = None
++    headers = {"PRIVATE-TOKEN": token}
++    if payload is not None:
++        data = json.dumps(payload).encode("utf-8")
++        headers["Content-Type"] = "application/json"
++    req = urllib.request.Request(url, data=data, headers=headers, method=method)
++    try:
++        with urllib.request.urlopen(req, timeout=60) as resp:
++            body = resp.read().decode("utf-8")
++            return json.loads(body) if body else None
++    except urllib.error.HTTPError as e:
++        if e.code == 404:
++            return None
++        raise
++
++
+ def make_list_jobs(cfg):
+     """Return a list_jobs() that lists pending job files from the bot repo."""
++    if cfg.backend == "gitlab":
++        def list_jobs_gitlab():
++            url = "%s/projects/%s/repository/tree?path=%s&ref=%s" % (
++                _GL_API, cfg.gitlab_project_id, _JOBS_DIR, cfg.gitlab_ref)
++            entries = _gl_request(url, cfg.gitlab_token)
++            if not entries:
++                return []
++            out = []
++            for entry in entries:
++                if entry.get("type") != "blob" or not entry.get("name", "").endswith(".json"):
++                    continue
++                file_url = "%s/projects/%s/repository/files/%s?ref=%s" % (
++                    _GL_API, cfg.gitlab_project_id,
++                    urllib.parse.quote(entry["path"], safe=""), cfg.gitlab_ref)
++                meta = _gl_request(file_url, cfg.gitlab_token)
++                if not meta or "content" not in meta:
++                    continue
++                raw = base64.b64decode(meta["content"]).decode("utf-8")
++                try:
++                    job = json.loads(raw)
++                except ValueError:
++                    continue
++                # Stash the last commit id so set_status can update in place.
++                job["_sha"] = meta.get("last_commit_id")
++                out.append((entry["name"], job))
++            return out
++        return list_jobs_gitlab
++
+     def list_jobs():
+         url = "%s/repos/%s/contents/%s" % (_GH_API, cfg.repo, _JOBS_DIR)
+         entries = _gh_request(url, cfg.github_pat)
+         if not entries:
+             return []
+         out = []
+         for entry in entries:
+             if not entry.get("name", "").endswith(".json"):
+                 continue
+             file_url = "%s/repos/%s/contents/%s/%s" % (
+@@ -1023,26 +1082,53 @@ def make_list_jobs(cfg):
+             except ValueError:
+                 continue
+             # Stash the sha so set_status can update in place.
+             job["_sha"] = meta.get("sha")
+             out.append((entry["name"], job))
+         return out
+     return list_jobs
+ 
+ 
+ def make_set_status(cfg):
+-    """Return a set_status(name, job) that PUTs the job file back to the repo.
++    """Return a set_status(name, job) that writes the job file back to the repo.
+ 
+-    Reads the current sha immediately before each PUT, so a stale sha — e.g. the
+-    running -> done update after a long agent run, or any other prior write —
+-    never 409s.
++    Reads the current sha/last_commit_id immediately before each write, so a
++    stale value — e.g. the running -> done update after a long agent run, or
++    any other prior write — never 409s.
+     """
++    if cfg.backend == "gitlab":
++        def set_status_gitlab(name, job):
++            file_path = urllib.parse.quote("%s/%s" % (_JOBS_DIR, name), safe="")
++            url = "%s/projects/%s/repository/files/%s" % (_GL_API, cfg.gitlab_project_id, file_path)
++            current = _gl_request(url + "?ref=" + cfg.gitlab_ref, cfg.gitlab_token)
++            last_commit_id = current.get("last_commit_id") if isinstance(current, dict) else None
++            clean = {k: v for k, v in job.items() if k != "_sha"}
++            # base64-encode, matching the GitHub branch's encoding — GitLab's
++            # Repository Files API defaults "encoding" to plain text, so we
++            # say so explicitly to avoid mangling non-ASCII job content.
++            content = base64.b64encode(
++                json.dumps(clean, ensure_ascii=False, indent=2).encode("utf-8")
++            ).decode("ascii")
++            payload = {
++                "branch": cfg.gitlab_ref,
++                "content": content,
++                "encoding": "base64",
++                "commit_message": "agent job %s: %s" % (job.get("tender_id", name), job.get("status", "?")),
++            }
++            if last_commit_id:
++                payload["last_commit_id"] = last_commit_id
++                method = "PUT"
++            else:
++                method = "POST"
++            _gl_request(url, cfg.gitlab_token, method=method, payload=payload)
++        return set_status_gitlab
++
+     def set_status(name, job):
+         url = "%s/repos/%s/contents/%s/%s" % (
+             _GH_API, cfg.repo, _JOBS_DIR, name)
+         current = _gh_request(url + "?ref=" + cfg.branch, cfg.github_pat)
+         sha = current.get("sha") if isinstance(current, dict) else None
+         # Persist a clean copy without our internal _sha field.
+         clean = {k: v for k, v in job.items() if k != "_sha"}
+         content = base64.b64encode(
+             json.dumps(clean, ensure_ascii=False, indent=2).encode("utf-8")
+         ).decode("ascii")
+@@ -1678,20 +1764,24 @@ def _main_locked(path):
+         telegram_bot_token=secrets["telegram_bot_token"],
+         admin_chat_id=str(secrets["admin_chat_id"]),
+         drive_root=secrets.get("drive_root", DEFAULT_DRIVE_ROOT),
+         drive_link=secrets.get("drive_link", ""),
+         drive_sa_key=secrets.get("drive_sa_key", ""),
+         drive_parent_id=secrets.get("drive_parent_id", ""),
+         publish_root=secrets.get("publish_root", DEFAULT_PUBLISH_ROOT),
+         publish_parent_id=secrets.get("publish_parent_id", DEFAULT_PUBLISH_PARENT_ID),
+         assets_root=secrets.get("assets_root", DEFAULT_ASSETS_ROOT),
+         stage_reporting=bool(secrets.get("stage_reporting", False)),
++        backend=secrets.get("backend", "github"),
++        gitlab_token=secrets.get("gitlab_token", ""),
++        gitlab_project_id=secrets.get("gitlab_project_id", ""),
++        gitlab_ref=secrets.get("gitlab_ref", "main"),
+     )
+ 
+     list_jobs = make_list_jobs(cfg)
+     set_status = make_set_status(cfg)
+     resolve_item = make_resolve_drive_item(cfg)
+ 
+     # Раз на кожен запуск, ДО обробки задачі з черги: прибрати чернеткові
+     # файли, які лишились від попередніх сесій (див. docstring
+     # cleanup_scratch_files). Збій прибирання ніколи не має блокувати чергу.
+     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+diff --git a/scripts/run_agent.py b/scripts/run_agent.py
+index d3649eb..537ae0f 100644
+--- a/scripts/run_agent.py
++++ b/scripts/run_agent.py
+@@ -229,21 +229,21 @@ def _stage_watcher(td_dir, out_dir, on_stage, stop_event, interval=60):
+         except Exception:  # noqa: BLE001
+             continue
+         if guess and guess != last:
+             last = guess
+             try:
+                 on_stage(guess)
+             except Exception:  # noqa: BLE001
+                 pass
+ 
+ 
+-def run(link, company, price, out_dir=None, timeout=2700, claude_bin="claude",
++def run(link, company, price, out_dir=None, timeout=3600, claude_bin="claude",
+         log_path=None, runner=_default_runner, on_stage=None):
+     if company not in COMPANIES:
+         raise ValueError("unknown company %r; expected one of %s" % (company, sorted(COMPANIES)))
+     out_dir = out_dir or default_out_dir(link)
+     os.makedirs(out_dir, exist_ok=True)
+     log_path = log_path or os.path.join(os.path.dirname(out_dir), "_agent_run.log")
+     root_dir = os.path.dirname(out_dir)
+     cache = td_cache_path(root_dir)
+     prompt = build_prompt(
+         link, company, price, out_dir,
+@@ -335,21 +335,21 @@ def build_amend_prompt(link, instruction, out_dir):
+         "correct. "
+         "Work autonomously; do not ask for confirmation. "
+         "Inside Python scripts set output encoding programmatically and write Cyrillic to "
+         "files you then Read — do NOT prefix shell commands with a PYTHONIOENCODING= env "
+         f"var. When finished, append a short 'що змінено' note to _ЗВІТ.md in {root_dir}, "
+         "then print a SHORT summary (a few sentences) of ONLY what THIS amendment changed "
+         "— do NOT restate the whole proposal."
+     )
+ 
+ 
+-def run_amend(link, instruction, out_dir, company=None, timeout=2700,
++def run_amend(link, instruction, out_dir, company=None, timeout=3600,
+               claude_bin="claude", log_path=None, runner=_default_runner):
+     """Amend an EXISTING package per a free-text instruction.
+ 
+     Mirrors run() but targets an existing ``out_dir`` and uses the amend prompt.
+     Same result contract ({status, package_dir, report_path, log_path, ...}).
+     ``company`` (optional) only drives the format validator. No price — amend does
+     not reprice.
+     """
+     if not out_dir:
+         raise ValueError("run_amend requires the existing out_dir (target package_dir)")
+@@ -421,21 +421,21 @@ def build_winner_prompt(link, company, winner_dir, td_requirements_path=None):
+         "name and always copy its detached «.p7s» signature alongside it. Never "
+         "encode a problem (stale document, missing signature) into a filename — "
+         "report it in «_ЗВІТ ПЕРЕМОЖЦЯ.md» instead.\n\n"
+         "Write the report to «_ЗВІТ ПЕРЕМОЖЦЯ.md» INSIDE that folder. The poller "
+         "inlines the whole report into a Telegram message (3500-char cap), so keep it "
+         "short: «##» headings, terse bullets, and ALWAYS include the sections "
+         "«Прострочене» and «Відсутнє» even when they are empty.\n"
+     )
+ 
+ 
+-def run_winner(link, company, winner_dir, work_root=None, timeout=2700, claude_bin="claude",
++def run_winner(link, company, winner_dir, work_root=None, timeout=3600, claude_bin="claude",
+                log_path=None, runner=_default_runner):
+     """Build the winner-documents package in ``winner_dir``.
+ 
+     Mirrors run()/run_amend(): same runner injection, same log handling. Success
+     is «звіт написано і є хоч один документ», which is what the poller reports.
+ 
+     ``winner_dir`` is the agent's OWN staging folder
+     (``Архів тендерних пропозицій\\<ДД.ММ.РР Замовник>\\Документи переможця``) — the
+     model never writes into the tender department's archive; the poller copies the
+     finished package there afterwards. ``work_root`` is the dated working root that
+@@ -520,21 +520,21 @@ def run_winner(link, company, winner_dir, work_root=None, timeout=2700, claude_b
+         res["summary"] += " (%s)" % note
+     return res
+ 
+ 
+ def main(argv=None):
+     ap = argparse.ArgumentParser(description="Headless runner for tender-proposal-builder.")
+     ap.add_argument("--link", required=True, help="Prozorro link or tenderID")
+     ap.add_argument("--company", required=True, help="bidder company (one of the 4)")
+     ap.add_argument("--price", required=True, help="total price in UAH, or 'auto'")
+     ap.add_argument("--out-dir", default=None, help="output folder for the package")
+-    ap.add_argument("--timeout", type=int, default=2700, help="seconds (default 2700)")
++    ap.add_argument("--timeout", type=int, default=3600, help="seconds (default 3600)")
+     ap.add_argument("--claude-bin", default="claude", help="claude CLI binary")
+     ap.add_argument("--log", default=None, help="log file path")
+     args = ap.parse_args(argv)
+     try:
+         res = run(args.link, args.company, args.price, out_dir=args.out_dir,
+                   timeout=args.timeout, claude_bin=args.claude_bin, log_path=args.log)
+     except ValueError as e:
+         print(json.dumps({"status": "error", "detail": str(e)}, ensure_ascii=False))
+         return 1
+     print(json.dumps(res, ensure_ascii=False))
+diff --git a/tests/test_agent_poller.py b/tests/test_agent_poller.py
+index 1e118b6..824b781 100644
+--- a/tests/test_agent_poller.py
++++ b/tests/test_agent_poller.py
+@@ -1,11 +1,11 @@
+-import sys, os, time, tempfile, datetime, shutil
++import sys, os, time, tempfile, datetime, shutil, json, base64
+ import pytest
+ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+ import agent_poller as ap
+ 
+ def test_process_one_job_ok():
+     statuses, sent, saved = [], [], []
+     jobs = [("UA-x.json", {"tender_id":"UA-2026-06-18-014256-a","link":"L","company":"МАЙЛАБ","price":"181200","requested_by":"42","status":"pending","created_at":"t"})]
+     def list_jobs(): return jobs
+     def set_status(name, job): statuses.append((name, job["status"])); saved.append(job)
+     def run_agent(link, company, price, out_dir):
+@@ -1944,10 +1944,76 @@ def test_release_lock_removes_file(tmp_path):
+     ap._release_lock(lock)
+     assert not os.path.exists(lock)
+     print("OK release_lock_removes_file")
+ 
+ 
+ def test_release_lock_missing_file_does_not_raise(tmp_path):
+     lock = str(tmp_path / "does-not-exist.lock")
+     ap._release_lock(lock)  # має мовчки нічого не робити
+     print("OK release_lock_missing_file_does_not_raise")
+     print("OK cleanup_scratch_files_missing_repo_root_does_not_raise")
++
++
++def test_make_list_jobs_gitlab_backend(monkeypatch):
++    cfg = ap.Config(repo="r", github_pat="x", telegram_bot_token="y", admin_chat_id="42",
++                    backend="gitlab", gitlab_token="glpat-x",
++                    gitlab_project_id="99", gitlab_ref="main")
++    calls = []
++
++    def fake_gl_request(url, token, *, method="GET", payload=None):
++        calls.append((url, token, method))
++        if "tree" in url:
++            return [{"name": "UA-1.json", "path": "_state/agent_jobs/UA-1.json", "type": "blob"}]
++        content = base64.b64encode(json.dumps({"tender_id": "UA-1"}).encode()).decode()
++        return {"content": content, "last_commit_id": "c1"}
++
++    monkeypatch.setattr(ap, "_gl_request", fake_gl_request)
++    list_jobs = ap.make_list_jobs(cfg)
++    jobs = list_jobs()
++    assert len(jobs) == 1
++    assert jobs[0][1]["tender_id"] == "UA-1"
++    assert jobs[0][1]["_sha"] == "c1"
++    assert any("PRIVATE-TOKEN" not in str(c) for c in calls)  # токен передається окремим аргументом, не в url
++    print("OK make_list_jobs_gitlab_backend")
++
++
++def test_make_set_status_gitlab_backend_update(monkeypatch):
++    cfg = ap.Config(repo="r", github_pat="x", telegram_bot_token="y", admin_chat_id="42",
++                    backend="gitlab", gitlab_token="glpat-x",
++                    gitlab_project_id="99", gitlab_ref="main")
++    captured = {}
++
++    def fake_gl_request(url, token, *, method="GET", payload=None):
++        if method == "GET":
++            return {"last_commit_id": "old-commit"}
++        captured["payload"] = payload
++        captured["method"] = method
++        return {}
++
++    monkeypatch.setattr(ap, "_gl_request", fake_gl_request)
++    set_status = ap.make_set_status(cfg)
++    set_status("UA-1.json", {"tender_id": "UA-1", "status": "done", "_sha": "old-commit"})
++    assert captured["method"] == "PUT"
++    assert captured["payload"]["last_commit_id"] == "old-commit"
++    assert "_sha" not in json.loads(base64.b64decode(captured["payload"]["content"]))
++    print("OK make_set_status_gitlab_backend_update")
++
++
++def test_make_set_status_gitlab_backend_create(monkeypatch):
++    cfg = ap.Config(repo="r", github_pat="x", telegram_bot_token="y", admin_chat_id="42",
++                    backend="gitlab", gitlab_token="glpat-x",
++                    gitlab_project_id="99", gitlab_ref="main")
++    captured = {}
++
++    def fake_gl_request(url, token, *, method="GET", payload=None):
++        if method == "GET":
++            return None  # 404 — _gl_request already turns that into None
++        captured["payload"] = payload
++        captured["method"] = method
++        return {}
++
++    monkeypatch.setattr(ap, "_gl_request", fake_gl_request)
++    set_status = ap.make_set_status(cfg)
++    set_status("UA-2.json", {"tender_id": "UA-2", "status": "pending"})
++    assert captured["method"] == "POST"
++    assert "last_commit_id" not in captured["payload"]
++    print("OK make_set_status_gitlab_backend_create")

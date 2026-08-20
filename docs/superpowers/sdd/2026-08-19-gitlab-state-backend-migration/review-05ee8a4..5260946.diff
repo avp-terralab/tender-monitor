@@ -1,0 +1,37 @@
+# Review package: 05ee8a4..5260946
+
+## Commits
+5260946 worker: route handler.mjs through state.mjs dispatcher
+
+## Files changed
+ worker/src/handler.mjs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+## Diff
+diff --git a/worker/src/handler.mjs b/worker/src/handler.mjs
+index e5b668f..b1eac34 100644
+--- a/worker/src/handler.mjs
++++ b/worker/src/handler.mjs
+@@ -34,21 +34,21 @@ import {
+   loadWatchedSeen, saveWatchedSeen, fetchLastCommit,
+   loadAllowedUsers, saveAllowedUsers,
+   loadInvites, saveInvites,
+   loadArchivedTenders, saveArchivedTenders,
+   loadPendingDigest, loadTenderState, fetchLatestDeployCommit,
+   fetchAuditLog,
+   saveAgentJob, loadAgentJob,
+   listAgentJobs,
+   loadNotificationHistory,
+   ConflictError,
+-} from './github.mjs';
++} from './state.mjs';
+ 
+ // Module-scope 60-second cache for /status responses, keyed by chatId string.
+ // Survives across invocations within the same CF Worker instance; cleared on cold start.
+ const STATUS_CACHE = new Map(); // chatId → { text, builtAt: number }
+ const STATUS_CACHE_TTL_MS = 60_000;
+ 
+ const BOT_USERNAME = 'terralab_tenders_bot';
+ 
+ // Commands whose reply is an on-demand "view": the bot keeps only the latest one
+ // in the chat (deletes the previous view + its trigger on the next view command).

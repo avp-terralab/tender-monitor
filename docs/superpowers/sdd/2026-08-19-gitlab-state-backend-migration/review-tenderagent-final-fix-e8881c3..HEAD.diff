@@ -1,0 +1,178 @@
+# Review package: e8881c3..HEAD
+
+## Commits
+1731ab9 CLAUDE.md: додати правило "коміти українською"
+c6379ea poller: fix GitLab job-listing cap and stage-reporting read path
+
+## Files changed
+ CLAUDE.md                  |  3 ++
+ scripts/agent_poller.py    | 11 +++++++-
+ tests/test_agent_poller.py | 68 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 81 insertions(+), 1 deletion(-)
+
+## Diff
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 8b5c318..63a590e 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -1,17 +1,20 @@
+ # Агент підготовки пропозицій — агент-білдер + поллер задач
+ 
+ Локальний headless-агент. За брифом (Prozorro-лінк, компанія-учасник, ціна) запускає
+ Claude Code (`claude -p`, викликає скіл `tender-proposal-prepare`) і **готує повний
+ пакет тендерної пропозиції**. Також **доробляє вже готові** пакети за текстовою інструкцією.
+ Задачі надходять від бота моніторингу (див. розділ інтеграції нижче).
+ 
++## Правила проєкту
++- **Коміти — українською**, як і в решти проєктів TerraLab.
++
+ ## Стек і робота
+ - Python 3.12. Код у `scripts/`: `agent_poller.py` (черга job-ів, оркестрація),
+   `run_agent.py` (`run`/`run_amend` + промпти), `job_lib.py` (pure-хелпери),
+   `prozorro_fetch.py`, `validate_package.py`, `word_export.py`, ін.
+ - Тести: `py -m pytest tests/ -q`.
+ - **Запуск локальний**: Windows Task Scheduler викликає `scripts/agent_poller.py` кожні ~2 хв
+   (один job за виклик, без нескінченного циклу). **CI/деплою НЕМАЄ** — працює з локальної
+   робочої теки на `main`, тож зміни «вмикаються», щойно потраплять у `main`.
+ - **Куди лягає результат (з 11.08.2026 — дві теки, не одна):**
+   - **Робоча** — `G:\Мій диск\AI\TENDERS\Архів тендерних пропозицій\<ДД.ММ.РР Замовник>\`
+diff --git a/scripts/agent_poller.py b/scripts/agent_poller.py
+index d1dae58..0efb3f7 100644
+--- a/scripts/agent_poller.py
++++ b/scripts/agent_poller.py
+@@ -1029,21 +1029,21 @@ def _gl_request(url, token, *, method="GET", payload=None):
+     except urllib.error.HTTPError as e:
+         if e.code == 404:
+             return None
+         raise
+ 
+ 
+ def make_list_jobs(cfg):
+     """Return a list_jobs() that lists pending job files from the bot repo."""
+     if cfg.backend == "gitlab":
+         def list_jobs_gitlab():
+-            url = "%s/projects/%s/repository/tree?path=%s&ref=%s" % (
++            url = "%s/projects/%s/repository/tree?path=%s&ref=%s&per_page=100" % (
+                 _GL_API, cfg.gitlab_project_id, _JOBS_DIR, cfg.gitlab_ref)
+             entries = _gl_request(url, cfg.gitlab_token)
+             if not entries:
+                 return []
+             out = []
+             for entry in entries:
+                 if entry.get("type") != "blob" or not entry.get("name", "").endswith(".json"):
+                     continue
+                 file_url = "%s/projects/%s/repository/files/%s?ref=%s" % (
+                     _GL_API, cfg.gitlab_project_id,
+@@ -1198,20 +1198,29 @@ def _should_commit_stage(kind, last_kind, last_at, now, min_interval=MIN_STAGE_C
+         return True
+     return (now - last_at).total_seconds() >= min_interval
+ 
+ 
+ def _load_job_raw(cfg, tid):
+     """Fetch the current job dict for ``tid``, or None if missing/unreachable.
+ 
+     Best-effort: any GitHub/network error is swallowed by the caller, never
+     raised into the real proposal run.
+     """
++    if cfg.backend == "gitlab":
++        file_path = urllib.parse.quote("%s/%s.json" % (_JOBS_DIR, tid), safe="")
++        url = "%s/projects/%s/repository/files/%s?ref=%s" % (
++            _GL_API, cfg.gitlab_project_id, file_path, cfg.gitlab_ref)
++        meta = _gl_request(url, cfg.gitlab_token)
++        if not meta or "content" not in meta:
++            return None
++        return json.loads(base64.b64decode(meta["content"]).decode("utf-8"))
++
+     url = "%s/repos/%s/contents/%s/%s.json?ref=%s" % (
+         _GH_API, cfg.repo, _JOBS_DIR, tid, cfg.branch)
+     meta = _gh_request(url, cfg.github_pat)
+     if not meta or "content" not in meta:
+         return None
+     return json.loads(base64.b64decode(meta["content"]).decode("utf-8"))
+ 
+ 
+ def make_stage_reporter(cfg, tid, set_status, now=None):
+     """Return an on_stage(stage_dict) callback for run_agent.run().
+diff --git a/tests/test_agent_poller.py b/tests/test_agent_poller.py
+index 824b781..29990d0 100644
+--- a/tests/test_agent_poller.py
++++ b/tests/test_agent_poller.py
+@@ -2010,10 +2010,78 @@ def test_make_set_status_gitlab_backend_create(monkeypatch):
+         captured["payload"] = payload
+         captured["method"] = method
+         return {}
+ 
+     monkeypatch.setattr(ap, "_gl_request", fake_gl_request)
+     set_status = ap.make_set_status(cfg)
+     set_status("UA-2.json", {"tender_id": "UA-2", "status": "pending"})
+     assert captured["method"] == "POST"
+     assert "last_commit_id" not in captured["payload"]
+     print("OK make_set_status_gitlab_backend_create")
++
++
++def test_make_list_jobs_gitlab_backend_requests_per_page_100_and_keeps_over_20(monkeypatch):
++    # Finding 1: repository/tree defaults to 20 entries per page, sorted by
++    # name — with UA-YYYY-MM-DD-... filenames that silently drops the NEWEST
++    # (pending) jobs once the directory holds more than 20 files. Assert the
++    # URL asks for per_page=100 and that a 25-entry tree is fully considered.
++    cfg = ap.Config(repo="r", github_pat="x", telegram_bot_token="y", admin_chat_id="42",
++                    backend="gitlab", gitlab_token="glpat-x",
++                    gitlab_project_id="99", gitlab_ref="main")
++    tree_urls = []
++    names = ["UA-2026-01-%02d.json" % i for i in range(1, 26)]  # 25 entries
++
++    def fake_gl_request(url, token, *, method="GET", payload=None):
++        if "tree" in url:
++            tree_urls.append(url)
++            return [{"name": n, "path": "_state/agent_jobs/%s" % n, "type": "blob"}
++                    for n in names]
++        # per-file fetch — path is percent-encoded, e.g. ".../UA-2026-01-01.json"
++        encoded = url.split("/repository/files/")[1].split("?")[0]
++        name = encoded.rsplit("%2F", 1)[-1]
++        tender_id = name[:-len(".json")]
++        content = base64.b64encode(json.dumps({"tender_id": tender_id}).encode()).decode()
++        return {"content": content, "last_commit_id": "c1"}
++
++    monkeypatch.setattr(ap, "_gl_request", fake_gl_request)
++    list_jobs = ap.make_list_jobs(cfg)
++    jobs = list_jobs()
++
++    assert "per_page=100" in tree_urls[0], tree_urls
++    assert len(jobs) == 25, jobs  # nothing silently cut off
++    seen_ids = {j["tender_id"] for _, j in jobs}
++    assert seen_ids == {n[:-5] for n in names}
++    print("OK make_list_jobs_gitlab_backend_requests_per_page_100_and_keeps_over_20")
++
++
++def test_load_job_raw_gitlab_backend_returns_parsed_job(monkeypatch):
++    cfg = ap.Config(repo="r", github_pat="x", telegram_bot_token="y", admin_chat_id="42",
++                    backend="gitlab", gitlab_token="glpat-x",
++                    gitlab_project_id="99", gitlab_ref="main")
++    calls = []
++
++    def fake_gl_request(url, token, *, method="GET", payload=None):
++        calls.append(url)
++        assert "repository/files/" in url
++        assert "_state%2Fagent_jobs%2FUA-1.json" in url
++        assert "ref=main" in url
++        content = base64.b64encode(json.dumps({"tender_id": "UA-1", "status": "running"}).encode()).decode()
++        return {"content": content}
++
++    monkeypatch.setattr(ap, "_gl_request", fake_gl_request)
++    job = ap._load_job_raw(cfg, "UA-1")
++    assert job == {"tender_id": "UA-1", "status": "running"}
++    assert len(calls) == 1
++    print("OK load_job_raw_gitlab_backend_returns_parsed_job")
++
++
++def test_load_job_raw_gitlab_backend_returns_none_when_missing(monkeypatch):
++    cfg = ap.Config(repo="r", github_pat="x", telegram_bot_token="y", admin_chat_id="42",
++                    backend="gitlab", gitlab_token="glpat-x",
++                    gitlab_project_id="99", gitlab_ref="main")
++
++    def fake_gl_request(url, token, *, method="GET", payload=None):
++        return None  # 404 — _gl_request already turns that into None
++
++    monkeypatch.setattr(ap, "_gl_request", fake_gl_request)
++    assert ap._load_job_raw(cfg, "UA-missing") is None
++    print("OK load_job_raw_gitlab_backend_returns_none_when_missing")

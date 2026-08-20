@@ -1,0 +1,316 @@
+# Review package: a1f2056..a25f8d5
+
+## Commits
+a25f8d5 poller: add GitLab backend to make_list_jobs/make_set_status
+
+## Files changed
+ _secrets/agent_poller.example.json |  7 ++-
+ scripts/agent_poller.py            | 95 ++++++++++++++++++++++++++++++++++++--
+ tests/test_agent_poller.py         | 47 ++++++++++++++++++-
+ 3 files changed, 143 insertions(+), 6 deletions(-)
+
+## Diff
+diff --git a/_secrets/agent_poller.example.json b/_secrets/agent_poller.example.json
+index d10f6ad..4d76312 100644
+--- a/_secrets/agent_poller.example.json
++++ b/_secrets/agent_poller.example.json
+@@ -3,12 +3,17 @@
+   "github_pat": "github_pat_…",
+   "telegram_bot_token": "123456:ABC…",
+   "admin_chat_id": "0000000000",
+   "drive_root": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій",
+   "drive_link": "",
+   "drive_sa_key": "_secrets/drive_sa.json",
+   "drive_parent_id": "1ndl0hSGEPfsnZYkPY_i7B7lXpWgYRzLJ",
+   "publish_root": "G:\\Мій диск\\ТЕНДЕРИ 2021-2026\\ТЕНДЕРИ 2026",
+   "publish_parent_id": "1G3D4Hwq4nU1K9luwgJk0Gu3uxuT9uok9",
+   "repo": "avp-terralab/tender-monitor",
+-  "poll_interval": 120
++  "poll_interval": 120,
++  "backend": "github",
++  "_backend_comment": "State backend for the job queue: 'github' (default, backward-compatible) or 'gitlab'. When 'gitlab', the fields below select the target project instead of repo/branch/github_pat.",
++  "gitlab_token": "glpat-…",
++  "gitlab_project_id": "99",
++  "gitlab_ref": "main"
+ }
+diff --git a/scripts/agent_poller.py b/scripts/agent_poller.py
+index 3610348..26d9b9b 100644
+--- a/scripts/agent_poller.py
++++ b/scripts/agent_poller.py
+@@ -15,20 +15,21 @@ import os
+ import re
+ import sys
+ import html
+ import json
+ import time
+ import shutil
+ import base64
+ import datetime
+ import urllib.request
+ import urllib.error
++import urllib.parse
+ from dataclasses import dataclass
+ 
+ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+ import job_lib
+ 
+ 
+ # --------------------------------------------------------------------------- #
+ # Config
+ # --------------------------------------------------------------------------- #
+ 
+@@ -62,20 +63,26 @@ class Config:
+     admin_chat_id: str
+     drive_root: str = DEFAULT_DRIVE_ROOT
+     drive_link: str = ""          # fallback parent-folder share link (optional)
+     drive_sa_key: str = ""        # path to a Google service-account JSON key
+     drive_parent_id: str = ""     # Drive id of the output root «Архів тендерних пропозицій»
+     publish_root: str = DEFAULT_PUBLISH_ROOT        # архів тендерного відділу
+     publish_parent_id: str = DEFAULT_PUBLISH_PARENT_ID  # його Drive-id (для посилання)
+     assets_root: str = DEFAULT_ASSETS_ROOT          # активи компаній (скани підписів)
+     branch: str = "main"
+     timeout: int = 2700
++    # State-backend selector: "github" (default, backward-compatible) or
++    # "gitlab". The GitLab fields below are only consumed when backend=="gitlab".
++    backend: str = "github"
++    gitlab_token: str = ""
++    gitlab_project_id: str = ""
++    gitlab_ref: str = "main"
+     # Kill-switch for live stage reporting (agent_poller.py:_agent_status).
+     # Defaults OFF: opt in explicitly by setting "stage_reporting": true in
+     # _secrets/agent_poller.json once a first few real runs look sane.
+     stage_reporting: bool = False
+ 
+ 
+ # --------------------------------------------------------------------------- #
+ # Pure orchestration
+ # --------------------------------------------------------------------------- #
+ 
+@@ -994,22 +1001,71 @@ def _gh_request(url, pat, *, method="GET", payload=None):
+     try:
+         with urllib.request.urlopen(req, timeout=60) as resp:
+             body = resp.read().decode("utf-8")
+             return json.loads(body) if body else None
+     except urllib.error.HTTPError as e:
+         if e.code == 404:
+             return None
+         raise
+ 
+ 
++_GL_API = "https://cl-gl.listerralab.com/api/v4"
++
++
++def _gl_request(url, token, *, method="GET", payload=None):
++    """Issue an authenticated GitLab API request; return parsed JSON or None."""
++    data = None
++    headers = {"PRIVATE-TOKEN": token}
++    if payload is not None:
++        data = json.dumps(payload).encode("utf-8")
++        headers["Content-Type"] = "application/json"
++    req = urllib.request.Request(url, data=data, headers=headers, method=method)
++    try:
++        with urllib.request.urlopen(req, timeout=60) as resp:
++            body = resp.read().decode("utf-8")
++            return json.loads(body) if body else None
++    except urllib.error.HTTPError as e:
++        if e.code == 404:
++            return None
++        raise
++
++
+ def make_list_jobs(cfg):
+     """Return a list_jobs() that lists pending job files from the bot repo."""
++    if cfg.backend == "gitlab":
++        def list_jobs_gitlab():
++            url = "%s/projects/%s/repository/tree?path=%s&ref=%s" % (
++                _GL_API, cfg.gitlab_project_id, _JOBS_DIR, cfg.gitlab_ref)
++            entries = _gl_request(url, cfg.gitlab_token)
++            if not entries:
++                return []
++            out = []
++            for entry in entries:
++                if entry.get("type") != "blob" or not entry.get("name", "").endswith(".json"):
++                    continue
++                file_url = "%s/projects/%s/repository/files/%s?ref=%s" % (
++                    _GL_API, cfg.gitlab_project_id,
++                    urllib.parse.quote(entry["path"], safe=""), cfg.gitlab_ref)
++                meta = _gl_request(file_url, cfg.gitlab_token)
++                if not meta or "content" not in meta:
++                    continue
++                raw = base64.b64decode(meta["content"]).decode("utf-8")
++                try:
++                    job = json.loads(raw)
++                except ValueError:
++                    continue
++                # Stash the last commit id so set_status can update in place.
++                job["_sha"] = meta.get("last_commit_id")
++                out.append((entry["name"], job))
++            return out
++        return list_jobs_gitlab
++
+     def list_jobs():
+         url = "%s/repos/%s/contents/%s" % (_GH_API, cfg.repo, _JOBS_DIR)
+         entries = _gh_request(url, cfg.github_pat)
+         if not entries:
+             return []
+         out = []
+         for entry in entries:
+             if not entry.get("name", "").endswith(".json"):
+                 continue
+             file_url = "%s/repos/%s/contents/%s/%s" % (
+@@ -1023,26 +1079,53 @@ def make_list_jobs(cfg):
+             except ValueError:
+                 continue
+             # Stash the sha so set_status can update in place.
+             job["_sha"] = meta.get("sha")
+             out.append((entry["name"], job))
+         return out
+     return list_jobs
+ 
+ 
+ def make_set_status(cfg):
+-    """Return a set_status(name, job) that PUTs the job file back to the repo.
++    """Return a set_status(name, job) that writes the job file back to the repo.
+ 
+-    Reads the current sha immediately before each PUT, so a stale sha — e.g. the
+-    running -> done update after a long agent run, or any other prior write —
+-    never 409s.
++    Reads the current sha/last_commit_id immediately before each write, so a
++    stale value — e.g. the running -> done update after a long agent run, or
++    any other prior write — never 409s.
+     """
++    if cfg.backend == "gitlab":
++        def set_status_gitlab(name, job):
++            file_path = urllib.parse.quote("%s/%s" % (_JOBS_DIR, name), safe="")
++            url = "%s/projects/%s/repository/files/%s" % (_GL_API, cfg.gitlab_project_id, file_path)
++            current = _gl_request(url + "?ref=" + cfg.gitlab_ref, cfg.gitlab_token)
++            last_commit_id = current.get("last_commit_id") if isinstance(current, dict) else None
++            clean = {k: v for k, v in job.items() if k != "_sha"}
++            # base64-encode, matching the GitHub branch's encoding — GitLab's
++            # Repository Files API defaults "encoding" to plain text, so we
++            # say so explicitly to avoid mangling non-ASCII job content.
++            content = base64.b64encode(
++                json.dumps(clean, ensure_ascii=False, indent=2).encode("utf-8")
++            ).decode("ascii")
++            payload = {
++                "branch": cfg.gitlab_ref,
++                "content": content,
++                "encoding": "base64",
++                "commit_message": "agent job %s: %s" % (job.get("tender_id", name), job.get("status", "?")),
++            }
++            if last_commit_id:
++                payload["last_commit_id"] = last_commit_id
++                method = "PUT"
++            else:
++                method = "POST"
++            _gl_request(url, cfg.gitlab_token, method=method, payload=payload)
++        return set_status_gitlab
++
+     def set_status(name, job):
+         url = "%s/repos/%s/contents/%s/%s" % (
+             _GH_API, cfg.repo, _JOBS_DIR, name)
+         current = _gh_request(url + "?ref=" + cfg.branch, cfg.github_pat)
+         sha = current.get("sha") if isinstance(current, dict) else None
+         # Persist a clean copy without our internal _sha field.
+         clean = {k: v for k, v in job.items() if k != "_sha"}
+         content = base64.b64encode(
+             json.dumps(clean, ensure_ascii=False, indent=2).encode("utf-8")
+         ).decode("ascii")
+@@ -1678,20 +1761,24 @@ def _main_locked(path):
+         telegram_bot_token=secrets["telegram_bot_token"],
+         admin_chat_id=str(secrets["admin_chat_id"]),
+         drive_root=secrets.get("drive_root", DEFAULT_DRIVE_ROOT),
+         drive_link=secrets.get("drive_link", ""),
+         drive_sa_key=secrets.get("drive_sa_key", ""),
+         drive_parent_id=secrets.get("drive_parent_id", ""),
+         publish_root=secrets.get("publish_root", DEFAULT_PUBLISH_ROOT),
+         publish_parent_id=secrets.get("publish_parent_id", DEFAULT_PUBLISH_PARENT_ID),
+         assets_root=secrets.get("assets_root", DEFAULT_ASSETS_ROOT),
+         stage_reporting=bool(secrets.get("stage_reporting", False)),
++        backend=secrets.get("backend", "github"),
++        gitlab_token=secrets.get("gitlab_token", ""),
++        gitlab_project_id=secrets.get("gitlab_project_id", ""),
++        gitlab_ref=secrets.get("gitlab_ref", "main"),
+     )
+ 
+     list_jobs = make_list_jobs(cfg)
+     set_status = make_set_status(cfg)
+     resolve_item = make_resolve_drive_item(cfg)
+ 
+     # Раз на кожен запуск, ДО обробки задачі з черги: прибрати чернеткові
+     # файли, які лишились від попередніх сесій (див. docstring
+     # cleanup_scratch_files). Збій прибирання ніколи не має блокувати чергу.
+     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+diff --git a/tests/test_agent_poller.py b/tests/test_agent_poller.py
+index 1e118b6..2615b4d 100644
+--- a/tests/test_agent_poller.py
++++ b/tests/test_agent_poller.py
+@@ -1,11 +1,11 @@
+-import sys, os, time, tempfile, datetime, shutil
++import sys, os, time, tempfile, datetime, shutil, json, base64
+ import pytest
+ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+ import agent_poller as ap
+ 
+ def test_process_one_job_ok():
+     statuses, sent, saved = [], [], []
+     jobs = [("UA-x.json", {"tender_id":"UA-2026-06-18-014256-a","link":"L","company":"МАЙЛАБ","price":"181200","requested_by":"42","status":"pending","created_at":"t"})]
+     def list_jobs(): return jobs
+     def set_status(name, job): statuses.append((name, job["status"])); saved.append(job)
+     def run_agent(link, company, price, out_dir):
+@@ -1944,10 +1944,55 @@ def test_release_lock_removes_file(tmp_path):
+     ap._release_lock(lock)
+     assert not os.path.exists(lock)
+     print("OK release_lock_removes_file")
+ 
+ 
+ def test_release_lock_missing_file_does_not_raise(tmp_path):
+     lock = str(tmp_path / "does-not-exist.lock")
+     ap._release_lock(lock)  # має мовчки нічого не робити
+     print("OK release_lock_missing_file_does_not_raise")
+     print("OK cleanup_scratch_files_missing_repo_root_does_not_raise")
++
++
++def test_make_list_jobs_gitlab_backend(monkeypatch):
++    cfg = ap.Config(repo="r", github_pat="x", telegram_bot_token="y", admin_chat_id="42",
++                    backend="gitlab", gitlab_token="glpat-x",
++                    gitlab_project_id="99", gitlab_ref="main")
++    calls = []
++
++    def fake_gl_request(url, token, *, method="GET", payload=None):
++        calls.append((url, token, method))
++        if "tree" in url:
++            return [{"name": "UA-1.json", "path": "_state/agent_jobs/UA-1.json", "type": "blob"}]
++        content = base64.b64encode(json.dumps({"tender_id": "UA-1"}).encode()).decode()
++        return {"content": content, "last_commit_id": "c1"}
++
++    monkeypatch.setattr(ap, "_gl_request", fake_gl_request)
++    list_jobs = ap.make_list_jobs(cfg)
++    jobs = list_jobs()
++    assert len(jobs) == 1
++    assert jobs[0][1]["tender_id"] == "UA-1"
++    assert jobs[0][1]["_sha"] == "c1"
++    assert any("PRIVATE-TOKEN" not in str(c) for c in calls)  # токен передається окремим аргументом, не в url
++    print("OK make_list_jobs_gitlab_backend")
++
++
++def test_make_set_status_gitlab_backend_update(monkeypatch):
++    cfg = ap.Config(repo="r", github_pat="x", telegram_bot_token="y", admin_chat_id="42",
++                    backend="gitlab", gitlab_token="glpat-x",
++                    gitlab_project_id="99", gitlab_ref="main")
++    captured = {}
++
++    def fake_gl_request(url, token, *, method="GET", payload=None):
++        if method == "GET":
++            return {"last_commit_id": "old-commit"}
++        captured["payload"] = payload
++        captured["method"] = method
++        return {}
++
++    monkeypatch.setattr(ap, "_gl_request", fake_gl_request)
++    set_status = ap.make_set_status(cfg)
++    set_status("UA-1.json", {"tender_id": "UA-1", "status": "done", "_sha": "old-commit"})
++    assert captured["method"] == "PUT"
++    assert captured["payload"]["last_commit_id"] == "old-commit"
++    assert "_sha" not in json.loads(base64.b64decode(captured["payload"]["content"]))
++    print("OK make_set_status_gitlab_backend_update")
