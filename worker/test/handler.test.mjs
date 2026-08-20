@@ -3002,6 +3002,42 @@ test('agent price reply "181200" → confirm keyboard + price stored', async () 
   assert.match(kb, new RegExp(`agent:confirm:${AGENT_TID}`));
 });
 
+// The 4 buildAgentConfirmText tests (commands.test.mjs) only cover the pure
+// text-builder; they never exercise handleAgentTextReply's own wiring — the
+// `_loadTenderState ? await _loadTenderState(env, entry.tid) : null` call that
+// supplies `announcedValue`. A refactor could drop/rename that dependency and
+// the pure-function tests would stay green while the warning silently stopped
+// firing. This proves the wiring end-to-end via runHandler.
+test('agent price reply higher than announced tender value → handler calls _loadTenderState and the warning reaches the confirm prompt', async () => {
+  const calledWith = [];
+  const { deps, store, sent } = makeAgentDeps({
+    loadTenderState: async (_env, tid) => {
+      calledWith.push(tid);
+      return { value: { amount: 100000 } };
+    },
+  });
+  store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' };
+  await runHandler({ update: agentMsg('150000'), env: ENV, deps });
+
+  assert.deepEqual(calledWith, [AGENT_TID], '_loadTenderState must be called with the pending dialog\'s tender id');
+  assert.equal(store.pending['123'].step, 'confirm');
+  assert.equal(store.pending['123'].price, '150000');
+  assert.match(sent[0].text, /ВИЩА за оголошену вартість закупівлі/, 'confirm prompt must carry the price warning');
+  assert.match(sent[0].text, /МАЙЛАБ/, 'confirm prompt still has the usual summary');
+});
+
+test('agent price reply within announced tender value → no warning, plain confirm prompt', async () => {
+  const { deps, store, sent } = makeAgentDeps({
+    loadTenderState: async () => ({ value: { amount: 200000 } }),
+  });
+  store.pending['123'] = { tid: AGENT_TID, company: 'МАЙЛАБ', step: 'await_price' };
+  await runHandler({ update: agentMsg('150000'), env: ENV, deps });
+
+  assert.equal(store.pending['123'].step, 'confirm');
+  assert.doesNotMatch(sent[0].text, /ВИЩА за оголошену вартість/);
+  assert.match(sent[0].text, /МАЙЛАБ/);
+});
+
 test('agent price reply on stale pending (>15 min) → not consumed, pending dropped', async () => {
   const { deps, store, sent, jobs } = makeAgentDeps();
   // Opened the dialog ~20 min before the injected "now" (10:00:00) → expired.
