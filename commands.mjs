@@ -1924,9 +1924,21 @@ export function buildAgentConfirmKeyboard(tenderId) {
 }
 
 // One-line confirm prompt summarising the queued request.
-export function buildAgentConfirmText({ company, price, tenderId, entityName }) {
+export function buildAgentConfirmText({ company, price, tenderId, entityName, announcedValue }) {
   const ent = entityName ? ` (${entityName})` : '';
-  return `🤖 Компанія: ${company} · Ціна: ${price} · Тендер: ${tenderId}${ent}`;
+  const base = `🤖 Компанія: ${company} · Ціна: ${price} · Тендер: ${tenderId}${ent}`;
+  // 20.08.2026: реальний випадок — введена ціна (387 600) виявилась ВИЩОЮ за
+  // оголошену вартість закупівлі (326 250), і це помітили аж по факту в
+  // готових документах. Попередження тут — останній момент, де людина ще
+  // бачить обидва числа поруч і може відмінити, перш ніж піде реальний прогін.
+  if (announcedValue != null && price !== 'auto') {
+    const parsed = parseFloat(String(price).replace(/\s/g, '').replace(',', '.'));
+    if (Number.isFinite(parsed) && parsed > announcedValue) {
+      const fmt = announcedValue.toLocaleString('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return `⚠️ Ціна ВИЩА за оголошену вартість закупівлі (${fmt} грн) — перевір, чи це саме та сума!\n\n${base}`;
+    }
+  }
+  return base;
 }
 
 

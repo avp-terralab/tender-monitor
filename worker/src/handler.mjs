@@ -175,7 +175,7 @@ export async function runHandler({ update, env, deps = {} }) {
   if (isEditor && typeof msg.text === 'string' && !msg.text.startsWith('/')) {
     const handled = await handleAgentTextReply({
       env, chatId, msg, _sendReply, _editMessageText,
-      _loadAgentPending, _saveAgentPending, _now,
+      _loadAgentPending, _saveAgentPending, _now, _loadTenderState,
     });
     if (handled) return;
   }
@@ -1987,6 +1987,7 @@ async function clearAgentPending({ env, chatId, _loadAgentPending, _saveAgentPen
 // pending step (caller continues normal parsing).
 async function handleAgentTextReply({
   env, chatId, msg, _sendReply, _editMessageText, _loadAgentPending, _saveAgentPending, _now,
+  _loadTenderState,
 }) {
   let pending, sha, entry;
   try {
@@ -2084,11 +2085,20 @@ async function handleAgentTextReply({
     return true; // consumed; stay at await_price
   }
 
-  // Advance to confirm.
+  // Advance to confirm. Cross-check against the tender's own announced value
+  // (cached snapshot) so a mistyped price gets flagged BEFORE a real run starts —
+  // see buildAgentConfirmText for the incident that motivated this.
+  let announcedValue = null;
+  try {
+    const snap = _loadTenderState ? await _loadTenderState(env, entry.tid) : null;
+    announcedValue = snap?.value?.amount ?? null;
+  } catch (err) {
+    console.error('worker: agent price snapshot lookup failed:', err.message);
+  }
   let newId;
   try {
     newId = await update(
-      buildAgentConfirmText({ company: entry.company, price, tenderId: entry.tid }),
+      buildAgentConfirmText({ company: entry.company, price, tenderId: entry.tid, announcedValue }),
       buildAgentConfirmKeyboard(entry.tid),
     );
   } catch (err) {

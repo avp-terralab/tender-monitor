@@ -3256,6 +3256,36 @@ test('buildAgentConfirmText: one-line prompt with fields', () => {
   assert.match(txt, /Лікарня/);
 });
 
+test('buildAgentConfirmText: warns when price exceeds the announced tender value', () => {
+  const txt = buildAgentConfirmText({
+    company: 'ТЕРРАЛАБ АЙ ТІ', price: '387600,00', tenderId: 'UA-x', announcedValue: 326250,
+  });
+  assert.match(txt, /ВИЩА за оголошену вартість/);
+  assert.match(txt, /326\s250,00/); //   (nbsp) — as produced by toLocaleString('uk-UA')
+  assert.match(txt, /387600,00/);
+});
+
+test('buildAgentConfirmText: no warning when price is at or below the announced value', () => {
+  const txt = buildAgentConfirmText({
+    company: 'ТЕРРАЛАБ АЙ ТІ', price: '323000', tenderId: 'UA-x', announcedValue: 326250,
+  });
+  assert.doesNotMatch(txt, /ВИЩА за оголошену вартість/);
+});
+
+test('buildAgentConfirmText: no warning for "auto" price regardless of announced value', () => {
+  const txt = buildAgentConfirmText({
+    company: 'ТЕРРАЛАБ АЙ ТІ', price: 'auto', tenderId: 'UA-x', announcedValue: 326250,
+  });
+  assert.doesNotMatch(txt, /ВИЩА за оголошену вартість/);
+});
+
+test('buildAgentConfirmText: no warning when announcedValue is unknown (null)', () => {
+  const txt = buildAgentConfirmText({
+    company: 'ТЕРРАЛАБ АЙ ТІ', price: '999999', tenderId: 'UA-x', announcedValue: null,
+  });
+  assert.doesNotMatch(txt, /ВИЩА за оголошену вартість/);
+});
+
 
 test('parseCommand: /agent', () => {
   assert.deepEqual(parseCommand('/agent'), { cmd: 'agent' });
