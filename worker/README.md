@@ -6,7 +6,9 @@ Telegram webhook handler для команд бота (`/add`, `/list`, `/info`,
 
 - `src/index.mjs` — entrypoint: secret verify + dispatch
 - `src/handler.mjs` — orchestrator (`runHandler({ update, env, deps })`); auth gate (ADMIN_CHAT_ID env + `_state/allowed_users.json` file)
+- `src/state.mjs` — диспетчер стану: вибирає `github.mjs` чи `gitlab.mjs` за `env.STATE_BACKEND` (`"github"` типово, `"gitlab"` на staging); `handler.mjs` імпортує load/save функції лише звідси
 - `src/github.mjs` — load/save для `watchlist.json`, `watched_entities.json`, `_state/_watched_seen.json`, `_state/invites.json`, `_state/allowed_users.json` через GitHub Contents API
+- `src/gitlab.mjs` — той самий набір load/save, але через GitLab Repository Files API (той самий репозиторій, дзеркалений на `cl-gl.listerralab.com`)
 
 Імпортує існуючі pure модулі з `../`: `commands.mjs`, `telegram.mjs`, `prozorro.mjs`.
 
@@ -35,6 +37,7 @@ cd worker
 npx wrangler secret put TELEGRAM_BOT_TOKEN     # bot token from BotFather
 npx wrangler secret put TELEGRAM_WEBHOOK_SECRET # random 32-char string
 npx wrangler secret put GITHUB_PAT              # fine-grained PAT, Contents:R+W on this repo
+npx wrangler secret put GITLAB_TOKEN            # project access token (api scope), потрібен лише коли STATE_BACKEND=gitlab
 npx wrangler secret put ADMIN_CHAT_ID           # admin chat_id (e.g. 1744078008); all others onboarded via /invite
 ```
 
