@@ -1,0 +1,47 @@
+{
+  "items": {
+    "UA-2026-08-13-006468-a": {
+      "tender_id": "UA-2026-08-13-006468-a",
+      "title": "ДК 021:2015:72260000-5 Послуги, пов’язані з програмним забезпеченням (Послуги, пов’язані з програмним забезпеченням)",
+      "status": "active.qualification",
+      "deadline": "2026-08-21T00:00:00+03:00",
+      "procuring_entity": {
+        "name": "КОМУНАЛЬНИЙ ЗАКЛАД КИЇВСЬКОЇ ОБЛАСНОЇ РАДИ \"БАЗА СПЕЦІАЛЬНОГО МЕДИЧНОГО ПОСТАЧАННЯ\"",
+        "edrpou": "02125740"
+      },
+      "value": {
+        "amount": 424000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurement_method_type": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "contact": {
+        "name": "Оберемчук Дмитро Володимирович",
+        "email": "tendener522@gmail.com",
+        "telephone": "380672396837"
+      },
+      "prozorro_url": "https://prozorro.gov.ua/tender/UA-2026-08-13-006468-a",
+      "events": [
+        {
+          "type": "qualification_started",
+          "old": "active.tendering",
+          "new": "active.qualification"
+        },
+        {
+          "type": "award_created",
+          "supplier_name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+          "supplier_edrpou": "39376596"
+        }
+      ],
+      "first_fired_at": "2026-08-20T21:25:34.594Z",
+      "last_fired_at": "2026-08-20T21:25:34.594Z"
+    }
+  },
+  "archived": [],
+  "errors": []
+}

@@ -1,11 +1,11 @@
 {
   "tender_id": "UA-2026-08-13-006468-a",
-  "saved_at": "2026-08-19T21:23:48.171Z",
+  "saved_at": "2026-08-20T21:25:41.735Z",
   "snapshot": {
     "tender_id": "UA-2026-08-13-006468-a",
     "title": "ДК 021:2015:72260000-5 Послуги, пов’язані з програмним забезпеченням (Послуги, пов’язані з програмним забезпеченням)",
-    "status": "active.tendering",
-    "dateModified": "2026-08-13T13:26:23.908857+03:00",
+    "status": "active.qualification",
+    "dateModified": "2026-08-21T00:02:38.147688+03:00",
     "tenderPeriod": {
       "endDate": "2026-08-21T00:00:00+03:00"
     },
@@ -55,7 +55,21 @@
     ],
     "questions": [],
     "complaints": [],
-    "awards": [],
+    "awards": [
+      {
+        "id": "bfdd27555ed74a7c86a9018f3076e82e",
+        "status": "pending",
+        "suppliers": [
+          {
+            "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+            "identifier": {
+              "id": "39376596"
+            }
+          }
+        ],
+        "complaints": []
+      }
+    ],
     "contracts": [],
     "cancellations": [],
     "_notifiedDeadlines": [
