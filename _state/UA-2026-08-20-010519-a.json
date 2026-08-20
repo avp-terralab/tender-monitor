@@ -1,0 +1,86 @@
+{
+  "tender_id": "UA-2026-08-20-010519-a",
+  "saved_at": "2026-08-20T13:25:45.980Z",
+  "snapshot": {
+    "tender_id": "UA-2026-08-20-010519-a",
+    "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+    "status": "active.tendering",
+    "dateModified": "2026-08-20T15:47:07.421884+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-08-28T01:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КНП \"Городоцька центральна лікарня\" Городоцької міської ради Львівської області",
+      "edrpou": "01997863"
+    },
+    "value": {
+      "amount": 326250,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Максимець Андрій Васильович",
+      "email": "gorcrl@ukr.net",
+      "telephone": "+380323130148"
+    },
+    "documents": [
+      {
+        "id": "562634b4c2884a8e81a7ac2b6ef1c92a",
+        "title": "Тендерна документація (за Особливостями зі змінами).docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-20T15:41:52.439345+03:00"
+      },
+      {
+        "id": "647776d1f42e46608a554cb08c6031f6",
+        "title": "Додаток 1 до тендерної документації.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-08-20T15:41:52.439345+03:00"
+      },
+      {
+        "id": "03f3aebbad1744c490726078beccf320",
+        "title": "Додаток 2 Технічні_вимоги_Лабораторна_інформаційна_система.docx",
+        "documentType": "technicalSpecifications",
+        "datePublished": "2026-08-20T15:41:52.439345+03:00"
+      },
+      {
+        "id": "7c801dc7602840a3a6e99d9884d28566",
+        "title": "Додаток 3 Проєкт договору.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-08-20T15:41:52.439345+03:00"
+      },
+      {
+        "id": "0c209c1886e04b8dbbb83ceb91b4f1d3",
+        "title": "Додаток 4 перелік документів переможця.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-08-20T15:41:52.439345+03:00"
+      },
+      {
+        "id": "ca663e08af1c498391e60b140641103e",
+        "title": "Додаток 5 до тендерної документації.docx",
+        "documentType": "eligibilityCriteria",
+        "datePublished": "2026-08-20T15:41:52.439345+03:00"
+      },
+      {
+        "id": "d95205080c3940b2b5876394090afe0a",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-08-20T15:46:58.672056+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
