@@ -4,11 +4,12 @@
   "job_type": "winner",
   "company": "ТЕРРАЛАБ АЙ ТІ",
   "requested_by": "7321709183",
-  "status": "pending",
+  "status": "running",
   "created_at": "2026-08-21T06:31:53.217Z",
   "target": {
     "drive_link": "https://drive.google.com/drive/folders/1PRZUPEs-VHF7it_M_dE6odhSxKqfVXxX",
     "package_dir": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій\\12.08.26 КНП Локачинської СелР Локачинська лікарня\\Тендерна пропозиція",
     "published_dir": "G:\\Мій диск\\ТЕНДЕРИ 2021-2026\\ТЕНДЕРИ 2026\\79. Локачинська Лікарня"
-  }
+  },
+  "updated_at": "2026-08-21T06:32:29.146711+00:00"
 }
