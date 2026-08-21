@@ -14,16 +14,30 @@ test:
   # спільному раннері з `concurrent = 1` — черга росла б і затримувала наступний
   # тік монітора. Код на `staging-state` усе одно приїжджає мерджем із `main`,
   # де тести вже пройшли.
+  #
+  # Далі — стандартний набір проти ДУБЛЮВАННЯ пайплайнів. Голе `when: always`
+  # давало попередження лінта «may allow multiple pipelines to run for a single
+  # action»: на гілці з відкритим MR один пуш створював би і branch-пайплайн, і
+  # MR-пайплайн, тобто суїт біг би двічі — на раннері з `concurrent = 1` це
+  # прямий простій. Порядок правил має значення, читається згори вниз.
   rules:
     - if: '$CI_COMMIT_BRANCH == "staging-state"'
       when: never
-    - when: always
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'          # MR — біжимо
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never                                                 # гілка з відкритим MR — вже покрито вище
+    - if: '$CI_COMMIT_BRANCH'                                     # звичайний пуш у гілку
   script:
     - node --test test/*.test.mjs worker/test/*.test.mjs
 
 deploy-staging:
   stage: deploy
   when: manual
+  # Тут це і так типове значення (`when: manual` на верхньому рівні), але
+  # задано явно — щоб обидві деплойні джоби читались однаково й ніхто не
+  # мусив пам'ятати, що типове залежить від місця оголошення. Див. коментар
+  # у deploy-production.
+  allow_failure: true
   script:
     - cd worker && npm install --no-save wrangler@^3 && npx wrangler deploy --env staging
 
@@ -134,3 +148,13 @@ deploy-production:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
+      # `allow_failure` задано ЯВНО, бо типове значення тут залежить від того,
+      # де стоїть `when: manual`. На верхньому рівні джоби (як у deploy-staging)
+      # воно типово `true` — джоба необов'язкова. Всередині `rules:` воно типово
+      # `false` — джоба стає БЛОКУЮЧОЮ, і пайплайн назавжди висить у статусі
+      # `manual`/«Blocked», чекаючи на кнопку, якої ніхто не натисне.
+      # Через це всі пайплайни на `main` ніколи не ставали зеленими, хоч `test`
+      # і проходив — тобто індикатор перестав відрізняти «тести пройшли» від
+      # «тести впали». Прод і далі деплоїться лише кнопкою; змінюється рівно
+      # те, чи чекає на неї статус пайплайна.
+      allow_failure: true
