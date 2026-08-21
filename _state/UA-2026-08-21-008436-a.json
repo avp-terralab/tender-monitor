@@ -1,0 +1,116 @@
+{
+  "tender_id": "UA-2026-08-21-008436-a",
+  "saved_at": "2026-08-21T12:25:37.469Z",
+  "snapshot": {
+    "tender_id": "UA-2026-08-21-008436-a",
+    "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів у клініко-діагностичній лабораторії",
+    "status": "active.tendering",
+    "dateModified": "2026-08-21T14:53:11.736008+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-08-29T14:26:17+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "Комунальне некомерційне підприємство «Костопільська багатопрофільна лікарня інтенсивного лікування» Костопільської міської ради",
+      "edrpou": "01999907"
+    },
+    "value": {
+      "amount": 245230,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72510000-3",
+      "description": "Управлінські послуги, пов’язані з комп’ютерними технологіями",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72510000-3"
+    ],
+    "contact": {
+      "name": "Андрушко Наталія Миколаївна",
+      "email": "kostcrl@gmail.com",
+      "telephone": "+380675954500"
+    },
+    "documents": [
+      {
+        "id": "a4b091adea69421483238f129d2d81ed",
+        "title": "Тендерна документація.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-21T14:21:28.229504+03:00"
+      },
+      {
+        "id": "b2b4ce165a4b4bc6afb99a683f8d1e05",
+        "title": "Додаток 1. Перелік документів та-або інформації_ які подаються учасником процедури закупівлі.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-21T14:21:28.229504+03:00"
+      },
+      {
+        "id": "c4056f0a537f401d9795100ac82fda42",
+        "title": "Додаток 2. Перелік документів та-або інформації_ які подаються переможцем процедури закупівлі.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-21T14:21:28.229504+03:00"
+      },
+      {
+        "id": "93a162492f2b4814ab1356e8ec0090bf",
+        "title": "Додаток 3. Перелік документів_ які вимагаються від учасника для підтвердження його відповідності кваліфікаційним критеріям.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-21T14:21:28.229504+03:00"
+      },
+      {
+        "id": "3e7cc01a3b354d168fffb9183314693f",
+        "title": "Додаток 4. Документи_ які повинен надати Учасник для підтвердження відповідності  п. 45 та п. 47 Особливостей.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-21T14:21:28.229504+03:00"
+      },
+      {
+        "id": "f9f8c7776d6f407f9993057d43ded9cb",
+        "title": "Додаток 5. Інформація про технічні_ якісні та кількісні характеристики предмета закупівлі.doc",
+        "documentType": "technicalSpecifications",
+        "datePublished": "2026-08-21T14:21:28.229504+03:00"
+      },
+      {
+        "id": "3f9de6a206d74d08ab15ad04a961b66f",
+        "title": "Додаток 6. Тендерна пропозиція.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-21T14:21:28.229504+03:00"
+      },
+      {
+        "id": "add902d9f3f44ba58407d140d0ee75e0",
+        "title": "Додаток 7. Лист-згода.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-21T14:21:28.229504+03:00"
+      },
+      {
+        "id": "e10de177e6f646dd884b94e1443db681",
+        "title": "Проєкт договору.doc",
+        "documentType": "contractProforma",
+        "datePublished": "2026-08-21T14:21:28.229504+03:00"
+      },
+      {
+        "id": "dd72d58885c64a1c94e3ddb466f32218",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-08-21T14:27:14.083278+03:00"
+      },
+      {
+        "id": "a4b091adea69421483238f129d2d81ed",
+        "title": "Тендерна документація.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-21T14:44:42.296601+03:00"
+      },
+      {
+        "id": "dd72d58885c64a1c94e3ddb466f32218",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-08-21T14:53:11.736008+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
