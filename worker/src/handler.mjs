@@ -1921,16 +1921,54 @@ async function handleAgentCallback({
     }
     if (!job) { await ack('⚠️ Job не знайдено', true); return; }
     if (job.status !== 'error') { await ack('ℹ️ Job вже не в стані error', true); return; }
-    const retried = { ...job, status: 'pending', updated_at: _now().toISOString() };
-    delete retried.result;
+
+    // «Повторити» НЕ ставить задачу в чергу саме — воно веде в те саме вікно
+    // підтвердження, що й ручне введення ціни, з підставленими компанією й
+    // ціною зі старої задачі. Далі все робить `action === 'confirm'` вище.
+    //
+    // Раніше тут була коротка обхідна стежка (`{...job, status: 'pending'}` →
+    // `saveAgentJob`), і вона ТРИЧІ забувала те, що вміє головна:
+    //   1. перевірку ціни проти оголошеної вартості закупівлі;
+    //   2. `requested_by` — успадковувався разом із задачею, тож звіт ішов
+    //      початковому авторові, а не тому, хто натиснув (реальний випадок
+    //      21.08.2026: оператор перезапустив задачу колеги, прочекав пів
+    //      години й не отримав нічого);
+    //   3. `notifyAdminAgentRun` — механізм, зроблений саме для того, щоб
+    //      адмін дізнавався про запуски, зроблені кимось іншим.
+    // Латати три пропуски окремо означало б лишити дві стежки, які розійдуться
+    // знову при наступній зміні. Тому стежка одна.
+    let announcedValue = null;
     try {
-      await _saveAgentJob(env, retried);
+      const snap = _loadTenderState ? await _loadTenderState(env, tid) : null;
+      announcedValue = snap?.value?.amount ?? null;
     } catch (err) {
-      console.error('worker: agent retry save failed:', err.message);
-      await ack('⚠️ Не вдалось зберегти, спробуй ще раз', true);
+      console.error('worker: agent retry price snapshot lookup failed:', err.message);
+    }
+    let newId;
+    try {
+      newId = await editOrSend({
+        _editMessageText, _sendReply, env, chatId, messageId,
+        text: buildAgentConfirmText({
+          company: job.company, price: job.price, tenderId: tid, announcedValue,
+        }),
+        replyMarkup: buildAgentConfirmKeyboard(tid),
+      });
+    } catch (err) {
+      console.error('worker: agent retry confirm prompt failed:', err.message);
+    }
+    try {
+      const { pending, sha } = await _loadAgentPending(env);
+      pending[chatId] = {
+        tid, company: job.company, price: job.price, step: 'confirm',
+        messageId: newId ?? messageId,
+      };
+      await _saveAgentPending(env, pending, sha);
+    } catch (err) {
+      console.error('worker: agent retry save pending failed:', err.message);
+      await ack('⚠️ Не вдалось відкрити підтвердження, спробуй ще раз', true);
       return;
     }
-    await ack('✅ Поставлено на повтор');
+    await ack('↩️ Перевір ціну й підтверди');
     return;
   }
 

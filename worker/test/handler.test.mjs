@@ -3150,21 +3150,86 @@ test('agent:confirm with kind=amend → amend job saved, target from prior done,
   assert.equal(acks.length, 1);
 });
 
-test('agent:retry → resets error job to pending, acks ✅', async () => {
-  const errorJob = {
-    tender_id: AGENT_TID, link: 'https://prozorro.gov.ua/tender/' + AGENT_TID,
-    company: 'МАЙЛАБ', price: '100000',
-    status: 'error', created_at: '2026-06-21T08:00:00.000Z',
-    result: { detail: 'no .docx generated (claude rc=1)' },
-  };
-  const { deps, jobs, acks } = makeAgentDeps({
-    loadAgentJob: async () => structuredClone(errorJob),
+// «Повторити» веде в те саме вікно підтвердження, що й ручне введення ціни, а
+// не ставить задачу в чергу самотужки. Причина не в зручності: коротка обхідна
+// стежка ТРИЧІ забувала те, що вміє головна — перевірку ціни, призначення
+// отримувача звіту (`requested_by`) і сповіщення адміна про запуск. Один шлях
+// замість двох робить таке розходження неможливим.
+const errorJobFor = (over = {}) => ({
+  tender_id: AGENT_TID, link: 'https://prozorro.gov.ua/tender/' + AGENT_TID,
+  company: 'МАЙЛАБ', price: '100000',
+  status: 'error', created_at: '2026-06-21T08:00:00.000Z',
+  result: { detail: 'no .docx generated (claude rc=1)' },
+  ...over,
+});
+
+test('agent:retry → відкриває підтвердження, а НЕ ставить задачу в чергу', async () => {
+  const { deps, jobs, acks, edits, store } = makeAgentDeps({
+    loadAgentJob: async () => errorJobFor(),
   });
   await runHandler({ update: CB(`agent:retry:${AGENT_TID}`), env: ENV, deps });
-  assert.equal(jobs.length, 1);
+
+  assert.equal(jobs.length, 0, 'без підтвердження задача в чергу не йде');
+  assert.equal(edits.length, 1, 'показано вікно підтвердження');
+  assert.match(edits[0].text, /МАЙЛАБ/, 'компанія зі старої задачі');
+  assert.match(edits[0].text, /100000/, 'ціна зі старої задачі');
+  assert.match(edits[0].text, new RegExp(AGENT_TID), 'тендер зі старої задачі');
+  const p = store.pending['123'];
+  assert.deepEqual(
+    { tid: p?.tid, company: p?.company, price: p?.price, step: p?.step },
+    { tid: AGENT_TID, company: 'МАЙЛАБ', price: '100000', step: 'confirm' },
+    'діалог засіяно так, щоб кнопка «Підтвердити» одразу працювала',
+  );
+  assert.equal(acks.length, 1);
+});
+
+test('agent:retry: ціна вища за оголошену → підтвердження несе попередження', async () => {
+  const { deps, edits } = makeAgentDeps({
+    loadAgentJob: async () => errorJobFor({ price: '150000' }),
+    loadTenderState: async () => ({ value: { amount: 100000 } }),
+  });
+  await runHandler({ update: CB(`agent:retry:${AGENT_TID}`), env: ENV, deps });
+  assert.match(edits[0].text, /ВИЩА за оголошену/,
+    'перевірка ціни працює й на шляху повтору, не лише при ручному введенні');
+});
+
+test('agent:retry: ціна в межах оголошеної → попередження НЕ показується', async () => {
+  const { deps, edits } = makeAgentDeps({
+    loadAgentJob: async () => errorJobFor({ price: '150000' }),
+    loadTenderState: async () => ({ value: { amount: 200000 } }),
+  });
+  await runHandler({ update: CB(`agent:retry:${AGENT_TID}`), env: ENV, deps });
+  assert.doesNotMatch(edits[0].text, /ВИЩА за оголошену/);
+});
+
+test('agent:retry → confirm: звіт піде тому, хто перезапустив, а не автору задачі', async () => {
+  const { deps, jobs } = makeAgentDeps({
+    loadAgentJob: async () => errorJobFor({ requested_by: '999' }),
+  });
+  await runHandler({ update: CB(`agent:retry:${AGENT_TID}`), env: ENV, deps });
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 1, 'після підтвердження задача таки ставиться');
   assert.equal(jobs[0].status, 'pending');
-  assert.equal(jobs[0].result, undefined);
-  assert.match(acks[0].text, /повтор/i);
+  assert.equal(jobs[0].requested_by, '123',
+    'раніше успадковувався requested_by=999, і звіт ішов не тому, хто натиснув');
+});
+
+// Третій пропуск обхідної стежки: `notifyAdminAgentRun` існує саме для того,
+// щоб адмін дізнавався про запуски, зроблені кимось іншим, — а «повторити»
+// його не викликало. Клікер тут editor 456, не адмін (ADMIN_CHAT_ID=123),
+// інакше сповіщення свідомо не надсилається (`if (isAdmin) return`).
+test('agent:retry → confirm редактором: адмін дізнається про перезапуск', async () => {
+  const { deps, sent, jobs } = makeAgentDeps({
+    loadAgentJob: async () => errorJobFor(),
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'Olha', role: 'editor' }], sha: 's' }),
+  });
+  await runHandler({ update: CB(`agent:retry:${AGENT_TID}`, 456), env: ENV, deps });
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`, 456), env: ENV, deps });
+
+  assert.equal(jobs.length, 1, 'задача поставлена');
+  const notice = sent.find((s) => String(s.chatId) === '123');
+  assert.ok(notice, 'адмін отримав сповіщення про запуск');
+  assert.match(notice.text, new RegExp(AGENT_TID));
 });
 
 test('agent:retry on non-error job → acks info, no save', async () => {
