@@ -2,6 +2,16 @@ name = "tender-monitor-bot"
 main = "src/index.mjs"
 compatibility_date = "2026-05-01"
 
+# Логи Worker'а. Були вимкнені до 23.08.2026, і через це весь `console.error`
+# у цьому коді летів у нікуди: `setMyCommands` стабільно падав, помилка
+# ловилась у catch, і дізнатись про це можна було лише заміром getMyCommands
+# іззовні. Увімкнути в панелі недостатньо — `wrangler deploy` застосовує
+# конфіг ізвідси, тож без цієї секції наступний деплой знову зробив би нас
+# сліпими. Успадковується обома [env.*]. Гейт — worker/test/wrangler.test.mjs.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 [[kv_namespaces]]
 binding = "EPHEMERAL_KV"
 id = "f9c6d80922f24615ab394d3cc1aa7251"   # KV namespace "tender-monitor-ephemeral"

@@ -121,6 +121,20 @@ test('worker-deploy.yml: деплой застосовує саме [env.product
   }
 });
 
+// Логи Worker'а були ВИМКНЕНІ, і через це весь `console.error` у цьому коді
+// летів у нікуди. Наслідок побачили 23.08: `setMyCommands` стабільно не
+// долітав, помилка ловилась у catch — і не існувало жодного способу про це
+// дізнатись, крім заміру getMyCommands іззовні.
+//
+// Увімкнути в панелі недостатньо: `wrangler deploy` застосовує конфіг із
+// цього файла, тож без секції тут наступний деплой знову зробить нас сліпими.
+test('wrangler.toml: логи Worker (observability) увімкнені у файлі, не лише в панелі', () => {
+  assert.match(TOML, /^\s*\[observability\]/m, 'немає секції [observability]');
+  const block = TOML.split(/^\s*\[observability\]/m)[1] ?? '';
+  const head = block.split(/^\s*\[/m)[0];
+  assert.match(head, /enabled\s*=\s*true/, '[observability] є, але enabled не true');
+});
+
 test('wrangler.toml: STATE_BACKEND задано явно в обох оточеннях', () => {
   // Типове значення (github) працює, але «не задано» і «задано github» —
   // різні речі при читанні конфіга людиною перед cutover.
