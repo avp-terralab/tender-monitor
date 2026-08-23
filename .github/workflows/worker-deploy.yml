@@ -30,4 +30,11 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy
+        # `--env production` тут ОБОВ'ЯЗКОВИЙ. Топ-рівень wrangler.toml має те
+        # саме ім'я скрипта (`tender-monitor-bot`), тож `wrangler deploy` без
+        # прапорця викочує той самий Worker, але з топ-рівневим конфігом — і
+        # блок [env.production] не застосовується взагалі. Виглядає це так, ніби
+        # налаштування є, а насправді вони мертві: на cutover прапорець
+        # STATE_BACKEND перемкнули б там, куди ніхто не дивиться.
+        # Гейт — worker/test/wrangler.test.mjs.
+        run: npx wrangler deploy --env production

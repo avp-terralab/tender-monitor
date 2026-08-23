@@ -93,6 +93,34 @@ for (const name of ['staging', 'production']) {
   });
 }
 
+// ⚠️ Найпідліша вада, знайдена 23.08.2026 при підготовці cutover.
+//
+// Топ-рівень wrangler.toml має ТЕ САМЕ ім'я скрипта, що й [env.production] —
+// `tender-monitor-bot`. Тому `wrangler deploy` БЕЗ `--env` викочує той самий
+// продовий Worker, але з топ-рівневим конфігом, а [env.production] не
+// застосовується взагалі. Тобто цілий блок налаштувань виглядає живим і не є.
+//
+// Наслідок на cutover: прапорець STATE_BACKEND перемкнули б у блоці, якого
+// ніхто не читає, побачили б, що поведінка не змінилась, і шукали б причину
+// де завгодно, крім цього місця. (`deploy-production` у .gitlab-ci.yml
+// `--env production` уже вживав — розбіжність була саме в GitHub-шляху.)
+test('worker-deploy.yml: деплой застосовує саме [env.production]', () => {
+  const wf = readFileSync(
+    new URL('../../.github/workflows/worker-deploy.yml', import.meta.url), 'utf8');
+  // Коментарі відкидаємо ДО пошуку: у самому воркфлоу є коментар, який
+  // цитує «wrangler deploy без прапорця», і наївний фільтр приймав його за
+  // команду. Дзеркало класичної помилки — гейт, що падає на власному тексті.
+  const deployLines = wf
+    .split(/\r?\n/)
+    .filter((l) => !/^\s*#/.test(l))
+    .filter((l) => /wrangler deploy/.test(l));
+  assert.ok(deployLines.length > 0, 'у воркфлоу немає команди wrangler deploy');
+  for (const line of deployLines) {
+    assert.match(line, /--env\s+production/,
+      'деплой без --env бере топ-рівневий конфіг, і [env.production] стає мертвим');
+  }
+});
+
 test('wrangler.toml: STATE_BACKEND задано явно в обох оточеннях', () => {
   // Типове значення (github) працює, але «не задано» і «задано github» —
   // різні речі при читанні конфіга людиною перед cutover.
