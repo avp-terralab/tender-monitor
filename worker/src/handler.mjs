@@ -239,8 +239,16 @@ export async function runHandler({ update, env, deps = {} }) {
       }
     }
     if (isAllowed) {
-      // Fire-and-forget; logs but doesn't block.
-      syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, chatId, role);
+      // ⚠️ ОБОВ'ЯЗКОВО `await`, хоч би як привабливо виглядало «не блокувати».
+      // Раніше тут був fire-and-forget, і кнопки «Меню» в тестовому боті не
+      // було НІКОЛИ: одразу після цього рядка йде `return`, тобто runHandler
+      // завершується, `ctx.waitUntil` в index.mjs вважає роботу зробленою,
+      // ізолят закривається — і запит до Telegram гине, не долетівши.
+      // Стабільно, а не «іноді»: після return ізоляту немає причин жити.
+      // Замір 23.08.2026: getMyCommands для чату віддавав порожньо навіть
+      // відразу після /start. Затримки для людини це не додає — відповідь уже
+      // надіслано вище, а помилки syncBotCommands глушить сам.
+      await syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, chatId, role);
     }
     return;
   }
@@ -319,7 +327,7 @@ export async function runHandler({ update, env, deps = {} }) {
           }
           // Sync chat-scope commands for the freshly-redeemed user.
           if (mutationBSucceeded && result.userMutation?.row?.role) {
-            syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, chatId, result.userMutation.row.role);
+            await syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, chatId, result.userMutation.row.role);
           }
         }
       } catch (err) {
@@ -647,7 +655,7 @@ export async function runHandler({ update, env, deps = {} }) {
       const roleSuccess = typeof reply === 'string'
         && (reply.startsWith('✏️') || reply.startsWith('📄'));
       if (roleSuccess) {
-        syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, cmd.chat_id, cmd.role);
+        await syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, cmd.chat_id, cmd.role);
         // Notify the target user about their new role + role-filtered command list.
         try {
           await _sendReply({
@@ -823,10 +831,15 @@ export async function runHandler({ update, env, deps = {} }) {
   }
 
   // Keep this chat's "/" autocomplete in sync with the current role's command
-  // list on every reply (fire-and-forget). Self-heals when BOT_COMMANDS_BY_ROLE
-  // changes without requiring the user to send /start.
+  // list on every reply. Self-heals when BOT_COMMANDS_BY_ROLE changes without
+  // requiring the user to send /start.
+  //
+  // Awaited — див. довгий коментар у гілці /start. Тут воно раніше «працювало»
+  // випадково: після цього рядка нічого не було, але сам рядок стоїть у кінці
+  // обробника, куди доходять лише шляхи з попередніми awaited-надсиланнями,
+  // які й тримали ізолят живим достатньо довго. Покладатися на це не варто.
   if (isAllowed) {
-    syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, chatId, role);
+    await syncBotCommands(_setMyCommands, env.TELEGRAM_BOT_TOKEN, chatId, role);
   }
 }
 

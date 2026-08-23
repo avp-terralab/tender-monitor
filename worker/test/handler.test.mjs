@@ -2205,6 +2205,43 @@ test('runHandler: /start (no token), viewer → setMyCommands called with viewer
   assert.deepEqual(names, ['start'], 'the "/" menu is one entry for every role');
 });
 
+// Кнопки «Меню» у тестового бота не було НІКОЛИ, і замір це підтвердив:
+// getMyCommands для чату віддавав порожньо навіть відразу після /start.
+//
+// Причина не в Telegram. `syncBotCommands` викликався fire-and-forget, а шлях
+// /start одразу після нього робить `return`. У Cloudflare Workers ізолят живе,
+// поки не завершиться проміс, переданий у ctx.waitUntil — тобто runHandler.
+// Проміс, якого ніхто не чекає, до цього не належить, тож запит до Telegram
+// скасовувався, не долетівши. Стабільно, а не «іноді»: після return ізоляту
+// немає причин жити далі.
+//
+// Три інші виклики syncBotCommands (зміна ролі, погашення invite) працювали
+// випадково — після них ідуть awaited-надсилання, які й тримали ізолят живим.
+// Саме тому в проді список команд колись виставився, а через /start — ні.
+//
+// Тест перевіряє не «викликали», а «дочекались»: фейк завершується на
+// наступному тіку, і без await runHandler віддає керування раніше.
+test('runHandler: /start ДОЧЕКУЄТЬСЯ setMyCommands (у Workers незавершений запит гине)', async () => {
+  let started = false;
+  let finished = false;
+  const { deps } = makeDeps({
+    loadAllowedUsers: async () => ({ users: [{ chat_id: '456', label: 'V', role: 'viewer' }], sha: 's' }),
+    setMyCommands: async () => {
+      started = true;
+      await new Promise((r) => setTimeout(r, 20));
+      finished = true;
+    },
+  });
+  await runHandler({
+    update: { message: { chat: { id: 456 }, text: '/start', message_id: 1 } },
+    env: ENV,
+    deps,
+  });
+  assert.ok(started, 'виклик мусить бути зроблений');
+  assert.ok(finished,
+    'runHandler завершився, не дочекавшись setMyCommands — у Workers такий запит гине');
+});
+
 test('runHandler: /start (no token), editor → setMyCommands with editor set', async () => {
   const calls = [];
   const { deps } = makeDeps({
