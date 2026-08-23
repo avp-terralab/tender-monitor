@@ -1,0 +1,88 @@
+// Гейт на `wrangler.toml`. З'явився після того, як ОДНА Й ТА САМА вада
+// повторилась двічі: спершу `[env.production]` не мав KV-байндингу (знайдено
+// оглядом у Task 6), потім не мав `GITLAB_PROJECT_ID`/`GITLAB_REF` (знайдено
+// оглядом при підготовці cutover, 22.08.2026). Обидві — «оточення оголошене,
+// але без параметра, без якого воно не працює», і обидві виявились би вже
+// після перемикання прода.
+//
+// Розбір тут навмисно мінімальний: у проєкті немає залежностей (кореневого
+// package.json теж немає), тягнути TOML-парсер заради трьох перевірок дорожче,
+// ніж прочитати рівно ті рядки, які нас цікавлять.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const TOML = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
+
+// → { staging: { vars: {...}, kvBindings: ['EPHEMERAL_KV'] }, production: {...} }
+function parseEnvs(toml) {
+  const envs = {};
+  let current = null;
+  for (const raw of toml.split(/\r?\n/)) {
+    const line = raw.replace(/#.*$/, '').trim();
+    if (!line) continue;
+
+    const kv = /^\[\[env\.([A-Za-z0-9_]+)\.kv_namespaces\]\]$/.exec(line);
+    if (kv) {
+      envs[kv[1]] ??= { vars: {}, kvBindings: [] };
+      current = { env: kv[1], inKv: true };
+      continue;
+    }
+    const head = /^\[env\.([A-Za-z0-9_]+)\]$/.exec(line);
+    if (head) {
+      envs[head[1]] ??= { vars: {}, kvBindings: [] };
+      current = { env: head[1], inKv: false };
+      continue;
+    }
+    if (/^\[/.test(line)) { current = null; continue; }
+    if (!current) continue;
+
+    if (current.inKv) {
+      const b = /^binding\s*=\s*"([^"]+)"$/.exec(line);
+      if (b) envs[current.env].kvBindings.push(b[1]);
+      continue;
+    }
+    const v = /^vars\s*=\s*\{(.*)\}$/.exec(line);
+    if (v) {
+      for (const pair of v[1].split(',')) {
+        const m = /^\s*([A-Za-z0-9_]+)\s*=\s*"([^"]*)"\s*$/.exec(pair);
+        if (m) envs[current.env].vars[m[1]] = m[2];
+      }
+    }
+  }
+  return envs;
+}
+
+const ENVS = parseEnvs(TOML);
+
+test('wrangler.toml: розбір знаходить обидва оточення', () => {
+  assert.deepEqual(Object.keys(ENVS).sort(), ['production', 'staging'],
+    'якщо оточень стало більше — перевірки нижче мусять покрити й нові');
+});
+
+// Перемикання бекенду мусить бути зміною ОДНОГО значення. Якщо параметри
+// GitLab лежать лише в тому оточенні, яке вже на GitLab, то перемикання
+// другого тихо заведе бота в бекенд, що не знає, куди писати: `gitlab.mjs`
+// читає env.GITLAB_PROJECT_ID, env.GITLAB_REF і env.GITLAB_TOKEN (перші два —
+// зі vars, токен — секретом).
+for (const name of ['staging', 'production']) {
+  test(`wrangler.toml: [env.${name}] має параметри GitLab незалежно від прапорця`, () => {
+    const vars = ENVS[name]?.vars ?? {};
+    assert.ok(vars.GITLAB_PROJECT_ID, `[env.${name}] без GITLAB_PROJECT_ID`);
+    assert.ok(vars.GITLAB_REF, `[env.${name}] без GITLAB_REF`);
+  });
+
+  // Урок Task 6: оточення без свого KV-байндингу ламає ephemeral.mjs
+  // (видалення попереднього повідомлення-перегляду) — і саме на проді.
+  test(`wrangler.toml: [env.${name}] має власний KV-байндинг EPHEMERAL_KV`, () => {
+    assert.deepEqual(ENVS[name]?.kvBindings, ['EPHEMERAL_KV'],
+      `[env.${name}] мусить оголошувати рівно один KV-байндинг EPHEMERAL_KV`);
+  });
+}
+
+test('wrangler.toml: STATE_BACKEND задано явно в обох оточеннях', () => {
+  // Типове значення (github) працює, але «не задано» і «задано github» —
+  // різні речі при читанні конфіга людиною перед cutover.
+  assert.equal(ENVS.staging?.vars.STATE_BACKEND, 'gitlab');
+  assert.ok(['github', 'gitlab'].includes(ENVS.production?.vars.STATE_BACKEND));
+});
