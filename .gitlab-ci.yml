@@ -189,8 +189,6 @@ monitor-production:
     - !reference [.monitor-commit-push, script]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TARGET == "production"'
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TARGET == "staging"'
 
 deploy-production:
   stage: deploy
