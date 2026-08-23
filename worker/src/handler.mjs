@@ -795,9 +795,28 @@ export async function runHandler({ update, env, deps = {} }) {
   }
 
   // Inline view keyboard (history, archive, agent, etc.) goes on the main message.
-  // reply keyboard (mainKeyboard) persists in Telegram without being refreshed.
   const inlineView = histReplyMarkup ?? archiveReplyMarkup ?? agentReplyMarkup
     ?? watchedReplyMarkup ?? monitorReplyMarkup ?? notifyReplyMarkup;
+
+  // ⚠️ Чи стане ця відповідь НОСІЄМ persistent reply-клавіатури. Telegram
+  // тримає таку клавіатуру не «в чаті», а на конкретному повідомленні: видалиш
+  // повідомлення — клавіатура зникне разом із ним.
+  //
+  // Через це вона й зникала «через раз» (виявлено 24.08.2026). Команди без
+  // inline-клавіатури (/help, /status, /whoami, /log, /users і будь-який
+  // ПОРОЖНІЙ список) віддавали `mainKeyboard`, тобто ставали носіями, — а їхні
+  // id ішли у СПІЛЬНИЙ ефемерний слот, який наступна view-команда прибирає.
+  // Тому ламала не та кнопка, яку натиснули, а та, що була перед нею.
+  //
+  // Лікування те саме, що вже застосоване до /start: носій живе у ВЛАСНОМУ
+  // слоті, тож його видаляє лише наступний носій — а той одразу привозить
+  // клавіатуру знову, і чат ніколи не лишається без неї.
+  //
+  // Прибрати `mainKeyboard` звідси НЕ можна: шлях погашення invite
+  // (/start <token>) клавіатури не чіпляє, тож щойно доданий користувач
+  // отримує її саме тут. Це самозцілення несуче.
+  const KB_NS = 'kb';
+  const carriesKeyboard = !inlineView && !forceReplyMarkup && isAllowed;
 
   const pages = Array.isArray(reply) ? reply : [reply];
   const botReplyIds = [];
@@ -821,10 +840,31 @@ export async function runHandler({ update, env, deps = {} }) {
   }
 
   // Record this view (trigger + bot reply) so the NEXT view command can clear it.
+  //
+  // Носій клавіатури (див. carriesKeyboard вище) пише у ВЛАСНИЙ слот, і старого
+  // носія прибирає тут же — САМЕ ПІСЛЯ того, як новий уже надіслано. Порядок
+  // навмисний: видали спершу — і між видаленням та відправкою чат лишився б без
+  // клавіатури.
   if (isView && _ephemeralKV) {
+    const ids = [msg.message_id, ...botReplyIds].filter((x) => x != null);
     try {
-      const ids = [msg.message_id, ...botReplyIds].filter((x) => x != null);
-      await saveEphemeral(_ephemeralKV, chatId, ids);
+      if (carriesKeyboard) {
+        // Старого носія прибираємо ТУТ, тобто вже ПІСЛЯ відправки нового:
+        // видали спершу — і між видаленням та відправкою чат лишився б без
+        // клавіатури.
+        const prevKb = await loadEphemeral(_ephemeralKV, chatId, KB_NS);
+        for (const id of prevKb) {
+          await _deleteMessage({ token: env.TELEGRAM_BOT_TOKEN, chatId, messageId: id });
+        }
+        await saveEphemeral(_ephemeralKV, chatId, ids, KB_NS);
+        // Спільний слот ми щойно спорожнили (прибирання вище), і в нього нічого
+        // не кладемо — інакше наступна view-команда видалила б носія. Записуємо
+        // порожньо, щоб у слоті не лишались id уже видалених повідомлень: інакше
+        // кожна наступна view-команда даремно ходила б їх видаляти.
+        await saveEphemeral(_ephemeralKV, chatId, [], undefined);
+      } else {
+        await saveEphemeral(_ephemeralKV, chatId, ids);
+      }
     } catch (err) {
       console.error('worker: ephemeral save failed:', err.message);
     }

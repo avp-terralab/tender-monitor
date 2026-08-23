@@ -4436,7 +4436,14 @@ test('runHandler: a VIEW command deletes the previous view + records the new one
     },
   });
   assert.deepEqual(deleted.sort((a, b) => a - b), [100, 101], 'previous view messages deleted');
-  assert.equal(kvStore['eph:123'], JSON.stringify([7, 555]), 'new ids = [trigger, reply]');
+  // /help не має inline-клавіатури, тож його відповідь НЕСЕ reply-клавіатуру —
+  // і саме тому її id ідуть в окремий слот `eph:kb:*`, а не в спільний. Інакше
+  // наступна view-команда видалила б носія, і клавіатура зникла б із чату
+  // (реальна скарга 24.08.2026).
+  assert.equal(kvStore['eph:kb:123'], JSON.stringify([7, 555]),
+    'носій клавіатури пишеться у ВЛАСНИЙ слот');
+  assert.equal(kvStore['eph:123'], JSON.stringify([]),
+    'спільний слот спорожнено — його вміст щойно видалили, тримати id мертвих повідомлень нема сенсу');
 });
 
 // Almost every recognized command is now a "view" for ephemeral purposes (admin
@@ -4483,7 +4490,12 @@ test('runHandler: /notify is now an ephemeral view too — deletes the previous 
     },
   });
   assert.deepEqual(deleted, [100], 'the previous exchange is cleaned up');
-  assert.equal(kvStore['eph:123'], JSON.stringify([8, 999]), 'new ids = [trigger, reply]');
+  // Тут `/notify` відповідає без inline-кнопки, тобто теж стає носієм
+  // reply-клавіатури — і йде у власний слот. Див. довгий коментар про
+  // carriesKeyboard у handler.mjs.
+  assert.equal(kvStore['eph:kb:123'], JSON.stringify([8, 999]),
+    'носій клавіатури пишеться у власний слот');
+  assert.equal(kvStore['eph:123'], JSON.stringify([]), 'спільний слот спорожнено');
 });
 
 test('runHandler: bare /add (editor) → force_reply prompt, no mutation', async () => {
@@ -4641,4 +4653,60 @@ test('runHandler: callback toast carries the status for the admin', async () => 
   });
   assert.equal(acks.length, 1);
   assert.match(acks[0].text, /HTTP 403/);
+});
+
+// Reply-клавіатура зникала «через раз», і винною щоразу здавалась інша кнопка.
+// Механізм (підтверджено детермінованим відтворенням 24.08.2026):
+//
+//   1. Команди БЕЗ inline-клавіатури (/help, /status, /whoami, /log, /users і
+//      будь-який ПОРОЖНІЙ список — там `keyboard: null`) отримують у
+//      reply_markup саму `mainKeyboard`. Тобто їхня відповідь стає НОСІЄМ
+//      persistent-клавіатури.
+//   2. Ці ж команди — view-команди, тож їхні id пишуться у спільний
+//      ефемерний слот.
+//   3. Наступна view-команда цей слот прибирає — і видаляє носія. Telegram
+//      знімає клавіатуру разом із повідомленням, на якому вона приїхала.
+//
+// Звідси й «через раз»: ламає не та кнопка, яку натиснули, а та, що була
+// ПЕРЕД нею. Відтворення на замовлення: /start → «Допомога» → будь-яка інша
+// кнопка.
+//
+// Автори про цей клас вади знали — /start навмисно живе в окремому слоті саме
+// тому, що його вітання несе клавіатуру. Але захистили тільки /start.
+//
+// Прибрати `mainKeyboard` із загального шляху НЕ можна: шлях погашення invite
+// (/start <token>) клавіатури не чіпляє, тож щойно доданий користувач отримує
+// її саме звідси. Це самозцілення несуче.
+test('reply-клавіатура: її носія НЕ видаляє наступна view-команда', async () => {
+  const kv = fakeEphemeralKV();
+  const sent = [];
+  const deleted = [];
+  let nextId = 500;
+  const mkDeps = () => makeDeps({
+    ephemeralKV: kv,
+    sendReply: async (a) => {
+      const id = nextId++;
+      sent.push({ ...a, _id: id });
+      return { result: { message_id: id } };
+    },
+    deleteMessage: async (a) => { deleted.push(a.messageId); return true; },
+    loadWatchedEntities: async () => ({ entities: WATCHED_TWO, sha: 's' }),
+  }).deps;
+
+  // 1) /help — без inline-клавіатури, тож відповідь несе reply-клавіатуру.
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/help', message_id: 1 } },
+    env: ENV, deps: mkDeps(),
+  });
+  const carrier = sent.find((s) => s.replyMarkup?.keyboard);
+  assert.ok(carrier, '/help мусить нести reply-клавіатуру (інакше тест перевіряє не те)');
+
+  // 2) /watched — має inline-клавіатуру, тож reply-клавіатуру не перенадсилає.
+  await runHandler({
+    update: { message: { chat: { id: 123 }, text: '/watched', message_id: 2 } },
+    env: ENV, deps: mkDeps(),
+  });
+
+  assert.ok(!deleted.includes(carrier._id),
+    'видалено повідомлення, на якому приїхала клавіатура — саме через це вона зникала');
 });
