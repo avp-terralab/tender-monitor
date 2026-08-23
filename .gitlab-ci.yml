@@ -148,7 +148,7 @@ monitor-staging:
   # запуски або конфліктували б на пуші, або дублювали сповіщення. Ребейс-ретрай
   # це пом'якшує, але не запобігає — а гілка з конфліктом виходить зеленою,
   # відкинувши свій коміт, тобто наклад був би тихим.
-  resource_group: monitor-staging
+  resource_group: staging-state
   variables:
     <<: *monitor-vars
     STATE_BRANCH: staging-state
@@ -177,7 +177,7 @@ monitor-staging:
 # очікувано й задокументовано — див. Task 10, Крок 0.1.
 monitor-production:
   stage: test
-  resource_group: monitor-production
+  resource_group: prod-state
   variables:
     <<: *monitor-vars
     STATE_BRANCH: prod-state
@@ -207,3 +207,90 @@ deploy-production:
       # «тести впали». Прод і далі деплоїться лише кнопкою; змінюється рівно
       # те, чи чекає на неї статус пайплайна.
       allow_failure: true
+
+# Довозить КОД із `main` у гілку стану `prod-state`. Без цього монітор поволі
+# відставав би: `prod-state` створена з `main`, тож несе й копію коду, а джоба
+# `monitor-production` запускається саме з неї — отже виконує той код, що там
+# лежить, а не найсвіжіший. Про таке відставання дізнаються найгіршим способом:
+# тестовий Worker кілька днів працював на білді від 20.08 саме тому, що його не
+# перевикотили.
+#
+# Руками цього не робимо принципово: обов'язок, який виконують руками, колись
+# забувають — і забувається він тихо, без жодної помилки в логах.
+#
+# ⚠️ Простий `git merge main` тут НЕ годиться. У гілці стану лежить живий стан,
+# у `main` — його застаріла копія (вона там від дня створення гілки). Мердж або
+# конфліктує, або тихо привозить старий стан і затирає живий. Саме це сталося зі
+# `staging-state` 23.08: чотири конфлікти рівно у файлах стану.
+# Тому після мерджу стан ПРИМУСОВО відновлюється з HEAD гілки стану.
+sync-prod-state-code:
+  stage: deploy
+  # Той самий ресурс, що й у monitor-production: обидва пишуть в одну гілку, і
+  # два одночасні пуші зійшлися б на ребейсі. resource_group у GitLab спільний
+  # на рівні проєкту, тож ресурс називаємо гілкою, а не джобою.
+  resource_group: prod-state
+  variables:
+    GIT_DEPTH: 0
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - |
+      set -e
+      STATE_BRANCH="prod-state"
+      # Шляхи, які належать ГІЛЦІ СТАНУ і не мають приїжджати з main.
+      STATE_PATHS="_state watchlist.json watched_entities.json"
+
+      git config user.name "gitlab-ci"
+      git config user.email "ci@cl-gl.listerralab.com"
+
+      PUSH_URL="https://${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      PUSH_AUTH="Authorization: Basic $(printf 'oauth2:%s' "${GITLAB_TOKEN}" | base64 -w0)"
+
+      # Рівно один ref за раз — тоді FETCH_HEAD однозначний. Код, який веземо,
+      # уже в репозиторії: його щойно викачав сам пайплайн ($CI_COMMIT_SHA).
+      git fetch origin "$STATE_BRANCH"
+      git checkout -B sync-tmp FETCH_HEAD
+
+      if git merge-base --is-ancestor "$CI_COMMIT_SHA" HEAD; then
+        echo "prod-state already contains $CI_COMMIT_SHA — nothing to sync."
+        exit 0
+      fi
+
+      # Мердж без коміту: спершу дозволяємо git зібрати код, потім забираємо
+      # стан назад. `|| true` — конфлікти у файлах стану тут очікувані й
+      # знімаються наступним кроком.
+      git merge --no-commit --no-ff "$CI_COMMIT_SHA" || true
+
+      # HEAD під час мерджу — це ще вершина гілки стану, тож саме звідси
+      # відновлюємо живий стан. Робиться БЕЗУМОВНО, а не лише на конфліктах:
+      # якщо файл стану не змінювався з часу спільного предка, git узяв би
+      # версію з main і тихо відкотив стан назад.
+      for p in $STATE_PATHS; do
+        if git cat-file -e "HEAD:$p" 2>/dev/null; then
+          git checkout HEAD -- "$p"
+        fi
+      done
+      git add -A
+
+      if git diff --cached --quiet; then
+        echo "No code changes to bring over."
+        exit 0
+      fi
+
+      git commit -m "sync: код із ${CI_COMMIT_BRANCH} (${CI_COMMIT_SHORT_SHA}); стан гілки не змінено"
+
+      for attempt in 1 2 3; do
+        if git -c http.extraHeader="${PUSH_AUTH}" push "$PUSH_URL" "HEAD:${STATE_BRANCH}"; then
+          echo "Pushed on attempt $attempt"
+          exit 0
+        fi
+        echo "Push attempt $attempt failed; fetching + rebasing onto ${STATE_BRANCH} and retrying..."
+        git fetch origin "$STATE_BRANCH"
+        if ! git rebase FETCH_HEAD; then
+          echo "Rebase conflict — aborting; наступний пуш у main спробує знову."
+          git rebase --abort
+          exit 0
+        fi
+      done
+      echo "Push failed after 3 attempts"
+      exit 1
