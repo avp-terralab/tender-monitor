@@ -41,36 +41,24 @@ deploy-staging:
   script:
     - cd worker && npm install --no-save wrangler@^3 && npx wrangler deploy --env staging
 
-monitor-staging:
-  stage: test
-  # Відповідник `concurrency: {group: tender-monitor}` із monitor.yml: два тіки
-  # не мають накладатись. Цикл ходить у Prozorro й комітить стан, тож паралельні
-  # запуски або конфліктували б на пуші, або дублювали сповіщення. Ребейс-ретрай
-  # нижче це пом'якшує, але не запобігає — а його гілка з конфліктом виходить
-  # зеленою, відкинувши свій коміт, тобто наклад був би тихим.
-  resource_group: monitor-staging
-  variables:
-    # Дефолтне мілке клонування (GIT_DEPTH=20) ламає два місця: `git rebase` у
-    # прищепленому репозиторії може не знайти спільного предка, а дебаунс
-    # курсора шукає `git log --grep` на 6 годин назад і впирався б у стелю з
-    # 20 комітів. Shell-раннер перевикористовує робочу теку, тож повна глибина
-    # коштує один раз.
-    GIT_DEPTH: 0
+# Спільний блок «закомітити стан і запушити у свою гілку» для обох моніторів.
+# Винесений у шаблон НЕ заради краси: до 23.08 існував лише staging-монітор, і
+# коли готували cutover, спокуса була скопіювати ці 78 рядків для прода. Саме
+# так у цьому проєкті вже тричі розходились дубльовані шляхи (найсвіжіший
+# приклад — кнопка «повторити», яка забула три речі з головного шляху). Тому
+# шлях один, а гілку задає змінна STATE_BRANCH.
+.monitor-commit-push:
   script:
-    - export TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN_STAGING"
-    - export TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID_STAGING"
-    - node ci.mjs
     - |
       set -e
-      # ci.mjs writes _state/ + watchlist.json into the working copy of whatever
-      # ref this pipeline checked out. For the staging schedule that's the
-      # staging-state branch (the pipeline schedule's target ref, configured in
-      # GitLab, mirrors GITLAB_REF="staging-state" in worker/wrangler.toml) — so
-      # unlike monitor.yml's main, we must commit+push there explicitly. GitLab
-      # CI checks out a detached HEAD regardless of ref type, so plain `git push`
-      # / `git pull --rebase` (which rely on a tracking branch) won't work here;
-      # every push/rebase below names the branch explicitly.
-      STATE_BRANCH="staging-state"
+      # ci.mjs пише _state/ + watchlist.json у робочу копію того ref, який
+      # викачав пайплайн — це гілка з STATE_BRANCH, вона ж ціль розкладу в
+      # GitLab, вона ж GITLAB_REF у worker/wrangler.toml для відповідного
+      # оточення. На відміну від monitor.yml, тут треба комітити й пушити
+      # явно. GitLab CI викачує detached HEAD незалежно від типу ref, тож
+      # звичайні `git push` / `git pull --rebase` (які спираються на tracking
+      # branch) не працюють — кожен пуш і ребейс нижче називає гілку прямо.
+      : "${STATE_BRANCH:?STATE_BRANCH not set}"
 
       git config user.name "gitlab-ci"
       git config user.email "ci@cl-gl.listerralab.com"
@@ -112,7 +100,7 @@ monitor-staging:
       fi
 
       git commit -m "$MSG"
-      # Retry with rebase if staging-state moved during the run (concurrent
+      # Retry with rebase if the state branch moved during the run (concurrent
       # push from another schedule tick or manual commit). State files are
       # append-only / merge-friendly, so rebase is usually clean — but two
       # runs computing near-identical state (e.g. cursor timestamps) moments
@@ -120,6 +108,12 @@ monitor-staging:
       # In that case the concurrent run's own commit already captured
       # equivalent state, so it's safe to drop this run's commit rather than
       # hard-fail.
+      #
+      # Гілка перевірена живим прогоном 21.08.2026 на staging-state: зсув ref
+      # під джобою дав `Push attempt 1 failed` → rebase → `Pushed on attempt 2`,
+      # стан не втрачено. Випадок «Rebase conflict» досі не траплявся — саме
+      # його треба виглядати в логах перших днів після cutover, бо джоба там
+      # виходить ЗЕЛЕНОЮ, відкинувши власний коміт.
       for attempt in 1 2 3; do
         if git -c http.extraHeader="${PUSH_AUTH}" push "$PUSH_URL" "HEAD:${STATE_BRANCH}"; then
           echo "Pushed on attempt $attempt"
@@ -138,6 +132,63 @@ monitor-staging:
       done
       echo "Push failed after 3 attempts"
       exit 1
+
+.monitor-vars: &monitor-vars
+  # Дефолтне мілке клонування (GIT_DEPTH=20) ламає два місця: `git rebase` у
+  # прищепленому репозиторії може не знайти спільного предка, а дебаунс
+  # курсора шукає `git log --grep` на 6 годин назад і впирався б у стелю з
+  # 20 комітів. Shell-раннер перевикористовує робочу теку, тож повна глибина
+  # коштує один раз.
+  GIT_DEPTH: 0
+
+monitor-staging:
+  stage: test
+  # Відповідник `concurrency: {group: tender-monitor}` із monitor.yml: два тіки
+  # не мають накладатись. Цикл ходить у Prozorro й комітить стан, тож паралельні
+  # запуски або конфліктували б на пуші, або дублювали сповіщення. Ребейс-ретрай
+  # це пом'якшує, але не запобігає — а гілка з конфліктом виходить зеленою,
+  # відкинувши свій коміт, тобто наклад був би тихим.
+  resource_group: monitor-staging
+  variables:
+    <<: *monitor-vars
+    STATE_BRANCH: staging-state
+  script:
+    # Тестовий бот (@TL2026testBot) і приватний чат оператора — щоб перевірка
+    # ніколи не написала реальним користувачам.
+    - export TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN_STAGING"
+    - export TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID_STAGING"
+    - node ci.mjs
+    - !reference [.monitor-commit-push, script]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TARGET == "staging"'
+
+# Прод-монітор. Заведений 23.08.2026 ЗАРАНЕЕ, до cutover: Крок 3 плану каже
+# «увімкнути Scheduled Pipeline», а вмикати було нічого — джоби не існувало.
+# Та сама пастка вже спрацювала зі staging: розклад стояв активним і мовчав,
+# бо на гілці не було .gitlab-ci.yml (`last_pipeline: None` за весь час).
+#
+# ⚠️ Запускається ЛИШЕ розкладом із SCHEDULE_TARGET=production, і сам розклад
+# створюється НЕАКТИВНИМ — інакше він писав би реальним користувачам паралельно
+# з погодинним monitor.yml на GitHub, тобто дублював сповіщення. Увімкнути —
+# рівно на Кроці 3 cutover, одночасно з вимкненням GitHub-розкладу.
+#
+# ⚠️ Пише стан у `main`, а вона ЗАХИЩЕНА (push лише Maintainer). Токен проєкту
+# має Developer, тож до виконання Кроку 0.1 плану ця джоба впаде на пуші. Це
+# очікувано й задокументовано — див. Task 10, Крок 0.1.
+monitor-production:
+  stage: test
+  resource_group: monitor-production
+  variables:
+    <<: *monitor-vars
+    STATE_BRANCH: main
+  script:
+    # Тут креденшели РЕАЛЬНОГО бота: ci.mjs читає рівно TELEGRAM_BOT_TOKEN і
+    # TELEGRAM_CHAT_ID, тож перейменовувати нічого не треба — обидві змінні
+    # заводяться в CI/CD проєкту під цими іменами (masked, unprotected).
+    - node ci.mjs
+    - !reference [.monitor-commit-push, script]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TARGET == "production"'
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TARGET == "staging"'
 
