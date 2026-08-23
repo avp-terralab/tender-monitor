@@ -20,8 +20,25 @@ function projectUrl(env) {
   return `${API_BASE}/projects/${env.GITLAB_PROJECT_ID}`;
 }
 
+// Гілка СТАНУ: звідси читаються й тут пишуться watchlist.json,
+// watched_entities.json та все під _state/, і сюди ж дивиться журнал дій
+// (`audit:`-коміти — це і є стан).
 function ref(env) {
   return env.GITLAB_REF ?? 'main';
+}
+
+// Гілка КОДУ — окремо від гілки стану. Потрібна одному викликові:
+// fetchLatestDeployCommit шукає останній НЕ службовий коміт, тобто деплой, а
+// деплої живуть у коді. На GitHub стан і код лежать в одній `main`, тому
+// різниці не було видно; у GitLab прод-стан свідомо переїхав в окрему гілку
+// (23.08.2026), щоб жоден компонент не потребував прав вище Developer —
+// захищена `main` вимагала б Maintainer, а це повноваження, з яких
+// використовувався б рівно один пункт.
+//
+// Падає назад на гілку стану, коли GITLAB_CODE_REF не задано: інакше правка
+// зламала б staging до того, як там з'явиться нова змінна.
+function codeRef(env) {
+  return env.GITLAB_CODE_REF ?? ref(env);
 }
 
 function authHeaders(env, extra = {}) {
@@ -285,7 +302,7 @@ export async function listAgentJobs(env, { fetch: fetchImpl = fetch } = {}) {
 
 export async function fetchLatestDeployCommit(env, { fetch: fetchImpl = fetch } = {}) {
   const res = await fetchImpl(
-    `${projectUrl(env)}/repository/commits?ref_name=${ref(env)}&per_page=20`,
+    `${projectUrl(env)}/repository/commits?ref_name=${codeRef(env)}&per_page=20`,
     { headers: authHeaders(env) }
   );
   if (!res.ok) throw glError(`GitLab commits API ${res.status}`, res.status);

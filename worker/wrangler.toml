@@ -8,7 +8,7 @@ id = "f9c6d80922f24615ab394d3cc1aa7251"   # KV namespace "tender-monitor-ephemer
 
 [env.staging]
 name = "tender-monitor-bot-staging"
-vars = { STATE_BACKEND = "gitlab", GITLAB_PROJECT_ID = "14", GITLAB_REF = "staging-state" }
+vars = { STATE_BACKEND = "gitlab", GITLAB_PROJECT_ID = "14", GITLAB_REF = "staging-state", GITLAB_CODE_REF = "main" }
 
 [[env.staging.kv_namespaces]]
 binding = "EPHEMERAL_KV"
@@ -22,7 +22,7 @@ name = "tender-monitor-bot"
 # писати — `gitlab.mjs` читає GITLAB_PROJECT_ID, GITLAB_REF і GITLAB_TOKEN
 # (перші два звідси, токен — секретом Worker'а). Поки STATE_BACKEND=github ці
 # два значення просто не читаються. Гейт — worker/test/wrangler.test.mjs.
-vars = { STATE_BACKEND = "github", GITLAB_PROJECT_ID = "14", GITLAB_REF = "main" }
+vars = { STATE_BACKEND = "github", GITLAB_PROJECT_ID = "14", GITLAB_REF = "prod-state", GITLAB_CODE_REF = "main" }
 
 [[env.production.kv_namespaces]]
 binding = "EPHEMERAL_KV"

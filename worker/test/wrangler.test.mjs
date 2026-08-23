@@ -70,6 +70,19 @@ for (const name of ['staging', 'production']) {
     const vars = ENVS[name]?.vars ?? {};
     assert.ok(vars.GITLAB_PROJECT_ID, `[env.${name}] без GITLAB_PROJECT_ID`);
     assert.ok(vars.GITLAB_REF, `[env.${name}] без GITLAB_REF`);
+    // Гілка коду задається ОКРЕМО від гілки стану (рішення 23.08.2026). Без
+    // неї `fetchLatestDeployCommit` шукав би деплой у гілці стану, де лежать
+    // самі службові коміти, і стрічка «останній деплой» у /status спорожніла б.
+    assert.ok(vars.GITLAB_CODE_REF, `[env.${name}] без GITLAB_CODE_REF`);
+  });
+
+  // Головний інваріант нової схеми: стан НЕ лежить у гілці коду. Якби лежав,
+  // запис стану вимагав би права писати в захищену `main`, тобто Maintainer —
+  // повноваження, з яких використовувався б рівно один пункт.
+  test(`wrangler.toml: [env.${name}] тримає стан НЕ в гілці коду`, () => {
+    const vars = ENVS[name]?.vars ?? {};
+    assert.notEqual(vars.GITLAB_REF, vars.GITLAB_CODE_REF,
+      `[env.${name}]: гілка стану збіглася з гілкою коду — саме цього ми й уникаємо`);
   });
 
   // Урок Task 6: оточення без свого KV-байндингу ламає ephemeral.mjs

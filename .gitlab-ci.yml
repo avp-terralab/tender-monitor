@@ -180,7 +180,7 @@ monitor-production:
   resource_group: monitor-production
   variables:
     <<: *monitor-vars
-    STATE_BRANCH: main
+    STATE_BRANCH: prod-state
   script:
     # Тут креденшели РЕАЛЬНОГО бота: ci.mjs читає рівно TELEGRAM_BOT_TOKEN і
     # TELEGRAM_CHAT_ID, тож перейменовувати нічого не треба — обидві змінні

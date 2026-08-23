@@ -228,6 +228,53 @@ test('fetchLatestDeployCommit: skips bot-authored commits (same BOT_RE as github
   assert.equal(out.message, 'feat: add history view');
 });
 
+// Ця функція про ДЕПЛОЙ КОДУ, тож читати мусить гілку коду, а не гілку стану.
+// На GitHub вони збігалися (стан і код в одній `main`), тому неточність не
+// проявлялась. Коли прод-стан переїде в окрему гілку (рішення 23.08.2026 —
+// щоб жоден компонент не потребував прав вище Developer), гілка стану матиме
+// ЛИШЕ службові коміти, і серед двадцяти прочитаних не знайшлось би жодного
+// не-службового: стрічка «останній деплой» у /status спорожніла б за добу.
+test('fetchLatestDeployCommit: читає гілку КОДУ (GITLAB_CODE_REF), а не гілку стану', async () => {
+  const urls = [];
+  const fakeFetch = async (url) => {
+    urls.push(url);
+    return { ok: true, status: 200, json: async () => ([
+      { short_id: 'ccc3333', title: 'feat: щось у коді', committed_date: '2026-08-23T10:00:00Z' },
+    ]) };
+  };
+  const env = { ...ENV, GITLAB_REF: 'prod-state', GITLAB_CODE_REF: 'main' };
+  await fetchLatestDeployCommit(env, { fetch: fakeFetch });
+  assert.match(urls[0], /ref_name=main/, 'мусить питати гілку коду');
+  assert.doesNotMatch(urls[0], /ref_name=prod-state/, 'гілка стану тут ні до чого');
+});
+
+// Сумісність: доки GITLAB_CODE_REF не задано (staging до правки конфіга),
+// поведінка лишається як була — читаємо гілку стану. Інакше правка коду
+// зламала б staging до того, як там з'явиться нова змінна.
+test('fetchLatestDeployCommit: без GITLAB_CODE_REF падає назад на гілку стану', async () => {
+  const urls = [];
+  const fakeFetch = async (url) => {
+    urls.push(url);
+    return { ok: true, status: 200, json: async () => ([
+      { short_id: 'ddd4444', title: 'feat: старий шлях', committed_date: '2026-08-23T10:00:00Z' },
+    ]) };
+  };
+  await fetchLatestDeployCommit({ ...ENV, GITLAB_REF: 'staging-state' }, { fetch: fakeFetch });
+  assert.match(urls[0], /ref_name=staging-state/);
+});
+
+// Дзеркально: журнал дій — це САМЕ службові коміти (`audit:`), тож він мусить
+// лишитися на гілці стану. Якби він теж переїхав на код, /log спорожнів би.
+test('fetchAuditLog: лишається на гілці СТАНУ, навіть коли задано GITLAB_CODE_REF', async () => {
+  const urls = [];
+  const fakeFetch = async (url) => {
+    urls.push(url);
+    return { ok: true, status: 200, json: async () => ([]) };
+  };
+  await fetchAuditLog({ ...ENV, GITLAB_REF: 'prod-state', GITLAB_CODE_REF: 'main' }, { fetch: fakeFetch });
+  assert.match(urls[0], /ref_name=prod-state/);
+});
+
 test('fetchAuditLog: maps title+committed_date for each commit', async () => {
   const fakeFetch = async () => ({ ok: true, status: 200, json: async () => ([
     { title: 'audit: add UA-x · A [1/editor]', committed_date: '2026-05-26T10:00:00Z' },
