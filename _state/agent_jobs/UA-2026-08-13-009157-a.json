@@ -4,11 +4,12 @@
   "job_type": "winner",
   "company": "ТЕРРАЛАБ АЙ ТІ",
   "requested_by": "7321709183",
-  "status": "pending",
+  "status": "running",
   "created_at": "2026-08-24T06:55:58.760Z",
   "target": {
     "drive_link": "https://drive.google.com/drive/folders/1navuatSpKoUiQRHCwno5L5wrDRjz1a0Z",
     "package_dir": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій\\13.08.26 КНП Старокостянтинівська багатопрофільна лікарня\\Тендерна пропозиція",
     "published_dir": "G:\\Мій диск\\ТЕНДЕРИ 2021-2026\\ТЕНДЕРИ 2026\\81. КНП Старокостянтинівська багатопрофільна лікарня"
-  }
+  },
+  "updated_at": "2026-08-24T06:56:30.309961+00:00"
 }
