@@ -10,10 +10,36 @@
     "published_dir": "G:\\Мій диск\\ТЕНДЕРИ 2021-2026\\ТЕНДЕРИ 2026\\82. КНП Городоцька центральна лікарня"
   },
   "requested_by": "7321709183",
-  "status": "running",
+  "status": "done",
   "created_at": "2026-08-25T14:36:00.735Z",
   "milestones": {
-    "prepared": true
+    "prepared": true,
+    "signed": true
   },
-  "updated_at": "2026-08-25T15:40:30.027163+00:00"
+  "updated_at": "2026-08-25T15:40:30.027163+00:00",
+  "result": {
+    "zip_path": "G:\\Мій диск\\ТЕНДЕРИ 2021-2026\\ТЕНДЕРИ 2026\\82. КНП Городоцька центральна лікарня\\КНП Городоцька центральна лікарня ТП 24.08.2026.zip",
+    "zip_link": "https://drive.google.com/file/d/1xZWc3m8X4hJKlk0yA7lEcAIgC9dZaqkJ/view?usp=drivesdk",
+    "signed_dir": "G:\\Мій диск\\ТЕНДЕРИ 2021-2026\\ТЕНДЕРИ 2026\\82. КНП Городоцька центральна лікарня\\Підписані PDF",
+    "letter_date": "24.08.2026",
+    "n_signed": 9,
+    "n_pdf_total": 26,
+    "n_pdf_expected": 26,
+    "unsigned": [
+      "0. РЕЄСТР НАДАНИХ ДОКУМЕНТІВ.docx"
+    ],
+    "unsigned_detail": {
+      "0. РЕЄСТР НАДАНИХ ДОКУМЕНТІВ.docx": "немає рядка підпису"
+    },
+    "undated": [
+      "0. РЕЄСТР НАДАНИХ ДОКУМЕНТІВ.docx"
+    ],
+    "missing_pdf": [],
+    "fallback_pdf": [],
+    "superseded_zip": [],
+    "older_zip": [],
+    "drive_link": "https://drive.google.com/drive/folders/17anrL1yi13mfmC4kOfKJTmfiMKnQLj_G",
+    "package_dir": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій\\21.08.26 КНП Городоцька центральна лікарня\\Тендерна пропозиція",
+    "published_dir": "G:\\Мій диск\\ТЕНДЕРИ 2021-2026\\ТЕНДЕРИ 2026\\82. КНП Городоцька центральна лікарня"
+  }
 }
