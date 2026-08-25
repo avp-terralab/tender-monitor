@@ -1,0 +1,94 @@
+{
+  "tender_id": "UA-2026-08-25-006093-a",
+  "saved_at": "2026-08-25T10:25:34.715Z",
+  "snapshot": {
+    "tender_id": "UA-2026-08-25-006093-a",
+    "title": "код ДК 021:2015 72260000-5 «Послуги, пов’язані з програмним забезпеченням» -\nПослуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії \n",
+    "status": "active.tendering",
+    "dateModified": "2026-08-25T12:54:22.752405+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-09-02T08:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "Комунальне некомерційне медичне підприємство «Рогатинська центральна районна лікарня»",
+      "edrpou": "01993581"
+    },
+    "value": {
+      "amount": 206000,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5",
+      "72260000-5",
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Василь Кривень",
+      "email": "krivenvasil1995_ukr.net@ukr.net",
+      "telephone": "+380682541559"
+    },
+    "documents": [
+      {
+        "id": "53a039781bc0426da30756fbf7d02a9b",
+        "title": "ТД.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-25T12:53:25.935745+03:00"
+      },
+      {
+        "id": "504f7649da634868915dfd690a671158",
+        "title": "ДОДАТОК 1.docx",
+        "documentType": null,
+        "datePublished": "2026-08-25T12:53:25.935745+03:00"
+      },
+      {
+        "id": "a2ecd7e10252493583fab1bc841a046a",
+        "title": "Додаток №2 до тендерної документації технічні вимоги до предмета закупівлі.docx",
+        "documentType": "technicalSpecifications",
+        "datePublished": "2026-08-25T12:53:25.935745+03:00"
+      },
+      {
+        "id": "cf6ae1aa2fc14fb4a96685c745bc1875",
+        "title": "Додаток №3 Договору.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-08-25T12:53:25.935745+03:00"
+      },
+      {
+        "id": "0f05aa0b72b3459a80491584485ffb63",
+        "title": "ДОДАТОК №4.docx",
+        "documentType": null,
+        "datePublished": "2026-08-25T12:53:25.935745+03:00"
+      },
+      {
+        "id": "035ee8e5334a4ae0829ea6328ca43622",
+        "title": "ДОДАТОК №5.docx",
+        "documentType": null,
+        "datePublished": "2026-08-25T12:53:25.935745+03:00"
+      },
+      {
+        "id": "af0ebff67e1641ebb4cad753eac5a37d",
+        "title": "ДОДАТОК №6.docx",
+        "documentType": null,
+        "datePublished": "2026-08-25T12:53:25.935745+03:00"
+      },
+      {
+        "id": "f7a282e372ac4f9db460d29c9e440e8c",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-08-25T12:54:22.316256+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
