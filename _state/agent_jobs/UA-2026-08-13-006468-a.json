@@ -4,11 +4,12 @@
   "job_type": "winner",
   "company": "ТЕРРАЛАБ АЙ ТІ",
   "requested_by": "1744078008",
-  "status": "pending",
+  "status": "running",
   "created_at": "2026-08-25T09:58:01.278Z",
   "target": {
     "drive_link": "https://drive.google.com/drive/folders/1KJzfZWJt2ZY_BqKY8QGJolbgtu8jAHs4",
     "package_dir": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій\\13.08.26 База спеціального медичного постачання\\Тендерна пропозиція",
     "published_dir": null
-  }
+  },
+  "updated_at": "2026-08-25T09:58:27.792755+00:00"
 }
