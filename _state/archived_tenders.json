@@ -3541,5 +3541,145 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-08-07-009770-a",
+    "notes": "Комунальне некомерційне підприємство \"Миколаївська обласна станція переливання крові\" Миколаївської обласної ради — Послуги з постачання програмного забезпечення лабораторної інформаційної системи дл…",
+    "archived_at": "2026-08-25T12:44:02.254Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-08-07-009770-a",
+      "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії за кодом ДК 021:2015:72260000-5 Послуги, пов’язані з програмним забезпеченням",
+      "status": "complete",
+      "dateModified": "2026-08-25T15:26:11.009066+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-08-17T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне некомерційне підприємство \"Миколаївська обласна станція переливання крові\" Миколаївської обласної ради",
+        "edrpou": "05483339"
+      },
+      "value": {
+        "amount": 170000,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72268000-1",
+        "description": "Послуги з постачання програмного забезпечення",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72268000-1",
+        "72268000-1",
+        "72268000-1",
+        "72268000-1",
+        "72268000-1",
+        "72268000-1"
+      ],
+      "contact": {
+        "name": "Гриненко Яна Вікторівна",
+        "email": "mospk@ukr.net",
+        "telephone": "+380512709453"
+      },
+      "documents": [
+        {
+          "id": "4ccb27379f1540aaab21b55b0c451fc5",
+          "title": "Додаток 1 перелік документів та інформації_ які подаються учасником процедури закупівлі.docx",
+          "documentType": null,
+          "datePublished": "2026-08-07T15:33:36.692463+03:00"
+        },
+        {
+          "id": "8e0cbb6244b5461f919eb35de796cb93",
+          "title": "Додаток 2 перелік документів та інформації_ які подаються переможцем процедури закупівлі.docx",
+          "documentType": null,
+          "datePublished": "2026-08-07T15:33:36.692463+03:00"
+        },
+        {
+          "id": "d97ba449ec824c268b0e395ec1108296",
+          "title": "Додаток 3 інформація про необхідні технічні_ якісні та кількісні характеристики.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-08-07T15:33:36.692463+03:00"
+        },
+        {
+          "id": "f95333c510e54919beadd35ac4a9e381",
+          "title": "Додаток 4 Проєкт_Договору.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-08-07T15:33:36.692463+03:00"
+        },
+        {
+          "id": "4e9926bab749496ab37674dcb08e5130",
+          "title": "ТД.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-07T15:33:36.692463+03:00"
+        },
+        {
+          "id": "56b379a5dfac483ab5aadff93e59a69a",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-08-07T15:35:55.756028+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "81f5f3ac6da74322bcf9e5fa728ebd37",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"МАЙЛАБ\"",
+              "identifier": {
+                "id": "41087617"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "6ad907e7c93f43a9b04e30c47716dc5c",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "title_en": "Договір.pdf",
+              "title_ru": "Договір.pdf",
+              "description": "SHA1: e55624da52353a286ca55e3d84f2f7db7b1090c0",
+              "id": "d0b2967e297f40cea5631fd57aca8661",
+              "hash": "md5:db27fe2aeb4afccaf14a8c2867496db0",
+              "title": "Договір.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/6ad907e7c93f43a9b04e30c47716dc5c/documents/d0b2967e297f40cea5631fd57aca8661?download=ec85490d7ad44fd583b4eab84baa31db",
+              "documentOf": "contract",
+              "datePublished": "2026-08-25T15:24:09.988000+03:00",
+              "dateModified": "2026-08-25T15:24:09.988000+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "documentType": "notice",
+              "title_en": "sign.p7s",
+              "title_ru": "sign.p7s",
+              "description": "SHA1: 181ea90e1ccab8fa5af4974aeb9015f77238dd5f",
+              "id": "6054c64dcafb4a2f81ab05c144066b35",
+              "hash": "md5:83b428c5b5f16005608bef33fb4cb1cc",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/6ad907e7c93f43a9b04e30c47716dc5c/documents/6054c64dcafb4a2f81ab05c144066b35?download=4a44d8b5f2ba41349b14d2ce8ef0cb96",
+              "documentOf": "contract",
+              "datePublished": "2026-08-25T15:25:58.552251+03:00",
+              "dateModified": "2026-08-25T15:25:58.552251+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
