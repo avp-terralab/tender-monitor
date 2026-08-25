@@ -1,0 +1,62 @@
+{
+  "tender_id": "UA-2026-08-25-012903-a",
+  "saved_at": "2026-08-25T14:42:51.533Z",
+  "snapshot": {
+    "tender_id": "UA-2026-08-25-012903-a",
+    "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії \n\n",
+    "status": "active.tendering",
+    "dateModified": "2026-08-25T17:17:58.544029+03:00",
+    "tenderPeriod": {
+      "endDate": "2026-09-02T09:00:00+03:00"
+    },
+    "auctionPeriod": null,
+    "procuringEntity": {
+      "name": "КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО \" ЛЬВІВСЬКЕ ТЕРИТОРІАЛЬНЕ МЕДИЧНЕ ОБ'ЄДНАННЯ \" БАГАТОПРОФІЛЬНА КЛІНІЧНА ЛІКАРНЯ ІНТЕНСИВНИХ МЕТОДІВ ЛІКУВАННЯ ТА ШВИДКОЇ МЕДИЧНОЇ ДОПОМОГИ\"",
+      "edrpou": "44496574"
+    },
+    "value": {
+      "amount": 758000,
+      "currency": "UAH",
+      "valueAddedTaxIncluded": false
+    },
+    "procurementMethodType": "aboveThreshold",
+    "classification": {
+      "id": "72260000-5",
+      "description": "Послуги, пов’язані з програмним забезпеченням",
+      "scheme": "ДК021"
+    },
+    "classification_ids": [
+      "72260000-5"
+    ],
+    "contact": {
+      "name": "Людмила Федорович",
+      "email": "1_tmo_tender@ukr.net",
+      "telephone": "+380322581125"
+    },
+    "documents": [
+      {
+        "id": "1ef68e36f74f4c0eaab07773d097bd45",
+        "title": "ТД _програмне забезпечення лабораторії.docx",
+        "documentType": "biddingDocuments",
+        "datePublished": "2026-08-25T17:16:25.557366+03:00"
+      },
+      {
+        "id": "b274f63cc01e4af0b1293cac107ca131",
+        "title": "Проєкт_Договору програмне лабораторії.docx",
+        "documentType": "contractProforma",
+        "datePublished": "2026-08-25T17:16:25.557366+03:00"
+      },
+      {
+        "id": "8f67285fc0cb41b09d85174be21559e2",
+        "title": "sign.p7s",
+        "documentType": "notice",
+        "datePublished": "2026-08-25T17:17:58.142328+03:00"
+      }
+    ],
+    "questions": [],
+    "complaints": [],
+    "awards": [],
+    "contracts": [],
+    "cancellations": []
+  }
+}
