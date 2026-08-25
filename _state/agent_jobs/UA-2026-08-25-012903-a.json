@@ -4,27 +4,21 @@
   "company": "ТЕРРАЛАБ АЙ ТІ",
   "price": "758000",
   "requested_by": "7321709183",
-  "status": "running",
+  "status": "done",
   "created_at": "2026-08-25T14:28:27.547Z",
+  "milestones": {
+    "prepared": true
+  },
   "updated_at": "2026-08-25T14:30:29.831917+00:00",
-  "stages": [
-    {
-      "stage": "analyzing",
-      "at": "2026-08-25T14:32:31.448885+00:00"
-    },
-    {
-      "stage": "packaging",
-      "count": 5,
-      "at": "2026-08-25T14:46:33.226826+00:00"
-    },
-    {
-      "stage": "packaging",
-      "count": 12,
-      "at": "2026-08-25T14:50:35.099605+00:00"
-    },
-    {
-      "stage": "validating",
-      "at": "2026-08-25T15:07:24.791521+00:00"
+  "result": {
+    "package_dir": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій\\25.08.26 КНП Львівське територіальне медичне об'єднання\\Тендерна пропозиція",
+    "published_dir": "G:\\Мій диск\\ТЕНДЕРИ 2021-2026\\ТЕНДЕРИ 2026\\87. КНП Львівське територіальне медичне об'єднання",
+    "report_path": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій\\25.08.26 КНП Львівське територіальне медичне об'єднання\\_ЗВІТ.md",
+    "n_docx": 12,
+    "drive_link": "https://drive.google.com/drive/folders/1mp4Xg2NZA-6B1dQd8WQRfWM0cfrXxDVB",
+    "validator": {
+      "state": "clean",
+      "detail": ""
     }
-  ]
+  }
 }
