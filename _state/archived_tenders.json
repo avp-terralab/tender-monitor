@@ -3681,5 +3681,164 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-08-06-000553-a",
+    "notes": "Комунальне некомерційне підприємство «Таїрівської селищної ради «Таїрівський консультативно-діагностичний центр» — Послуги з постачання та налаштування програмного забезпечення лабораторної інформаці…",
+    "archived_at": "2026-08-26T06:55:40.103Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-08-06-000553-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії (код ДК 021:2015-72260000-5 - Послуги, пов’язані з програмним забезпеченням)",
+      "status": "complete",
+      "dateModified": "2026-08-26T09:49:56.100096+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-08-14T10:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне некомерційне підприємство «Таїрівської селищної ради «Таїрівський консультативно-діагностичний центр»",
+        "edrpou": "43060644"
+      },
+      "value": {
+        "amount": 217100,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Пасічніченко Вікторія Миколаївна",
+        "email": "vikakdc1977@gmail.com",
+        "telephone": "380487701730"
+      },
+      "documents": [
+        {
+          "id": "008cd8b884c840cdb3d1963a1023a5e0",
+          "title": "Додаток 1 квалиф критерии.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-06T09:08:02.024998+03:00"
+        },
+        {
+          "id": "da6a49d2f26744f1ae69e559f5b3f401",
+          "title": "Додаток 2 технични вимоги.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-06T09:08:02.024998+03:00"
+        },
+        {
+          "id": "0428f7f46f2b44038bf8f69df2200e0a",
+          "title": "Додаток 3 документи учасника переможця.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-06T09:08:02.024998+03:00"
+        },
+        {
+          "id": "01bec96b522c465da493704c063ad965",
+          "title": "Додаток 4 проект договору.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-08-06T09:08:02.024998+03:00"
+        },
+        {
+          "id": "b86e67e724154c20ac5b0139cdf3a6c3",
+          "title": "Додаток 5 информация про учасника.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-06T09:08:02.024998+03:00"
+        },
+        {
+          "id": "41a56c35cdda43eba76a737e88034d04",
+          "title": "Додаток 6 тендерна пропозиция.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-06T09:08:02.024998+03:00"
+        },
+        {
+          "id": "b88007fbff3e4c078b169363a11123a0",
+          "title": "Додаток 7 згода персональни дани.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-06T09:08:02.024998+03:00"
+        },
+        {
+          "id": "29541bc226574df2a1a809beeaa4f68a",
+          "title": "Додаток 8 документи учасника.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-06T09:08:02.024998+03:00"
+        },
+        {
+          "id": "9bf1a521697943a6b649c43ed72afd27",
+          "title": "Тендерна_документация_видкрити_торги_з_особливостями.doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-06T09:08:02.024998+03:00"
+        },
+        {
+          "id": "d482a0cef875448c999de42e711e57fd",
+          "title": "Додаток 9 документи переможця.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-06T09:08:02.024998+03:00"
+        },
+        {
+          "id": "4824d8ea16c74dc7a511b57b2cd12c0f",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-08-06T09:08:07.103396+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "b5cf41a3f1564d5da31c4e190b097e62",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "d1a74fc923a340f4be655760181d2aae",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "id": "9b3c01a4b5bd4f7c965364c3d6afdf5d",
+              "hash": "md5:45e70909845de9b15d381c7651c1efe0",
+              "title": "Договир.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/d1a74fc923a340f4be655760181d2aae/documents/9b3c01a4b5bd4f7c965364c3d6afdf5d?download=6a98852eb0184dc7a6bb2e9579f14a0f",
+              "documentOf": "contract",
+              "datePublished": "2026-08-26T09:49:33.197108+03:00",
+              "dateModified": "2026-08-26T09:49:33.197108+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "9db27879f8964d938990c0f5480eb900",
+              "hash": "md5:371da91fc40ee1e58b01ad8713294800",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/d1a74fc923a340f4be655760181d2aae/documents/9db27879f8964d938990c0f5480eb900?download=ffd8a8707c2b4ec68f0a2370e8155bc1",
+              "documentOf": "contract",
+              "datePublished": "2026-08-26T09:49:53.750335+03:00",
+              "dateModified": "2026-08-26T09:49:53.750335+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
