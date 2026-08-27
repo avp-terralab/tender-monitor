@@ -1,5 +1,5 @@
 import { diff, DEADLINE_THRESHOLD_KEYS } from './compare.mjs';
-import { formatDigest, formatDeadlineReminder, summarizeDigest, formatHeartbeat, formatNightDigest } from './telegram.mjs';
+import { formatDigest, formatDeadlineReminder, summarizeDigest, formatHeartbeat, formatNightDigest, nightDigestHeader } from './telegram.mjs';
 import { companyForEdrpou, slugForCompany } from './commands.mjs';
 
 const TENDER_ID_RE = /^UA-\d{4}-\d{2}-\d{2}-\d{6}-[a-z]$/;
@@ -127,6 +127,35 @@ export function winnerTendersFor(groups) {
     out.push({ tenderId: g.tender_id, company, slug: slugForCompany(company) });
   }
   return out;
+}
+
+// Одне повідомлення на ТЕНДЕР, а не одне на прогін (зауваження власника
+// 27.08.2026). Раніше всі групи зшивались в один текст, а кнопки всіх тендерів
+// вішались під ним сукупно — і «🤖 Надіслати агенту» чи «📄 Документи
+// переможця» не казали, до котрого з них належать. Розділити текст було
+// недостатньо: кнопка живе на ПОВІДОМЛЕННІ, тож ділити треба саме повідомлення.
+//
+// `tail` — те, що не належить жодному тендеру окремо (помилки перевірки,
+// архівування): окреме повідомлення в кінці, без кнопок.
+export function splitDigestMessages({
+  runIso, groups = [], addButtonsForTenders = [], winnerTenders = [],
+  header = '', tail = '',
+}) {
+  const withHeader = (body) => (header ? `${header}\n\n${body}` : body);
+  const messages = groups.map((g) => {
+    const add = addButtonsForTenders.filter((id) => id === g.tender_id);
+    const win = winnerTenders.filter((w) => w.tenderId === g.tender_id);
+    const opts = {};
+    if (add.length > 0) opts.addButtonsForTenders = add;
+    if (win.length > 0) opts.winnerTenders = win;
+    return {
+      text: withHeader(formatDigest(runIso, [g])),
+      opts: Object.keys(opts).length > 0 ? opts : undefined,
+    };
+  });
+  const t = (tail ?? '').trim();
+  if (t) messages.push({ text: messages.length === 0 ? withHeader(t) : t, opts: undefined });
+  return messages;
 }
 
 export async function runOnce(deps) {
@@ -314,25 +343,34 @@ export async function runOnce(deps) {
       (pending.errors ?? []).length > 0
     );
     if (pendingHasContent) {
-      const morningText = formatNightDigest(runIso, pending);
       const nightButtons = pendingItems
         .filter(g => g.events?.some(e => e.type === 'new_tender_announced'))
         .map(g => g.tender_id);
       const nightWinnerTenders = winnerTendersFor(pendingItems);
-      const nightOpts = {};
-      if (nightButtons.length > 0) nightOpts.addButtonsForTenders = nightButtons;
-      if (nightWinnerTenders.length > 0) nightOpts.winnerTenders = nightWinnerTenders;
-      const nightRec = await sendDigest(
-        morningText,
-        Object.keys(nightOpts).length > 0 ? nightOpts : undefined,
-      );
+      // Хвіст нічного дайджесту (помилки, архівування) беремо з тієї самої
+      // функції, що й раніше, — з порожнім items, — щоб формулювання «(вночі)»
+      // жили в одному місці, а не роздвоїлись.
+      const nightHeader = nightDigestHeader(runIso);
+      const nightTail = formatNightDigest(runIso, { ...pending, items: {} })
+        .slice(nightHeader.length);
+      const nightMessages = splitDigestMessages({
+        runIso, groups: pendingItems, addButtonsForTenders: nightButtons,
+        winnerTenders: nightWinnerTenders, header: nightHeader, tail: nightTail,
+      });
+      const nightRec = [];
+      for (const m of nightMessages) {
+        const rec = await sendDigest(m.text, m.opts);
+        // Реалізації sendDigest у тестах повертають не масив — беремо лише те,
+        // що справді є списком отримувачів, інакше історія падає на спреді.
+        if (Array.isArray(rec)) nightRec.push(...rec);
+      }
       if (deps.saveNotificationHistory) {
         history = logBroadcast(history, {
           sent_at: now.toISOString(),
           type: 'digest',
           summary: summarizeDigest(pendingItems),
-          text: morningText,
-          recipients: nightRec ?? [],
+          text: nightMessages.map(m => m.text).join("\n\n"),
+          recipients: nightRec,
           deleted: false,
         });
       }
@@ -355,21 +393,19 @@ export async function runOnce(deps) {
 
   const isSilent = !hasContent;
   if (!isSilent || archivedNow.length > 0) {
-    let text = '';
-    if (!isSilent && (digestGroups.length > 0 || invalidErrors.length > 0)) {
-      text = formatDigest(runIso, digestGroups);
-      if (invalidErrors.length > 0) {
-        text += '\n\n⚠️ не вдалось перевірити:\n' +
-          invalidErrors.map(e =>
-            `  • ${e.tender_id} — не знайдено в Prozorro або невалідний формат, відключено від моніторингу`
-          ).join('\n');
-      }
+    // Хвіст — те, що не належить жодному тендеру окремо. Він поїде останнім
+    // повідомленням, без кнопок.
+    const tailBlocks = [];
+    if (!isSilent && invalidErrors.length > 0) {
+      tailBlocks.push('⚠️ не вдалось перевірити:\n' +
+        invalidErrors.map(e =>
+          `  • ${e.tender_id} — не знайдено в Prozorro або невалідний формат, відключено від моніторингу`
+        ).join('\n'));
     }
     if (archivedNow.length > 0) {
-      const block = '📦 Архівовано:\n' + archivedNow.map(a =>
+      tailBlocks.push('📦 Архівовано:\n' + archivedNow.map(a =>
         `  ${STATUS_ICONS[a.status] ?? '📦'} ${a.tender_id} — ${a.status}`
-      ).join('\n');
-      text = text ? `${text}\n\n${block}` : block;
+      ).join('\n'));
     }
     const addButtonsForTenders = groups
       .filter(g => g.events?.some(e => e.type === 'new_tender_announced'))
@@ -389,22 +425,29 @@ export async function runOnce(deps) {
         const dText = formatDeadlineReminder(deadlineTenders);
         await sendDigest(dText);
       }
-      // Main digest — only if there is something to say.
-      if (text) {
-        const digestOpts = {};
-        if (addButtonsForTenders.length > 0) digestOpts.addButtonsForTenders = addButtonsForTenders;
-        if (winnerTenders.length > 0) digestOpts.winnerTenders = winnerTenders;
-        const rec = await sendDigest(
-          text,
-          Object.keys(digestOpts).length > 0 ? digestOpts : undefined,
-        );
+      // Main digest — одне повідомлення на ТЕНДЕР (див. splitDigestMessages).
+      const messages = splitDigestMessages({
+        runIso,
+        groups: isSilent ? [] : digestGroups,
+        addButtonsForTenders, winnerTenders,
+        tail: tailBlocks.join('\n\n'),
+      });
+      if (messages.length > 0) {
+        const recipients = [];
+        for (const m of messages) {
+          const rec = await sendDigest(m.text, m.opts);
+          if (Array.isArray(rec)) recipients.push(...rec);
+        }
         if (deps.saveNotificationHistory) {
+          // Один запис на ПРОГІН, але з message_id усіх надісланих повідомлень:
+          // видалення сповіщення ходить саме по цьому списку, і запис на кожне
+          // повідомлення окремо розсипав би історію.
           history = logBroadcast(history, {
             sent_at: now.toISOString(),
             type: 'digest',
             summary: summarizeDigest(digestGroups),
-            text,
-            recipients: rec ?? [],
+            text: messages.map(m => m.text).join('\n\n'),
+            recipients,
             deleted: false,
           });
         }

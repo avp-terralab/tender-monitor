@@ -470,12 +470,19 @@ export function formatHeartbeat(runIso, snapshots) {
   return lines.join('\n');
 }
 
-export function formatNightDigest(runIso, pending) {
-  const groups = Object.values(pending.items ?? {});
+// Заголовок нічного дайджесту окремо: з 27.08.2026 кожен тендер їде своїм
+// повідомленням, і монітору потрібен цей самий рядок, щоб поставити його в
+// кожне з них. Одне джерело — щоб формулювання не розійшлись.
+export function nightDigestHeader(runIso) {
   const dateStr = new Intl.DateTimeFormat('uk-UA', {
     timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', year: 'numeric',
   }).format(new Date(runIso));
-  let text = `🌙 Нічний дайджест за ${dateStr}`;
+  return `🌙 Нічний дайджест за ${dateStr}`;
+}
+
+export function formatNightDigest(runIso, pending) {
+  const groups = Object.values(pending.items ?? {});
+  let text = nightDigestHeader(runIso);
   if (groups.length > 0) {
     text += '\n\n' + formatDigest(runIso, groups);
   }
@@ -558,7 +565,10 @@ export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, te
       : chunks[i];
     const buttonsHere = addButtonsForTenders.filter(id => annotated.includes(id));
     const rows = buttonsHere.flatMap(id => {
-      const row = [[{ text: `➕ Додати в моніторинг ${id}`, callback_data: `add:${id}` }]];
+      // Ідентифікатор у підписі більше не потрібен: з 27.08.2026 кожен тендер
+      // їде ОКРЕМИМ повідомленням (splitDigestMessages), і рядок 🆔 у тілі вже
+      // однозначно каже, до чого ця кнопка. Довгий id лише різав підпис.
+      const row = [[{ text: '➕ Додати в моніторинг', callback_data: `add:${id}` }]];
       // Agent-trigger entry button (admin + editor — див. canUseAgent), directly
       // under the add button for the same tender. Inlined (rather than importing
       // agentTriggerButtonRow from commands.mjs) to avoid a telegram.mjs ↔
