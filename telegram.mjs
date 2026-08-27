@@ -102,6 +102,11 @@ const LEGAL_FORM_ABBREVIATIONS = [
   // [іи] tolerates the "некомерцийне" typo seen in some Prozorro registry entries.
   // (підприємство|товариство): standard form is "підприємство", but registry has
   // entries like "Комунальне некомерцийне товариство" that are semantically КНП too.
+  // КНМП — окрема форма: «медичне» стоїть МІЖ «некомерційне» і «підприємство»,
+  // тож правило КНП нижче її не ловить. Стоїть вище свідомо — перелік застосовує
+  // ПЕРШИЙ збіг, і покладатись на те, що сусіднє правило випадково не збігається,
+  // означало б зламатись від будь-якої його зміни. (Прохання власника 27.08.2026.)
+  [new RegExp(`^Комунальне\\s+некомерц[іи]йне\\s+медичне\\s+підприємство${_SEP}`, 'i'), 'КНМП '],
   [new RegExp(`^Комунальне\\s+некомерц[іи]йне\\s+(?:підприємство|товариство)${_SEP}`, 'i'), 'КНП '],
   [new RegExp(`^Комунальне\\s+підприємство${_SEP}`, 'i'), 'КП '],
   [new RegExp(`^Комунальний\\s+заклад${_SEP}`, 'i'), 'КЗ '],
@@ -465,12 +470,19 @@ export function formatHeartbeat(runIso, snapshots) {
   return lines.join('\n');
 }
 
-export function formatNightDigest(runIso, pending) {
-  const groups = Object.values(pending.items ?? {});
+// Заголовок нічного дайджесту окремо: з 27.08.2026 кожен тендер їде своїм
+// повідомленням, і монітору потрібен цей самий рядок, щоб поставити його в
+// кожне з них. Одне джерело — щоб формулювання не розійшлись.
+export function nightDigestHeader(runIso) {
   const dateStr = new Intl.DateTimeFormat('uk-UA', {
     timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', year: 'numeric',
   }).format(new Date(runIso));
-  let text = `🌙 Нічний дайджест за ${dateStr}`;
+  return `🌙 Нічний дайджест за ${dateStr}`;
+}
+
+export function formatNightDigest(runIso, pending) {
+  const groups = Object.values(pending.items ?? {});
+  let text = nightDigestHeader(runIso);
   if (groups.length > 0) {
     text += '\n\n' + formatDigest(runIso, groups);
   }
@@ -553,7 +565,10 @@ export async function sendDigest({ token, chatId, fetch: fetchImpl = fetch }, te
       : chunks[i];
     const buttonsHere = addButtonsForTenders.filter(id => annotated.includes(id));
     const rows = buttonsHere.flatMap(id => {
-      const row = [[{ text: `➕ Додати в моніторинг ${id}`, callback_data: `add:${id}` }]];
+      // Ідентифікатор у підписі більше не потрібен: з 27.08.2026 кожен тендер
+      // їде ОКРЕМИМ повідомленням (splitDigestMessages), і рядок 🆔 у тілі вже
+      // однозначно каже, до чого ця кнопка. Довгий id лише різав підпис.
+      const row = [[{ text: '➕ Додати в моніторинг', callback_data: `add:${id}` }]];
       // Agent-trigger entry button (admin + editor — див. canUseAgent), directly
       // under the add button for the same tender. Inlined (rather than importing
       // agentTriggerButtonRow from commands.mjs) to avoid a telegram.mjs ↔
