@@ -1,12 +1,15 @@
 name: tender-monitor
 
 on:
-  # Hourly. GitHub Actions free-tier cron drops scheduled runs under load — running every
-  # hour gives ≥1 successful tick per few hours even during drops, and keeps the per-tick
-  # forward-feed backlog small (~1h ≈ 500 items) so watched-entity alerts don't lag.
-  schedule:
-    - cron: '0 * * * *'
-  # Allow manual trigger from Actions tab
+  # ⛔ Погодинний cron ВИМКНЕНО 28.08.2026 разом із cutover: стан прода переїхав
+  # у GitLab (prod-state), і монітор тепер жене розклад GitLab (id=2, щогодини).
+  # Лишити його увімкненим означало б, що цей воркфлоу пише стан у гілку, якої
+  # бот більше не читає, — знахідки за годину просто зникали б.
+  #
+  # Ручний запуск лишається СВІДОМО: це шлях відкату. Повернути cron —
+  # розкоментувати schedule нижче й повернути STATE_BACKEND на "github".
+  # schedule:
+  #   - cron: '0 * * * *'
   workflow_dispatch:
 
 permissions:
