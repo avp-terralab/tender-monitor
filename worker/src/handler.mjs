@@ -2092,6 +2092,92 @@ async function handleAgentCallback({
     if (!job) { await ack('⚠️ Job не знайдено', true); return; }
     if (job.status !== 'error') { await ack('ℹ️ Job вже не в стані error', true); return; }
 
+    // «Повторити» мусить вести в діалог ТІЄЇ САМОЇ дії, що впала. До 27.08.2026
+    // воно завжди відкривало вікно ПІДГОТОВКИ — для sign/winner/amend це
+    // виглядало як «Ціна: undefined», а натиснута «Підтвердити» ставила в чергу
+    // повну ПЕРЕГЕНЕРАЦІЮ пропозиції поверх пакета, який оператор правив руками.
+    // Тобто ціна ціни помилки: не зламана кнопка, а тихо знищена робота.
+    const failedKind = job.job_type ?? 'prepare';
+
+    if (failedKind === 'sign') {
+      // Той самий шлях, що й кнопка 🖊 Підписати: спершу дата, потім підтвердження.
+      // Гейт теж той самий — підписують кінцеву теку відділу.
+      const published = job.result?.published_dir ?? job.target?.published_dir ?? null;
+      if (!published) {
+        await ack('🚫 Пропозиція ще не опублікована в теку відділу', true);
+        return;
+      }
+      try {
+        const newId = await editOrSend({
+          _editMessageText, _sendReply, env, chatId, messageId,
+          text: 'Яку дату проставити в документах?',
+          replyMarkup: buildAgentSignDateKeyboard(tid, formatLetterDate(_now())),
+        });
+        const { pending, sha } = await _loadAgentPending(env);
+        pending[chatId] = {
+          tid, kind: 'sign', step: 'await_date', messageId: newId,
+          company: job.company ?? null, at: _now().toISOString(),
+        };
+        await _saveAgentPending(env, pending, sha);
+      } catch (err) {
+        console.error('worker: agent retry (sign) failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+      await ack('↩️ Обери дату й підтверди');
+      return;
+    }
+
+    if (failedKind === 'winner') {
+      try {
+        const newId = await editOrSend({
+          _editMessageText, _sendReply, env, chatId, messageId,
+          text: buildAgentWinnerConfirmText({ tenderId: tid, company: job.company ?? null }),
+          replyMarkup: buildAgentConfirmKeyboard(tid),
+        });
+        const { pending, sha } = await _loadAgentPending(env);
+        pending[chatId] = {
+          tid, kind: 'winner', step: 'confirm', company: job.company ?? null,
+          messageId: newId, at: _now().toISOString(),
+        };
+        await _saveAgentPending(env, pending, sha);
+      } catch (err) {
+        console.error('worker: agent retry (winner) failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+      await ack('↩️ Підтверди перезапуск');
+      return;
+    }
+
+    if (failedKind === 'amend') {
+      // Інструкція зі старої задачі переноситься: змушувати переписувати її
+      // заново — зайва робота й зайвий шанс зробити це інакше.
+      const instruction = job.instruction ?? null;
+      try {
+        const newId = await editOrSend({
+          _editMessageText, _sendReply, env, chatId, messageId,
+          text: instruction
+            ? buildAgentAmendConfirmText({ tenderId: tid, instruction })
+            : 'Напиши текстом, що доробити:',
+          replyMarkup: instruction ? buildAgentConfirmKeyboard(tid) : undefined,
+        });
+        const { pending, sha } = await _loadAgentPending(env);
+        pending[chatId] = instruction
+          ? { tid, kind: 'amend', step: 'confirm', instruction, messageId: newId,
+              at: _now().toISOString() }
+          : { tid, kind: 'amend', step: 'await_instruction', messageId: newId,
+              at: _now().toISOString() };
+        await _saveAgentPending(env, pending, sha);
+      } catch (err) {
+        console.error('worker: agent retry (amend) failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+      await ack(instruction ? '↩️ Підтверди доробку' : '↩️ Напиши, що доробити');
+      return;
+    }
+
     // «Повторити» НЕ ставить задачу в чергу саме — воно веде в те саме вікно
     // підтвердження, що й ручне введення ціни, з підставленими компанією й
     // ціною зі старої задачі. Далі все робить `action === 'confirm'` вище.
