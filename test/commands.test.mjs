@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import {
   parseCommand, mainKeyboard, MAIN_KEYBOARD, buildAutoNotes, formatAddReply,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
-  abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
+  abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation, priceExceedsAnnounced,
+  buildAgentKillKeyboard,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, handleWhoami, handleUsersList, handleInvitesList, HELP_TEXT,
   buildHelpText, buildWelcomeText, buildRoleChangeNotice, buildStartGreeting,
@@ -263,6 +264,20 @@ test('abbreviateLegalForm: КНП — accepts "товариство" alt form (s
   assert.equal(
     abbreviateLegalForm('Комунальне некомерцийне товариство "Дніпропетровська обласна клінічна лікарня ім. І. І. Мечникова"'),
     'КНП "Дніпропетровська ОКЛ ім. І. І. Мечникова"'
+  );
+});
+
+test('abbreviateLegalForm: КНМП — «медичне» між формою й підприємством', () => {
+  // Прохання власника 27.08.2026. Правило стоїть ПЕРЕД КНП: перелік застосовує
+  // перший збіг, і хоч теперішній КНП цю назву не ловить («медичне» стоїть між
+  // словами), покладатись на цю деталь не варто.
+  assert.equal(
+    abbreviateLegalForm('Комунальне некомерційне медичне підприємство «Тест»'),
+    'КНМП «Тест»'
+  );
+  assert.equal(
+    abbreviateLegalForm('КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ МЕДИЧНЕ ПІДПРИЄМСТВО"ТЕСТ" ТЕРНОПІЛЬСЬКОЇ МІСЬКОЇ РАДИ'),
+    'КНМП "ТЕСТ" ТЕРНОПІЛЬСЬКОЇ МР'   // форма додає пробіл, як і КНП
   );
 });
 
@@ -3755,8 +3770,8 @@ test('buildAgentUnifiedList: milestone glyphs accumulate across a job_type chang
 test('buildAgentUnifiedList: text carries the milestone legend', () => {
   const v = buildAgentUnifiedList({ watchlist: [watchEntry('UA-1', 'A')], jobs: [], page: 0 });
   assert.match(v.text, /підготовлена ТП/);
+  assert.match(v.text, /підписано/);
   assert.match(v.text, /документи переможця/);
-  assert.match(v.text, /документи для подачі/);
 });
 
 test('buildAgentUnifiedList: jobbed entries sort by created_at desc, then 🆕 entries after', () => {
@@ -3798,13 +3813,13 @@ test('buildAgentTenderDetail: no watchlist entry (entry=null) → falls back to 
   assert.match(v.text, /^📄 UA-1/);
 });
 
-test('buildAgentTenderDetail: done + drive_link → folder, доробити, winner docs, sign, back', () => {
+test('buildAgentTenderDetail: done + drive_link → folder, доробити, sign, winner docs, back', () => {
   const v = buildAgentTenderDetail({
     tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
     job: job('UA-1', 'done', { result: { drive_link: 'https://d/1' }, milestones: { prepared: true } }), page: 0,
   });
   const cbs = v.keyboard.inline_keyboard.map((r) => r[0].callback_data ?? r[0].url);
-  assert.deepEqual(cbs, ['https://d/1', 'agent:amend:UA-1', 'agent:winner:UA-1', 'agent:sign:UA-1', 'agent:jobs:0']);
+  assert.deepEqual(cbs, ['https://d/1', 'agent:amend:UA-1', 'agent:sign:UA-1', 'agent:winner:UA-1', 'agent:jobs:0']);
   // "✅ Готово" text is gone — the milestone glyphs (legend on the list screen) say it now.
   assert.match(v.text, /✅/);
   assert.doesNotMatch(v.text, /▫️/);
@@ -3869,13 +3884,40 @@ test('buildAgentTenderDetail: done job with no result at all → only winner doc
   assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-6'));
 });
 
-test('buildAgentTenderDetail: pending/running → status text, only winner docs + back', () => {
+test('buildAgentTenderDetail: pending/running → status text, kill + winner docs + back', () => {
   const running = buildAgentTenderDetail({ tenderId: 'UA-1', entry: null, job: job('UA-1', 'running'), page: 0 });
   assert.match(running.text, /⏳ Виконується/);
+  // ✖ Скасувати завдання — перша кнопка: незавершене завдання можна зупинити,
+  // і лише на картці видно, ЯКИЙ тендер зупиняють (27.08.2026).
   assert.deepEqual(running.keyboard.inline_keyboard.map((r) => r[0].callback_data),
-    ['agent:winner:UA-1', 'agent:jobs:0']);
+    ['agent:kill:UA-1', 'agent:winner:UA-1', 'agent:jobs:0']);
   const pending = buildAgentTenderDetail({ tenderId: 'UA-2', entry: null, job: job('UA-2', 'pending'), page: 0 });
   assert.match(pending.text, /📋 У черзі/);
+  assert.equal(pending.keyboard.inline_keyboard[0][0].callback_data, 'agent:kill:UA-2');
+});
+
+test('buildAgentTenderDetail: скасоване завдання — не помилка й не «в черзі»', () => {
+  const purged = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: null, page: 0,
+    job: job('UA-1', 'cancelled', { result: { cancel_mode: 'purge' } }),
+  });
+  assert.match(purged.text, /✖ Скасовано/);
+  assert.match(purged.text, /видалено/);
+  assert.ok(!/У черзі|Виконується|Помилка/.test(purged.text), purged.text);
+  assert.deepEqual(purged.keyboard.inline_keyboard.map((r) => r[0].callback_data),
+    ['agent:start:UA-1', 'agent:winner:UA-1', 'agent:jobs:0']);
+
+  const kept = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: null, page: 0,
+    job: job('UA-1', 'cancelled', { result: { cancel_mode: 'keep' } }),
+  });
+  assert.match(kept.text, /тека лишилась/);
+});
+
+test('buildAgentKillKeyboard: два режими + вихід', () => {
+  const kb = buildAgentKillKeyboard('UA-1');
+  const cbs = kb.inline_keyboard.map((r) => r[0].callback_data);
+  assert.deepEqual(cbs, ['agent:kill:UA-1:purge', 'agent:kill:UA-1:keep', 'agent:pick:UA-1']);
 });
 
 // ── Live stage reporting (job.stages, written by run_agent.py on the desktop) ─
@@ -4173,6 +4215,67 @@ test('sign date keyboard offers today, a manual entry and cancel', () => {
   assert.ok(flat.some((b) => b.callback_data === 'agent:signother:UA-1'));
   assert.ok(flat.some((b) => b.callback_data === 'agent:cancel:UA-1'));
   assert.ok(flat.some((b) => b.text.includes('13.08.2026')), 'the date is visible on the button');
+});
+
+test('sign date keyboard offers a «keep the letters dates» option', () => {
+  // Третя опція (27.08.2026): дати в листах не чіпаємо взагалі. Поллер розуміє
+  // саме рядок «keep» і перетворює його на None.
+  const kb = buildAgentSignDateKeyboard('UA-1', '13.08.2026');
+  const flat = kb.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.callback_data === 'agent:signdate:UA-1:keep'));
+  assert.ok(flat.some((b) => /Залишити дату/.test(b.text)));
+  assert.equal(kb.inline_keyboard.length, 4, 'сьогодні + залишити + інша + скасувати');
+});
+
+test('buildAgentSignConfirmText: «keep» показується словами, а не сентинелом', () => {
+  // Голе «keep» у підтвердженні читалось би як помилка бота, а не як вибір,
+  // який людина щойно зробила.
+  const t = buildAgentSignConfirmText({
+    tenderId: 'UA-1', company: 'МАЙЛАБ', letterDate: 'keep',
+  });
+  assert.match(t, /залишити як у листах/);
+  assert.ok(!/keep/.test(t), t);
+});
+
+test('buildAgentAdminNotice: sign з «keep» теж без сентинела', () => {
+  const t = buildAgentAdminNotice({
+    kind: 'sign', actorName: 'Оксана', chatId: 555, tenderId: 'UA-1',
+    company: 'МАЙЛАБ', letterDate: 'keep',
+  });
+  assert.match(t, /залишити як у листах/);
+  assert.ok(!/keep/.test(t), t);
+});
+
+test('buildAgentConfirmKeyboard: перевищення суми додає «Ввести іншу суму»', () => {
+  // Доти виправити суму можна було лише скасувавши діалог і обравши компанію
+  // наново — тобто попередження було, а дешевого шляху виправити не було.
+  const plain = buildAgentConfirmKeyboard('UA-1');
+  assert.equal(plain.inline_keyboard.length, 1);
+
+  const exceeded = buildAgentConfirmKeyboard('UA-1', true);
+  assert.equal(exceeded.inline_keyboard.length, 2);
+  assert.equal(exceeded.inline_keyboard[0][0].callback_data, 'agent:reprice:UA-1');
+  assert.match(exceeded.inline_keyboard[0][0].text, /іншу суму/);
+});
+
+test('priceExceedsAnnounced: один поріг для тексту й для клавіатури', () => {
+  // Два різні пороги означали б попередження без кнопки або кнопку без
+  // попередження.
+  assert.equal(priceExceedsAnnounced('387 600', 326250), true);
+  assert.equal(priceExceedsAnnounced('300 000', 326250), false);
+  assert.equal(priceExceedsAnnounced('326250,00', 326250), false, 'рівно стільки — не перевищення');
+  assert.equal(priceExceedsAnnounced('auto', 326250), false, 'auto не порівнюємо');
+  assert.equal(priceExceedsAnnounced('387 600', null), false, 'без оголошеної вартості порівнювати нема з чим');
+
+  // Текст і клавіатура мусять погоджуватись на тих самих даних.
+  const t = buildAgentConfirmText({
+    company: 'МАЙЛАБ', price: '387 600', tenderId: 'UA-1', announcedValue: 326250,
+  });
+  assert.match(t, /ВИЩА за оголошену вартість/);
+  assert.equal(
+    buildAgentConfirmKeyboard('UA-1', priceExceedsAnnounced('387 600', 326250)).inline_keyboard.length,
+    2
+  );
 });
 
 test('buildAgentSignConfirmText shows tid, company and date, HTML-escaped', () => {

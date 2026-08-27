@@ -1355,7 +1355,7 @@ test('runHandler: /archive UA-... (admin) shows the agent line when a job exists
     update: { message: { chat: { id: 123 }, text: '/archive UA-2026-04-30-010542-a', message_id: 1 } },
     env: ENV, deps,
   });
-  assert.match(sent[0].text, /🤖 Агент: ✅📄🖊 · <a href="https:\/\/drive\/x">Відкрити теку<\/a>/);
+  assert.match(sent[0].text, /🤖 Агент: ✅🖊📄 · <a href="https:\/\/drive\/x">Відкрити теку<\/a>/);
 });
 
 test('runHandler: /archive UA-... (viewer, not editor/admin) never sees the agent line', async () => {
@@ -3645,11 +3645,12 @@ test('agent:confirm with kind=winner, admin is the actor → no self-notificatio
 
 // ── Task 8: діалог підписання (agent:sign → дата → confirm) ───────────────────
 
-// Готова пропозиція, з якої можна щось підписувати: sign-job бере
-// target.package_dir саме звідси.
+// Готова Й ОПУБЛІКОВАНА пропозиція: з 27.08.2026 підписують кінцеву теку
+// відділу (published_dir), бо саме там оператор править листи. package_dir
+// лишається — поллер бере з нього підказку, де ставити стейджинг.
 const DONE_PREPARED = {
   tender_id: AGENT_TID, status: 'done', company: 'МАЙЛАБ',
-  result: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg' },
+  result: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg', published_dir: 'G:\\pub' },
 };
 
 test('agent:sign on a prepared proposal → date keyboard, pending at await_date', async () => {
@@ -3675,22 +3676,23 @@ test('agent:sign refuses when the proposal is not ready', async () => {
     loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'running' }),
   });
   await runHandler({ update: CB(`agent:sign:${AGENT_TID}`), env: ENV, deps });
-  assert.match(acks[0].text, /не готова/);
+  assert.match(acks[0].text, /не опублікована/);
   assert.equal(store.pending['123'], undefined, 'no dialog opened');
   assert.equal(sent.length, 0, 'no date keyboard');
 });
 
-// package_dir — це те, ЩО підписують. Без нього агент не має теки з .docx, тож
-// кнопка не має відкривати діалог, навіть коли пропозиція «done» і має лінк.
-test('agent:sign refuses a done job whose result has no package_dir', async () => {
+// published_dir — це те, ЩО підписують: кінцева тека відділу з правками
+// оператора. Без неї поллер відмовляє, тож кнопка не має відкривати діалог —
+// навіть коли пропозиція «done», має лінк і навіть має package_dir.
+test('agent:sign refuses a done job never published to the department folder', async () => {
   const { deps, store, acks } = makeAgentDeps({
     loadAgentJob: async () => ({
       tender_id: AGENT_TID, status: 'done', company: 'МАЙЛАБ',
-      result: { drive_link: 'https://drive/x' },
+      result: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg' },
     }),
   });
   await runHandler({ update: CB(`agent:sign:${AGENT_TID}`), env: ENV, deps });
-  assert.match(acks[0].text, /не готова/);
+  assert.match(acks[0].text, /не опублікована/);
   assert.equal(store.pending['123'], undefined);
 });
 
@@ -3714,7 +3716,7 @@ test('agent:signdate → date stored, sign confirmation shown', async () => {
     tid: AGENT_TID, kind: 'sign', step: 'confirm', company: 'МАЙЛАБ', messageId: 9,
     letterDate: '21.06.2026', at: '2026-06-21T10:00:00.000Z',
   });
-  assert.match(edits.at(-1).text, /Підписати й запакувати/);
+  assert.match(edits.at(-1).text, /Підписати/);
   assert.match(edits.at(-1).text, /21\.06\.2026/);
   assert.match(JSON.stringify(edits.at(-1).replyMarkup), new RegExp(`agent:confirm:${AGENT_TID}`));
   assert.equal(acks.length, 1);
@@ -3899,7 +3901,7 @@ test('agent:confirm with kind=sign → sign job saved with an agent_sign audit, 
     job_type: 'sign',
     company: 'МАЙЛАБ',
     letter_date: '21.06.2026',
-    target: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg', published_dir: null },
+    target: { drive_link: 'https://drive/x', package_dir: 'G:\\pkg', published_dir: 'G:\\pub' },
     requested_by: '456',
     status: 'pending',
     created_at: '2026-06-21T10:00:00.000Z',
@@ -3920,6 +3922,35 @@ test('agent:confirm with kind=sign → sign job saved with an agent_sign audit, 
 // Локачинської СелР Локачинська лікарня» -> «79. Локачинська Лікарня»), і без
 // цього поля поллер завів би підписаний пакет у НОВУ нумеровану теку, з'ївши
 // номер у чужій ручній послідовності. Winner-флоу передає це поле так само.
+test('agent:signdate:keep → pending letterDate=keep, підтвердження без сентинела', async () => {
+  const { deps, store, edits } = makeAgentDeps({
+    loadAgentJob: async () => structuredClone(DONE_PREPARED),
+  });
+  store.pending['123'] = {
+    tid: AGENT_TID, kind: 'sign', step: 'await_date', company: 'МАЙЛАБ', messageId: 9,
+    at: '2026-06-21T10:00:00.000Z',
+  };
+  await runHandler({ update: CB(`agent:signdate:${AGENT_TID}:keep`), env: ENV, deps });
+  assert.equal(store.pending['123'].letterDate, 'keep');
+  assert.equal(store.pending['123'].step, 'confirm');
+  assert.match(edits.at(-1).text, /залишити як у листах/);
+});
+
+test('agent:confirm with kind=sign and keep → job letter_date=keep', async () => {
+  // Сентинел їде в job як є: перетворює його на None вже поллер.
+  const { deps, store, jobs } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+    loadAgentJob: async () => structuredClone(DONE_PREPARED),
+  });
+  store.pending['123'] = {
+    tid: AGENT_TID, kind: 'sign', step: 'confirm', company: 'МАЙЛАБ',
+    letterDate: 'keep', at: '2026-06-21T10:00:00.000Z',
+  };
+  await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].job.letter_date, 'keep');
+});
+
 test('agent:confirm with kind=sign carries published_dir into the job target', async () => {
   const { deps, store, jobs } = makeAgentDeps({
     saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
@@ -3961,8 +3992,9 @@ test('agent:confirm with kind=sign but no chosen date → no job, soft ack', asy
 });
 
 // Між відкриттям діалогу і підтвердженням job-файл могли переписати (напр.
-// повторним prepare). Підписувати нема чого — черга має лишитись порожньою.
-test('agent:confirm with kind=sign when the prior job lost its package_dir → no job', async () => {
+// повторним prepare, який ще не доїхав до теки відділу). Підписувати нема чого
+// — черга має лишитись порожньою.
+test('agent:confirm with kind=sign when the prior job lost its published_dir → no job', async () => {
   const { deps, store, jobs, acks } = makeAgentDeps({
     loadAgentJob: async () => ({
       tender_id: AGENT_TID, status: 'done', company: 'МАЙЛАБ',
@@ -3975,7 +4007,7 @@ test('agent:confirm with kind=sign when the prior job lost its package_dir → n
   };
   await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
   assert.equal(jobs.length, 0);
-  assert.match(acks[0].text, /не готова/);
+  assert.match(acks[0].text, /не опублікована/);
 });
 
 test('agent:confirm with kind=sign when loadAgentJob throws → no job, soft ack', async () => {
@@ -4018,6 +4050,84 @@ test('agent:confirm on a sign dialog still at await_date → no job', async () =
   await runHandler({ update: CB(`agent:confirm:${AGENT_TID}`), env: ENV, deps });
   assert.equal(jobs.length, 0);
   assert.match(acks[0].text, /Немає активного запиту/);
+});
+
+test('agent:kill на завданні в черзі — скасовує одразу, без питань', async () => {
+  // У черзі питати нема про що: агент ще нічого не написав.
+  const { deps, jobs, acks, edits } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'pending', company: 'МАЙЛАБ' }),
+  });
+  await runHandler({ update: CB(`agent:kill:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].job.status, 'cancelled');
+  assert.equal(jobs[0].job.cancel_mode, undefined, 'у черзі режим не потрібен');
+  assert.match(edits.at(-1).text, /скасовано/i);
+  assert.equal(acks.length, 1);
+});
+
+test('agent:kill на ЗАПУЩЕНОМУ — спершу питає, що зробити зі зробленим', async () => {
+  const { deps, jobs, edits } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'running', company: 'МАЙЛАБ' }),
+  });
+  await runHandler({ update: CB(`agent:kill:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 0, 'нічого не пишемо, доки людина не обрала режим');
+  const kb = JSON.stringify(edits.at(-1).replyMarkup);
+  assert.match(kb, new RegExp(`agent:kill:${AGENT_TID}:purge`));
+  assert.match(kb, new RegExp(`agent:kill:${AGENT_TID}:keep`));
+});
+
+test('agent:kill:purge — статус cancelled + cancel_mode у самому завданні', async () => {
+  // Режим мусить лежати в job-записі НА МОМЕНТ зупинки: коли сесію вб'ють,
+  // питати вже нема кого.
+  const { deps, jobs, edits } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'running', company: 'МАЙЛАБ' }),
+  });
+  await runHandler({ update: CB(`agent:kill:${AGENT_TID}:purge`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].job.status, 'cancelled');
+  assert.equal(jobs[0].job.cancel_mode, 'purge');
+  assert.match(jobs[0].opts.message, /^audit: agent_cancel /, jobs[0].opts.message);
+  assert.match(edits.at(-1).text, /30 с/);
+});
+
+test('agent:kill на завершеному завданні нічого не міняє', async () => {
+  const { deps, jobs, acks } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'done', result: {} }),
+  });
+  await runHandler({ update: CB(`agent:kill:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 0);
+  assert.match(acks[0].text, /вже не виконується/);
+});
+
+test('agent:reprice повертає діалог на крок ціни, зберігши компанію', async () => {
+  const { deps, store, edits, acks } = makeAgentDeps();
+  store.pending['123'] = {
+    tid: AGENT_TID, company: 'МАЙЛАБ', price: '387 600', step: 'confirm',
+    messageId: 9, at: '2026-06-21T10:00:00.000Z',
+  };
+  await runHandler({ update: CB(`agent:reprice:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(store.pending['123'].step, 'await_price');
+  assert.equal(store.pending['123'].company, 'МАЙЛАБ', 'компанію заново не питаємо');
+  assert.equal(store.pending['123'].price, undefined, 'стару суму не тягнемо далі');
+  assert.match(edits.at(-1).text, /ціну/i);
+  assert.equal(acks.length, 1);
+});
+
+test('agent:reprice на чужому/протухлому діалозі нічого не робить', async () => {
+  // Та сама обережність, що й у гілці дати: покинутий діалог не має
+  // перехоплювати пізніший дотик по старій кнопці.
+  const { deps, store, acks } = makeAgentDeps();
+  store.pending['123'] = {
+    tid: AGENT_TID, kind: 'sign', step: 'confirm', letterDate: '21.06.2026',
+    at: '2026-06-21T10:00:00.000Z',
+  };
+  await runHandler({ update: CB(`agent:reprice:${AGENT_TID}`), env: ENV, deps });
+  assert.match(acks[0].text, /Немає активного запиту/);
+  assert.equal(store.pending['123'].step, 'confirm', 'sign-діалог не зачеплено');
 });
 
 test('agent:cancel clears a sign dialog', async () => {

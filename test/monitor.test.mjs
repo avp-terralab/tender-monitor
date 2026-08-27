@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runOnce, isQuietHour, mergePending, emptyPending, expireHistory, logBroadcast, checkAgentHealth, winnerTendersFor } from '../monitor.mjs';
+import { runOnce, isQuietHour, mergePending, emptyPending, expireHistory, logBroadcast, checkAgentHealth, winnerTendersFor, splitDigestMessages } from '../monitor.mjs';
 
 // Use valid tender_id format throughout (UA-YYYY-MM-DD-NNNNNN-x)
 const T_X      = 'UA-2026-05-01-000001-a';
@@ -1332,4 +1332,106 @@ test('checkAgentHealth: multiple jobs — one stale new, one alerted, one fresh'
 test('checkAgentHealth: null/undefined jobs → safe', () => {
   const { toAlert } = checkAgentHealth(null, {}, Date.now());
   assert.deepEqual(toAlert, []);
+});
+
+// ── Одне повідомлення на тендер (27.08.2026) ─────────────────────────────────
+
+const G = (id, extra = {}) => ({
+  tender_id: id,
+  title: `Предмет ${id}`,
+  prozorro_url: `https://prozorro.gov.ua/tender/${id}`,
+  status: 'active.tendering',
+  events: [{ type: 'new_tender_announced' }],
+  ...extra,
+});
+
+test('splitDigestMessages: кожен тендер — окреме повідомлення зі СВОЇМИ кнопками', () => {
+  // Суть правки: кнопка живе на ПОВІДОМЛЕННІ. Доки два тендери в одному
+  // повідомленні, «🤖 Надіслати агенту» не може сказати, до котрого належить.
+  const msgs = splitDigestMessages({
+    runIso: '2026-08-27T12:52:00Z',
+    groups: [G('UA-1'), G('UA-2')],
+    addButtonsForTenders: ['UA-1', 'UA-2'],
+    winnerTenders: [{ tenderId: 'UA-2', slug: 'terralab_it' }],
+  });
+
+  assert.equal(msgs.length, 2);
+  assert.match(msgs[0].text, /UA-1/);
+  assert.ok(!msgs[0].text.includes('UA-2'), 'чужого тендера в повідомленні бути не може');
+  assert.deepEqual(msgs[0].opts.addButtonsForTenders, ['UA-1']);
+  assert.equal(msgs[0].opts.winnerTenders, undefined, 'переможець лише в свого тендера');
+  assert.deepEqual(msgs[1].opts.addButtonsForTenders, ['UA-2']);
+  assert.deepEqual(msgs[1].opts.winnerTenders, [{ tenderId: 'UA-2', slug: 'terralab_it' }]);
+});
+
+test('splitDigestMessages: один тендер — рівно одне повідомлення, як і було', () => {
+  const msgs = splitDigestMessages({
+    runIso: '2026-08-27T12:52:00Z', groups: [G('UA-1')], addButtonsForTenders: ['UA-1'],
+  });
+  assert.equal(msgs.length, 1);
+  assert.deepEqual(msgs[0].opts.addButtonsForTenders, ['UA-1']);
+});
+
+test('splitDigestMessages: хвіст іде окремим повідомленням без кнопок', () => {
+  const msgs = splitDigestMessages({
+    runIso: '2026-08-27T12:52:00Z', groups: [G('UA-1')],
+    addButtonsForTenders: ['UA-1'], tail: '📦 Архівовано:\n  UA-9 — complete',
+  });
+  assert.equal(msgs.length, 2);
+  assert.match(msgs[1].text, /Архівовано/);
+  assert.equal(msgs[1].opts, undefined, 'хвіст не належить жодному тендеру — кнопок немає');
+});
+
+test('splitDigestMessages: сам лише хвіст отримує заголовок', () => {
+  const msgs = splitDigestMessages({
+    runIso: '2026-08-27T12:52:00Z', groups: [], header: '🌙 Нічний дайджест',
+    tail: '📦 Архівовано:\n  UA-9 — complete',
+  });
+  assert.equal(msgs.length, 1);
+  assert.match(msgs[0].text, /🌙 Нічний дайджест/);
+  assert.match(msgs[0].text, /Архівовано/);
+});
+
+test('splitDigestMessages: заголовок повторюється в КОЖНОМУ повідомленні', () => {
+  const msgs = splitDigestMessages({
+    runIso: '2026-08-27T12:52:00Z', groups: [G('UA-1'), G('UA-2')],
+    header: '🌙 Нічний дайджест',
+  });
+  assert.equal(msgs.length, 2);
+  for (const m of msgs) assert.match(m.text, /^🌙 Нічний дайджест/);
+});
+
+test('splitDigestMessages: без груп і без хвоста — нічого не шлемо', () => {
+  assert.deepEqual(splitDigestMessages({ runIso: '2026-08-27T12:52:00Z', groups: [] }), []);
+});
+
+test('runOnce: дві зміни — два повідомлення, а не одне на обидві', async () => {
+  // Реальна скарга власника 27.08.2026: під сповіщенням про ДВА тендери висіла
+  // одна «🤖 Надіслати агенту», і було невідомо, до котрого вона.
+  const sent = [];
+  const prev = {
+    [T_OK]: baseSnap({ tender_id: T_OK, status: 'active.tendering' }),
+    [T_CHANGE]: baseSnap({ tender_id: T_CHANGE, status: 'active.tendering' }),
+  };
+  const curr = {
+    [T_OK]: baseSnap({ tender_id: T_OK, status: 'active.qualification' }),
+    [T_CHANGE]: baseSnap({ tender_id: T_CHANGE, status: 'unsuccessful' }),
+  };
+  const res = await runOnce({
+    runIso: '2026-08-27T13:00:00+03:00',
+    watchlist: [{ tender_id: T_OK, enabled: true }, { tender_id: T_CHANGE, enabled: true }],
+    fetchTender: async (id) => ({ data: curr[id] }),
+    extractSnapshot: (r) => r.data,
+    loadState: async (id) => prev[id],
+    saveState: async () => {},
+    sendDigest: async (text) => { sent.push(text); },
+    updateSheet: async () => {},
+  });
+
+  assert.equal(res.sent, true);
+  assert.equal(sent.length, 2, `очікували два повідомлення, отримали ${sent.length}`);
+  assert.match(sent[0], new RegExp(T_OK));
+  assert.ok(!sent[0].includes(T_CHANGE), 'у першому повідомленні не має бути другого тендера');
+  assert.match(sent[1], new RegExp(T_CHANGE));
+  assert.ok(!sent[1].includes(T_OK));
 });

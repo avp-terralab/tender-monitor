@@ -271,6 +271,7 @@ function auditPhrase(e) {
     case 'revoke':    return `прибрав доступ ${tgt}`;
     case 'agent':     return `запустив агента по ${tgt}`;
     case 'agent_amend': return `надіслав агенту доробку по ${tgt}`;
+    case 'agent_cancel': return `скасував завдання агента по ${tgt}`;
     case 'invite': {
       const raw = e.target ?? '';
       const [role, ...rest] = raw.split(':');
@@ -1914,13 +1915,31 @@ export function validateAgentPrice(text) {
 
 // Step 3: final confirm. Company + price live in Worker dialog state (not in
 // callback_data), so confirm/cancel stay short.
-export function buildAgentConfirmKeyboard(tenderId) {
-  return {
-    inline_keyboard: [[
-      { text: '✅ Підтвердити', callback_data: `agent:confirm:${tenderId}` },
-      { text: '✖ Скасувати', callback_data: `agent:cancel:${tenderId}` },
-    ]],
-  };
+// `priceExceeds` — ціна вища за оголошену вартість закупівлі. Тоді додається
+// шлях виправити суму на місці: доти єдиним способом було скасувати діалог і
+// почати спочатку, тобто заново обирати компанію (27.08.2026).
+export function buildAgentConfirmKeyboard(tenderId, priceExceeds = false) {
+  const rows = [[
+    { text: '✅ Підтвердити', callback_data: `agent:confirm:${tenderId}` },
+    { text: '✖ Скасувати', callback_data: `agent:cancel:${tenderId}` },
+  ]];
+  if (priceExceeds) {
+    rows.unshift([{ text: '✏️ Ввести іншу суму', callback_data: `agent:reprice:${tenderId}` }]);
+  }
+  return { inline_keyboard: rows };
+}
+
+// Чи вища введена ціна за оголошену вартість закупівлі. Винесено окремо, бо цим
+// самим порівнянням користуються і текст підтвердження, і його клавіатура —
+// два різні пороги тут означали б попередження без кнопки або кнопку без
+// попередження.
+//
+// ⚠️ Пряме порівняння ПРАВИЛЬНЕ — не «лагодь» його арифметикою ПДВ: оголошена
+// вартість у Prozorro практично завжди без ПДВ, і ціну власник вводить без ПДВ.
+export function priceExceedsAnnounced(price, announcedValue) {
+  if (announcedValue == null || price === 'auto') return false;
+  const parsed = parseFloat(String(price).replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) && parsed > announcedValue;
 }
 
 // One-line confirm prompt summarising the queued request.
@@ -1941,18 +1960,17 @@ export function buildAgentConfirmText({ company, price, tenderId, entityName, an
   // перерахунок. Власник поправив: оголошена вартість завжди без ПДВ, тобто
   // тривога була справжня. Ставку ПДВ тут не вгадувати — на медичні позиції
   // вона буває 7%, і «розумний» перерахунок одного дня змовчить помилково.)
-  if (announcedValue != null && price !== 'auto') {
-    const parsed = parseFloat(String(price).replace(/\s/g, '').replace(',', '.'));
-    if (Number.isFinite(parsed) && parsed > announcedValue) {
-      const fmt = announcedValue.toLocaleString('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      return `⚠️ Ціна ВИЩА за оголошену вартість закупівлі (${fmt} грн) — перевір, чи це саме та сума!\n\n${base}`;
-    }
+  if (priceExceedsAnnounced(price, announcedValue)) {
+    const fmt = announcedValue.toLocaleString('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `⚠️ Ціна ВИЩА за оголошену вартість закупівлі (${fmt} грн) — перевір, чи це саме та сума!\n\n${base}`;
   }
   return base;
 }
 
 
-const AGENT_JOB_ICONS = { pending: '📋', running: '⏳', done: '✅', error: '❌' };
+// `cancelled` (27.08.2026) — завдання зупинила людина. Без цього рядка воно
+// малювалось як '•' і читалось як невідомий стан.
+const AGENT_JOB_ICONS = { pending: '📋', running: '⏳', done: '✅', error: '❌', cancelled: '✖' };
 // Job-type marker — what the CURRENT (or last) job on this tender_id actually
 // is (a plain `prepare` job has no job_type, hence no marker). Brought back
 // 17.08.2026 after removing it turned out to lose real information: unlike
@@ -1966,10 +1984,13 @@ const AGENT_JOB_MARKS = { amend: '✏️', winner: '📄', sign: '🖊' };
 // див. job.milestones/job_lib.with_milestone на боці поллера). Без цього
 // список показував стан лише останньої дії: після «Документи переможця» факт
 // підготовленої ТП зникав із рядка (issue 17.08.2026).
-const MILESTONE_ORDER = ['prepared', 'winner', 'signed'];
+// Порядок = порядок ЖИТТЯ тендера: спершу готуємо ТП, потім підписуємо її для
+// подачі, і лише вигравши — робимо документи переможця. До 27.08.2026 підписання
+// стояло останнім, хоча відбувається раніше (зауваження власника).
+const MILESTONE_ORDER = ['prepared', 'signed', 'winner'];
 const MILESTONE_ICONS = { prepared: '✅', winner: '📄', signed: '🖊' };
 const MILESTONE_LEGEND =
-  '✅ підготовлена ТП · 📄 документи переможця · 🖊 документи для подачі';
+  '✅ підготовлена ТП · 🖊 підписано · 📄 документи переможця';
 
 // Job-и, завершені ДО того, як з'явилось job.milestones (17.08.2026), не
 // мають цього поля взагалі — і показували порожній рядок значків, хоча ТП чи
@@ -2180,13 +2201,34 @@ export function buildAgentTenderDetail({ tenderId, entry, job, page = 0, now = n
       ] },
     };
   }
+  if (job.status === 'cancelled') {
+    // Скасоване — це не помилка й не робота в процесі: ані ⏳, ані ♻️ тут не
+    // доречні. Наступний крок — запустити наново.
+    const mode = job.result?.cancel_mode === 'purge'
+      ? 'робочу теку видалено'
+      : 'тека лишилась';
+    return {
+      text: `${header}${co}${milestoneLine}\n✖ Скасовано (${mode})`,
+      keyboard: { inline_keyboard: [
+        [{ text: '🚀 Підготувати пропозицію', callback_data: `agent:start:${tenderId}` }],
+        winnerRow,
+        [back],
+      ] },
+    };
+  }
   if (job.status !== 'done') {
     let statusText = job.status === 'running' ? '⏳ Виконується' : '📋 У черзі';
     if (job.status === 'running') {
       const log = _renderStageLog(job.stages, now);
       if (log) statusText = log;
     }
-    return { text: `${header}${co}${milestoneLine}\n${statusText}`, keyboard: { inline_keyboard: [winnerRow, [back]] } };
+    // Незавершене завдання можна зупинити. Кнопка живе саме тут, бо лише на
+    // картці видно, ЯКИЙ тендер зупиняють.
+    const killRow = [{ text: '✖ Скасувати завдання', callback_data: `agent:kill:${tenderId}` }];
+    return {
+      text: `${header}${co}${milestoneLine}\n${statusText}`,
+      keyboard: { inline_keyboard: [killRow, winnerRow, [back]] },
+    };
   }
 
   // 📁 — тека з результатом. Для готової ПРОПОЗИЦІЇ це result.drive_link; для
@@ -2198,8 +2240,10 @@ export function buildAgentTenderDetail({ tenderId, entry, job, page = 0, now = n
   const rows = [];
   if (folderUrl) rows.push([{ text: '📁 Відкрити теку', url: folderUrl }]);
   if (prepared) rows.push([{ text: '✏️ Доробити', callback_data: `agent:amend:${tenderId}` }]);
+  // 🖊 Підписати — ПЕРЕД документами переможця, у тому ж порядку, що й значки
+  // етапів вище: спершу подача, потім перемога.
+  if (prepared) rows.push([{ text: '🖊 Підписати', callback_data: `agent:sign:${tenderId}` }]);
   rows.push(winnerRow);
-  if (prepared) rows.push([{ text: '🖊 Підписати й запакувати', callback_data: `agent:sign:${tenderId}` }]);
   rows.push([back]);
   return { text: `${header}${co}${milestoneLine}`, keyboard: { inline_keyboard: rows } };
 }
@@ -2239,7 +2283,7 @@ export function buildAgentAdminNotice({ kind, actorName, chatId, tenderId, compa
   }
   if (kind === 'sign') {
     const co = company ? ` · ${escapeHtml(company)}` : '';
-    const dt = letterDate ? ` · дата ${escapeHtml(letterDate)}` : '';
+    const dt = letterDate ? ` · дата ${escapeHtml(letterDateLabel(letterDate))}` : '';
     return `🤖 ${who} запустив підписання по ${escapeHtml(tenderId)}${co}${dt}`;
   }
   const co = company ? ` · ${escapeHtml(company)}` : '';
@@ -2342,21 +2386,58 @@ export function formatLetterDate(date) {
   return LETTER_DATE_KYIV.format(date);
 }
 
+// `keep` — сентинел «залишити дату як є», а не дата. Поллер розуміє саме цей
+// рядок і перетворює його на None, після чого агент дат у листах не чіпає
+// взагалі. Тримаємо його тут, поруч із кнопкою, щоб зв'язок був видимий.
+export const LETTER_DATE_KEEP = 'keep';
+
 export function buildAgentSignDateKeyboard(tenderId, todayStr) {
   return {
     inline_keyboard: [
       [{ text: `📅 Сьогодні — ${todayStr}`, callback_data: `agent:signdate:${tenderId}:${todayStr}` }],
+      [{ text: '📌 Залишити дату як є', callback_data: `agent:signdate:${tenderId}:${LETTER_DATE_KEEP}` }],
       [{ text: '✏️ Ввести іншу', callback_data: `agent:signother:${tenderId}` }],
       [{ text: '✖ Скасувати', callback_data: `agent:cancel:${tenderId}` }],
     ],
   };
 }
 
+// Дата для ЛЮДИНИ. Голе «keep» у підтвердженні читалось би як помилка бота, а
+// не як вибір, який вона щойно зробила.
+export function letterDateLabel(letterDate) {
+  return letterDate === LETTER_DATE_KEEP ? 'залишити як у листах' : letterDate;
+}
+
 // Підтвердження підписання. Компанія приходить із pending-запису діалогу, тож
 // екранується так само, як у сусідніх buildAgent*Text (parse_mode завжди HTML).
 export function buildAgentSignConfirmText({ tenderId, company, letterDate }) {
   const co = company ? `\nКомпанія: ${escapeHtml(company)}` : '';
-  return `🖊 Підписати й запакувати\nТендер: ${escapeHtml(tenderId)}${co}\nДата: ${escapeHtml(letterDate)}`;
+  return `🖊 Підписати\nТендер: ${escapeHtml(tenderId)}${co}\nДата: ${escapeHtml(letterDateLabel(letterDate))}`;
+}
+
+// Зупинка ЗАПУЩЕНОГО раунда. Режим питаємо НАПЕРЕД, а не після зупинки: коли
+// сесію вб'ють, питати вже нема кого — процес мертвий, а наступний тік поллера
+// візьме інше завдання. Тому рішення мусить лежати в самому job-записі на
+// момент зупинки.
+export function buildAgentKillKeyboard(tenderId) {
+  return {
+    inline_keyboard: [
+      [{ text: '🗑 Скасувати й видалити зроблене', callback_data: `agent:kill:${tenderId}:purge` }],
+      [{ text: '⏸ Скасувати, лишити теку', callback_data: `agent:kill:${tenderId}:keep` }],
+      [{ text: '⬅ Не скасовувати', callback_data: `agent:pick:${tenderId}` }],
+    ],
+  };
+}
+
+export function buildAgentKillText(tenderId) {
+  return [
+    `✖ Зупинити завдання по ${escapeHtml(tenderId)}?`,
+    '',
+    'Агент уже працює, тож у робочій теці є недороблені документи.',
+    '🗑 — прибрати їх; ⏸ — лишити, щоб продовжити наступним разом.',
+    '',
+    'Зупинка займає до 30 с.',
+  ].join('\n');
 }
 
 // Sign job: проставити дату, накласти скан підпису, відрендерити PDF і зібрати
