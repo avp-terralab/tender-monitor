@@ -1,0 +1,47 @@
+{
+  "items": {
+    "UA-2026-08-20-010519-a": {
+      "tender_id": "UA-2026-08-20-010519-a",
+      "title": "Послуги з постачання та налаштування програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в лабораторії",
+      "status": "active.qualification",
+      "deadline": "2026-08-28T01:00:00+03:00",
+      "procuring_entity": {
+        "name": "КНП \"Городоцька центральна лікарня\" Городоцької міської ради Львівської області",
+        "edrpou": "01997863"
+      },
+      "value": {
+        "amount": 326250,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurement_method_type": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "contact": {
+        "name": "Максимець Андрій Васильович",
+        "email": "gorcrl@ukr.net",
+        "telephone": "+380323130148"
+      },
+      "prozorro_url": "https://prozorro.gov.ua/tender/UA-2026-08-20-010519-a",
+      "events": [
+        {
+          "type": "qualification_started",
+          "old": "active.tendering",
+          "new": "active.qualification"
+        },
+        {
+          "type": "award_created",
+          "supplier_name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+          "supplier_edrpou": "39376596"
+        }
+      ],
+      "first_fired_at": "2026-08-27T22:25:32.232Z",
+      "last_fired_at": "2026-08-27T22:25:32.232Z"
+    }
+  },
+  "archived": [],
+  "errors": []
+}
