@@ -3953,5 +3953,177 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-08-10-010703-a",
+    "notes": "Комунальне некомерційне підприємство \"Локачинська лікарня\" Локачинської селищної ради — Послуги, пов'язані  з програмним забезпеченням",
+    "archived_at": "2026-08-27T07:55:38.798Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-08-10-010703-a",
+      "title": "Послуги, пов'язані  з програмним забезпеченням",
+      "status": "complete",
+      "dateModified": "2026-08-27T10:51:10.605801+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-08-20T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне некомерційне підприємство \"Локачинська лікарня\" Локачинської селищної ради",
+        "edrpou": "01982933"
+      },
+      "value": {
+        "amount": 183333,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Леся Лукашевич",
+        "email": "crl.finanse@gmail.com",
+        "telephone": "+380963393269"
+      },
+      "documents": [
+        {
+          "id": "f76af398277f4ff9afe8a6b659e20d89",
+          "title": "4. ТД послуги .doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-10T16:49:39.038605+03:00"
+        },
+        {
+          "id": "0292860313fc419cb7189d1efbae2413",
+          "title": "4.1. Додаток 1 послуги .doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-10T16:49:39.038605+03:00"
+        },
+        {
+          "id": "a8767d4dfb694a0ea3056ec4637b7a2a",
+          "title": "4.2.Технічні_вимоги_Лабораторна_інформаційна_система.docx",
+          "documentType": "technicalSpecifications",
+          "datePublished": "2026-08-10T16:49:39.038605+03:00"
+        },
+        {
+          "id": "377e6279e74f43318b09e2c4b557be57",
+          "title": "4.3.Проєкт_Договору+Календарний_план.docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-08-10T16:49:39.038605+03:00"
+        },
+        {
+          "id": "fccc2e8454344798a89f584f1b96ddc9",
+          "title": "4.4. Додаток 4 Перелiк .docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-10T16:49:39.038605+03:00"
+        },
+        {
+          "id": "3f8f8389f61b4f0ab5bc8f8a322f50ad",
+          "title": "4.5. Додаток 5 вимоги до переможця.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-10T16:49:39.038605+03:00"
+        },
+        {
+          "id": "b4a6d98b29ab4dec8c1969f6bb804bf1",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-08-10T16:51:25.145161+03:00"
+        },
+        {
+          "id": "8986cdd80ef04d10ad175de12d8bd746",
+          "title": "Протокол про внесення змін до тенд докум.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-12T17:28:01.332697+03:00"
+        },
+        {
+          "id": "1f476fdcccd243a5a2c9a83f04d16b95",
+          "title": "4.4. Додаток 4 Перелiк зм .docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-12T17:28:01.332697+03:00"
+        },
+        {
+          "id": "ad0b419a1b92425087dcb83589b3d183",
+          "title": "4. ТД послуги .doc",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-12T17:28:01.332697+03:00"
+        },
+        {
+          "id": "8986cdd80ef04d10ad175de12d8bd746",
+          "title": "Перелік змін до тенд. документ.docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-12T17:30:43.877869+03:00"
+        },
+        {
+          "id": "6520a17bd356404481ef4a994a684457",
+          "title": "протокол.PDF",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-12T17:42:31.852852+03:00"
+        },
+        {
+          "id": "b4a6d98b29ab4dec8c1969f6bb804bf1",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-08-12T17:45:16.604783+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "c966154804844c63bbee9bbc6ba13eee",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "221e04f678e74e558ed5af82372637ec",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "description": "SHA1:802fa95f532f770ceda3db7feac8b52a55360b96;SHA2-384:95c0c57ae9fa1d14fc4f060be6b4fb745c3bd84e56e2d615becba1d2d1d0ceccd1bb56e12b22e26e8293b1fe7710f4c0;Antivirus: ESET Antivirus",
+              "id": "a24487dcefcb4cb4bfa62c2f33cb1c1d",
+              "hash": "md5:0909af83cba3fc020439fa2764445e71",
+              "title": "File.PDF",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/221e04f678e74e558ed5af82372637ec/documents/a24487dcefcb4cb4bfa62c2f33cb1c1d?download=fa83768508304ebb80b9a8f45d835ce3",
+              "documentOf": "contract",
+              "datePublished": "2026-08-27T10:47:57.482402+03:00",
+              "dateModified": "2026-08-27T10:47:57.677430+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "id": "b8e4588b72b84773ac6b5894896f2604",
+              "hash": "md5:66bf4d5c374b1ab62215ccf790acb833",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/221e04f678e74e558ed5af82372637ec/documents/b8e4588b72b84773ac6b5894896f2604?download=310f6eac97f645289ef0f110860d5b65",
+              "documentOf": "contract",
+              "datePublished": "2026-08-27T10:51:10.397767+03:00",
+              "dateModified": "2026-08-27T10:51:10.397767+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
