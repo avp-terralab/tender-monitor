@@ -26,13 +26,12 @@ id = "197ecb4e174848aa8efed56ffffa8698"   # staging KV namespace
 
 [env.production]
 name = "tender-monitor-bot"
-# GITLAB_* лежать тут ЗАРАНЕЕ, хоч бекенд поки github: щоб cutover був зміною
-# одного значення (`github` → `gitlab`), а не двома правками, з яких другу
-# легко забути. Забути її означало б завести бота в бекенд, який не знає, куди
-# писати — `gitlab.mjs` читає GITLAB_PROJECT_ID, GITLAB_REF і GITLAB_TOKEN
-# (перші два звідси, токен — секретом Worker'а). Поки STATE_BACKEND=github ці
-# два значення просто не читаються. Гейт — worker/test/wrangler.test.mjs.
-vars = { STATE_BACKEND = "github", GITLAB_PROJECT_ID = "14", GITLAB_REF = "prod-state", GITLAB_CODE_REF = "main" }
+# Cutover виконано 28.08.2026: стан прода живе в GitLab, гілка prod-state.
+# `gitlab.mjs` читає GITLAB_PROJECT_ID, GITLAB_REF і GITLAB_TOKEN (перші два
+# звідси, токен — секретом Worker'а). GITHUB_* лишаються заповненими навмисно:
+# відкат — це повернути STATE_BACKEND на "github" і ввімкнути назад cron у
+# .github/workflows/monitor.yml. Гейт — worker/test/wrangler.test.mjs.
+vars = { STATE_BACKEND = "gitlab", GITLAB_PROJECT_ID = "14", GITLAB_REF = "prod-state", GITLAB_CODE_REF = "main" }
 
 [[env.production.kv_namespaces]]
 binding = "EPHEMERAL_KV"
