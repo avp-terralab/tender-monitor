@@ -2107,7 +2107,7 @@ function _agentSummaryLine({ jobs, watchlist, now }) {
   if (running) {
     const label = escapeHtml(_agentRowLabel(running.tender_id, watchlist));
     const mins = _minutesSince(running.updated_at, now);
-    return `🏃 Зараз: ${escapeHtml(running.tender_id)} · ${label}${mins != null ? ` · ${mins} хв` : ''}`;
+    return `🏃 Зараз: ${label} · ${escapeHtml(running.tender_id)}${mins != null ? ` · ${mins} хв` : ''}`;
   }
   const pending = list.filter((j) => j?.status === 'pending').length;
   if (pending > 0) return `📋 У черзі: ${pending}`;
@@ -2137,16 +2137,20 @@ export function buildAgentUnifiedList({ watchlist, jobs, page = 0, now = new Dat
   const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
 
   const rows = slice.map(({ entry, job }) => {
-    // Ідентифікатор — ПЕРШИМ і завжди: у підписі кнопки він єдиний, що
-    // розрізняє дві закупівлі одного замовника, відколи предмет прибрано
-    // (прохання власника 27.08.2026). Замовник іде за ним і обрізається
-    // разом із рядком, ідентифікатор лишається цілим.
+    // Замовник ПЕРШИМ, ідентифікатор за ним: дві закупівлі одного замовника,
+    // у яких ми беремо участь, — рідкість, тож у першу чергу читають назву
+    // (уточнення власника 28.08.2026). Обрізається при цьому НАЗВА, а не
+    // ідентифікатор: він короткий, фіксованої довжини й потрібен цілим.
     const note = entityFromNotes(entry.notes);
-    const label = note
-      ? `${entry.tender_id} · ${abbreviateLegalForm(note)}`
-      : entry.tender_id;
+    // Підпис кнопки збирається з бюджетом: значки й ідентифікатор мають
+    // фіксовану довжину і потрібні цілими, тож обрізається САМЕ назва.
+    const withId = (prefix) => {
+      if (!note) return `${prefix}${entry.tender_id}`;
+      const budget = 64 - prefix.length - entry.tender_id.length - 3;
+      return `${prefix}${truncate(abbreviateLegalForm(note), Math.max(8, budget))} · ${entry.tender_id}`;
+    };
     if (!job) {
-      return [{ text: truncate(`🆕 ${label}`, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
+      return [{ text: withId('🆕 '), callback_data: `agent:view:${entry.tender_id}:${p}` }];
     }
     // glyphs — усе, що з трьох етапів УЖЕ зроблено для цього тендера коли-
     // небудь, у порядку самого процесу (ТП -> переможець -> подача), а не
@@ -2165,8 +2169,10 @@ export function buildAgentUnifiedList({ watchlist, jobs, page = 0, now = new Dat
     const markIsRedundant = job.status === 'done' && job.job_type !== 'amend';
     const statusIcon = job.status === 'done' ? null : (AGENT_JOB_ICONS[job.status] ?? '•');
     const glyphs = _milestoneGlyphs(job) || null;
-    const text = [glyphs, markIsRedundant ? null : mark, statusIcon, label].filter(Boolean).join(' ');
-    return [{ text: truncate(text, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
+    const prefix = [glyphs, markIsRedundant ? null : mark, statusIcon]
+      .filter(Boolean).join(' ');
+    return [{ text: withId(prefix ? `${prefix} ` : ''),
+              callback_data: `agent:view:${entry.tender_id}:${p}` }];
   });
   const nav = buildPageNavRow(p, pages, (x) => `agent:jobs:${x}`, 'agent:noop');
   if (nav) rows.push(nav);

@@ -3719,7 +3719,7 @@ test('buildAgentUnifiedList: no job yet → 🆕 marker, label from abbreviated 
     jobs: [], page: 0,
   });
   const btn = v.keyboard.inline_keyboard[0][0];
-  assert.match(btn.text, /^🆕 UA-2026-06-01-000002-a · КНП «Дніпро»/);
+  assert.match(btn.text, /^🆕 КНП «Дніпро» · UA-2026-06-01-000002-a/);
   assert.equal(btn.callback_data, 'agent:view:UA-2026-06-01-000002-a:0');
 });
 
@@ -3744,15 +3744,15 @@ test('buildAgentUnifiedList: glyphs (process order) first, then a non-redundant 
   // Нічого ще не зроблено, і plain prepare немає власної позначки — жодного
   // значка, жодного сірого плейсхолдера (власник прямо попросив прибрати їх
   // 17.08.2026): статус-іконка й одразу назва.
-  assert.ok(texts.some((t) => t.startsWith('📋 UA-1 · A')));
-  assert.ok(texts.some((t) => t.startsWith('⏳ UA-2 · B')));
+  assert.ok(texts.some((t) => t.startsWith('📋 A · UA-1')));
+  assert.ok(texts.some((t) => t.startsWith('⏳ B · UA-2')));
   // done: статус-іконку прибрано — саму лише «✅» (без плейсхолдерів) каже значок.
-  assert.ok(texts.some((t) => t.startsWith('✅ UA-3 · C')));
+  assert.ok(texts.some((t) => t.startsWith('✅ C · UA-3')));
   // error на sign-дії, ще НЕ done — мітка дії (🖊) інформативна (значка
   // «signed» серед glyphs ще нема), тож іде за вже накопиченими значками
   // (✅📄) і статус-іконкою помилки (власник 17.08.2026: спершу процес,
   // потім поточна дія — «спершу галочка, далі лист»).
-  assert.ok(texts.some((t) => t.startsWith('✅📄 🖊 ❌ UA-4 · D')));
+  assert.ok(texts.some((t) => t.startsWith('✅📄 🖊 ❌ D · UA-4')));
   assert.ok(!texts.some((t) => t.includes('▫️')), 'no gray placeholder squares anywhere');
 });
 
@@ -3919,6 +3919,16 @@ test('buildAgentUnifiedList: рядки-кнопки — ідентифікат�
   assert.ok(!/Послуги з постачання/.test(label), label);
 });
 
+test('buildAgentUnifiedList: довга назва обрізається, ідентифікатор лишається цілим', () => {
+  const long = 'КОМУНАЛЬНЕ НЕКОМЕРЦІЙНЕ ПІДПРИЄМСТВО «ДУЖЕ ДОВГА НАЗВА ЗАКЛАДУ ОХОРОНИ ЗДОРОВЯ ОБЛАСНОГО ПІДПОРЯДКУВАННЯ»';
+  const v = buildAgentUnifiedList({
+    watchlist: [watchEntry('UA-2026-08-20-002934-a', long)], jobs: [], page: 0,
+  });
+  const label = v.keyboard.inline_keyboard[0][0].text;
+  assert.match(label, /UA-2026-08-20-002934-a$/, 'ідентифікатор має вціліти цілком');
+  assert.ok(label.length <= 64, label.length);
+});
+
 test('buildAgentUnifiedList: рядок «Зараз» несе ідентифікатор', () => {
   const watchlist = [watchEntry('UA-2026-08-20-002934-a', 'КНП «КДЦ» СЄВЄРОДОНЕЦЬКОЇ МР — Послуги')];
   const jobs = [job('UA-2026-08-20-002934-a', 'running', { updated_at: '2026-08-27T20:00:00Z' })];
@@ -3995,7 +4005,7 @@ test('buildAgentUnifiedList: summary line — running job with elapsed minutes',
   const jobs = [job('UA-1', 'running', { updated_at: '2026-08-16T12:00:00Z' })];
   const now = new Date('2026-08-16T12:08:00Z');
   const v = buildAgentUnifiedList({ watchlist, jobs, page: 0, now });
-  assert.match(v.text, /🏃 Зараз: UA-1 · КНП «Обласна лікарня» · 8 хв/);
+  assert.match(v.text, /🏃 Зараз: КНП «Обласна лікарня» · UA-1 · 8 хв/);
 });
 
 test('buildAgentUnifiedList: summary line — no running job, some pending → queue count', () => {
