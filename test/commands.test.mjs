@@ -3684,13 +3684,15 @@ test('buildAgentUnifiedList: a pre-milestones job still shows ✅ from result.dr
   assert.match(v.keyboard.inline_keyboard[0][0].text, /^✅📄 /);
 });
 
-test('buildAgentTenderDetail: a pre-milestones "sign" job shows ✅ (prepared) even without milestones', () => {
+test('buildAgentTenderDetail: a pre-milestones "sign" job shows both stages even without milestones', () => {
   const v = buildAgentTenderDetail({
     tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
     job: job('UA-1', 'done', { job_type: 'sign', result: { drive_link: 'https://d/1', zip_link: 'https://d/1.zip' } }),
     page: 0,
   });
-  assert.match(v.text, /✅🖊/);
+  // з 27.08.2026 етапи йдуть РЯДКАМИ, а не злитим рядком значків
+  assert.match(v.text, /✅ підготовлена ТП/);
+  assert.match(v.text, /🖊 підписано/);
 });
 
 // ── Merged /agent list (buildAgentUnifiedList) — 2026-08-14 redesign ─────────
@@ -3717,7 +3719,7 @@ test('buildAgentUnifiedList: no job yet → 🆕 marker, label from abbreviated 
     jobs: [], page: 0,
   });
   const btn = v.keyboard.inline_keyboard[0][0];
-  assert.match(btn.text, /^🆕 КНП «Дніпро»/);
+  assert.match(btn.text, /^🆕 UA-2026-06-01-000002-a · КНП «Дніпро»/);
   assert.equal(btn.callback_data, 'agent:view:UA-2026-06-01-000002-a:0');
 });
 
@@ -3742,15 +3744,15 @@ test('buildAgentUnifiedList: glyphs (process order) first, then a non-redundant 
   // Нічого ще не зроблено, і plain prepare немає власної позначки — жодного
   // значка, жодного сірого плейсхолдера (власник прямо попросив прибрати їх
   // 17.08.2026): статус-іконка й одразу назва.
-  assert.ok(texts.some((t) => t.startsWith('📋 A')));
-  assert.ok(texts.some((t) => t.startsWith('⏳ B')));
+  assert.ok(texts.some((t) => t.startsWith('📋 UA-1 · A')));
+  assert.ok(texts.some((t) => t.startsWith('⏳ UA-2 · B')));
   // done: статус-іконку прибрано — саму лише «✅» (без плейсхолдерів) каже значок.
-  assert.ok(texts.some((t) => t.startsWith('✅ C')));
+  assert.ok(texts.some((t) => t.startsWith('✅ UA-3 · C')));
   // error на sign-дії, ще НЕ done — мітка дії (🖊) інформативна (значка
   // «signed» серед glyphs ще нема), тож іде за вже накопиченими значками
   // (✅📄) і статус-іконкою помилки (власник 17.08.2026: спершу процес,
   // потім поточна дія — «спершу галочка, далі лист»).
-  assert.ok(texts.some((t) => t.startsWith('✅📄 🖊 ❌ D')));
+  assert.ok(texts.some((t) => t.startsWith('✅📄 🖊 ❌ UA-4 · D')));
   assert.ok(!texts.some((t) => t.includes('▫️')), 'no gray placeholder squares anywhere');
 });
 
@@ -3825,7 +3827,7 @@ test('buildAgentTenderDetail: done + drive_link → folder, доробити, si
   assert.doesNotMatch(v.text, /▫️/);
 });
 
-test('buildAgentTenderDetail: milestone glyphs show for in-flight and errored jobs too, no legend, no placeholders', () => {
+test('buildAgentTenderDetail: етапи видно і на запущеній, і на впалій задачі; без легенди й плейсхолдерів', () => {
   const running = buildAgentTenderDetail({
     tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
     job: job('UA-1', 'running', { milestones: { prepared: true } }), page: 0,
@@ -3838,7 +3840,8 @@ test('buildAgentTenderDetail: milestone glyphs show for in-flight and errored jo
     tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
     job: job('UA-1', 'error', { milestones: { prepared: true, winner: true } }), page: 0,
   });
-  assert.match(errored.text, /✅📄/);
+  assert.match(errored.text, /✅ підготовлена ТП/);
+  assert.match(errored.text, /📄 документи переможця/);
   assert.doesNotMatch(errored.text, /▫️/);
 
   // Ще нічого не зроблено взагалі — рядок значків не з'являється як порожній.
@@ -3896,6 +3899,71 @@ test('buildAgentTenderDetail: pending/running → status text, kill + winner doc
   assert.equal(pending.keyboard.inline_keyboard[0][0].callback_data, 'agent:kill:UA-2');
 });
 
+test('buildAgentTenderDetail: у шапці лише замовник, без предмета закупівлі', () => {
+  // notes = «Замовник — Предмет» (buildAutoNotes). Предмет у картці лише
+  // засмічує: тендер уже відкритий, і що це за закупівля, людина знає.
+  const entry = watchEntry('UA-1',
+    'КНП "Городоцька центральна лікарня" Городоцької МР Львівської області — Послуги з постачання та налаштування програмного забезпечення');
+  const v = buildAgentTenderDetail({ tenderId: 'UA-1', entry, job: null, page: 0 });
+  assert.match(v.text, /Городоцька центральна лікарня/);
+  assert.ok(!/Послуги з постачання/.test(v.text), v.text);
+});
+
+test('buildAgentUnifiedList: рядки-кнопки — ідентифікатор + замовник, без предмета', () => {
+  const watchlist = [watchEntry('UA-2026-08-20-002934-a',
+    'КНП «КДЦ» СЄВЄРОДОНЕЦЬКОЇ МР — Послуги з постачання програмного забезпечення')];
+  const v = buildAgentUnifiedList({ watchlist, jobs: [], page: 0 });
+  const label = v.keyboard.inline_keyboard[0][0].text;
+  assert.match(label, /UA-2026-08-20-002934-a/, 'ідентифікатор має бути на кнопці');
+  assert.match(label, /КДЦ/);
+  assert.ok(!/Послуги з постачання/.test(label), label);
+});
+
+test('buildAgentUnifiedList: рядок «Зараз» несе ідентифікатор', () => {
+  const watchlist = [watchEntry('UA-2026-08-20-002934-a', 'КНП «КДЦ» СЄВЄРОДОНЕЦЬКОЇ МР — Послуги')];
+  const jobs = [job('UA-2026-08-20-002934-a', 'running', { updated_at: '2026-08-27T20:00:00Z' })];
+  const v = buildAgentUnifiedList({ watchlist, jobs, page: 0, now: new Date('2026-08-27T20:02:00Z') });
+  assert.match(v.text, /UA-2026-08-20-002934-a/);
+  assert.match(v.text, /КДЦ/);
+});
+
+test('buildAgentUnifiedList: рядок «Зараз» теж без предмета закупівлі', () => {
+  const watchlist = [watchEntry('UA-1', 'КНП «КДЦ» СЄВЄРОДОНЕЦЬКОЇ МР — Послуги з постачання ПЗ')];
+  const jobs = [job('UA-1', 'running', { updated_at: '2026-08-27T20:00:00Z' })];
+  const v = buildAgentUnifiedList({
+    watchlist, jobs, page: 0, now: new Date('2026-08-27T20:02:00Z'),
+  });
+  assert.match(v.text, /КДЦ/);
+  assert.ok(!/Послуги з постачання/.test(v.text), v.text);
+});
+
+test('buildAgentTenderDetail: етапи — кожен з абзацу, з датою, часом і тривалістю', () => {
+  const v = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: null, page: 0,
+    job: job('UA-1', 'done', {
+      result: { drive_link: 'https://d/1' },
+      milestones: { prepared: true, signed: true },
+      milestones_at: { prepared: '2026-08-20T11:32:00Z', signed: '2026-08-27T20:03:00Z' },
+      milestones_min: { prepared: 47, signed: 4 },
+    }),
+  });
+  const lines = v.text.split('\n');
+  assert.ok(lines.some((l) => /^✅ підготовлена ТП — 20\.08\.2026 14:32 · 47 хв$/.test(l)), v.text);
+  assert.ok(lines.some((l) => /^🖊 підписано — 27\.08\.2026 23:03 · 4 хв$/.test(l)), v.text);
+  // порядок — життєвий: спершу ТП, потім підписання
+  assert.ok(v.text.indexOf('підготовлена ТП') < v.text.indexOf('підписано'));
+});
+
+test('buildAgentTenderDetail: старий job без часу — етап без вигаданої дати', () => {
+  const v = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: null, page: 0,
+    job: job('UA-1', 'done', { result: { drive_link: 'https://d/1' },
+                               milestones: { prepared: true } }),
+  });
+  assert.match(v.text, /✅ підготовлена ТП/);
+  assert.ok(!/—.*хв/.test(v.text), v.text);
+});
+
 test('buildAgentTenderDetail: скасоване завдання — не помилка й не «в черзі»', () => {
   const purged = buildAgentTenderDetail({
     tenderId: 'UA-1', entry: null, page: 0,
@@ -3927,7 +3995,7 @@ test('buildAgentUnifiedList: summary line — running job with elapsed minutes',
   const jobs = [job('UA-1', 'running', { updated_at: '2026-08-16T12:00:00Z' })];
   const now = new Date('2026-08-16T12:08:00Z');
   const v = buildAgentUnifiedList({ watchlist, jobs, page: 0, now });
-  assert.match(v.text, /🏃 Зараз: КНП «Обласна лікарня» · 8 хв/);
+  assert.match(v.text, /🏃 Зараз: UA-1 · КНП «Обласна лікарня» · 8 хв/);
 });
 
 test('buildAgentUnifiedList: summary line — no running job, some pending → queue count', () => {

@@ -4307,7 +4307,7 @@ test('runHandler: /agent with a done job → ✅ icon on that tender\'s row', as
   });
   await runHandler({ update: { message: { chat: { id: 123 }, text: '/agent', message_id: 1 } }, env: ENV, deps });
   assert.equal(sent.length, 1);
-  assert.match(sent[0].replyMarkup.inline_keyboard[0][0].text, /^✅ КНП «Х»/);
+  assert.match(sent[0].replyMarkup.inline_keyboard[0][0].text, new RegExp(`^✅ ${ID} · КНП «Х»`));
   assert.match(JSON.stringify(sent[0].replyMarkup), new RegExp(`agent:view:${ID}:0`));
 });
 

@@ -2024,6 +2024,41 @@ function _effectiveMilestones(job) {
 // власник прямо попросив прибрати їх 17.08.2026: рядок росте, а не «мигає»
 // заповненою рамкою з трьох клітинок). Без job-а взагалі (тендер, якого
 // агент ще не торкався) викликач лишає окремий 🆕-маркер — сюди не заходить.
+const MILESTONE_LABELS = {
+  prepared: 'підготовлена ТП',
+  signed: 'підписано',
+  winner: 'документи переможця',
+};
+
+// Київський час: поллер пише мітки в UTC, а дивиться на них людина тут.
+const MILESTONE_TIME_FMT = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', year: 'numeric',
+  hour: '2-digit', minute: '2-digit',
+});
+
+// Етапи РЯДКАМИ — «коли зроблено і скільки тривало», а не самі значки
+// (прохання власника 27.08.2026). Час і тривалість пише поллер
+// (job.milestones_at / job.milestones_min); у записів, зроблених до
+// 27.08.2026, їх немає — тоді рядок лишається без часу, бо вигадувати дату
+// гірше, ніж не показати її.
+function _milestoneLines(job) {
+  const m = _effectiveMilestones(job);
+  const at = job?.milestones_at ?? {};
+  const min = job?.milestones_min ?? {};
+  return MILESTONE_ORDER.filter((k) => m[k]).map((k) => {
+    let line = `${MILESTONE_ICONS[k]} ${MILESTONE_LABELS[k]}`;
+    const iso = at[k];
+    if (iso) {
+      const d = new Date(iso);
+      if (!Number.isNaN(d.getTime())) {
+        line += ` — ${MILESTONE_TIME_FMT.format(d).replace(', ', ' ')}`;
+        if (Number.isFinite(min[k])) line += ` · ${min[k]} хв`;
+      }
+    }
+    return line;
+  });
+}
+
 function _milestoneGlyphs(job) {
   const m = _effectiveMilestones(job);
   return MILESTONE_ORDER.filter((k) => m[k]).map((k) => MILESTONE_ICONS[k]).join('');
@@ -2046,9 +2081,20 @@ function _minutesSince(iso, now) {
   return mins >= 0 ? mins : null;
 }
 
+// `notes` для авто-доданих тендерів має вигляд «Замовник — Предмет»
+// (buildAutoNotes). На екранах агента предмет лише засмічує: тендер уже
+// відкритий, і що це за закупівля, людина знає (зауваження власника
+// 27.08.2026). Ручні нотатки роздільника не мають — вони лишаються цілими.
+export function entityFromNotes(notes) {
+  const t = (notes ?? '').trim();
+  if (!t) return '';
+  const cut = t.indexOf(' — ');
+  return cut > 0 ? t.slice(0, cut).trim() : t;
+}
+
 function _agentRowLabel(tenderId, watchlist) {
   const entry = (watchlist ?? []).find((r) => r.tender_id === tenderId);
-  const note = (entry?.notes ?? '').trim();
+  const note = entityFromNotes(entry?.notes);
   return note ? abbreviateLegalForm(note) : tenderId;
 }
 
@@ -2061,7 +2107,7 @@ function _agentSummaryLine({ jobs, watchlist, now }) {
   if (running) {
     const label = escapeHtml(_agentRowLabel(running.tender_id, watchlist));
     const mins = _minutesSince(running.updated_at, now);
-    return `🏃 Зараз: ${label}${mins != null ? ` · ${mins} хв` : ''}`;
+    return `🏃 Зараз: ${escapeHtml(running.tender_id)} · ${label}${mins != null ? ` · ${mins} хв` : ''}`;
   }
   const pending = list.filter((j) => j?.status === 'pending').length;
   if (pending > 0) return `📋 У черзі: ${pending}`;
@@ -2091,8 +2137,14 @@ export function buildAgentUnifiedList({ watchlist, jobs, page = 0, now = new Dat
   const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
 
   const rows = slice.map(({ entry, job }) => {
-    const note = (entry.notes ?? '').trim();
-    const label = note ? abbreviateLegalForm(note) : entry.tender_id;
+    // Ідентифікатор — ПЕРШИМ і завжди: у підписі кнопки він єдиний, що
+    // розрізняє дві закупівлі одного замовника, відколи предмет прибрано
+    // (прохання власника 27.08.2026). Замовник іде за ним і обрізається
+    // разом із рядком, ідентифікатор лишається цілим.
+    const note = entityFromNotes(entry.notes);
+    const label = note
+      ? `${entry.tender_id} · ${abbreviateLegalForm(note)}`
+      : entry.tender_id;
     if (!job) {
       return [{ text: truncate(`🆕 ${label}`, 64), callback_data: `agent:view:${entry.tender_id}:${p}` }];
     }
@@ -2164,7 +2216,7 @@ function _renderStageLog(stages, now) {
 // the tender_id to stay unambiguous (the old flat list's reason for it — see
 // git history — no longer applies once there's only one tender on screen).
 export function buildAgentTenderDetail({ tenderId, entry, job, page = 0, now = new Date() }) {
-  const note = (entry?.notes ?? '').trim();
+  const note = entityFromNotes(entry?.notes);
   const name = note ? abbreviateLegalForm(note) : null;
   const header = name ? `🏢 ${escapeHtml(name)}\n${escapeHtml(tenderId)}` : `📄 ${escapeHtml(tenderId)}`;
   const back = { text: '⬅ До списку', callback_data: `agent:jobs:${page}` };
@@ -2187,8 +2239,8 @@ export function buildAgentTenderDetail({ tenderId, entry, job, page = 0, now = n
   // Значки етапів (issue 17.08.2026) — накопичені за весь час роботи над цим
   // тендером, а не лише стан ОСТАННЬОЇ дії; розшифровку значків дає
   // buildAgentUnifiedList (початковий екран), тут — лише самі значки.
-  const milestoneGlyphs = _milestoneGlyphs(job);
-  const milestoneLine = milestoneGlyphs ? `\n${milestoneGlyphs}` : '';
+  const stages = _milestoneLines(job);
+  const milestoneLine = stages.length ? `\n${stages.map(escapeHtml).join('\n')}` : '';
 
   if (job.status === 'error') {
     const detail = job.result?.detail ? `\n⚠️ ${escapeHtml(truncate(job.result.detail, 300))}` : '';
