@@ -1966,10 +1966,13 @@ const AGENT_JOB_MARKS = { amend: '✏️', winner: '📄', sign: '🖊' };
 // див. job.milestones/job_lib.with_milestone на боці поллера). Без цього
 // список показував стан лише останньої дії: після «Документи переможця» факт
 // підготовленої ТП зникав із рядка (issue 17.08.2026).
-const MILESTONE_ORDER = ['prepared', 'winner', 'signed'];
+// Порядок = порядок ЖИТТЯ тендера: спершу готуємо ТП, потім підписуємо її для
+// подачі, і лише вигравши — робимо документи переможця. До 27.08.2026 підписання
+// стояло останнім, хоча відбувається раніше (зауваження власника).
+const MILESTONE_ORDER = ['prepared', 'signed', 'winner'];
 const MILESTONE_ICONS = { prepared: '✅', winner: '📄', signed: '🖊' };
 const MILESTONE_LEGEND =
-  '✅ підготовлена ТП · 📄 документи переможця · 🖊 документи для подачі';
+  '✅ підготовлена ТП · 🖊 підписано · 📄 документи переможця';
 
 // Job-и, завершені ДО того, як з'явилось job.milestones (17.08.2026), не
 // мають цього поля взагалі — і показували порожній рядок значків, хоча ТП чи
@@ -2198,8 +2201,10 @@ export function buildAgentTenderDetail({ tenderId, entry, job, page = 0, now = n
   const rows = [];
   if (folderUrl) rows.push([{ text: '📁 Відкрити теку', url: folderUrl }]);
   if (prepared) rows.push([{ text: '✏️ Доробити', callback_data: `agent:amend:${tenderId}` }]);
+  // 🖊 Підписати — ПЕРЕД документами переможця, у тому ж порядку, що й значки
+  // етапів вище: спершу подача, потім перемога.
+  if (prepared) rows.push([{ text: '🖊 Підписати', callback_data: `agent:sign:${tenderId}` }]);
   rows.push(winnerRow);
-  if (prepared) rows.push([{ text: '🖊 Підписати й запакувати', callback_data: `agent:sign:${tenderId}` }]);
   rows.push([back]);
   return { text: `${header}${co}${milestoneLine}`, keyboard: { inline_keyboard: rows } };
 }
@@ -2356,7 +2361,7 @@ export function buildAgentSignDateKeyboard(tenderId, todayStr) {
 // екранується так само, як у сусідніх buildAgent*Text (parse_mode завжди HTML).
 export function buildAgentSignConfirmText({ tenderId, company, letterDate }) {
   const co = company ? `\nКомпанія: ${escapeHtml(company)}` : '';
-  return `🖊 Підписати й запакувати\nТендер: ${escapeHtml(tenderId)}${co}\nДата: ${escapeHtml(letterDate)}`;
+  return `🖊 Підписати\nТендер: ${escapeHtml(tenderId)}${co}\nДата: ${escapeHtml(letterDate)}`;
 }
 
 // Sign job: проставити дату, накласти скан підпису, відрендерити PDF і зібрати

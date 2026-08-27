@@ -1355,7 +1355,7 @@ test('runHandler: /archive UA-... (admin) shows the agent line when a job exists
     update: { message: { chat: { id: 123 }, text: '/archive UA-2026-04-30-010542-a', message_id: 1 } },
     env: ENV, deps,
   });
-  assert.match(sent[0].text, /🤖 Агент: ✅📄🖊 · <a href="https:\/\/drive\/x">Відкрити теку<\/a>/);
+  assert.match(sent[0].text, /🤖 Агент: ✅🖊📄 · <a href="https:\/\/drive\/x">Відкрити теку<\/a>/);
 });
 
 test('runHandler: /archive UA-... (viewer, not editor/admin) never sees the agent line', async () => {
@@ -3714,7 +3714,7 @@ test('agent:signdate → date stored, sign confirmation shown', async () => {
     tid: AGENT_TID, kind: 'sign', step: 'confirm', company: 'МАЙЛАБ', messageId: 9,
     letterDate: '21.06.2026', at: '2026-06-21T10:00:00.000Z',
   });
-  assert.match(edits.at(-1).text, /Підписати й запакувати/);
+  assert.match(edits.at(-1).text, /Підписати/);
   assert.match(edits.at(-1).text, /21\.06\.2026/);
   assert.match(JSON.stringify(edits.at(-1).replyMarkup), new RegExp(`agent:confirm:${AGENT_TID}`));
   assert.equal(acks.length, 1);

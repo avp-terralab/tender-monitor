@@ -3769,8 +3769,8 @@ test('buildAgentUnifiedList: milestone glyphs accumulate across a job_type chang
 test('buildAgentUnifiedList: text carries the milestone legend', () => {
   const v = buildAgentUnifiedList({ watchlist: [watchEntry('UA-1', 'A')], jobs: [], page: 0 });
   assert.match(v.text, /підготовлена ТП/);
+  assert.match(v.text, /підписано/);
   assert.match(v.text, /документи переможця/);
-  assert.match(v.text, /документи для подачі/);
 });
 
 test('buildAgentUnifiedList: jobbed entries sort by created_at desc, then 🆕 entries after', () => {
@@ -3812,13 +3812,13 @@ test('buildAgentTenderDetail: no watchlist entry (entry=null) → falls back to 
   assert.match(v.text, /^📄 UA-1/);
 });
 
-test('buildAgentTenderDetail: done + drive_link → folder, доробити, winner docs, sign, back', () => {
+test('buildAgentTenderDetail: done + drive_link → folder, доробити, sign, winner docs, back', () => {
   const v = buildAgentTenderDetail({
     tenderId: 'UA-1', entry: watchEntry('UA-1', 'КНП'),
     job: job('UA-1', 'done', { result: { drive_link: 'https://d/1' }, milestones: { prepared: true } }), page: 0,
   });
   const cbs = v.keyboard.inline_keyboard.map((r) => r[0].callback_data ?? r[0].url);
-  assert.deepEqual(cbs, ['https://d/1', 'agent:amend:UA-1', 'agent:winner:UA-1', 'agent:sign:UA-1', 'agent:jobs:0']);
+  assert.deepEqual(cbs, ['https://d/1', 'agent:amend:UA-1', 'agent:sign:UA-1', 'agent:winner:UA-1', 'agent:jobs:0']);
   // "✅ Готово" text is gone — the milestone glyphs (legend on the list screen) say it now.
   assert.match(v.text, /✅/);
   assert.doesNotMatch(v.text, /▫️/);
