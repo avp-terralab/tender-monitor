@@ -1,24 +1,18 @@
 {
   "tender_id": "UA-2026-08-20-002934-a",
   "link": "https://prozorro.gov.ua/tender/UA-2026-08-20-002934-a",
+  "job_type": "sign",
   "company": "ТЕРРАЛАБ ПРО",
-  "price": "435000",
+  "letter_date": "keep",
+  "target": {
+    "drive_link": "https://drive.google.com/drive/folders/17HFJTTvYjac_jKB5mMyfs80ZUbqcwTwf",
+    "package_dir": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій\\21.08.26 КНП Сєвєродонецької МР Консультативно-діагностичний центр\\Тендерна пропозиція",
+    "published_dir": "G:\\Мій диск\\ТЕНДЕРИ 2021-2026\\ТЕНДЕРИ 2026\\84. КНП Сєвєродонецької МР КДЦ"
+  },
   "requested_by": "1744078008",
-  "status": "done",
-  "created_at": "2026-08-21T00:50:55.223Z",
+  "status": "pending",
+  "created_at": "2026-08-27T19:10:57.940Z",
   "milestones": {
     "prepared": true
-  },
-  "updated_at": "2026-08-21T01:08:28.601826+00:00",
-  "result": {
-    "package_dir": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій\\21.08.26 КНП Сєвєродонецької МР Консультативно-діагностичний центр\\Тендерна пропозиція",
-    "published_dir": "G:\\Мій диск\\ТЕНДЕРИ 2021-2026\\ТЕНДЕРИ 2026\\84. КНП Сєвєродонецької МР КДЦ",
-    "report_path": "G:\\Мій диск\\AI\\TENDERS\\Архів тендерних пропозицій\\21.08.26 КНП Сєвєродонецької МР Консультативно-діагностичний центр\\_ЗВІТ.md",
-    "n_docx": 16,
-    "drive_link": "https://drive.google.com/drive/folders/17HFJTTvYjac_jKB5mMyfs80ZUbqcwTwf",
-    "validator": {
-      "state": "clean",
-      "detail": ""
-    }
   }
 }
