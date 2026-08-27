@@ -15,7 +15,7 @@ import {
   formatAuditLog,
   companyForSlug, agentTriggerButtonRow,
   buildAgentCompanyKeyboard, validateAgentPrice,
-  buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob,
+  buildAgentConfirmKeyboard, buildAgentConfirmText, buildAgentJob, priceExceedsAnnounced,
   buildAgentAdminNotice,
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   buildAgentWinnerJob, buildAgentWinnerConfirmText,
@@ -1442,8 +1442,48 @@ async function handleAgentCallback({
   }
 
   // Підписання й архів. На відміну від winner, тут ОБОВ'ЯЗКОВО потрібна готова
-  // пропозиція: підписують теку `result.package_dir`, і без неї агенту нічого
-  // відкривати. Тому кнопка й живе лише на готовій задачі в «📊 Останні задачі».
+  // Й ОПУБЛІКОВАНА пропозиція: з 27.08.2026 підписують КІНЦЕВУ теку відділу
+  // (`result.published_dir`) — саме там оператор править листи перед подачею.
+  // Тому кнопка й живе лише на готовій задачі в «📊 Останні задачі».
+  // «✏️ Ввести іншу суму» під попередженням про перевищення оголошеної вартості.
+  // Повертає діалог на крок ціни, зберігши компанію: доти єдиним шляхом було
+  // скасувати все й обирати компанію наново.
+  if (action === 'reprice') {
+    let entry;
+    try {
+      const loaded = await _loadAgentPending(env);
+      entry = loaded.pending?.[chatId];
+    } catch (err) {
+      console.error('worker: agent reprice load pending failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
+    }
+    // Звіряються всі три поля — як і в гілці дати: покинутий діалог не має
+    // перехоплювати пізніший дотик по старій кнопці.
+    if (!entry || entry.tid !== tid || entry.step !== 'confirm' || entry.kind) {
+      await ack('⚠️ Немає активного запиту');
+      return;
+    }
+    try {
+      const newId = await editOrSend({
+        _editMessageText, _sendReply, env, chatId, messageId,
+        text: 'Введіть іншу ціну пропозиції (грн) або «auto»:',
+      });
+      const { pending, sha } = await _loadAgentPending(env);
+      pending[chatId] = {
+        tid, company: entry.company, step: 'await_price', messageId: newId,
+        at: _now().toISOString(),
+      };
+      await _saveAgentPending(env, pending, sha);
+    } catch (err) {
+      console.error('worker: agent reprice failed:', err.message);
+      await ack('⚠️ Помилка, спробуй ще раз', true);
+      return;
+    }
+    await ack();
+    return;
+  }
+
   if (action === 'sign') {
     let prior;
     try {
@@ -2016,7 +2056,8 @@ async function handleAgentCallback({
         text: buildAgentConfirmText({
           company: job.company, price: job.price, tenderId: tid, announcedValue,
         }),
-        replyMarkup: buildAgentConfirmKeyboard(tid),
+        replyMarkup: buildAgentConfirmKeyboard(
+          tid, priceExceedsAnnounced(job.price, announcedValue)),
       });
     } catch (err) {
       console.error('worker: agent retry confirm prompt failed:', err.message);
@@ -2202,7 +2243,7 @@ async function handleAgentTextReply({
   try {
     newId = await update(
       buildAgentConfirmText({ company: entry.company, price, tenderId: entry.tid, announcedValue }),
-      buildAgentConfirmKeyboard(entry.tid),
+      buildAgentConfirmKeyboard(entry.tid, priceExceedsAnnounced(price, announcedValue)),
     );
   } catch (err) {
     console.error('worker: agent confirm prompt failed:', err.message);

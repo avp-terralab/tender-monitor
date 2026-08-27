@@ -1914,13 +1914,31 @@ export function validateAgentPrice(text) {
 
 // Step 3: final confirm. Company + price live in Worker dialog state (not in
 // callback_data), so confirm/cancel stay short.
-export function buildAgentConfirmKeyboard(tenderId) {
-  return {
-    inline_keyboard: [[
-      { text: '✅ Підтвердити', callback_data: `agent:confirm:${tenderId}` },
-      { text: '✖ Скасувати', callback_data: `agent:cancel:${tenderId}` },
-    ]],
-  };
+// `priceExceeds` — ціна вища за оголошену вартість закупівлі. Тоді додається
+// шлях виправити суму на місці: доти єдиним способом було скасувати діалог і
+// почати спочатку, тобто заново обирати компанію (27.08.2026).
+export function buildAgentConfirmKeyboard(tenderId, priceExceeds = false) {
+  const rows = [[
+    { text: '✅ Підтвердити', callback_data: `agent:confirm:${tenderId}` },
+    { text: '✖ Скасувати', callback_data: `agent:cancel:${tenderId}` },
+  ]];
+  if (priceExceeds) {
+    rows.unshift([{ text: '✏️ Ввести іншу суму', callback_data: `agent:reprice:${tenderId}` }]);
+  }
+  return { inline_keyboard: rows };
+}
+
+// Чи вища введена ціна за оголошену вартість закупівлі. Винесено окремо, бо цим
+// самим порівнянням користуються і текст підтвердження, і його клавіатура —
+// два різні пороги тут означали б попередження без кнопки або кнопку без
+// попередження.
+//
+// ⚠️ Пряме порівняння ПРАВИЛЬНЕ — не «лагодь» його арифметикою ПДВ: оголошена
+// вартість у Prozorro практично завжди без ПДВ, і ціну власник вводить без ПДВ.
+export function priceExceedsAnnounced(price, announcedValue) {
+  if (announcedValue == null || price === 'auto') return false;
+  const parsed = parseFloat(String(price).replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) && parsed > announcedValue;
 }
 
 // One-line confirm prompt summarising the queued request.
@@ -1941,12 +1959,9 @@ export function buildAgentConfirmText({ company, price, tenderId, entityName, an
   // перерахунок. Власник поправив: оголошена вартість завжди без ПДВ, тобто
   // тривога була справжня. Ставку ПДВ тут не вгадувати — на медичні позиції
   // вона буває 7%, і «розумний» перерахунок одного дня змовчить помилково.)
-  if (announcedValue != null && price !== 'auto') {
-    const parsed = parseFloat(String(price).replace(/\s/g, '').replace(',', '.'));
-    if (Number.isFinite(parsed) && parsed > announcedValue) {
-      const fmt = announcedValue.toLocaleString('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      return `⚠️ Ціна ВИЩА за оголошену вартість закупівлі (${fmt} грн) — перевір, чи це саме та сума!\n\n${base}`;
-    }
+  if (priceExceedsAnnounced(price, announcedValue)) {
+    const fmt = announcedValue.toLocaleString('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `⚠️ Ціна ВИЩА за оголошену вартість закупівлі (${fmt} грн) — перевір, чи це саме та сума!\n\n${base}`;
   }
   return base;
 }

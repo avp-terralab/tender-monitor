@@ -4052,6 +4052,33 @@ test('agent:confirm on a sign dialog still at await_date → no job', async () =
   assert.match(acks[0].text, /Немає активного запиту/);
 });
 
+test('agent:reprice повертає діалог на крок ціни, зберігши компанію', async () => {
+  const { deps, store, edits, acks } = makeAgentDeps();
+  store.pending['123'] = {
+    tid: AGENT_TID, company: 'МАЙЛАБ', price: '387 600', step: 'confirm',
+    messageId: 9, at: '2026-06-21T10:00:00.000Z',
+  };
+  await runHandler({ update: CB(`agent:reprice:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(store.pending['123'].step, 'await_price');
+  assert.equal(store.pending['123'].company, 'МАЙЛАБ', 'компанію заново не питаємо');
+  assert.equal(store.pending['123'].price, undefined, 'стару суму не тягнемо далі');
+  assert.match(edits.at(-1).text, /ціну/i);
+  assert.equal(acks.length, 1);
+});
+
+test('agent:reprice на чужому/протухлому діалозі нічого не робить', async () => {
+  // Та сама обережність, що й у гілці дати: покинутий діалог не має
+  // перехоплювати пізніший дотик по старій кнопці.
+  const { deps, store, acks } = makeAgentDeps();
+  store.pending['123'] = {
+    tid: AGENT_TID, kind: 'sign', step: 'confirm', letterDate: '21.06.2026',
+    at: '2026-06-21T10:00:00.000Z',
+  };
+  await runHandler({ update: CB(`agent:reprice:${AGENT_TID}`), env: ENV, deps });
+  assert.match(acks[0].text, /Немає активного запиту/);
+  assert.equal(store.pending['123'].step, 'confirm', 'sign-діалог не зачеплено');
+});
+
 test('agent:cancel clears a sign dialog', async () => {
   const { deps, store, edits, acks } = makeAgentDeps();
   store.pending['123'] = {

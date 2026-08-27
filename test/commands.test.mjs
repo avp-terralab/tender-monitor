@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   parseCommand, mainKeyboard, MAIN_KEYBOARD, buildAutoNotes, formatAddReply,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
-  abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation,
+  abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation, priceExceedsAnnounced,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, handleWhoami, handleUsersList, handleInvitesList, HELP_TEXT,
   buildHelpText, buildWelcomeText, buildRoleChangeNotice, buildStartGreeting,
@@ -4216,6 +4216,38 @@ test('buildAgentAdminNotice: sign з «keep» теж без сентинела',
   });
   assert.match(t, /залишити як у листах/);
   assert.ok(!/keep/.test(t), t);
+});
+
+test('buildAgentConfirmKeyboard: перевищення суми додає «Ввести іншу суму»', () => {
+  // Доти виправити суму можна було лише скасувавши діалог і обравши компанію
+  // наново — тобто попередження було, а дешевого шляху виправити не було.
+  const plain = buildAgentConfirmKeyboard('UA-1');
+  assert.equal(plain.inline_keyboard.length, 1);
+
+  const exceeded = buildAgentConfirmKeyboard('UA-1', true);
+  assert.equal(exceeded.inline_keyboard.length, 2);
+  assert.equal(exceeded.inline_keyboard[0][0].callback_data, 'agent:reprice:UA-1');
+  assert.match(exceeded.inline_keyboard[0][0].text, /іншу суму/);
+});
+
+test('priceExceedsAnnounced: один поріг для тексту й для клавіатури', () => {
+  // Два різні пороги означали б попередження без кнопки або кнопку без
+  // попередження.
+  assert.equal(priceExceedsAnnounced('387 600', 326250), true);
+  assert.equal(priceExceedsAnnounced('300 000', 326250), false);
+  assert.equal(priceExceedsAnnounced('326250,00', 326250), false, 'рівно стільки — не перевищення');
+  assert.equal(priceExceedsAnnounced('auto', 326250), false, 'auto не порівнюємо');
+  assert.equal(priceExceedsAnnounced('387 600', null), false, 'без оголошеної вартості порівнювати нема з чим');
+
+  // Текст і клавіатура мусять погоджуватись на тих самих даних.
+  const t = buildAgentConfirmText({
+    company: 'МАЙЛАБ', price: '387 600', tenderId: 'UA-1', announcedValue: 326250,
+  });
+  assert.match(t, /ВИЩА за оголошену вартість/);
+  assert.equal(
+    buildAgentConfirmKeyboard('UA-1', priceExceedsAnnounced('387 600', 326250)).inline_keyboard.length,
+    2
+  );
 });
 
 test('buildAgentSignConfirmText shows tid, company and date, HTML-escaped', () => {
