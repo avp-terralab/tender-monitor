@@ -10,10 +10,11 @@
     "published_dir": "G:\\Мій диск\\ТЕНДЕРИ 2021-2026\\ТЕНДЕРИ 2026\\84. КНП Сєвєродонецької МР КДЦ"
   },
   "requested_by": "1744078008",
-  "status": "pending",
+  "status": "running",
   "created_at": "2026-08-27T22:53:17.706Z",
   "milestones": {
     "prepared": true,
     "signed": true
-  }
+  },
+  "updated_at": "2026-08-27T22:54:29.133809+00:00"
 }
