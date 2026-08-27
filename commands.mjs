@@ -2244,7 +2244,7 @@ export function buildAgentAdminNotice({ kind, actorName, chatId, tenderId, compa
   }
   if (kind === 'sign') {
     const co = company ? ` · ${escapeHtml(company)}` : '';
-    const dt = letterDate ? ` · дата ${escapeHtml(letterDate)}` : '';
+    const dt = letterDate ? ` · дата ${escapeHtml(letterDateLabel(letterDate))}` : '';
     return `🤖 ${who} запустив підписання по ${escapeHtml(tenderId)}${co}${dt}`;
   }
   const co = company ? ` · ${escapeHtml(company)}` : '';
@@ -2347,21 +2347,33 @@ export function formatLetterDate(date) {
   return LETTER_DATE_KYIV.format(date);
 }
 
+// `keep` — сентинел «залишити дату як є», а не дата. Поллер розуміє саме цей
+// рядок і перетворює його на None, після чого агент дат у листах не чіпає
+// взагалі. Тримаємо його тут, поруч із кнопкою, щоб зв'язок був видимий.
+export const LETTER_DATE_KEEP = 'keep';
+
 export function buildAgentSignDateKeyboard(tenderId, todayStr) {
   return {
     inline_keyboard: [
       [{ text: `📅 Сьогодні — ${todayStr}`, callback_data: `agent:signdate:${tenderId}:${todayStr}` }],
+      [{ text: '📌 Залишити дату як є', callback_data: `agent:signdate:${tenderId}:${LETTER_DATE_KEEP}` }],
       [{ text: '✏️ Ввести іншу', callback_data: `agent:signother:${tenderId}` }],
       [{ text: '✖ Скасувати', callback_data: `agent:cancel:${tenderId}` }],
     ],
   };
 }
 
+// Дата для ЛЮДИНИ. Голе «keep» у підтвердженні читалось би як помилка бота, а
+// не як вибір, який вона щойно зробила.
+export function letterDateLabel(letterDate) {
+  return letterDate === LETTER_DATE_KEEP ? 'залишити як у листах' : letterDate;
+}
+
 // Підтвердження підписання. Компанія приходить із pending-запису діалогу, тож
 // екранується так само, як у сусідніх buildAgent*Text (parse_mode завжди HTML).
 export function buildAgentSignConfirmText({ tenderId, company, letterDate }) {
   const co = company ? `\nКомпанія: ${escapeHtml(company)}` : '';
-  return `🖊 Підписати\nТендер: ${escapeHtml(tenderId)}${co}\nДата: ${escapeHtml(letterDate)}`;
+  return `🖊 Підписати\nТендер: ${escapeHtml(tenderId)}${co}\nДата: ${escapeHtml(letterDateLabel(letterDate))}`;
 }
 
 // Sign job: проставити дату, накласти скан підпису, відрендерити PDF і зібрати

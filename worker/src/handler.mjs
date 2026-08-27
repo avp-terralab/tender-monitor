@@ -19,7 +19,7 @@ import {
   buildAgentAdminNotice,
   validateInstruction, buildAgentAmendJob, buildAgentAmendConfirmText,
   buildAgentWinnerJob, buildAgentWinnerConfirmText,
-  validateLetterDate, formatLetterDate, buildAgentSignJob,
+  validateLetterDate, formatLetterDate, buildAgentSignJob, LETTER_DATE_KEEP,
   buildAgentSignDateKeyboard, buildAgentSignConfirmText, buildAgentCancelKeyboard,
   buildAgentUnifiedList, buildAgentTenderDetail, handleAgentMenuNav,
   buildHistoryCalendar, handleHistoryNav,
@@ -1453,8 +1453,11 @@ async function handleAgentCallback({
       await ack(githubUnavailableAck(err, isAdmin), true);
       return;
     }
-    if (!prior || prior.status !== 'done' || !prior.result?.package_dir) {
-      await ack('🚫 Пропозиція ще не готова', true);
+    // Гейт саме на published_dir: з 27.08.2026 підписують КІНЦЕВУ теку відділу
+    // (там оператор править листи), і поллер без неї відмовляє. Гейт на
+    // package_dir показував би кнопку там, де раунд одразу впаде.
+    if (!prior || prior.status !== 'done' || !prior.result?.published_dir) {
+      await ack('🚫 Пропозиція ще не опублікована в теку відділу', true);
       return;
     }
     try {
@@ -1517,7 +1520,13 @@ async function handleAgentCallback({
       await ack();
       return;
     }
-    const letterDate = validateLetterDate(parts[3] ?? '', _now());
+    // «keep» — не дата, а вибір «залишити ту, що в листах». Через
+    // validateLetterDate він не пройде (вона перевіряє ДД.ММ.РРРР у вікні
+    // ±N днів) і діалог відповів би «Невірна дата» на цілком правильну дію.
+    const raw = parts[3] ?? '';
+    const letterDate = raw === LETTER_DATE_KEEP
+      ? LETTER_DATE_KEEP
+      : validateLetterDate(raw, _now());
     if (!letterDate) { await ack('❌ Невірна дата', true); return; }
     try {
       const newId = await editOrSend({
@@ -1757,7 +1766,10 @@ async function handleAgentCallback({
       // Перевіряється ще раз, а не лише на кнопці: між відкриттям діалогу і
       // підтвердженням job-файл могли переписати (повторний prepare), і тоді
       // теки, яку збиралися підписувати, вже немає.
-      if (!prior?.result?.package_dir) { await ack('🚫 Пропозиція ще не готова', true); return; }
+      if (!prior?.result?.published_dir) {
+        await ack('🚫 Пропозиція ще не опублікована в теку відділу', true);
+        return;
+      }
       const job = buildAgentSignJob({
         tenderId: tid,
         company: entry.company ?? prior.company ?? null,

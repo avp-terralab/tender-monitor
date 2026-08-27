@@ -4189,6 +4189,35 @@ test('sign date keyboard offers today, a manual entry and cancel', () => {
   assert.ok(flat.some((b) => b.text.includes('13.08.2026')), 'the date is visible on the button');
 });
 
+test('sign date keyboard offers a «keep the letters dates» option', () => {
+  // Третя опція (27.08.2026): дати в листах не чіпаємо взагалі. Поллер розуміє
+  // саме рядок «keep» і перетворює його на None.
+  const kb = buildAgentSignDateKeyboard('UA-1', '13.08.2026');
+  const flat = kb.inline_keyboard.flat();
+  assert.ok(flat.some((b) => b.callback_data === 'agent:signdate:UA-1:keep'));
+  assert.ok(flat.some((b) => /Залишити дату/.test(b.text)));
+  assert.equal(kb.inline_keyboard.length, 4, 'сьогодні + залишити + інша + скасувати');
+});
+
+test('buildAgentSignConfirmText: «keep» показується словами, а не сентинелом', () => {
+  // Голе «keep» у підтвердженні читалось би як помилка бота, а не як вибір,
+  // який людина щойно зробила.
+  const t = buildAgentSignConfirmText({
+    tenderId: 'UA-1', company: 'МАЙЛАБ', letterDate: 'keep',
+  });
+  assert.match(t, /залишити як у листах/);
+  assert.ok(!/keep/.test(t), t);
+});
+
+test('buildAgentAdminNotice: sign з «keep» теж без сентинела', () => {
+  const t = buildAgentAdminNotice({
+    kind: 'sign', actorName: 'Оксана', chatId: 555, tenderId: 'UA-1',
+    company: 'МАЙЛАБ', letterDate: 'keep',
+  });
+  assert.match(t, /залишити як у листах/);
+  assert.ok(!/keep/.test(t), t);
+});
+
 test('buildAgentSignConfirmText shows tid, company and date, HTML-escaped', () => {
   const t = buildAgentSignConfirmText({
     tenderId: 'UA-1', company: 'ТОВ <А> & <Б>', letterDate: '13.08.2026',
