@@ -3840,5 +3840,118 @@
         "24h"
       ]
     }
+  },
+  {
+    "tender_id": "UA-2026-08-07-004306-a",
+    "notes": "Комунальне підприємство \"Рівненська обласна дитяча лікарня\" Рівненської обласної ради — Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних…",
+    "archived_at": "2026-08-27T06:55:41.656Z",
+    "final_status": "complete",
+    "final_snapshot": {
+      "tender_id": "UA-2026-08-07-004306-a",
+      "title": "Послуги з постачання програмного забезпечення лабораторної інформаційної системи для автоматизації лабораторних процесів в клініко-діагностичній лабораторії",
+      "status": "complete",
+      "dateModified": "2026-08-27T09:43:41.802741+03:00",
+      "tenderPeriod": {
+        "endDate": "2026-08-17T00:00:00+03:00"
+      },
+      "auctionPeriod": null,
+      "procuringEntity": {
+        "name": "Комунальне підприємство \"Рівненська обласна дитяча лікарня\" Рівненської обласної ради",
+        "edrpou": "03067009"
+      },
+      "value": {
+        "amount": 237433.33,
+        "currency": "UAH",
+        "valueAddedTaxIncluded": false
+      },
+      "procurementMethodType": "aboveThreshold",
+      "classification": {
+        "id": "72260000-5",
+        "description": "Послуги, пов’язані з програмним забезпеченням",
+        "scheme": "ДК021"
+      },
+      "classification_ids": [
+        "72260000-5"
+      ],
+      "contact": {
+        "name": "Вознюк Назар Віталійович",
+        "email": "rodl.zakup@gmail.com",
+        "telephone": "380975832051"
+      },
+      "documents": [
+        {
+          "id": "d52176c4611047a09f776c314f4fa9ac",
+          "title": "ТД КП РОДЛ 2026 - Послуга з постачання та налаштування програмного забезчення лабораторної інформації.docx  (1).docx",
+          "documentType": "biddingDocuments",
+          "datePublished": "2026-08-07T11:49:09.995493+03:00"
+        },
+        {
+          "id": "89a831bccd994172ba8e97697ff4623b",
+          "title": "Проєкт договору .docx",
+          "documentType": "contractProforma",
+          "datePublished": "2026-08-07T11:50:31.661643+03:00"
+        },
+        {
+          "id": "5ecd9673d33a4d88966e5aecfc627b3b",
+          "title": "sign.p7s",
+          "documentType": "notice",
+          "datePublished": "2026-08-07T12:01:01.156785+03:00"
+        }
+      ],
+      "questions": [],
+      "complaints": [],
+      "awards": [
+        {
+          "id": "33a97de614ea454b8d1b7a57115d52c7",
+          "status": "active",
+          "suppliers": [
+            {
+              "name": "ТОВ \"ТЕРРАЛАБ АЙ ТІ\"",
+              "identifier": {
+                "id": "39376596"
+              }
+            }
+          ],
+          "complaints": []
+        }
+      ],
+      "contracts": [
+        {
+          "id": "a7e524cb55a14d73afcefa23b6b2cec9",
+          "status": "active",
+          "documents": [
+            {
+              "confidentiality": "public",
+              "documentType": "contractSigned",
+              "relatedItem": "a7e524cb55a14d73afcefa23b6b2cec9",
+              "id": "50bf554e3684484b91c5922f83982134",
+              "hash": "md5:015f82354ce67c14c1a306b9e972c4e9",
+              "title": "Договір №19_08-02 від 26.08.2026.pdf",
+              "format": "application/pdf",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/a7e524cb55a14d73afcefa23b6b2cec9/documents/50bf554e3684484b91c5922f83982134?download=46329fa7cf0d4938b3f38553d2f47a77",
+              "documentOf": "contract",
+              "datePublished": "2026-08-27T09:42:25.512726+03:00",
+              "dateModified": "2026-08-27T09:42:25.512726+03:00"
+            },
+            {
+              "confidentiality": "public",
+              "relatedItem": "a7e524cb55a14d73afcefa23b6b2cec9",
+              "id": "fc826082c89244b2b218783e85ce972e",
+              "hash": "md5:7bef51e804e56c9f97d0823df3e947ca",
+              "title": "sign.p7s",
+              "format": "application/pkcs7-signature",
+              "url": "https://public-api.prozorro.gov.ua/api/2.5/contracts/a7e524cb55a14d73afcefa23b6b2cec9/documents/fc826082c89244b2b218783e85ce972e?download=3e2ae1b1d615469684d95db3758cc210",
+              "documentOf": "contract",
+              "datePublished": "2026-08-27T09:43:36.735530+03:00",
+              "dateModified": "2026-08-27T09:43:36.735530+03:00"
+            }
+          ]
+        }
+      ],
+      "cancellations": [],
+      "_notifiedDeadlines": [
+        "24h"
+      ]
+    }
   }
 ]
