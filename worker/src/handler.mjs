@@ -21,6 +21,7 @@ import {
   buildAgentWinnerJob, buildAgentWinnerConfirmText,
   validateLetterDate, formatLetterDate, buildAgentSignJob, LETTER_DATE_KEEP,
   buildAgentSignDateKeyboard, buildAgentSignConfirmText, buildAgentCancelKeyboard,
+  buildAgentKillKeyboard, buildAgentKillText,
   buildAgentUnifiedList, buildAgentTenderDetail, handleAgentMenuNav,
   buildHistoryCalendar, handleHistoryNav,
   abbreviateLegalForm,
@@ -1445,6 +1446,70 @@ async function handleAgentCallback({
   // Й ОПУБЛІКОВАНА пропозиція: з 27.08.2026 підписують КІНЦЕВУ теку відділу
   // (`result.published_dir`) — саме там оператор править листи перед подачею.
   // Тому кнопка й живе лише на готовій задачі в «📊 Останні задачі».
+  // Зупинка ВЖЕ ПОСТАВЛЕНОГО завдання. `kill`, а не `cancel`: `cancel` віддавна
+  // означає «закрити діалог», і сплутати їх коштувало б зупиненого раунда
+  // замість закритого меню.
+  //
+  // Механізм: бот лише переписує job-файл у status "cancelled" (+ cancel_mode).
+  // Далі `pending` поллер просто не підбере, а запущений раунд зупинить його
+  // власний сторож — до 30 с. Процесів бот не вбиває й вбити не може: він живе
+  // у Cloudflare, а агент — на робочій станції.
+  if (action === 'kill') {
+    let job;
+    try {
+      job = await _loadAgentJob(env, tid);
+    } catch (err) {
+      console.error('worker: agent kill load job failed:', err.message);
+      await ack(githubUnavailableAck(err, isAdmin), true);
+      return;
+    }
+    if (!job || (job.status !== 'pending' && job.status !== 'running')) {
+      await ack('🚫 Це завдання вже не виконується', true);
+      return;
+    }
+    const mode = parts[3] ?? '';
+    // Запущений раунд без обраного режиму — спершу питаємо, що робити з уже
+    // зробленим. У черзі питати нема про що: агент ще нічого не написав.
+    if (job.status === 'running' && mode !== 'purge' && mode !== 'keep') {
+      try {
+        await editOrSend({
+          _editMessageText, _sendReply, env, chatId, messageId,
+          text: buildAgentKillText(tid),
+          replyMarkup: buildAgentKillKeyboard(tid),
+        });
+      } catch (err) {
+        console.error('worker: agent kill prompt failed:', err.message);
+        await ack('⚠️ Помилка, спробуй ще раз', true);
+        return;
+      }
+      await ack();
+      return;
+    }
+    const cancelled = { ...job, status: 'cancelled' };
+    if (job.status === 'running') cancelled.cancel_mode = mode;
+    try {
+      await _saveAgentJob(env, cancelled, {
+        message: formatAuditMessage({ action: 'agent_cancel', target: tid, actor: actorName, chatId, role }),
+      });
+    } catch (err) {
+      console.error('worker: agent kill save failed:', err.message);
+      await ack('⚠️ Не зміг скасувати, спробуй ще раз', true);
+      return;
+    }
+    try {
+      await editOrSend({
+        _editMessageText, _sendReply, env, chatId, messageId,
+        text: job.status === 'running'
+          ? `✖ Зупиняю ${tid} — до 30 с (${mode === 'purge' ? 'робочу теку буде видалено' : 'теку лишаю'}).`
+          : `✖ Завдання по ${tid} скасовано.`,
+      });
+    } catch (err) {
+      console.error('worker: agent kill reply failed:', err.message);
+    }
+    await ack();
+    return;
+  }
+
   // «✏️ Ввести іншу суму» під попередженням про перевищення оголошеної вартості.
   // Повертає діалог на крок ціни, зберігши компанію: доти єдиним шляхом було
   // скасувати все й обирати компанію наново.

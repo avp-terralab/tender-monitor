@@ -5,6 +5,7 @@ import {
   parseCommand, mainKeyboard, MAIN_KEYBOARD, buildAutoNotes, formatAddReply,
   applyMutation, handleAdd, handleStatus, handleRemove, formatInfo,
   abbreviateLegalForm, handleWatched, handleUnwatch, applyEntityMutation, priceExceedsAnnounced,
+  buildAgentKillKeyboard,
   handleWatch, handleInvite, applyInviteMutation, applyAllowedUsersMutation,
   handleRedeem, handleRevoke, handleRole, handleNotify, buildNotifyButton, handleWhoami, handleUsersList, handleInvitesList, HELP_TEXT,
   buildHelpText, buildWelcomeText, buildRoleChangeNotice, buildStartGreeting,
@@ -3883,13 +3884,40 @@ test('buildAgentTenderDetail: done job with no result at all → only winner doc
   assert.ok(flat.some((b) => b.callback_data === 'agent:winner:UA-6'));
 });
 
-test('buildAgentTenderDetail: pending/running → status text, only winner docs + back', () => {
+test('buildAgentTenderDetail: pending/running → status text, kill + winner docs + back', () => {
   const running = buildAgentTenderDetail({ tenderId: 'UA-1', entry: null, job: job('UA-1', 'running'), page: 0 });
   assert.match(running.text, /⏳ Виконується/);
+  // ✖ Скасувати завдання — перша кнопка: незавершене завдання можна зупинити,
+  // і лише на картці видно, ЯКИЙ тендер зупиняють (27.08.2026).
   assert.deepEqual(running.keyboard.inline_keyboard.map((r) => r[0].callback_data),
-    ['agent:winner:UA-1', 'agent:jobs:0']);
+    ['agent:kill:UA-1', 'agent:winner:UA-1', 'agent:jobs:0']);
   const pending = buildAgentTenderDetail({ tenderId: 'UA-2', entry: null, job: job('UA-2', 'pending'), page: 0 });
   assert.match(pending.text, /📋 У черзі/);
+  assert.equal(pending.keyboard.inline_keyboard[0][0].callback_data, 'agent:kill:UA-2');
+});
+
+test('buildAgentTenderDetail: скасоване завдання — не помилка й не «в черзі»', () => {
+  const purged = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: null, page: 0,
+    job: job('UA-1', 'cancelled', { result: { cancel_mode: 'purge' } }),
+  });
+  assert.match(purged.text, /✖ Скасовано/);
+  assert.match(purged.text, /видалено/);
+  assert.ok(!/У черзі|Виконується|Помилка/.test(purged.text), purged.text);
+  assert.deepEqual(purged.keyboard.inline_keyboard.map((r) => r[0].callback_data),
+    ['agent:start:UA-1', 'agent:winner:UA-1', 'agent:jobs:0']);
+
+  const kept = buildAgentTenderDetail({
+    tenderId: 'UA-1', entry: null, page: 0,
+    job: job('UA-1', 'cancelled', { result: { cancel_mode: 'keep' } }),
+  });
+  assert.match(kept.text, /тека лишилась/);
+});
+
+test('buildAgentKillKeyboard: два режими + вихід', () => {
+  const kb = buildAgentKillKeyboard('UA-1');
+  const cbs = kb.inline_keyboard.map((r) => r[0].callback_data);
+  assert.deepEqual(cbs, ['agent:kill:UA-1:purge', 'agent:kill:UA-1:keep', 'agent:pick:UA-1']);
 });
 
 // ── Live stage reporting (job.stages, written by run_agent.py on the desktop) ─

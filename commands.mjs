@@ -271,6 +271,7 @@ function auditPhrase(e) {
     case 'revoke':    return `прибрав доступ ${tgt}`;
     case 'agent':     return `запустив агента по ${tgt}`;
     case 'agent_amend': return `надіслав агенту доробку по ${tgt}`;
+    case 'agent_cancel': return `скасував завдання агента по ${tgt}`;
     case 'invite': {
       const raw = e.target ?? '';
       const [role, ...rest] = raw.split(':');
@@ -1967,7 +1968,9 @@ export function buildAgentConfirmText({ company, price, tenderId, entityName, an
 }
 
 
-const AGENT_JOB_ICONS = { pending: '📋', running: '⏳', done: '✅', error: '❌' };
+// `cancelled` (27.08.2026) — завдання зупинила людина. Без цього рядка воно
+// малювалось як '•' і читалось як невідомий стан.
+const AGENT_JOB_ICONS = { pending: '📋', running: '⏳', done: '✅', error: '❌', cancelled: '✖' };
 // Job-type marker — what the CURRENT (or last) job on this tender_id actually
 // is (a plain `prepare` job has no job_type, hence no marker). Brought back
 // 17.08.2026 after removing it turned out to lose real information: unlike
@@ -2198,13 +2201,34 @@ export function buildAgentTenderDetail({ tenderId, entry, job, page = 0, now = n
       ] },
     };
   }
+  if (job.status === 'cancelled') {
+    // Скасоване — це не помилка й не робота в процесі: ані ⏳, ані ♻️ тут не
+    // доречні. Наступний крок — запустити наново.
+    const mode = job.result?.cancel_mode === 'purge'
+      ? 'робочу теку видалено'
+      : 'тека лишилась';
+    return {
+      text: `${header}${co}${milestoneLine}\n✖ Скасовано (${mode})`,
+      keyboard: { inline_keyboard: [
+        [{ text: '🚀 Підготувати пропозицію', callback_data: `agent:start:${tenderId}` }],
+        winnerRow,
+        [back],
+      ] },
+    };
+  }
   if (job.status !== 'done') {
     let statusText = job.status === 'running' ? '⏳ Виконується' : '📋 У черзі';
     if (job.status === 'running') {
       const log = _renderStageLog(job.stages, now);
       if (log) statusText = log;
     }
-    return { text: `${header}${co}${milestoneLine}\n${statusText}`, keyboard: { inline_keyboard: [winnerRow, [back]] } };
+    // Незавершене завдання можна зупинити. Кнопка живе саме тут, бо лише на
+    // картці видно, ЯКИЙ тендер зупиняють.
+    const killRow = [{ text: '✖ Скасувати завдання', callback_data: `agent:kill:${tenderId}` }];
+    return {
+      text: `${header}${co}${milestoneLine}\n${statusText}`,
+      keyboard: { inline_keyboard: [killRow, winnerRow, [back]] },
+    };
   }
 
   // 📁 — тека з результатом. Для готової ПРОПОЗИЦІЇ це result.drive_link; для
@@ -2389,6 +2413,31 @@ export function letterDateLabel(letterDate) {
 export function buildAgentSignConfirmText({ tenderId, company, letterDate }) {
   const co = company ? `\nКомпанія: ${escapeHtml(company)}` : '';
   return `🖊 Підписати\nТендер: ${escapeHtml(tenderId)}${co}\nДата: ${escapeHtml(letterDateLabel(letterDate))}`;
+}
+
+// Зупинка ЗАПУЩЕНОГО раунда. Режим питаємо НАПЕРЕД, а не після зупинки: коли
+// сесію вб'ють, питати вже нема кого — процес мертвий, а наступний тік поллера
+// візьме інше завдання. Тому рішення мусить лежати в самому job-записі на
+// момент зупинки.
+export function buildAgentKillKeyboard(tenderId) {
+  return {
+    inline_keyboard: [
+      [{ text: '🗑 Скасувати й видалити зроблене', callback_data: `agent:kill:${tenderId}:purge` }],
+      [{ text: '⏸ Скасувати, лишити теку', callback_data: `agent:kill:${tenderId}:keep` }],
+      [{ text: '⬅ Не скасовувати', callback_data: `agent:pick:${tenderId}` }],
+    ],
+  };
+}
+
+export function buildAgentKillText(tenderId) {
+  return [
+    `✖ Зупинити завдання по ${escapeHtml(tenderId)}?`,
+    '',
+    'Агент уже працює, тож у робочій теці є недороблені документи.',
+    '🗑 — прибрати їх; ⏸ — лишити, щоб продовжити наступним разом.',
+    '',
+    'Зупинка займає до 30 с.',
+  ].join('\n');
 }
 
 // Sign job: проставити дату, накласти скан підпису, відрендерити PDF і зібрати

@@ -4052,6 +4052,57 @@ test('agent:confirm on a sign dialog still at await_date → no job', async () =
   assert.match(acks[0].text, /Немає активного запиту/);
 });
 
+test('agent:kill на завданні в черзі — скасовує одразу, без питань', async () => {
+  // У черзі питати нема про що: агент ще нічого не написав.
+  const { deps, jobs, acks, edits } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'pending', company: 'МАЙЛАБ' }),
+  });
+  await runHandler({ update: CB(`agent:kill:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].job.status, 'cancelled');
+  assert.equal(jobs[0].job.cancel_mode, undefined, 'у черзі режим не потрібен');
+  assert.match(edits.at(-1).text, /скасовано/i);
+  assert.equal(acks.length, 1);
+});
+
+test('agent:kill на ЗАПУЩЕНОМУ — спершу питає, що зробити зі зробленим', async () => {
+  const { deps, jobs, edits } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'running', company: 'МАЙЛАБ' }),
+  });
+  await runHandler({ update: CB(`agent:kill:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 0, 'нічого не пишемо, доки людина не обрала режим');
+  const kb = JSON.stringify(edits.at(-1).replyMarkup);
+  assert.match(kb, new RegExp(`agent:kill:${AGENT_TID}:purge`));
+  assert.match(kb, new RegExp(`agent:kill:${AGENT_TID}:keep`));
+});
+
+test('agent:kill:purge — статус cancelled + cancel_mode у самому завданні', async () => {
+  // Режим мусить лежати в job-записі НА МОМЕНТ зупинки: коли сесію вб'ють,
+  // питати вже нема кого.
+  const { deps, jobs, edits } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'running', company: 'МАЙЛАБ' }),
+  });
+  await runHandler({ update: CB(`agent:kill:${AGENT_TID}:purge`), env: ENV, deps });
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].job.status, 'cancelled');
+  assert.equal(jobs[0].job.cancel_mode, 'purge');
+  assert.match(jobs[0].opts.message, /^audit: agent_cancel /, jobs[0].opts.message);
+  assert.match(edits.at(-1).text, /30 с/);
+});
+
+test('agent:kill на завершеному завданні нічого не міняє', async () => {
+  const { deps, jobs, acks } = makeAgentDeps({
+    saveAgentJob: async (_e, job, opts) => { jobs.push({ job, opts }); },
+    loadAgentJob: async () => ({ tender_id: AGENT_TID, status: 'done', result: {} }),
+  });
+  await runHandler({ update: CB(`agent:kill:${AGENT_TID}`), env: ENV, deps });
+  assert.equal(jobs.length, 0);
+  assert.match(acks[0].text, /вже не виконується/);
+});
+
 test('agent:reprice повертає діалог на крок ціни, зберігши компанію', async () => {
   const { deps, store, edits, acks } = makeAgentDeps();
   store.pending['123'] = {
