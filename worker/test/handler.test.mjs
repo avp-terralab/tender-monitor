@@ -3220,6 +3220,66 @@ test('agent:retry → відкриває підтвердження, а НЕ с�
   assert.equal(acks.length, 1);
 });
 
+// «Повторити» будувало вікно ПІДГОТОВКИ для будь-якої задачі — включно з тими,
+// де ціни немає в принципі. Видно це було лише як «Ціна: undefined», а натиснута
+// «Підтвердити» запустила б повну ПЕРЕГЕНЕРАЦІЮ пропозиції поверх пакета, який
+// оператор правив руками (реальний випадок 27.08.2026, Сєвєродонецька КДЦ).
+test('agent:retry на sign-задачі → діалог ПІДПИСАННЯ, а не ціни', async () => {
+  const { deps, jobs, edits, store } = makeAgentDeps({
+    loadAgentJob: async () => errorJobFor({
+      job_type: 'sign', price: undefined, letter_date: '24.08.2026',
+      result: { detail: 'немає скана підпису', drive_link: 'https://drive/x',
+                package_dir: 'G:\\pkg', published_dir: 'G:\\pub' },
+    }),
+  });
+  await runHandler({ update: CB(`agent:retry:${AGENT_TID}`), env: ENV, deps });
+
+  assert.equal(jobs.length, 0);
+  const p = store.pending['123'];
+  assert.equal(p?.kind, 'sign', 'діалог має бути саме підписання');
+  assert.equal(p?.step, 'await_date');
+  assert.equal(p?.price, undefined, 'у підписання ціни немає й бути не може');
+  assert.ok(!/[Цц]іна/.test(edits.at(-1).text), edits.at(-1).text);
+  assert.match(JSON.stringify(edits.at(-1).replyMarkup),
+    new RegExp(`agent:signdate:${AGENT_TID}`));
+});
+
+test('agent:retry на winner-задачі → діалог документів переможця', async () => {
+  const { deps, jobs, edits, store } = makeAgentDeps({
+    loadAgentJob: async () => errorJobFor({
+      job_type: 'winner', price: undefined,
+      result: { detail: 'Word не відповідає' },
+    }),
+  });
+  await runHandler({ update: CB(`agent:retry:${AGENT_TID}`), env: ENV, deps });
+
+  assert.equal(jobs.length, 0);
+  const p = store.pending['123'];
+  assert.equal(p?.kind, 'winner');
+  assert.equal(p?.step, 'confirm');
+  assert.equal(p?.company, 'МАЙЛАБ');
+  assert.ok(!/[Цц]іна/.test(edits.at(-1).text), edits.at(-1).text);
+});
+
+test('agent:retry на amend-задачі → інструкція зі старої задачі не губиться', async () => {
+  const { deps, jobs, edits, store } = makeAgentDeps({
+    loadAgentJob: async () => errorJobFor({
+      job_type: 'amend', price: undefined, instruction: 'прибрати пункт 5',
+      result: { detail: 'claude rc=1' },
+    }),
+  });
+  await runHandler({ update: CB(`agent:retry:${AGENT_TID}`), env: ENV, deps });
+
+  assert.equal(jobs.length, 0);
+  const p = store.pending['123'];
+  assert.equal(p?.kind, 'amend');
+  assert.equal(p?.step, 'confirm');
+  assert.equal(p?.instruction, 'прибрати пункт 5', 'переписувати інструкцію заново — зайве');
+  assert.match(edits.at(-1).text, /прибрати пункт 5/);
+  assert.match(JSON.stringify(edits.at(-1).replyMarkup),
+    new RegExp(`agent:confirm:${AGENT_TID}`), 'кнопка «Підтвердити» має бути одразу');
+});
+
 test('agent:retry: ціна вища за оголошену → підтвердження несе попередження', async () => {
   const { deps, edits } = makeAgentDeps({
     loadAgentJob: async () => errorJobFor({ price: '150000' }),
